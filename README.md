@@ -121,6 +121,29 @@ houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input, limits);
 
 Fixed-size reads reject truncated streams, encoded lengths cannot be negative, allocation byte counts are overflow-checked, and undefined string-token references are rejected. The defaults allow the tested Crag geometry without adjustment.
 
+### Capture structured diagnostics
+
+Diagnostics-aware overloads return a null pointer on failure and append caller-owned records instead of printing errors:
+
+```cpp
+houio::DiagnosticList diagnostics;
+std::ifstream input("mesh.bgeo", std::ios::binary);
+houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input, &diagnostics);
+
+for (const houio::Diagnostic& diagnostic : diagnostics)
+{
+    // diagnostic.severity
+    // diagnostic.category
+    // diagnostic.message
+    // diagnostic.byteOffset: -1 when the failure is not tied to stream bytes
+    // diagnostic.path: for example attributes.pointattributes[2]
+}
+```
+
+`DiagnosticCategory::malformed_input` identifies invalid stream encoding, while `unsupported_input` identifies valid records HouIO does not implement. Semantic failures use `schema`, file access uses `io`, and lossy convenience conversion warnings use `conversion`.
+
+The original overloads remain available. Parser failures continue to throw when no diagnostic list is supplied, while the diagnostics-aware overloads capture those failures and return null. `importGeometry()`, `importVolume()`, and `convertToGeometry()` also accept diagnostic lists. `importVolume()` now reports an empty primitive list instead of indexing it.
+
 ## Building
 
 HouIO builds as a static C++20 library using target-based CMake.

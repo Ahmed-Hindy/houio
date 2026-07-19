@@ -2,6 +2,7 @@
 
 #include <houio/json.h>
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 
 
@@ -85,10 +86,8 @@ namespace houio
 				case Token::JID_REAL16:
 				case Token::JID_UINT16:
 				default:
-					{
-						throw std::runtime_error( "json.cpp Token::event: error unsupported uniform array type" );
-						break;
-					}
+					p->fail(DiagnosticCategory::unsupported_input,
+						"Token::event encountered an unsupported uniform-array type");
 				};
 			}
 
@@ -112,6 +111,8 @@ namespace houio
 			handler(nullptr),
 			stream(nullptr),
 			binary(false),
+			byteOffset(0),
+			tokenOffset(-1),
 			limits(parserLimits)
 		{
 			if( limits.maxStringBytes < 0 || limits.maxUniformArrayElements < 0 )
@@ -120,25 +121,67 @@ namespace houio
 				throw std::invalid_argument( "Parser nesting depth must be greater than zero" );
 		}
 
-		bool Parser::parse( std::istream *in,  Handler *h )
+		bool Parser::parse( std::istream *in, Handler *h )
+		{
+			return parse(in, h, nullptr);
+		}
+
+		bool Parser::parse( std::istream *in, Handler *h, DiagnosticList *outputDiagnostics )
 		{
 			if( !in || !h || !in->good() )
+			{
+				Diagnostic diagnostic{DiagnosticSeverity::error, DiagnosticCategory::io,
+					"Parser requires a readable input stream and a valid handler", 0, ""};
+				if( outputDiagnostics )
+					appendDiagnostic(outputDiagnostics, std::move(diagnostic));
 				return false;
+			}
 
-			// (re)initialize all per-document state.
 			state = STATE_START;
 			stateStack = std::stack<State>();
 			strings.clear();
 			binary = false;
+			byteOffset = 0;
+			tokenOffset = -1;
 			handler = h;
 			stream = in;
 
-			if( !parseStream() )
+			try
 			{
-				std::cout << "error occured\n";
-				return false;
+				if( !parseStream() )
+					fail(DiagnosticCategory::malformed_input, "Parser state machine rejected the input", byteOffset);
+				return true;
 			}
-			return true;
+			catch( const DiagnosticException &exception )
+			{
+				if( outputDiagnostics )
+				{
+					Diagnostic diagnostic = exception.diagnostic();
+					if( diagnostic.byteOffset < 0 )
+						diagnostic.byteOffset = byteOffset;
+					appendDiagnostic(outputDiagnostics, std::move(diagnostic));
+					return false;
+				}
+				throw;
+			}
+			catch( const std::exception &exception )
+			{
+				Diagnostic diagnostic{DiagnosticSeverity::error, DiagnosticCategory::malformed_input,
+					exception.what(), byteOffset, ""};
+				if( outputDiagnostics )
+				{
+					appendDiagnostic(outputDiagnostics, std::move(diagnostic));
+					return false;
+				}
+				throw;
+			}
+		}
+
+		[[noreturn]] void Parser::fail( DiagnosticCategory category, const std::string &message, sint64 offset )
+		{
+			if( offset < 0 )
+				offset = byteOffset;
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, category, message, offset, ""});
 		}
 
 		bool Parser::parseStream()
@@ -240,6 +283,7 @@ namespace houio
 
 		bool Parser::readToken( Token &t )
 		{
+			tokenOffset = byteOffset;
 			ubyte c = read<ubyte>();
 
 			if(!stream->good())
@@ -253,8 +297,7 @@ namespace houio
 				if( magic == 0x624a534e )  // BINARY_MAGIC = 0x624a534e
 					binary = true;
 				else
-					// todo: error message
-					return false;
+					fail(DiagnosticCategory::malformed_input, "Parser encountered an invalid binary JSON magic value", tokenOffset);
 				return readToken(t);
 			}else
 				if( binary )
@@ -292,7 +335,7 @@ namespace houio
 					const sint64 stringId = readLength();
 					const auto stringIterator = strings.find(stringId);
 					if( stringIterator == strings.end() )
-						throw std::runtime_error( "Parser::readBinaryToken referenced an undefined string token" );
+						fail(DiagnosticCategory::malformed_input, "Parser::readBinaryToken referenced an undefined string token", tokenOffset);
 					t.type = Token::JID_STRING;
 					t.value = stringIterator->second;
 				}return true;
@@ -324,17 +367,17 @@ namespace houio
 					case Token::JID_STRING:
 						break;
 					default:
-						throw std::runtime_error( "Parser::readBinaryToken encountered an unsupported uniform-array type" );
+						fail(DiagnosticCategory::unsupported_input, "Parser::readBinaryToken encountered an unsupported uniform-array type", byteOffset - 1);
 					}
 
 					const sint64 elementCount = readLength();
 					if( elementCount > limits.maxUniformArrayElements )
-						throw std::length_error( "Parser uniform-array element limit exceeded" );
+						fail(DiagnosticCategory::malformed_input, "Parser uniform-array element limit exceeded");
 					t.value = elementCount;
 					return true;
 				}
 			default:
-				throw std::runtime_error( "Parser::readToken - unknown id" );
+				fail(DiagnosticCategory::unsupported_input, "Parser::readToken encountered an unsupported token id", tokenOffset);
 			};
 
 
@@ -406,6 +449,8 @@ namespace houio
 					if( (c == ' ')||(c == '\r')||(c == '\n')||(c == '\t')||(c == '/')||(c == '{')||(c == '}')||(c == '[')||(c == ']')||(c == ',')||(c == ':')||(c == '"') )
 					{
 						stream->unget();
+						if( stream->good() && byteOffset > 0 )
+							--byteOffset;
 						break;
 					}else
 					if( (c == '.')||(c == 'e')||(c == 'E') )
@@ -415,7 +460,10 @@ namespace houio
 				if( string.empty() )
 					return true;
 
-				std::transform(string.begin(), string.end(), string.begin(), tolower);
+				std::transform(string.begin(), string.end(), string.begin(), [](unsigned char character)
+				{
+					return static_cast<char>(std::tolower(character));
+				});
 
 				if( string == "null" ) t.type = Token::JID_NULL;
 				else
@@ -440,7 +488,7 @@ namespace houio
 		void Parser::pushState( State s )
 		{
 			if( stateStack.size() >= limits.maxNestingDepth )
-				throw std::length_error( "Parser nesting depth limit exceeded" );
+				fail(DiagnosticCategory::malformed_input, "Parser nesting depth limit exceeded");
 			stateStack.push( s );
 
 			// set new state
@@ -507,8 +555,7 @@ namespace houio
 
 		bool Parser::undefineString()
 		{
-			throw std::runtime_error("undefineString not implemented");
-			return false;
+			fail(DiagnosticCategory::unsupported_input, "Parser does not support string-token undefinition", tokenOffset);
 		}
 
 		sint64 Parser::readLength()
@@ -536,11 +583,11 @@ namespace houio
 				{
 					std::ostringstream stringStream;
 					stringStream << "unknown length id " << static_cast<int>(n);
-					throw std::runtime_error(stringStream.str());
+					fail(DiagnosticCategory::malformed_input, stringStream.str(), byteOffset - 1);
 				}
 			}
 			if( length < 0 )
-				throw std::length_error( "Parser::readLength decoded a negative length" );
+				fail(DiagnosticCategory::malformed_input, "Parser::readLength decoded a negative length");
 			return length;
 		}
 
@@ -549,7 +596,7 @@ namespace houio
 			// A binary string stores an encoded byte length followed by raw bytes.
 			const sint64 length = readLength();
 			if( length > limits.maxStringBytes )
-				throw std::length_error( "Parser binary-string byte limit exceeded" );
+				fail(DiagnosticCategory::malformed_input, "Parser binary-string byte limit exceeded");
 
 			std::string value(static_cast<size_t>(length), '\0');
 			if( length > 0 )
@@ -582,7 +629,7 @@ namespace houio
 					else
 					if( c=='u' )
 					{
-						throw std::runtime_error( "error " );
+						fail(DiagnosticCategory::unsupported_input, "Parser does not support Unicode escape sequences");
 					}else
 						result.push_back('\\');
 						result.push_back(c);

@@ -40,6 +40,31 @@ int expectParseFailure(const std::string& binaryData, const houio::json::ParserL
     return fail(description + " was not rejected");
 }
 
+int expectDiagnosticFailure(const std::string& binaryData, houio::DiagnosticCategory category,
+                            houio::sint64 byteOffset, const std::string& description)
+{
+    std::istringstream input(binaryData, std::ios::in | std::ios::binary);
+    houio::json::JSONReader reader;
+    houio::json::Parser parser;
+    houio::DiagnosticList diagnostics;
+    if (parser.parse(&input, &reader, &diagnostics))
+    {
+        return fail(description + " unexpectedly parsed");
+    }
+    if (diagnostics.size() != 1)
+    {
+        return fail(description + " did not produce exactly one diagnostic");
+    }
+    const houio::Diagnostic& diagnostic = diagnostics.front();
+    if (diagnostic.severity != houio::DiagnosticSeverity::error
+        || diagnostic.category != category || diagnostic.byteOffset != byteOffset
+        || diagnostic.message.empty())
+    {
+        return fail(description + " produced incorrect diagnostic metadata");
+    }
+    return 0;
+}
+
 int verifyUniformInt8()
 {
     const std::string binaryData = binaryDocument({
@@ -156,6 +181,27 @@ int verifyTokenAndNestingValidation()
         "excessive nesting");
 }
 
+int verifyStructuredDiagnostics()
+{
+    if (const int result = expectDiagnosticFailure(
+            binaryDocument({0x5b, 0x13, 0x01, 0x02}),
+            houio::DiagnosticCategory::malformed_input, 9, "truncated int32 diagnostic");
+        result != 0)
+    {
+        return result;
+    }
+    if (const int result = expectDiagnosticFailure(
+            binaryDocument({0x5b, 0x26, 0x00, 0x5d}),
+            houio::DiagnosticCategory::malformed_input, 6, "undefined token diagnostic");
+        result != 0)
+    {
+        return result;
+    }
+    return expectDiagnosticFailure(
+        binaryDocument({0x5b, 0x40, 0x18, 0x00, 0x5d}),
+        houio::DiagnosticCategory::unsupported_input, 7, "unsupported array diagnostic");
+}
+
 int verifyParserReuse()
 {
     houio::json::Parser parser;
@@ -221,6 +267,10 @@ int main()
         return result;
     }
     if (const int result = verifyTokenAndNestingValidation(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyStructuredDiagnostics(); result != 0)
     {
         return result;
     }

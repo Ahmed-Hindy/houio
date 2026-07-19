@@ -89,6 +89,24 @@ namespace houio
 				throw std::runtime_error( "HouGeo::loadAttribute integer page expansion mismatch for attribute " + attributeName );
 			return result;
 		}
+
+		template<typename Function>
+		void withSchemaPath( const std::string &path, Function &&function )
+		{
+			try
+			{
+				function();
+			}
+			catch( const DiagnosticException &exception )
+			{
+				throw DiagnosticException(withDiagnosticPath(exception.diagnostic(), path));
+			}
+			catch( const std::exception &exception )
+			{
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					exception.what(), -1, path});
+			}
+		}
 	}
 
 	HouGeo::HouGeo() :
@@ -482,6 +500,10 @@ namespace houio
 	// a has to be the root of the array from hou geo
 	void HouGeo::load( json::ObjectPtr o )
 	{
+		if( !o )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeo::load received a null root object", -1, "root"});
+
 		SharedPrimitiveData sharedPrimitiveData;
 
 		sint64 numVertices = 0;
@@ -494,7 +516,8 @@ namespace houio
 		if( o->hasKey("primitivecount") )
 			numPrimitives = o->get<int>("primitivecount", 0);
 		if( numPoints < 0 || numVertices < 0 || numPrimitives < 0 )
-			throw std::runtime_error( "HouGeo::load received negative geometry counts" );
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeo::load received negative geometry counts", -1, "counts"});
 		if( o->hasKey("attributes") )
 		{
 			json::ObjectPtr attributes = toObject(o->getArray("attributes"));
@@ -504,8 +527,11 @@ namespace houio
 				sint64 numPointAttributes = pointAttributes->size();
 				for(int i=0;i<numPointAttributes;++i)
 				{
-					json::ArrayPtr pointAttribute = pointAttributes->getArray(i);
-					HouAttribute::Ptr attr = loadAttribute( pointAttribute, numPoints );
+					HouAttribute::Ptr attr;
+					withSchemaPath("attributes.pointattributes[" + std::to_string(i) + "]", [&]()
+					{
+						attr = loadAttribute(pointAttributes->getArray(i), numPoints);
+					});
 					m_pointAttributes.insert( std::make_pair(attr->getName(), attr) );
 				}
 			}
@@ -515,8 +541,11 @@ namespace houio
 				sint64 numVertexAttributes = vertexAttributes->size();
 				for(int i=0;i<numVertexAttributes;++i)
 				{
-					json::ArrayPtr vertexAttribute = vertexAttributes->getArray(i);
-					HouAttribute::Ptr attr = loadAttribute( vertexAttribute, numVertices );
+					HouAttribute::Ptr attr;
+					withSchemaPath("attributes.vertexattributes[" + std::to_string(i) + "]", [&]()
+					{
+						attr = loadAttribute(vertexAttributes->getArray(i), numVertices);
+					});
 					m_vertexAttributes.insert( std::make_pair(attr->getName(), attr) );
 				}
 			}
@@ -526,8 +555,11 @@ namespace houio
 				sint64 numPrimitiveAttributes = primitiveAttributes->size();
 				for(int i=0;i<numPrimitiveAttributes;++i)
 				{
-					json::ArrayPtr primitiveAttribute = primitiveAttributes->getArray(i);
-					HouAttribute::Ptr attr = loadAttribute( primitiveAttribute, numPrimitives );
+					HouAttribute::Ptr attr;
+					withSchemaPath("attributes.primitiveattributes[" + std::to_string(i) + "]", [&]()
+					{
+						attr = loadAttribute(primitiveAttributes->getArray(i), numPrimitives);
+					});
 					m_primitiveAttributes.insert( std::make_pair(attr->getName(), attr) );
 				}
 			}
@@ -537,22 +569,28 @@ namespace houio
 				sint64 numGlobalAttributes = globalAttributes->size();
 				for(int i=0;i<numGlobalAttributes;++i)
 				{
-					json::ArrayPtr globalAttribute = globalAttributes->getArray(i);
-					// TODO: element count argument, how many?!
-					HouAttribute::Ptr attr = loadAttribute( globalAttribute, 1 );
+					HouAttribute::Ptr attr;
+					withSchemaPath("attributes.globalattributes[" + std::to_string(i) + "]", [&]()
+					{
+						attr = loadAttribute(globalAttributes->getArray(i), 1);
+					});
 					m_globalAttributes.insert( std::make_pair(attr->getName(), attr) );
 				}
 			}
 		}
 		if( o->hasKey("topology") )
 		{
-			loadTopology(toObject(o->getArray("topology")), numPoints);
-			if( m_topology->getNumIndices() != numVertices )
-				throw std::runtime_error( "HouGeo::load topology count does not match vertexcount" );
+			withSchemaPath("topology", [&]()
+			{
+				loadTopology(toObject(o->getArray("topology")), numPoints);
+				if( m_topology->getNumIndices() != numVertices )
+					throw std::runtime_error( "HouGeo::load topology count does not match vertexcount" );
+			});
 		}
 		else if( numVertices != 0 )
 		{
-			throw std::runtime_error( "HouGeo::load missing topology for non-empty vertex domain" );
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeo::load missing topology for non-empty vertex domain", -1, "topology"});
 		}
 		if( o->hasKey("sharedprimitivedata") )
 		{
@@ -578,16 +616,18 @@ namespace houio
 			int primitiveRecordCount = (int)primitives->size();
 			for( int j=0;j<primitiveRecordCount;++j )
 			{
-				json::ArrayPtr primitive = primitives->getArray(j);
-				loadPrimitive( primitive, sharedPrimitiveData );
+				withSchemaPath("primitives[" + std::to_string(j) + "]", [&]()
+				{
+					loadPrimitive(primitives->getArray(j), sharedPrimitiveData);
+				});
 			}
 		}
 		if( o->hasKey("pointgroups") )
-			loadGroups(o->getArray("pointgroups"), numPoints, m_pointGroups);
+			withSchemaPath("pointgroups", [&]() { loadGroups(o->getArray("pointgroups"), numPoints, m_pointGroups); });
 		if( o->hasKey("vertexgroups") )
-			loadGroups(o->getArray("vertexgroups"), numVertices, m_vertexGroups);
+			withSchemaPath("vertexgroups", [&]() { loadGroups(o->getArray("vertexgroups"), numVertices, m_vertexGroups); });
 		if( o->hasKey("primitivegroups") )
-			loadGroups(o->getArray("primitivegroups"), numPrimitives, m_primitiveGroups);
+			withSchemaPath("primitivegroups", [&]() { loadGroups(o->getArray("primitivegroups"), numPrimitives, m_primitiveGroups); });
 	}
 
 
@@ -614,15 +654,19 @@ namespace houio
 				throw std::runtime_error( "HouGeo::loadGroups missing selection for group " + name );
 
 			json::ArrayPtr selection = data->getArray("selection");
-			if( !selection || selection->size() != 2 || !selection->getValue(0).isString()
-				|| selection->get<std::string>(0) != "unordered" )
-				throw std::runtime_error( "HouGeo::loadGroups supports only unordered selections for group " + name );
+			if( !selection || selection->size() != 2 || !selection->getValue(0).isString() )
+				throw std::runtime_error( "HouGeo::loadGroups received malformed selection data for group " + name );
+			if( selection->get<std::string>(0) != "unordered" )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+					"HouGeo::loadGroups supports only unordered selections for group " + name, -1, "selection"});
 
 			json::ArrayPtr encodedMembership = selection->getArray(1);
 			if( !encodedMembership || encodedMembership->size() != 2
-				|| !encodedMembership->getValue(0).isString()
-				|| encodedMembership->get<std::string>(0) != "i8" )
-				throw std::runtime_error( "HouGeo::loadGroups requires i8 membership encoding for group " + name );
+				|| !encodedMembership->getValue(0).isString() )
+				throw std::runtime_error( "HouGeo::loadGroups received malformed membership data for group " + name );
+			if( encodedMembership->get<std::string>(0) != "i8" )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+					"HouGeo::loadGroups requires i8 membership encoding for group " + name, -1, "selection.encoding"});
 
 			json::ArrayPtr membershipValues = encodedMembership->getArray(1);
 			if( !membershipValues || membershipValues->size() != elementCount )
@@ -940,15 +984,17 @@ namespace houio
 
 	void HouGeo::loadPrimitive( json::ArrayPtr primitive, SharedPrimitiveData& sharedPrimitiveData )
 	{
-		// we follow the scheme from houdini...
+		if( !primitive || primitive->size() != 2 )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeo::loadPrimitive expected definition and data arrays", -1, ""});
 
-		// primitives have 2 arrays:
-		//primitive definition
 		json::ObjectPtr primdef = toObject(primitive->getArray(0));
 		std::string primitiveType ="";
 		if( primdef->hasKey("type") )
 			primitiveType = primdef->get<std::string>("type", "");
-
+		if( primitiveType.empty() )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeo::loadPrimitive missing primitive type", -1, "definition.type"});
 
 		// primitive
 		if( primitiveType=="Volume" )
@@ -963,10 +1009,24 @@ namespace houio
 		if( primitiveType=="PolygonCurve_run" || primitiveType=="c_r" )
 			loadPolygonRun( toObject(primitive->getArray(1)), false );
 		else
-		if( (primitiveType=="run")&&(primdef->hasKey("runtype")) )
+		if( primitiveType=="run" )
 		{
+			if( !primdef->hasKey("runtype") )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeo::loadPrimitive run record is missing runtype", -1, "definition.runtype"});
 			if( primdef->get<std::string>( "runtype" ) == "Poly" )
-				loadPolyPrimitiveRun( primdef, primitive->getArray(1) );
+			{
+				loadPolyPrimitiveRun(primdef, primitive->getArray(1));
+				return;
+			}
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+				"HouGeo::loadPrimitive does not support run type " + primdef->get<std::string>("runtype"), -1, "definition.runtype"});
+		}
+		else if( primitiveType!="Volume" && primitiveType!="Poly" && primitiveType!="Polygon_run"
+			&& primitiveType!="p_r" && primitiveType!="PolygonCurve_run" && primitiveType!="c_r" )
+		{
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+				"HouGeo::loadPrimitive does not support primitive type " + primitiveType, -1, "definition.type"});
 		}
 
 	}

@@ -77,13 +77,13 @@ The priority labels indicate dependency order rather than estimated effort.
 
 ### Structured diagnostics
 
-- [ ] Introduce an error or diagnostic type with severity and message.
-- [ ] Include stream byte offsets in parser errors.
-- [ ] Include schema paths such as `attributes.pointattributes[2]` in semantic errors.
-- [ ] Replace library `std::cout` messages with caller-controlled diagnostics.
-- [ ] Distinguish malformed input from unsupported input.
-- [ ] Ensure unsupported primitive types produce useful diagnostics.
-- [ ] Preserve backward-compatible null-return behavior only where explicitly documented.
+- [x] Introduce an error or diagnostic type with severity and message.
+- [x] Include stream byte offsets in parser errors.
+- [x] Include schema paths such as `attributes.pointattributes[2]` in semantic errors.
+- [x] Replace import-path library `std::cout` messages with caller-controlled diagnostics.
+- [x] Distinguish malformed input from unsupported input.
+- [x] Ensure unsupported primitive types produce useful diagnostics.
+- [x] Preserve historical throwing overloads while documenting diagnostics-aware null returns.
 
 ### Parser safety
 
@@ -118,7 +118,7 @@ The priority labels indicate dependency order rather than estimated effort.
 
 ### Correctness fixes
 
-- [ ] Guard `importVolume()` against an empty primitive list.
+- [x] Guard `importVolume()` against an empty primitive list.
 - [x] Initialize all `HouPoly` members deterministically.
 - [x] Load and preserve polygon closed state where present.
 - [x] Verify `Polygon_run` vertex indexing against static Houdini 21/22 Crag geometry.
@@ -133,7 +133,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [ ] Document ownership for every stream, pointer, and returned object.
 - [ ] Document supported primitive and attribute types.
 - [ ] Document lossy behavior in `convertToGeometry()`.
-- [ ] Document exception and null-return behavior.
+- [x] Document exception and null-return behavior.
 - [ ] Add small compilable examples for import, export, logging, and custom adapters.
 - [ ] Decide whether to preserve the historical `xport` spelling or add a compatible `exportGeometry` API.
 

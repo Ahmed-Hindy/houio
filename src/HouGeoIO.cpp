@@ -8,100 +8,146 @@ namespace houio
 
 	HouGeo::Ptr HouGeoIO::import( std::istream *in )
 	{
-		return import(in, json::ParserLimits());
+		return import(in, json::ParserLimits(), nullptr);
+	}
+
+	HouGeo::Ptr HouGeoIO::import( std::istream *in, DiagnosticList *diagnostics )
+	{
+		return import(in, json::ParserLimits(), diagnostics);
 	}
 
 	HouGeo::Ptr HouGeoIO::import( std::istream *in, const json::ParserLimits &limits )
 	{
+		return import(in, limits, nullptr);
+	}
+
+	HouGeo::Ptr HouGeoIO::import( std::istream *in, const json::ParserLimits &limits, DiagnosticList *diagnostics )
+	{
 		json::JSONReader reader;
-		json::Parser p(limits);
-
-		//core::Timer timer;
-		//timer.start();
-		if(!p.parse( in, &reader ))
+		json::Parser parser(limits);
+		if( !parser.parse(in, &reader, diagnostics) )
 			return HouGeo::Ptr();
-		//timer.stop();
-		//float time_parse = timer.elapsedSeconds();
 
-		//timer.reset();
-		// now reader contains the json data (structured after the scheme of the file)
-		// we will create an empty HouGeo and have it load its data from the json data
-		HouGeo::Ptr houGeo = HouGeo::create();
-		//timer.start();
-		houGeo->load( HouGeo::toObject(reader.getRoot().asArray()) );
-		//timer.stop();
-		//float time_load = timer.elapsedSeconds();
-		//qDebug() << "loading time: " << time_load;
-		//qDebug() << "total time: " << (time_load + time_parse);
-		return houGeo;
+		try
+		{
+			json::ArrayPtr rootArray = reader.getRoot().asArray();
+			if( !rootArray )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeoIO::import expected a flattened root array", -1, "root"});
+
+			HouGeo::Ptr houGeo = HouGeo::create();
+			houGeo->load(HouGeo::toObject(rootArray));
+			return houGeo;
+		}
+		catch( const DiagnosticException &exception )
+		{
+			if( diagnostics )
+			{
+				appendDiagnostic(diagnostics, exception.diagnostic());
+				return HouGeo::Ptr();
+			}
+			throw;
+		}
+		catch( const std::exception &exception )
+		{
+			Diagnostic diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				exception.what(), -1, "root"};
+			if( diagnostics )
+			{
+				appendDiagnostic(diagnostics, std::move(diagnostic));
+				return HouGeo::Ptr();
+			}
+			throw DiagnosticException(std::move(diagnostic));
+		}
 	}
 
 	Geometry::Ptr HouGeoIO::importGeometry( const std::string &path )
 	{
-		Geometry::Ptr result;
-		std::ifstream in( path.c_str(), std::ios_base::in | std::ios_base::binary );
-		HouGeo::Ptr hgeo = HouGeoIO::import( &in );
-		if( hgeo )
-		{
-			std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
-			hgeo->getPrimitives(primitives);
+		return importGeometry(path, nullptr);
+	}
 
-			HouGeo::Primitive::Ptr prim;
-
-			// warning: the list of primitives does not coincide with the actuall
-			// list of primitives because some primitives represent multiple primitives
-			// such as the PolyPrimitive representing multiple polygons
-			// just be ware when letting users access primitives...
-			if( !primitives.empty() )
-			{
-				prim = primitives[0];
-				if(std::dynamic_pointer_cast<HouGeo::HouPoly>(prim) )
-					result = convertToGeometry(hgeo, prim);
-			}else
-				// no valid primitive to convert
-				// we pass an invalid point to get some default geometry created
-				// if there are points present, we will get those points
-				result = convertToGeometry(hgeo, HouGeoAdapter::Primitive::Ptr());
-		}else
+	Geometry::Ptr HouGeoIO::importGeometry( const std::string &path, DiagnosticList *diagnostics )
+	{
+		std::ifstream input(path.c_str(), std::ios_base::in | std::ios_base::binary);
+		if( !input.good() )
 		{
-			std::cout << "HouGeoIO::importGeometry: failed to import houGeo\n";
+			appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::io,
+				"HouGeoIO::importGeometry could not open " + path, -1, ""});
+			return Geometry::Ptr();
 		}
-		return result;
+
+		HouGeo::Ptr hgeo = HouGeoIO::import(&input, diagnostics);
+		if( !hgeo )
+			return Geometry::Ptr();
+
+		std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
+		hgeo->getPrimitives(primitives);
+		if( primitives.empty() )
+			return convertToGeometry(hgeo, HouGeoAdapter::Primitive::Ptr(), diagnostics);
+
+		HouGeo::Primitive::Ptr primitive = primitives.front();
+		if( !std::dynamic_pointer_cast<HouGeo::HouPoly>(primitive) )
+		{
+			appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+				"HouGeoIO::importGeometry supports only polygon primitives", -1, "primitives[0]"});
+			return Geometry::Ptr();
+		}
+		return convertToGeometry(hgeo, primitive, diagnostics);
 	}
 
 	ScalarField::Ptr HouGeoIO::importVolume( const std::string &path )
 	{
-		ScalarField::Ptr result;
-		std::ifstream in( path.c_str(), std::ios_base::in | std::ios_base::binary );
-		HouGeo::Ptr hgeo = HouGeoIO::import( &in );
-		if( hgeo )
-		{
-			std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
-			hgeo->getPrimitives(primitives);
+		return importVolume(path, nullptr);
+	}
 
-			// warning: the list of primitives does not coincide with the actuall
-			// list of primitives because some primitives represent multiple primitives
-			// such as the PolyPrimitive representing multiple polygons
-			// just be ware when letting users access primitives...
-			HouGeo::Primitive::Ptr prim = primitives[0];
-
-			//volume
-			if(std::dynamic_pointer_cast<HouGeo::HouVolume>(prim) )
-			{
-				HouGeo::HouVolume::Ptr houVolume = std::dynamic_pointer_cast<HouGeo::HouVolume>(prim);
-				result = houVolume->field;
-			}
-		}else
+	ScalarField::Ptr HouGeoIO::importVolume( const std::string &path, DiagnosticList *diagnostics )
+	{
+		std::ifstream input(path.c_str(), std::ios_base::in | std::ios_base::binary);
+		if( !input.good() )
 		{
-			std::cout << "HouGeoIO::importVolume: failed to import houGeo\n";
+			appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::io,
+				"HouGeoIO::importVolume could not open " + path, -1, ""});
+			return ScalarField::Ptr();
 		}
-		return result;
+
+		HouGeo::Ptr hgeo = HouGeoIO::import(&input, diagnostics);
+		if( !hgeo )
+			return ScalarField::Ptr();
+
+		std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
+		hgeo->getPrimitives(primitives);
+		if( primitives.empty() )
+		{
+			appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeoIO::importVolume found no primitives", -1, "primitives"});
+			return ScalarField::Ptr();
+		}
+
+		HouGeo::HouVolume::Ptr volume = std::dynamic_pointer_cast<HouGeo::HouVolume>(primitives.front());
+		if( !volume )
+		{
+			appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+				"HouGeoIO::importVolume expected a volume primitive", -1, "primitives[0]"});
+			return ScalarField::Ptr();
+		}
+		return volume->field;
 	}
 
 	// prim -1 means we will get a simple pointsgeometry
 	Geometry::Ptr HouGeoIO::convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim )
 	{
-		Geometry::Ptr result;
+		return convertToGeometry(houGeo, houPrim, nullptr);
+	}
+
+	Geometry::Ptr HouGeoIO::convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim,
+		DiagnosticList *diagnostics )
+	{
+		try
+		{
+			if( !houGeo )
+				throw std::invalid_argument( "HouGeoIO::convertToGeometry received null geometry" );
+
+			Geometry::Ptr result;
 
 		// cast and get some first numbers...
 		sint64 numPoints = houGeo->pointcount();
@@ -113,6 +159,9 @@ namespace houio
 		if( houPrim )
 		{
 			HouGeo::HouPoly::Ptr poly = std::dynamic_pointer_cast<HouGeo::HouPoly>(houPrim);
+			if( !poly )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+					"HouGeoIO::convertToGeometry supports only polygon primitives", -1, "conversion.primitive"});
 			sint64 numPolys = poly->numPolys();
 
 			bool hasConstantVertexCountPerPoly = true;
@@ -149,6 +198,10 @@ namespace houio
 		{
 			result = Geometry::createQuadGeometry();
 		}
+		if( !result )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+				"HouGeoIO::convertToGeometry supports only lines, triangles, and quads", -1,
+				"conversion.primitive"});
 
 		// attributes ---
 		std::vector<Attribute::Ptr> geoAttrs;
@@ -232,7 +285,9 @@ namespace houio
 				attr = Attribute::create( numComponents, Attribute::INT, (unsigned char *)houAttr->getRawPointer()->ptr, houAttr->getNumElements() );
 
 			}else
-				std::cout << "HouGeoIO::convertToGeometry: warning: unable to handle storage type " << houAttr->getStorage() << " for attribute " << attrName << std::endl;
+				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
+					"HouGeoIO::convertToGeometry cannot convert point attribute " + attrName,
+					-1, "attributes.pointattributes." + attrName});
 
 			if( attr )
 				result->setAttr( attrName, attr );
@@ -284,7 +339,9 @@ namespace houio
 
 			if( !attr )
 			{
-				std::cout << "HouGeoIO::convertToGeometry: warning: unable to convert vertex attribute " << attrName << std::endl;
+				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
+					"HouGeoIO::convertToGeometry cannot convert vertex attribute " + attrName,
+					-1, "attributes.vertexattributes." + attrName});
 				continue;
 			}
 
@@ -382,7 +439,28 @@ namespace houio
 			// houdini polys are CW - opengl defaults to CCW
 			result->reverse();
 		}
-		return result;
+			return result;
+		}
+		catch( const DiagnosticException &exception )
+		{
+			if( diagnostics )
+			{
+				appendDiagnostic(diagnostics, exception.diagnostic());
+				return Geometry::Ptr();
+			}
+			throw;
+		}
+		catch( const std::exception &exception )
+		{
+			Diagnostic diagnostic{DiagnosticSeverity::error, DiagnosticCategory::conversion,
+				exception.what(), -1, "conversion"};
+			if( diagnostics )
+			{
+				appendDiagnostic(diagnostics, std::move(diagnostic));
+				return Geometry::Ptr();
+			}
+			throw DiagnosticException(std::move(diagnostic));
+		}
 	}
 
 	void HouGeoIO::makeLog( const std::string &path, std::ostream *out )
@@ -431,7 +509,6 @@ namespace houio
 				attr = attr_new;
 			}
 
-			std::cout << "adding " << name << std::endl;
 			HouGeo::HouAttribute::Ptr hattr = std::make_shared<HouGeo::HouAttribute>( name, attr );
 			houGeo->setPointAttribute( hattr );
 		}
