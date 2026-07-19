@@ -50,6 +50,8 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Add Debug and Release CMake presets.
 - [x] Run CTest with failure output enabled.
 - [x] Enable warnings without immediately treating legacy warnings as errors.
+- [x] Remove invalid source encodings and low-risk narrowing, shadowing, and unused-parameter warnings.
+- [ ] Resolve intentional anonymous-union, JSON parser, and dense-field warnings.
 - [ ] Add a separate strict-warning job once the warning baseline is clean.
 
 ## P1 — Make current behavior safe and maintainable
@@ -122,7 +124,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [ ] Verify point-count behavior when no point attributes exist.
 - [ ] Check every `dynamic_pointer_cast` result before dereferencing it.
 - [ ] Avoid inserting null attributes into `Geometry`.
-- [ ] Verify 16-bit topology export handles negative and out-of-range indices correctly.
+- [x] Verify 16-bit topology export rejects negative indices and promotes large indices to 32-bit storage.
 - [ ] Verify matrix conventions, multiplication order, and volume transforms.
 
 ### Public API documentation
@@ -257,13 +259,15 @@ Add each type only with representative Houdini 21 fixtures and tests.
 
 ### `Attribute`
 
-- [ ] Replace unsafe reinterpret-cast access with validated typed views or `memcpy`-based access.
-- [ ] Resolve alignment and strict-aliasing concerns.
-- [ ] Add bounds checks in debug builds.
+- [x] Use `memcpy` for append operations instead of writing through unaligned typed pointers.
+- [ ] Replace remaining unsafe reinterpret-cast access with validated typed views or `memcpy`-based access.
+- [ ] Resolve alignment and strict-aliasing concerns in typed `get()` and `set()` accessors.
+- [x] Add bounds checks for indexed raw-pointer access.
 - [ ] Add immutable views for adapter export.
 - [ ] Represent tuple size and storage type with stronger types.
 - [ ] Prevent appending values incompatible with the declared component metadata.
-- [ ] Add tests for matrices, vectors, scalars, copy, resize, and duplicate-point behavior.
+- [x] Add focused tests for vector append storage, invalid component counts, null raw storage, and indexed bounds.
+- [ ] Add tests for matrices, scalars, copy, resize, and duplicate-point behavior.
 
 ### `Field<T>`
 

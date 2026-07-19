@@ -8,12 +8,15 @@
 
 namespace houio
 {
-	Attribute::Attribute( char numComponents, ComponentType componentType ) :
+	Attribute::Attribute( int numComponents, ComponentType componentType ) :
 		m_componentType(componentType),
 		m_numComponents(numComponents),
 		m_numElements(0),
 		m_isDirty(true)
 	{
+		if( numComponents <= 0 )
+			throw std::invalid_argument( "Attribute requires at least one component" );
+
 		switch(componentType)
 		{
 		case INT:
@@ -35,7 +38,7 @@ namespace houio
 
 	Attribute::Ptr Attribute::copy()
 	{
-		return create( numComponents(), elementComponentType(), (unsigned char *)getRawPointer(), numElements() );
+		return create( numComponents(), elementComponentType(), static_cast<const unsigned char*>(getRawPointer()), numElements() );
 	}
 
 	Attribute::ComponentType Attribute::elementComponentType()
@@ -44,14 +47,22 @@ namespace houio
 	}
 
 
-	Attribute::Ptr Attribute::create(char numComponents, ComponentType componentType, unsigned char *raw, int numElements)
+	Attribute::Ptr Attribute::create(int numComponents, ComponentType componentType, const unsigned char *raw, int numElements)
 	{
-		Attribute::Ptr attr = std::make_shared<Attribute>( numComponents, componentType );
+		if( numElements < 0 )
+			throw std::invalid_argument( "Attribute element count cannot be negative" );
 
-		attr->m_numElements = numElements;
-		int size = attr->elementComponentSize()*attr->numComponents()*attr->numElements();
-		attr->m_data.resize( size );
-		memcpy( &attr->m_data[0], raw, size );
+		Attribute::Ptr attr = std::make_shared<Attribute>( numComponents, componentType );
+		attr->m_numElements = static_cast<size_t>(numElements);
+		const size_t size = static_cast<size_t>(attr->elementComponentSize())
+			* static_cast<size_t>(attr->numComponents()) * attr->m_numElements;
+		attr->m_data.resize(size);
+		if( size > 0 )
+		{
+			if( !raw )
+				throw std::invalid_argument( "Attribute raw data cannot be null for non-empty storage" );
+			std::memcpy(attr->m_data.data(), raw, size);
+		}
 
 		return attr;
 	}
@@ -114,7 +125,6 @@ namespace houio
 		default:
 			throw std::runtime_error( "unknown component type" );
 		};
-		return -1;
 	}
 
 

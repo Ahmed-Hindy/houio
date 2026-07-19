@@ -22,9 +22,9 @@ namespace math
 	//
 	//
 	//
-	Color::Color( const float &r, const float &g, const float &b, const float &a )
+	Color::Color( const float &red, const float &green, const float &blue, const float &alpha )
 	{
-		this->r=r; this->g=g; this->b=b; this->a=a;
+		r = red; g = green; b = blue; a = alpha;
 	}
 
 
@@ -38,9 +38,9 @@ namespace math
 	//
 	//
 	//
-    void Color::set( const float &r, const float &g, const float &b, const float &a )
+    void Color::set( const float &red, const float &green, const float &blue, const float &alpha )
 	{
-		this->r=r; this->g=g; this->b=b; this->a=a;
+		r = red; g = green; b = blue; a = alpha;
 	}
 
 	//
@@ -250,9 +250,10 @@ namespace math
 		return Color( 1.0f, 0.0f, 0.0f );
 	}
 
-	Color Color::From255( const unsigned char &r, const unsigned char &g, const unsigned char &b, const unsigned char &a )
+	Color Color::From255( const unsigned char &red, const unsigned char &green, const unsigned char &blue, const unsigned char &alpha )
 	{
-		return Color( r/255.0f, g/255.0f, b/255.0f, a/255.0f );
+		return Color( static_cast<float>(red)/255.0f, static_cast<float>(green)/255.0f,
+			static_cast<float>(blue)/255.0f, static_cast<float>(alpha)/255.0f );
 	}
 }
 

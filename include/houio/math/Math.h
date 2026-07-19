@@ -96,7 +96,7 @@ namespace math
 	//                  Y
 	//                  ^
 	//                  |  Z
-	// elevation ----¬  | /
+	// elevation -----> | /
 	// angle between  / |/ ) azimuth: -angle between X and YZ plane,
 	// Y and XZ plane \ +------> X    -is 0 for (1,0,0)
 	// is 0 for (0,1,0)               -increases towards Z+

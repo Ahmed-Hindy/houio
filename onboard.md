@@ -423,7 +423,11 @@ Failures may return null, print to standard output, or throw a generic exception
 
 ### Raw attribute memory requires care
 
-`Attribute` uses a byte vector and reinterpret casts. Tuple sizes, element types, alignment, and bounds are mostly caller responsibilities.
+`Attribute` uses a byte vector. Append operations now use `std::memcpy`, validate count conversions, and reject invalid indexed raw-pointer access. The legacy typed `get()` and `set()` methods still use reinterpret casts, so tuple types and alignment remain caller responsibilities.
+
+### Warning baseline
+
+MSVC and GCC builds still report intentional compatibility debt. Anonymous unions preserve the public vector, matrix, and color layouts, while the legacy JSON and dense-field paths retain conversion and unreachable-code warnings. Warnings-as-errors stays disabled until those paths are modernized without changing file-format behavior or public layout.
 
 ## A safe first contribution
 

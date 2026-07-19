@@ -472,9 +472,11 @@ namespace houio
 				}
 				poly->m_perPolyVertexCount = std::vector<int>(numPrims, numPrimVertices);
 
+				if( geo->m_indexBuffer.size() > static_cast<size_t>(std::numeric_limits<int>::max()) )
+					throw std::overflow_error( "HouGeoIO::xport index buffer exceeds int range" );
 				poly->m_vertices.resize(geo->m_indexBuffer.size());
-				for( int i=0,count=geo->m_indexBuffer.size();i<count;++i )
-					poly->m_vertices[i] = i;
+				for( size_t i=0;i<geo->m_indexBuffer.size();++i )
+					poly->m_vertices[i] = static_cast<int>(i);
 
 				poly->m_closed = false;
 				if(geo->primitiveType() != Geometry::LINE)
@@ -878,22 +880,31 @@ namespace houio
 		std::vector<sint32> indices;
 		topo->getIndices(indices);
 		
-		// determine the type we use for the index array, either 16 or 32 bit integers
-		bool index_exceeds_16bit = false;
-		for( auto& i : indices )
-			if( i > std::numeric_limits<sint16>::max() )
-			{
-				index_exceeds_16bit = true;
-				break;
-			}
+		// Determine the type used for the index array, either 16- or 32-bit integers.
+		bool indexExceeds16Bit = false;
+		for( const sint32 index : indices )
+		{
+			if( index < 0 )
+				throw std::runtime_error( "HouGeoIO::exportTopology cannot export negative point indices" );
+			if( index > std::numeric_limits<sint16>::max() )
+				indexExceeds16Bit = true;
+		}
 
 		g_writer->jsonString( "pointref" );
 		g_writer->jsonBeginArray();
 			g_writer->jsonString( "indices" );
-			if(index_exceeds_16bit)
+			if( indexExceeds16Bit )
+			{
 				g_writer->jsonUniformArray<sint32>(indices);
+			}
 			else
-				g_writer->jsonUniformArray<sint16>(std::vector<sint16>(indices.begin(), indices.end()));
+			{
+				std::vector<sint16> compactIndices;
+				compactIndices.reserve(indices.size());
+				for( const sint32 index : indices )
+					compactIndices.push_back(static_cast<sint16>(index));
+				g_writer->jsonUniformArray<sint16>(compactIndices);
+			}
 			
 		g_writer->jsonEndArray();
 
@@ -909,7 +920,7 @@ namespace houio
 		std::vector<sbyte> encodedMembership;
 		encodedMembership.reserve(membership.size());
 		for( bool selected : membership )
-			encodedMembership.push_back(selected ? 1 : 0);
+			encodedMembership.push_back(static_cast<sbyte>(selected ? 1 : 0));
 
 		g_writer->jsonBeginArray();
 			g_writer->jsonBeginArray();

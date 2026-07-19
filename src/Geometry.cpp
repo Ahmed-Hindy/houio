@@ -411,7 +411,7 @@ namespace houio
 					float u = i / (float)(numPointsX-1);
 					float v = j / (float)(numPointsY-1);
 					float w = k / (float)(zres);
-					positions->appendElement(math::V3f(u - 0.5f, v - 0.5f, w-0.5));
+					positions->appendElement(math::V3f(u - 0.5f, v - 0.5f, w - 0.5f));
 				}
 
 		if (primType == Geometry::POINT)

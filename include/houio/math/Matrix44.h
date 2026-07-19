@@ -22,7 +22,7 @@ namespace math
     /// M = | Jx  Jy  Jz  0 |
     ///     | Kx  Ky  Kz  0 |
     ///     | Tx  Ty  Tz  1  |
-	/// where I,J and K are the base vectors of |R³
+	/// where I, J, and K are the basis vectors of R^3
 	///
 	/// memory storage is row major (which is native to the c++ arrays)
     ///     | 0  1  2  3 |
@@ -560,18 +560,18 @@ namespace math
 	template<typename T>
 	Matrix44<T> Matrix44<T>::inverted( void )const
 	{
-		Matrix44<T> m = *this;
-		m.invert();
-		return m;
+		Matrix44<T> result = *this;
+		result.invert();
+		return result;
 	}
 
 	// same as inverted (here for Imath compatibility
 	template<typename T>
 	Matrix44<T> Matrix44<T>::inverse( void )const
 	{
-		Matrix44<T> m = *this;
-		m.invert();
-		return m;
+		Matrix44<T> result = *this;
+		result.invert();
+		return result;
 	}
 
 

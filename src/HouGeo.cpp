@@ -1,6 +1,7 @@
 #include <houio/HouGeo.h>
 
 #include <cstring>
+#include <limits>
 
 
 
@@ -291,7 +292,10 @@ namespace houio
 		std::vector<int> indexList;
 		indexList.push_back( index );
 
-		hvol->vertex = m_topology->getNumIndices();
+		const sint64 topologyVertex = m_topology->getNumIndices();
+		if( topologyVertex > static_cast<sint64>(std::numeric_limits<int>::max()) )
+			throw std::overflow_error( "HouGeo volume topology index exceeds int range" );
+		hvol->vertex = static_cast<int>(topologyVertex);
 		m_topology->addIndices(indexList);
 
 
@@ -390,7 +394,7 @@ namespace houio
 		return m_storage;
 	}
 
-	void HouGeo::HouAttribute::getPacking( std::vector<int> &packing )const
+	void HouGeo::HouAttribute::getPacking( std::vector<int> & )const
 	{
 	}
 
@@ -735,7 +739,11 @@ namespace houio
 							attrPacking.push_back( packingArray->get<ubyte>(i) );
 						}
 					}else
-						attrPacking.push_back( attrTupleSize );
+					{
+						if( attrTupleSize < 0 || attrTupleSize > std::numeric_limits<ubyte>::max() )
+							throw std::runtime_error( "HouGeo::loadAttribute tuple size exceeds packing range for attribute " + attrName );
+						attrPacking.push_back(static_cast<ubyte>(attrTupleSize));
+					}
 
 					// constantpageflags is an array which
 					// contains an array for each pack
@@ -771,27 +779,30 @@ namespace houio
 
 					// we need to repack - which when done in a generic way looks like a pain in the butt ======
 
-					attr->numElements = elementCount;
-					int elementsRemaining = attr->numElements;
+					if( elementCount > static_cast<sint64>(std::numeric_limits<int>::max()) )
+						throw std::overflow_error( "HouGeo::loadAttribute element count exceeds int range for attribute " + attrName );
+					attr->numElements = static_cast<int>(elementCount);
+					size_t elementsRemaining = static_cast<size_t>(attr->numElements);
 					//qDebug() << "numElements " << attr->numElements;
 					//qDebug() << "rawPageData->size() " << (int)rawPageData->size();
 					//qDebug() << "attrTupleSize " << attrTupleSize;
 
 					// process each page
-					int pageIndex = 0;
-					int pageStartIndex = 0;
+					size_t pageIndex = 0;
+					size_t pageStartIndex = 0;
 					while( elementsRemaining>0 )
 					{
-						int pageStartElement = pageIndex*elementsPerPage;
-						size_t numElements = std::min( elementsRemaining, elementsPerPage );
+						const size_t pageStartElement = pageIndex * static_cast<size_t>(elementsPerPage);
+						const size_t numElements = std::min(elementsRemaining, static_cast<size_t>(elementsPerPage));
 
 						// process each pack
-						int packIndex = 0;
-						ubyte startComponentIndex = 0;
+						size_t packIndex = 0;
+						size_t startComponentIndex = 0;
 						for( std::vector<ubyte>::iterator it = attrPacking.begin(); it != attrPacking.end();++it, ++packIndex )
 						{
 							ubyte pack = *it;
-							size_t maxPack = std::min( (int)pack, std::max(0, dstTupleSize-startComponentIndex) );
+							const int remainingComponents = std::max(0, dstTupleSize - static_cast<int>(startComponentIndex));
+							const size_t maxPack = std::min(static_cast<size_t>(pack), static_cast<size_t>(remainingComponents));
 
 							if( maxPack == 0 )
 								break;
@@ -821,14 +832,20 @@ namespace houio
 									//qDebug() << "pack " << pack;
 
 								// get global element index for writing into our dense array
-								size_t destElementIndex = (pageStartElement+i)*dstTupleSize;
+								const size_t destElementIndex = (pageStartElement + i) * static_cast<size_t>(dstTupleSize);
 
 								// for each component of current pack
 								for( size_t component=0;component<maxPack;++component )
+								{
 									// get component value from current rawpagedata
 									// and copy that component to the location of that component in dense array
 									// TODO: uniform arrays!
-									rawPageData->getValue(elementIndex+component).cpyTo( (char *)&(data[(destElementIndex + startComponentIndex + component)*dstComponentSize]) );
+									const size_t rawIndex = elementIndex + component;
+									if( rawIndex > static_cast<size_t>(std::numeric_limits<int>::max()) )
+										throw std::overflow_error( "HouGeo::loadAttribute raw page index exceeds int range for attribute " + attrName );
+									rawPageData->getValue(static_cast<int>(rawIndex)).cpyTo(
+										(char *)&(data[(destElementIndex + startComponentIndex + component)*dstComponentSize]) );
+								}
 							}
 
 
@@ -841,7 +858,6 @@ namespace houio
 
 
 						elementsRemaining -= numElements;
-						pageStartElement += numElements;
 
 						// proceed next page
 						++pageIndex;

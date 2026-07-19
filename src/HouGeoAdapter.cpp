@@ -48,7 +48,7 @@ namespace houio
 		return ATTR_STORAGE_INVALID;
 	}
 
-	void HouGeoAdapter::AttributeAdapter::getPacking( std::vector<int> &packing )const
+	void HouGeoAdapter::AttributeAdapter::getPacking( std::vector<int> & )const
 	{
 	}
 
@@ -125,12 +125,12 @@ namespace houio
 		return 0;
 	}
 
-	int HouGeoAdapter::PolyPrimitive::numVertices( int poly )const
+	int HouGeoAdapter::PolyPrimitive::numVertices( int )const
 	{
 		return 0;
 	}
 
-	int const *HouGeoAdapter::PolyPrimitive::vertices( int poly )const
+	int const *HouGeoAdapter::PolyPrimitive::vertices( int )const
 	{
 		return 0;
 	}
@@ -159,29 +159,29 @@ namespace houio
 	}
 
 
-	void HouGeoAdapter::getPointAttributeNames( std::vector<std::string> &names )const
+	void HouGeoAdapter::getPointAttributeNames( std::vector<std::string> & )const
 	{
 	}
 
-	HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::getPointAttribute( const std::string &name )
-	{
-		return AttributeAdapter::Ptr();
-	}
-
-	void HouGeoAdapter::getVertexAttributeNames( std::vector<std::string> &names )const
-	{
-	}
-	HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::getVertexAttribute( const std::string &name )
+	HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::getPointAttribute( const std::string & )
 	{
 		return AttributeAdapter::Ptr();
 	}
 
+	void HouGeoAdapter::getVertexAttributeNames( std::vector<std::string> & )const
+	{
+	}
+	HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::getVertexAttribute( const std::string & )
+	{
+		return AttributeAdapter::Ptr();
+	}
 
-	void HouGeoAdapter::getGlobalAttributeNames( std::vector<std::string> &names )const
+
+	void HouGeoAdapter::getGlobalAttributeNames( std::vector<std::string> & )const
 	{
 	}
 
-	HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::getGlobalAttribute( const std::string &name )
+	HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::getGlobalAttribute( const std::string & )
 	{
 		return AttributeAdapter::Ptr();
 	}
@@ -219,12 +219,12 @@ namespace houio
 		return false;
 	}
 
-	bool HouGeoAdapter::hasPrimitiveAttribute( const std::string &name )const
+	bool HouGeoAdapter::hasPrimitiveAttribute( const std::string & )const
 	{
 		return false;
 	}
 
-	void HouGeoAdapter::getPrimitives( std::vector<HouGeoAdapter::Primitive::Ptr>& primitives )
+	void HouGeoAdapter::getPrimitives( std::vector<HouGeoAdapter::Primitive::Ptr>& )
 	{
 	}
 

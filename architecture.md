@@ -344,17 +344,17 @@ Metadata records:
 - Component byte size
 - Element count
 
-Templated methods reinterpret the byte buffer as caller-selected types.
+Append operations copy trivially stored tuple bytes with `std::memcpy`, validate component and element counts, and reject indexed raw-pointer access outside the stored range. The historical typed `get()` and `set()` methods still reinterpret the byte buffer as caller-selected types.
 
-This design is compact and simple but has architectural risks:
+This design is compact and simple but still has architectural risks:
 
-- Alignment assumptions
-- Strict-aliasing concerns
+- Alignment assumptions in typed accessors
+- Strict-aliasing concerns in typed accessors
 - Limited runtime type validation
 - Easy tuple-size mismatches
 - Raw pointer lifetime coupling
 
-Modernization should either make these invariants explicit and validated or replace the storage abstraction.
+Modernization should replace the remaining reinterpret-cast access with validated typed views or copy-based access while preserving the compact adapter representation.
 
 ## 8. Dense `Field<T>`
 

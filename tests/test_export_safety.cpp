@@ -116,6 +116,30 @@ int verifyOutputFailure(const houio::HouGeoAdapter::Ptr& validGeometry)
     return 0;
 }
 
+int verifyNegativeTopologyRejection(const houio::HouGeoAdapter::Ptr& validGeometry)
+{
+    houio::HouGeo::Ptr geometry = createPointGeometry();
+    houio::HouGeo::HouTopology::Ptr topology = std::make_shared<houio::HouGeo::HouTopology>();
+    topology->indexBuffer.push_back(-1);
+    geometry->setTopology(topology);
+
+    std::ostringstream output(std::ios::out | std::ios::binary);
+    try
+    {
+        houio::HouGeoIO::xport(&output, geometry, true);
+        return fail("export accepted a negative topology index");
+    }
+    catch (const std::runtime_error&)
+    {
+    }
+
+    if (!roundtripOnce(validGeometry))
+    {
+        return fail("export did not recover after rejecting negative topology");
+    }
+    return 0;
+}
+
 int verifyConcurrentExports(const houio::HouGeoAdapter::Ptr& validGeometry)
 {
     constexpr int threadCount = 8;
@@ -170,6 +194,10 @@ int main()
         return result;
     }
     if (const int result = verifyOutputFailure(validGeometry); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyNegativeTopologyRejection(validGeometry); result != 0)
     {
         return result;
     }

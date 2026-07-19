@@ -18,7 +18,7 @@ namespace math
 	{
 	public:
 		Color();
-		Color( const float &r, const float &g, const float &b, const float &a = 1.0f );
+		Color( const float &red, const float &green, const float &blue, const float &alpha = 1.0f );
 		~Color();
 
 		// standard colors
@@ -28,10 +28,10 @@ namespace math
 		static Color                                                             Yellow();
 		static Color                                                              Green();
 		static Color                                                                Red();
-		static Color From255( const unsigned char &r, const unsigned char &g, const unsigned char &b, const unsigned char &a = 255 );
+		static Color From255( const unsigned char &red, const unsigned char &green, const unsigned char &blue, const unsigned char &alpha = 255 );
 
 
-        void set( const float &r, const float &g, const float &b, const float &a = 1.0f ); 
+        void set( const float &red, const float &green, const float &blue, const float &alpha = 1.0f );
 
 		void                                                                clamp( void ); ///< clamp the component values into the range of [0,1]
         void                                                               invert( void ); ///< invert the color -> each component is 1.0f - value

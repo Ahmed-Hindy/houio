@@ -11,6 +11,11 @@ target_link_libraries(houio_test_binary_json PRIVATE houio::houio)
 target_compile_features(houio_test_binary_json PRIVATE cxx_std_20)
 add_test(NAME houio.binary_json COMMAND houio_test_binary_json)
 
+add_executable(houio_test_attribute test_attribute.cpp)
+target_link_libraries(houio_test_attribute PRIVATE houio::houio)
+target_compile_features(houio_test_attribute PRIVATE cxx_std_20)
+add_test(NAME houio.attribute COMMAND houio_test_attribute)
+
 add_executable(houio_test_modern_geometry test_modern_geometry.cpp)
 target_link_libraries(houio_test_modern_geometry PRIVATE houio::houio)
 target_compile_features(houio_test_modern_geometry PRIVATE cxx_std_20)
