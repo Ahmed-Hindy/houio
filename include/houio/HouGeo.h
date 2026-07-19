@@ -72,7 +72,7 @@ namespace houio
 			virtual real32                                    getVoxel( int i, int j, int k )const;
 
 			ScalarField::Ptr                                  field;
-			int                                               vertex; // hougeo uses point indices to encode translation
+			int                                               vertex = -1; // hougeo uses topology vertex indices to encode translation
 		};
 
 		struct HouPoly : public PolyPrimitive

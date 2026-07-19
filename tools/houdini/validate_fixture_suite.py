@@ -146,22 +146,38 @@ def attribute_summary(geometry: hou.Geometry, domain: str) -> dict[str, dict[str
 
 
 def primitive_summary(geometry: hou.Geometry) -> list[dict[str, Any]]:
-    """Summarize polygon topology in primitive order.
+    """Summarize supported primitive data in primitive order.
 
     Args:
         geometry: Geometry to summarize.
 
     Returns:
-        Primitive type, closed state, and point indices.
+        Polygon topology or dense-volume values and transforms.
     """
-    return [
-        {
-            "type": primitive.type().name(),
-            "closed": primitive.isClosed(),
-            "points": [vertex.point().number() for vertex in primitive.vertices()],
-        }
-        for primitive in geometry.prims()
-    ]
+    summaries = []
+    for primitive in geometry.prims():
+        if isinstance(primitive, hou.Volume):
+            summaries.append(
+                {
+                    "type": primitive.type().name(),
+                    "closed": None,
+                    "points": [vertex.point().number() for vertex in primitive.vertices()],
+                    "resolution": list(primitive.resolution()),
+                    "transform": list(primitive.transform().asTuple()),
+                    "position": list(primitive.vertex(0).point().position()),
+                    "voxels": list(primitive.allVoxels()),
+                }
+            )
+            continue
+
+        summaries.append(
+            {
+                "type": primitive.type().name(),
+                "closed": primitive.isClosed(),
+                "points": [vertex.point().number() for vertex in primitive.vertices()],
+            }
+        )
+    return summaries
 
 
 def geometry_summary(geometry: hou.Geometry) -> dict[str, Any]:

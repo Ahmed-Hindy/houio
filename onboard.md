@@ -120,14 +120,14 @@ A successful run only proves that the historical fixtures still parse. It does n
 
 ## Run the minimal Houdini fixture matrix
 
-The fixture harness generates 11 small Houdini 22 binary files, round-trips them through HouIO, and compares them exactly in Houdini 21 and 22:
+The fixture harness generates 12 small Houdini binary files, round-trips them through HouIO, and compares them exactly in Houdini 21 and 22:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_fixture_roundtrips.ps1
 ```
 
-The matrix covers empty geometry; typed point attributes; triangle, quad, mixed-size, and n-gon polygon runs; open polygon curves; UV seams; multiple primitive records; global and primitive attributes; and overlapping point, vertex, and primitive groups. Validation checks counts, attribute metadata and values, primitive type, open/closed state, point topology, and every group membership.
+The matrix covers empty geometry; typed point attributes; triangle, quad, mixed-size, and n-gon polygon runs; open polygon curves; UV seams; multiple primitive records; global and primitive attributes; a dense scalar volume spanning multiple tiles; and overlapping point, vertex, and primitive groups. Validation checks counts, attribute metadata and values, primitive type, open/closed state, point topology, dense-volume resolution, transform, position and voxel values, and every group membership. The suite succeeds with either Houdini 21.0.631 or Houdini 22.0.368 as the generator.
 
 Generated sources, outputs, and `manifest.json` live under:
 
@@ -413,9 +413,9 @@ A JSON `Array` may store values in a packed uniform buffer rather than individua
 
 It selects the first stored primitive representation and only creates line, triangle, or quad geometry when the polygon vertex count is constant.
 
-### `importVolume()` requires a volume primitive
+### `importVolume()` requires a valid dense volume primitive
 
-The diagnostics-aware overload reports empty primitive lists and non-volume first primitives through schema or unsupported-input diagnostics. The historical overload returns null for these convenience-import failures.
+The diagnostics-aware overload reports empty primitive lists and non-volume first primitives through schema or unsupported-input diagnostics. Dense-volume loading also validates resolution, topology and `P` references, the transform tuple, tile count, tile payload sizes, and compression modes. The historical overload returns null for convenience-import failures.
 
 ### Export uses a scoped thread-local binding
 

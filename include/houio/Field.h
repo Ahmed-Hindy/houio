@@ -5,6 +5,8 @@
 #include <fstream>
 #include <memory>
 #include <cstring>
+#include <limits>
+#include <stdexcept>
 
 #include <houio/math/Math.h>
 
@@ -119,57 +121,75 @@ namespace houio
 	template<typename T>
 	typename Field<T>::Ptr Field<T>::load( const std::string &filename )
 	{
-		Field<T>::Ptr field = Field<T>::create();
+		std::ifstream input(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+		if( !input.good() )
+			return Field<T>::Ptr();
 
-		// load bound, resolution, data from file
-		std::ifstream in( filename.c_str(), std::ios_base::in | std::ios_base::binary );
-
-		if( !in.good() )
-			return field;
-
-		in.read( (char *)&field->m_resolution, sizeof(int)*3 );
-		in.read( (char *)&field->m_bound, sizeof(float)*6 );
+		math::V3i resolution;
+		math::Box3f storedBound;
 		int dataType = 0;
-		in.read( (char *)&dataType, sizeof(int) );
+		input.read(reinterpret_cast<char*>(&resolution), static_cast<std::streamsize>(sizeof(int) * 3));
+		input.read(reinterpret_cast<char*>(&storedBound), static_cast<std::streamsize>(sizeof(float) * 6));
+		input.read(reinterpret_cast<char*>(&dataType), static_cast<std::streamsize>(sizeof(int)));
+		if( !input.good() || dataType != m_dataType )
+			return Field<T>::Ptr();
 
-		if( dataType != m_dataType )
+		Field<T>::Ptr field = Field<T>::create();
+		try
 		{
-			std::cerr << "Field<T>::load: error: datatype in " << filename << " doesnt match.\n";
+			field->resize(resolution);
+		}
+		catch( const std::exception & )
+		{
 			return Field<T>::Ptr();
 		}
 
-		int size = field->m_resolution.x*field->m_resolution.y*field->m_resolution.z;
-		field->m_data.resize( size );
-		in.read( (char *)&field->m_data[0], size*sizeof(T) );
+		if( field->m_data.size() > static_cast<size_t>(std::numeric_limits<std::streamsize>::max()) / sizeof(T) )
+			return Field<T>::Ptr();
+		const std::streamsize byteCount = static_cast<std::streamsize>(field->m_data.size() * sizeof(T));
+		if( byteCount > 0 )
+		{
+			input.read(reinterpret_cast<char*>(field->m_data.data()), byteCount);
+			if( input.gcount() != byteCount )
+				return Field<T>::Ptr();
+		}
 
-		// need to to this to trigger update of matrices
-		field->setBound( field->m_bound );
-
+		field->setBound(storedBound);
 		return field;
 	}
 
 	template<typename T>
 	void Field<T>::store( const std::string &filename )
 	{
-		std::ofstream out( filename.c_str(), std::ios_base::out | std::ios_base::binary | std::ios_base::trunc );
+		std::ofstream output(filename.c_str(), std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+		if( !output.good() )
+			return;
 
-		// save bound, resolution, data to file
-		out.write( (const char *)&m_resolution, sizeof(int)*3 );
-		math::Box3f b = bound();
-		out.write( (const char *)&b, sizeof(float)*6 );
-		out.write( (const char *)&m_dataType, sizeof(int) );
-		out.write( (const char *)&m_data[0], sizeof(T)*m_resolution.x*m_resolution.y*m_resolution.z );
+		output.write(reinterpret_cast<const char*>(&m_resolution), static_cast<std::streamsize>(sizeof(int) * 3));
+		const math::Box3f storedBound = bound();
+		output.write(reinterpret_cast<const char*>(&storedBound), static_cast<std::streamsize>(sizeof(float) * 6));
+		output.write(reinterpret_cast<const char*>(&m_dataType), static_cast<std::streamsize>(sizeof(int)));
+		if( m_data.size() > static_cast<size_t>(std::numeric_limits<std::streamsize>::max()) / sizeof(T) )
+			throw std::length_error( "Field storage exceeds streamsize range" );
+		const std::streamsize byteCount = static_cast<std::streamsize>(m_data.size() * sizeof(T));
+		if( byteCount > 0 )
+			output.write(reinterpret_cast<const char*>(m_data.data()), byteCount);
 	}
 
 	template<typename T>
 	void Field<T>::storeWithoutBoundingBox( const std::string &filename )
 	{
-		std::ofstream out( filename.c_str(), std::ios_base::out | std::ios_base::binary | std::ios_base::trunc );
+		std::ofstream output(filename.c_str(), std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+		if( !output.good() )
+			return;
 
-		// save bound, resolution, data to file
-		out.write( (const char *)&m_resolution, sizeof(int)*3 );
-		out.write( (const char *)&m_dataType, sizeof(int) );
-		out.write( (const char *)&m_data[0], sizeof(T)*m_resolution.x*m_resolution.y*m_resolution.z );
+		output.write(reinterpret_cast<const char*>(&m_resolution), static_cast<std::streamsize>(sizeof(int) * 3));
+		output.write(reinterpret_cast<const char*>(&m_dataType), static_cast<std::streamsize>(sizeof(int)));
+		if( m_data.size() > static_cast<size_t>(std::numeric_limits<std::streamsize>::max()) / sizeof(T) )
+			throw std::length_error( "Field storage exceeds streamsize range" );
+		const std::streamsize byteCount = static_cast<std::streamsize>(m_data.size() * sizeof(T));
+		if( byteCount > 0 )
+			output.write(reinterpret_cast<const char*>(m_data.data()), byteCount);
 	}
 
 	template<typename T>
@@ -182,9 +202,27 @@ namespace houio
 	template<typename T>
 	void Field<T>::resize( math::V3i resolution )
 	{
+		if( resolution.x < 0 || resolution.y < 0 || resolution.z < 0 )
+			throw std::invalid_argument( "Field resolution cannot be negative" );
+
+		const size_t resolutionX = static_cast<size_t>(resolution.x);
+		const size_t resolutionY = static_cast<size_t>(resolution.y);
+		const size_t resolutionZ = static_cast<size_t>(resolution.z);
+		if( resolutionX != 0 && resolutionY > std::numeric_limits<size_t>::max() / resolutionX )
+			throw std::length_error( "Field resolution exceeds addressable storage" );
+		const size_t resolutionXY = resolutionX * resolutionY;
+		if( resolutionXY != 0 && resolutionZ > std::numeric_limits<size_t>::max() / resolutionXY )
+			throw std::length_error( "Field resolution exceeds addressable storage" );
+
 		m_resolution = resolution;
-		m_data.resize(m_resolution.x*m_resolution.y*m_resolution.z);
-		memset( &m_data[0], 0, m_resolution.x*m_resolution.y*m_resolution.z*sizeof(T));
+		const size_t voxelCount = resolutionXY * resolutionZ;
+		m_data.assign(voxelCount, T());
+		if( voxelCount == 0 )
+		{
+			m_worldToVoxel = math::M44f::Identity();
+			m_voxelToWorld = math::M44f::Identity();
+			return;
+		}
 		m_worldToVoxel = m_worldToLocal*math::M44f().scale( math::V3f(m_resolution) );
 		m_voxelToWorld = m_worldToVoxel.inverse();
 	}
@@ -256,13 +294,13 @@ namespace houio
 	template<typename T>
 	T *Field<T>::getRawPointer()
 	{
-		return &m_data[0];
+		return m_data.data();
 	}
 
 	template<typename T>
 	const T *Field<T>::getRawPointer()const
 	{
-		return &m_data[0];
+		return m_data.data();
 	}
 
 	template<typename T>
@@ -383,19 +421,17 @@ namespace houio
 	template<typename T>
 	T field_maximum( const Field<T> &field )
 	{
-		T max = -std::numeric_limits<T>::max();
-		const T *ptr = field.getRawPointer();
-		math::V3i res = field.getResolution();
-		int numVoxels = res.x*res.y*res.z;
-		for( int i=0;i<numVoxels;++i )
-			max = std::max( ptr[i], max );
-		return max;
+		if( field.m_data.empty() )
+			throw std::invalid_argument( "field_maximum requires a non-empty field" );
+		return *std::max_element(field.m_data.begin(), field.m_data.end());
 	}
 
 	template<typename T>
 	void field_range( const Field<T> &field, T& min, T& max )
 	{
-		auto minmax = std::minmax_element( field.m_data.begin(), field.m_data.end() );
+		if( field.m_data.empty() )
+			throw std::invalid_argument( "field_range requires a non-empty field" );
+		const auto minmax = std::minmax_element(field.m_data.begin(), field.m_data.end());
 		min = *minmax.first;
 		max = *minmax.second;
 	}
