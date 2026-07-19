@@ -225,10 +225,11 @@ Conversion to `Geometry` is intentionally render-oriented and lossy. Face-varyin
 
 ## Houdini 21/22 minimal fixture matrix
 
-The generated fixture matrix isolates modern schema behavior into 13 small binary files:
+The generated fixture matrix isolates modern schema behavior into 14 small binary files:
 
 - Empty and point-only geometry
 - Point `P`, `Cd`, Float16/Float32/Float64, 32-bit integer, 64-bit integer, and string attributes
+- Multi-page numeric attributes with constant-page compression and a partial final page
 - Triangle-only, quad-only, mixed-size, and n-gon polygon runs
 - Open polygon curves and multiple closed/open primitive records
 - Vertex-domain UV seams

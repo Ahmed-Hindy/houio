@@ -170,7 +170,7 @@ tests/fixtures/
 - [ ] Unit-test uniform arrays for every other supported numeric storage type.
 - [x] Unit-test multiword uniform bool arrays.
 - [x] Unit-test malformed flattened-array rejection.
-- [ ] Unit-test attribute packing and constant pages.
+- [x] Unit-test attribute packing, constant pages, and partial final pages.
 - [x] Unit-test topology loading.
 - [ ] Unit-test polygon and polygon-run loading.
 - [x] Unit-test tiled and constant volume loading, including partial boundary tiles.
@@ -202,8 +202,8 @@ tests/fixtures/
 - [x] Support vertex attribute export.
 - [x] Restore and test global attribute export.
 - [x] Verify primitive string and integer attribute export for polygon runs.
-- [ ] Support attribute packing layouts comprehensively.
-- [ ] Support constant-page encodings comprehensively.
+- [x] Validate and decode observed interleaved and component-major attribute packing layouts.
+- [x] Validate and decode numeric and indexed-string constant-page encodings.
 
 ### Polygon geometry
 

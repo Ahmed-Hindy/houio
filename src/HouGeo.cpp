@@ -858,7 +858,12 @@ namespace houio
 				}
 				else if( values->hasKey("rawpagedata") )
 				{
-					int elementsPerPage = values->get<int>("pagesize");
+					const int elementsPerPage = values->get<int>("pagesize");
+					if( elementsPerPage <= 0 )
+						throw std::runtime_error( "HouGeo::loadAttribute pagesize must be positive for attribute " + attrName );
+					const size_t pageCount = elementCount == 0 ? 0 :
+						(static_cast<size_t>(elementCount) + static_cast<size_t>(elementsPerPage) - 1u)
+						/ static_cast<size_t>(elementsPerPage);
 
 					// one pack is a sequence of components
 					// packing is used to describe in which sequence components are written to the file
@@ -867,10 +872,16 @@ namespace houio
 					if( values->hasKey("packing") )
 					{
 						json::ArrayPtr packingArray = values->getArray("packing");
-						int psize = (int)packingArray->size();
-						for( int i=0;i<psize;++i )
+						if( !packingArray || packingArray->size() <= 0
+							|| packingArray->size() > std::numeric_limits<int>::max() )
+							throw std::runtime_error( "HouGeo::loadAttribute packing must be a non-empty array for attribute " + attrName );
+						const int packingCount = static_cast<int>(packingArray->size());
+						for( int packingIndex=0;packingIndex<packingCount;++packingIndex )
 						{
-							attrPacking.push_back( packingArray->get<ubyte>(i) );
+							const ubyte packSize = packingArray->get<ubyte>(packingIndex);
+							if( packSize == 0 )
+								throw std::runtime_error( "HouGeo::loadAttribute packing cannot contain zero for attribute " + attrName );
+							attrPacking.push_back(packSize);
 						}
 					}else
 					{
@@ -878,6 +889,11 @@ namespace houio
 							throw std::runtime_error( "HouGeo::loadAttribute tuple size exceeds packing range for attribute " + attrName );
 						attrPacking.push_back(static_cast<ubyte>(attrTupleSize));
 					}
+					size_t packedComponentCount = 0;
+					for( ubyte packSize : attrPacking )
+						packedComponentCount += static_cast<size_t>(packSize);
+					if( packedComponentCount != static_cast<size_t>(attrTupleSize) )
+						throw std::runtime_error( "HouGeo::loadAttribute packing does not cover tuple size for attribute " + attrName );
 
 					// constantpageflags is an array which
 					// contains an array for each pack
@@ -890,26 +906,48 @@ namespace houio
 					if( values->hasKey("constantpageflags") )
 					{
 						json::ArrayPtr constantPageFlags = values->getArray("constantpageflags");
+						if( !constantPageFlags || constantPageFlags->size() != static_cast<sint64>(attrPacking.size()) )
+							throw std::runtime_error( "HouGeo::loadAttribute constantpageflags pack count mismatch for attribute " + attrName );
 
-						// for each pack
-						int i=0;
-						for( auto it = attrPacking.begin(); it != attrPacking.end();++it,++i )
+						for( size_t packIndex=0;packIndex<attrPacking.size();++packIndex )
 						{
-							constantPageFlagsPerPack.push_back(std::vector<bool>());
-
-							// get array which tells us for each page if the pack is constant
-							json::ArrayPtr packConstantFlags = constantPageFlags->getArray(i);
-
-							for( int j=0;j<packConstantFlags->size();++j )
-								constantPageFlagsPerPack.back().push_back( packConstantFlags->get<bool>(j) );
+							json::ArrayPtr packConstantFlags = constantPageFlags->getArray(static_cast<int>(packIndex));
+							if( !packConstantFlags || packConstantFlags->size() != static_cast<sint64>(pageCount) )
+								throw std::runtime_error( "HouGeo::loadAttribute constantpageflags page count mismatch for attribute " + attrName );
+							constantPageFlagsPerPack.emplace_back();
+							constantPageFlagsPerPack.back().reserve(pageCount);
+							for( size_t pageIndex=0;pageIndex<pageCount;++pageIndex )
+								constantPageFlagsPerPack.back().push_back(
+									packConstantFlags->get<bool>(static_cast<int>(pageIndex)) );
 						}
 					}else
 					{
-						for( int j=0;j<attrTupleSize;++j )
-							constantPageFlagsPerPack.push_back(std::vector<bool>());
+						constantPageFlagsPerPack.resize(attrPacking.size(), std::vector<bool>(pageCount, false));
 					}
 
 					json::ArrayPtr rawPageData = values->getArray("rawpagedata");
+					if( !rawPageData )
+						throw std::runtime_error( "HouGeo::loadAttribute rawpagedata must be an array for attribute " + attrName );
+
+					size_t expectedRawValueCount = 0;
+					for( size_t pageIndex=0;pageIndex<pageCount;++pageIndex )
+					{
+						const size_t pageStartElement = pageIndex * static_cast<size_t>(elementsPerPage);
+						const size_t pageElementCount = std::min(static_cast<size_t>(elementCount) - pageStartElement,
+							static_cast<size_t>(elementsPerPage));
+						for( size_t packIndex=0;packIndex<attrPacking.size();++packIndex )
+						{
+							const size_t repeatedElementCount = constantPageFlagsPerPack[packIndex][pageIndex]
+								? 1u : pageElementCount;
+							const size_t packValueCount = checkedProduct(static_cast<size_t>(attrPacking[packIndex]),
+								repeatedElementCount, "Attribute page payload");
+							if( packValueCount > std::numeric_limits<size_t>::max() - expectedRawValueCount )
+								throw std::length_error( "Attribute page payload exceeds addressable storage" );
+							expectedRawValueCount += packValueCount;
+						}
+					}
+					if( rawPageData->size() != static_cast<sint64>(expectedRawValueCount) )
+						throw std::runtime_error( "HouGeo::loadAttribute rawpagedata size mismatch for attribute " + attrName );
 
 					// we need to repack - which when done in a generic way looks like a pain in the butt ======
 
@@ -996,6 +1034,8 @@ namespace houio
 						// proceed next page
 						++pageIndex;
 					}
+					if( pageStartIndex != expectedRawValueCount )
+						throw std::runtime_error( "HouGeo::loadAttribute did not consume the complete paged payload for attribute " + attrName );
 
 				}
 			}
