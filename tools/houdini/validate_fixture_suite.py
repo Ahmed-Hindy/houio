@@ -137,8 +137,14 @@ def attribute_summary(geometry: hou.Geometry, domain: str) -> dict[str, dict[str
     """
     summary = {}
     for attribute in domain_attributes(geometry, domain):
+        data_type = attribute.dataType()
         summary[attribute.name()] = {
-            "data_type": str(attribute.dataType()),
+            "data_type": str(data_type),
+            "numeric_data_type": (
+                str(attribute.numericDataType())
+                if data_type in (hou.attribData.Float, hou.attribData.Int)
+                else None
+            ),
             "size": attribute.size(),
             "values": attribute_values(geometry, domain, attribute),
         }

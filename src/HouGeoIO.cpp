@@ -365,6 +365,12 @@ namespace houio
 				attr = Attribute::create(numComponents, Attribute::INT,
 					static_cast<const unsigned char*>(rawPointer ? rawPointer->ptr : nullptr), houAttr->getNumElements());
 			}
+			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
+			{
+				HouGeoAdapter::RawPointer::Ptr rawPointer = requireRawAttributeData(houAttr, attributePath);
+				attr = Attribute::create(numComponents, Attribute::INT64,
+					static_cast<const unsigned char*>(rawPointer ? rawPointer->ptr : nullptr), houAttr->getNumElements());
+			}
 			else
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry cannot convert point attribute " + attrName,
@@ -425,7 +431,12 @@ namespace houio
 				attr = Attribute::create(numComponents, Attribute::FLOAT,
 					static_cast<const unsigned char*>(rawPointer ? rawPointer->ptr : nullptr), houAttr->getNumElements());
 			}
-
+			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
+			{
+				HouGeoAdapter::RawPointer::Ptr rawPointer = requireRawAttributeData(houAttr, attributePath);
+				attr = Attribute::create(numComponents, Attribute::INT64,
+					static_cast<const unsigned char*>(rawPointer ? rawPointer->ptr : nullptr), houAttr->getNumElements());
+			}
 
 			if( !attr )
 			{
@@ -911,7 +922,11 @@ namespace houio
 				storage = "fpreal64";
 		else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
 				storage = "int32";
+		else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
+				storage = "int64";
 
+		if( attr->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC && storage.empty() )
+			throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported storage for attribute " + name );
 
 		if( name == "P" && size != 4 )
 			throw std::runtime_error( "HouGeoIO::exportAttribute: P must contain either three or four components" );
@@ -994,6 +1009,8 @@ namespace houio
 					g_writer->jsonUniformArray<real64>( static_cast<const real64*>(rawPointer->ptr), attr->getNumElements()*sourceSize );
 				else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
 					g_writer->jsonUniformArray<sint32>( static_cast<const sint32*>(rawPointer->ptr), attr->getNumElements()*sourceSize );
+				else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
+					g_writer->jsonUniformArray<sint64>( static_cast<const sint64*>(rawPointer->ptr), attr->getNumElements()*sourceSize );
 
 			g_writer->jsonEndArray(); // values
 		}else

@@ -47,7 +47,8 @@ namespace houio
 				ATTR_STORAGE_INVALID  = 0,
 				ATTR_STORAGE_FPREAL32 = 1,
 				ATTR_STORAGE_FPREAL64 = 2,
-				ATTR_STORAGE_INT32 = 3
+				ATTR_STORAGE_INT32 = 3,
+				ATTR_STORAGE_INT64 = 4
 			};
 			virtual std::string              getName()const;
 			virtual Type                     getType()const;

@@ -21,7 +21,8 @@ namespace houio
 		{
 			INVALID,
 			INT,
-			FLOAT
+			FLOAT,
+			INT64
 		};
 
 		Attribute( int numComponents=3, ComponentType componentType = FLOAT );

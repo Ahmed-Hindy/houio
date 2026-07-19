@@ -82,6 +82,8 @@ namespace houio
 		else
 		if( storageName == "int32" )
 			return ATTR_STORAGE_INT32;
+		else if( storageName == "int64" )
+			return ATTR_STORAGE_INT64;
 		return ATTR_STORAGE_INVALID;
 	}
 
@@ -91,7 +93,8 @@ namespace houio
 		{
 		case ATTR_STORAGE_FPREAL32:return sizeof(float);break;
 		case ATTR_STORAGE_FPREAL64:return sizeof(double);break;
-		case ATTR_STORAGE_INT32:return sizeof(int);break;
+		case ATTR_STORAGE_INT32:return sizeof(sint32);break;
+		case ATTR_STORAGE_INT64:return sizeof(sint64);break;
 		default:break;
 		};
 		return 0;

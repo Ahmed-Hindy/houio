@@ -129,6 +129,42 @@ namespace houio
 			return static_cast<size_t>(z) * planeSize + static_cast<size_t>(y) * static_cast<size_t>(resolution.x)
 				+ static_cast<size_t>(x);
 		}
+
+		void storeNumericComponent( char *data, size_t destinationIndex,
+			HouGeoAdapter::AttributeAdapter::Storage storage, const json::Value &value )
+		{
+			if( !data )
+				throw std::invalid_argument( "Numeric attribute storage is null" );
+			switch( storage )
+			{
+			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32:
+			{
+				const real32 converted = value.as<real32>();
+				std::memcpy(data + destinationIndex * sizeof(converted), &converted, sizeof(converted));
+				break;
+			}
+			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64:
+			{
+				const real64 converted = value.as<real64>();
+				std::memcpy(data + destinationIndex * sizeof(converted), &converted, sizeof(converted));
+				break;
+			}
+			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32:
+			{
+				const sint32 converted = value.as<sint32>();
+				std::memcpy(data + destinationIndex * sizeof(converted), &converted, sizeof(converted));
+				break;
+			}
+			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64:
+			{
+				const sint64 converted = value.as<sint64>();
+				std::memcpy(data + destinationIndex * sizeof(converted), &converted, sizeof(converted));
+				break;
+			}
+			default:
+				throw std::runtime_error( "Unsupported numeric attribute storage" );
+			}
+		}
 	}
 
 	HouGeo::HouGeo() :
@@ -429,6 +465,8 @@ namespace houio
 		//	m_storage = ATTR_STORAGE_FPREAL64;break;
 		case Attribute::INT:
 			m_storage = ATTR_STORAGE_INT32;break;
+		case Attribute::INT64:
+			m_storage = ATTR_STORAGE_INT64;break;
 		default:
 			throw std::runtime_error("HouGeo::HouAttribute::HouAttribute - unsupported attribute type");
 		}
@@ -754,15 +792,17 @@ namespace houio
 			attr->m_attr->resize(elementCount);
 			char *data = (char*)attr->m_attr->getRawPointer();
 
-			int attrComponentSize = AttributeAdapter::storageSize( attrStorage );
-			int dstTupleSize = attrTupleSize;
-			size_t dstComponentSize = attrComponentSize;
+			const int attrComponentSize = AttributeAdapter::storageSize(attrStorage);
+			if( attrStorage == AttributeAdapter::ATTR_STORAGE_INVALID || attrComponentSize <= 0 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+					"HouGeo::loadAttribute does not support storage " + attrData->get<std::string>("storage"),
+					-1, "storage"});
+			const int dstTupleSize = attrTupleSize;
 			attr->m_name = attrName;
 			attr->m_type = attrType;
 			attr->m_storage = attrStorage;
 			attr->tupleSize = dstTupleSize;
 			attr->numElements = static_cast<int>(elementCount);
-			//attr->data.resize( elementCount*dstTupleSize*dstComponentSize );
 
 			if( attrData->hasKey("values") )
 			{
@@ -781,13 +821,9 @@ namespace houio
 
 						for( int componentIndex=0;componentIndex<attrTupleSize;++componentIndex )
 						{
-							const size_t destinationIndex = static_cast<size_t>(elementIndex)*static_cast<size_t>(attrTupleSize) + static_cast<size_t>(componentIndex);
-							if( attrStorage == AttributeAdapter::ATTR_STORAGE_FPREAL32 )
-								reinterpret_cast<real32*>(data)[destinationIndex] = tuple->get<real32>(componentIndex);
-							else if( attrStorage == AttributeAdapter::ATTR_STORAGE_FPREAL64 )
-								reinterpret_cast<real64*>(data)[destinationIndex] = tuple->get<real64>(componentIndex);
-							else if( attrStorage == AttributeAdapter::ATTR_STORAGE_INT32 )
-								reinterpret_cast<sint32*>(data)[destinationIndex] = tuple->get<sint32>(componentIndex);
+							const size_t destinationIndex = static_cast<size_t>(elementIndex)
+								* static_cast<size_t>(attrTupleSize) + static_cast<size_t>(componentIndex);
+							storeNumericComponent(data, destinationIndex, attrStorage, tuple->getValue(componentIndex));
 						}
 					}
 				}
@@ -805,13 +841,10 @@ namespace houio
 
 						for( sint64 elementIndex=0;elementIndex<elementCount;++elementIndex )
 						{
-							const size_t destinationIndex = static_cast<size_t>(elementIndex)*static_cast<size_t>(attrTupleSize) + static_cast<size_t>(componentIndex);
-							if( attrStorage == AttributeAdapter::ATTR_STORAGE_FPREAL32 )
-								reinterpret_cast<real32*>(data)[destinationIndex] = componentValues->get<real32>(static_cast<int>(elementIndex));
-							else if( attrStorage == AttributeAdapter::ATTR_STORAGE_FPREAL64 )
-								reinterpret_cast<real64*>(data)[destinationIndex] = componentValues->get<real64>(static_cast<int>(elementIndex));
-							else if( attrStorage == AttributeAdapter::ATTR_STORAGE_INT32 )
-								reinterpret_cast<sint32*>(data)[destinationIndex] = componentValues->get<sint32>(static_cast<int>(elementIndex));
+							const size_t destinationIndex = static_cast<size_t>(elementIndex)
+								* static_cast<size_t>(attrTupleSize) + static_cast<size_t>(componentIndex);
+							storeNumericComponent(data, destinationIndex, attrStorage,
+								componentValues->getValue(static_cast<int>(elementIndex)));
 						}
 					}
 				}
@@ -936,8 +969,8 @@ namespace houio
 									const size_t rawIndex = elementIndex + component;
 									if( rawIndex > static_cast<size_t>(std::numeric_limits<int>::max()) )
 										throw std::overflow_error( "HouGeo::loadAttribute raw page index exceeds int range for attribute " + attrName );
-									rawPageData->getValue(static_cast<int>(rawIndex)).cpyTo(
-										(char *)&(data[(destElementIndex + startComponentIndex + component)*dstComponentSize]) );
+									storeNumericComponent(data, destElementIndex + startComponentIndex + component,
+										attrStorage, rawPageData->getValue(static_cast<int>(rawIndex)));
 								}
 							}
 

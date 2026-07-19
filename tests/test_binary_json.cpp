@@ -186,6 +186,32 @@ int verifyLengthValidation()
         "oversized uniform array");
 }
 
+int verifyWideScalarFidelity()
+{
+    std::ostringstream output(std::ios::out | std::ios::binary);
+    houio::json::BinaryWriter writer(&output);
+    writer.jsonMagic();
+    writer.jsonBeginArray();
+    writer.jsonInt64(1099511627779LL);
+    writer.jsonReal64(1.0 / 3.0);
+    writer.jsonEndArray();
+
+    std::istringstream input(output.str(), std::ios::in | std::ios::binary);
+    houio::json::JSONReader reader;
+    houio::json::Parser parser;
+    if (!parser.parse(&input, &reader))
+    {
+        return fail("failed to parse wide scalar fixture");
+    }
+    houio::json::ArrayPtr values = reader.getRoot().asArray();
+    if (!values || values->size() != 2 || values->get<houio::sint64>(0) != 1099511627779LL
+        || values->get<houio::real64>(1) != 1.0 / 3.0)
+    {
+        return fail("standalone Int64 or Real64 scalar was narrowed");
+    }
+    return 0;
+}
+
 int verifyInputBudgetAndTrailingData()
 {
     const std::string binaryData = binaryDocument({0x5b, 0x11, 0x05, 0x5d});
@@ -419,6 +445,10 @@ int main()
         return result;
     }
     if (const int result = verifyLengthValidation(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyWideScalarFidelity(); result != 0)
     {
         return result;
     }
