@@ -568,8 +568,10 @@ namespace houio
 
 		std::string type;
 		std::string storage;
-		int size = attr->getTupleSize();
-		std::string name = attr->getName();
+		const int sourceSize = attr->getTupleSize();
+		const std::string name = attr->getName();
+		const bool promotePosition = name == "P" && sourceSize == 3;
+		const int size = promotePosition ? 4 : sourceSize;
 
 		if( attr->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
 			type = "numeric";
@@ -584,9 +586,8 @@ namespace houio
 				storage = "int32";
 
 
-		// P attribute has to have 4 components, otherwise houdini will become unstable and eventually crash
-		if( (name == "P")&&(size!=4)  )
-			throw std::runtime_error( "HouGeoIO::exportAttribute: P attribute has to have 4 components, otherwise houdini will become unstable and eventually crash" );
+		if( name == "P" && size != 4 )
+			throw std::runtime_error( "HouGeoIO::exportAttribute: P must contain either three or four components" );
 
 		g_writer->jsonBeginArray();
 
@@ -618,7 +619,7 @@ namespace houio
 			g_writer->jsonBeginArray();
 
 				g_writer->jsonString( "size" );
-				g_writer->jsonInt( attr->getTupleSize() );
+				g_writer->jsonInt( size );
 
 				g_writer->jsonString( "storage" );
 				g_writer->jsonString( storage );
@@ -638,12 +639,34 @@ namespace houio
 				//attr->getRawPointer();
 
 				g_writer->jsonString( "rawpagedata" );
-				if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
-					g_writer->jsonUniformArray<real32>(  (const real32*) attr->getRawPointer()->ptr, attr->getNumElements()*attr->getTupleSize() );
+				HouGeoAdapter::RawPointer::Ptr rawPointer = attr->getRawPointer();
+				if( !rawPointer || (!rawPointer->ptr && attr->getNumElements() > 0) )
+					throw std::runtime_error( "HouGeoIO::exportAttribute: missing data for attribute " + name );
+
+				if( promotePosition )
+				{
+					if( attr->getStorage() != HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+						throw std::runtime_error( "HouGeoIO::exportAttribute: three-component P promotion currently requires fpreal32 storage" );
+
+					const real32* source = static_cast<const real32*>(rawPointer->ptr);
+					std::vector<real32> promotedData(static_cast<size_t>(attr->getNumElements())*4u);
+					for( int elementIndex=0;elementIndex<attr->getNumElements();++elementIndex )
+					{
+						const size_t sourceOffset = static_cast<size_t>(elementIndex)*3u;
+						const size_t destinationOffset = static_cast<size_t>(elementIndex)*4u;
+						promotedData[destinationOffset] = source[sourceOffset];
+						promotedData[destinationOffset+1u] = source[sourceOffset+1u];
+						promotedData[destinationOffset+2u] = source[sourceOffset+2u];
+						promotedData[destinationOffset+3u] = 1.0f;
+					}
+					g_writer->jsonUniformArray(promotedData);
+				}
+				else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+					g_writer->jsonUniformArray<real32>( static_cast<const real32*>(rawPointer->ptr), attr->getNumElements()*sourceSize );
 				else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
-					g_writer->jsonUniformArray<real64>( (const real64*) attr->getRawPointer()->ptr, attr->getNumElements()*attr->getTupleSize() );
+					g_writer->jsonUniformArray<real64>( static_cast<const real64*>(rawPointer->ptr), attr->getNumElements()*sourceSize );
 				else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
-					g_writer->jsonUniformArray<sint32>( (const sint32*) attr->getRawPointer()->ptr, attr->getNumElements()*attr->getTupleSize() );
+					g_writer->jsonUniformArray<sint32>( static_cast<const sint32*>(rawPointer->ptr), attr->getNumElements()*sourceSize );
 
 			g_writer->jsonEndArray(); // values
 		}else

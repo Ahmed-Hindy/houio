@@ -135,6 +135,7 @@ namespace houio
 		void                                                 loadVolumePrimitive( json::ObjectPtr volume, SharedPrimitiveData& sharedPrimitiveData );
 		void                                                 loadPolyPrimitive( json::ObjectPtr poly );
 		void                                                 loadPolyPrimitiveRun( json::ObjectPtr def, json::ArrayPtr run );
+		void                                                 loadPolygonRun( json::ObjectPtr polygonRun );
 
 		void                                                 loadVoxelData( json::ObjectPtr voxels, const math::V3i& res, float* volData );
 

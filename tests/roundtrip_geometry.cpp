@@ -1,0 +1,59 @@
+#include <houio/HouGeoIO.h>
+
+#include <fstream>
+#include <iostream>
+#include <string>
+
+namespace
+{
+int fail(const std::string& message)
+{
+    std::cerr << "error: " << message << '\n';
+    return 1;
+}
+}
+
+int main(int argc, char* argv[])
+{
+    if (argc != 3)
+    {
+        return fail("usage: houio_roundtrip_geometry <input.geo|bgeo> <output.bgeo>");
+    }
+
+    const std::string inputPath = argv[1];
+    const std::string outputPath = argv[2];
+
+    std::ifstream input(inputPath, std::ios::binary);
+    if (!input)
+    {
+        return fail("unable to open input file: " + inputPath);
+    }
+
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input);
+    if (!geometry)
+    {
+        return fail("HouIO failed to parse input file: " + inputPath);
+    }
+
+    std::ofstream output(outputPath, std::ios::binary | std::ios::trunc);
+    if (!output)
+    {
+        return fail("unable to open output file: " + outputPath);
+    }
+
+    if (!houio::HouGeoIO::xport(&output, geometry, true))
+    {
+        return fail("HouIO failed to export output file: " + outputPath);
+    }
+
+    output.flush();
+    if (!output)
+    {
+        return fail("failed while flushing output file: " + outputPath);
+    }
+
+    std::cout << "points=" << geometry->pointcount() << '\n';
+    std::cout << "vertices=" << geometry->vertexcount() << '\n';
+    std::cout << "primitives=" << geometry->primitivecount() << '\n';
+    return 0;
+}

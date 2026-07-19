@@ -695,6 +695,25 @@ namespace houio
 		};
 
 		template<>
+		struct VariantConverter<double>
+		{
+			typedef double t_dest;
+			t_dest &dest;
+			VariantConverter( t_dest &_dest ) : dest(_dest){}
+
+			void operator()(std::string /*x*/)
+			{
+				// Keep the default destination value for incompatible string input.
+			}
+
+			template< typename T >
+			void operator()( T d )
+			{
+				dest = static_cast<t_dest>(d);
+			}
+		};
+
+		template<>
 		struct VariantConverter<int>
 		{
 			typedef int t_dest;

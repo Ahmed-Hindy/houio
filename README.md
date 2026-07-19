@@ -18,7 +18,7 @@ HouIO should currently be treated as an experimental legacy library rather than 
 
 - The included geometry fixtures identify themselves as Houdini `13.0.288` files.
 - The latest upstream commit is from 2020.
-- Houdini 21 and 22 compatibility is being established on the modernization branch.
+- A static Crag `P` and polygon-topology round-trip has been validated with Houdini `21.0.631` and `22.0.368`.
 - Polygon and legacy dense-volume paths are the best-developed areas.
 - Packed geometry, VDBs, curves, agents, height fields, and most modern primitive types are not supported.
 - `.bgeo.sc` compression is not handled.
@@ -30,7 +30,7 @@ See [todo.md](todo.md) for the modernization plan.
 - Parse Houdini ASCII and binary JSON.
 - Inspect unknown Houdini geometry structures using a JSON logger.
 - Read point, vertex, primitive, and global attribute domains.
-- Read polygon primitives and polygon runs.
+- Read legacy polygon runs and Houdini 21/22 `Polygon_run` records.
 - Read legacy dense Houdini volumes, including tiled and constant storage.
 - Write point, polygon, and dense-volume `.bgeo` files.
 - Convert supported Houdini geometry into a lightweight render-oriented mesh representation.
@@ -116,7 +116,7 @@ cmake --build --preset windows-msvc-release
 ctest --preset windows-msvc-release
 ```
 
-The release preset uses Ninja, builds the examples, and registers the historical logger executable with CTest. The test currently proves that the Houdini 13 fixtures still parse; assertion-based semantic and Houdini 21/22 compatibility tests remain to be added.
+The release preset uses Ninja, builds the examples, and registers the historical logger executable with CTest. Houdini integration tests are registered when `HOUIO_HYTHON_EXECUTABLE` points to an installed `hython.exe`.
 
 ## Supported data model
 
@@ -136,7 +136,8 @@ Numeric support is primarily focused on 32-bit float, 64-bit float, and 32-bit i
 The Houdini-oriented layer currently recognizes:
 
 - `Poly`
-- Polygon `run` records
+- Legacy polygon `run` records
+- Houdini 21/22 `Polygon_run` records
 - Legacy `Volume`
 
 The simplified `Geometry` class supports one primitive type per object:
@@ -149,22 +150,40 @@ The simplified `Geometry` class supports one primitive type per object:
 
 Conversion to `Geometry` is intentionally render-oriented. Face-varying vertex attributes are converted into point attributes by duplicating points at discontinuities such as UV seams.
 
-## Houdini 21 notes
+## Houdini 21/22 Crag experiment
 
-Compatibility with Houdini 21 must be validated using newly generated fixtures before relying on the library.
+The modernization branch includes a reproducible static Crag round-trip:
 
-When creating fixtures, prefer uncompressed `.geo` and `.bgeo` files. Do not use `.bgeo.sc` during initial testing because HouIO does not implement the outer compression layer.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command `
+  '& ".\tools\houdini\run_crag_roundtrip.ps1"'
+```
 
-Start with simple cases:
+The harness:
 
-1. Points with `P`, `Cd`, and integer attributes.
-2. Triangle-only meshes.
-3. Quad-only meshes.
-4. Vertex UV seams.
-5. String attributes.
-6. Mixed triangle and quad meshes.
-7. Dense volumes.
-8. Modern primitive types expected to fail cleanly.
+1. Opens Crag at frame 1.
+2. Enables its rest T-pose.
+3. removes the time expression from the animation-frame parameter.
+4. Unpacks the 67 packed pieces into polygon geometry.
+5. Removes indexed primitive string attributes that HouIO does not yet preserve correctly.
+6. Saves an ASCII `.geo` source file.
+7. Imports it through HouIO and exports binary `.bgeo`.
+8. Validates the result in Houdini 21.0.631 and Houdini 22.0.368.
+
+The verified geometry contains 90,085 points, 359,794 vertices, and 89,942 polygons. The output is static and preserves `P` plus polygon topology. Vertex `N` and `uv`, and primitive `name` and `piece`, are intentionally not part of this first preservation milestone.
+
+Houdini 21/22 encode this mesh with `Polygon_run` and run-length vertex counts. HouIO now reads that record and promotes three-component `P` data to the four-component representation used by its legacy writer.
+
+Modern Houdini binary `.bgeo` input remains unresolved: a Houdini 22-generated binary Crag currently triggers a fast-fail in the legacy binary parser. The verified path therefore uses ASCII `.geo` as input and binary `.bgeo` as output. `.bgeo.sc` is also unsupported.
+
+To register the same chain with CTest:
+
+```powershell
+cmake --preset windows-msvc-release `
+  -DHOUIO_HYTHON_EXECUTABLE="C:\Program Files\Side Effects Software\Houdini 22.0.368\bin\hython.exe"
+cmake --build --preset windows-msvc-release
+ctest --test-dir build/windows-msvc-release --output-on-failure -R houio.crag
+```
 
 ## Contributing
 

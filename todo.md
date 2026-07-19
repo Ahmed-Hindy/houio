@@ -55,9 +55,13 @@ The priority labels indicate dependency order rather than estimated effort.
 
 ### Houdini 21 and 22 compatibility baseline
 
-- [ ] Generate minimal Houdini 21 `.geo` fixtures.
-- [ ] Generate matching uncompressed Houdini 21 `.bgeo` fixtures.
-- [ ] Record the exact Houdini build used to produce each fixture.
+- [x] Add a reproducible Houdini 21.0.631 and 22.0.368 Crag generator.
+- [x] Freeze Crag in its rest T-pose with no time dependency.
+- [x] Add optional CTest generation, round-trip, and Houdini validation stages.
+- [x] Validate binary HouIO output in both Houdini 21.0.631 and 22.0.368.
+- [ ] Generate minimal purpose-specific Houdini 21/22 `.geo` fixtures for individual schema features.
+- [ ] Generate matching uncompressed Houdini 21/22 `.bgeo` fixtures after the modern binary parser is safe.
+- [x] Record the exact Houdini builds used by the Crag experiment.
 - [ ] Test points with `P`, `Cd`, float, integer, and string attributes.
 - [ ] Test point, vertex, primitive, and global attribute domains.
 - [ ] Test triangle-only polygon runs.
@@ -79,6 +83,7 @@ The priority labels indicate dependency order rather than estimated effort.
 
 ### Parser safety
 
+- [ ] Diagnose and fix the fast-fail when importing Houdini 22-generated binary Crag `.bgeo`.
 - [ ] Check stream state after every fixed-size read.
 - [ ] Validate binary lengths before allocation.
 - [ ] Add configurable file-size, array-size, and nesting-depth limits.
@@ -105,7 +110,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [ ] Guard `importVolume()` against an empty primitive list.
 - [ ] Initialize all `HouPoly` members deterministically.
 - [ ] Load and preserve polygon closed state where present.
-- [ ] Verify polygon-run vertex indexing against modern fixtures.
+- [x] Verify `Polygon_run` vertex indexing against static Houdini 21/22 Crag geometry.
 - [ ] Verify point-count behavior when no point attributes exist.
 - [ ] Check every `dynamic_pointer_cast` result before dereferencing it.
 - [ ] Avoid inserting null attributes into `Geometry`.
@@ -169,6 +174,10 @@ tests/fixtures/
 
 ### Attributes
 
+- [x] Decode modern numeric `values.tuples` arrays.
+- [x] Promote three-component `P` to the writer's four-component representation.
+- [ ] Preserve vertex `N` and `uv` in the Crag round-trip.
+- [ ] Preserve indexed primitive string attributes such as Crag `name` and `piece`.
 - [ ] Verify 64-bit integer handling.
 - [ ] Verify half-float attribute handling.
 - [ ] Add unsigned integer storage where the format uses it.
@@ -183,6 +192,7 @@ tests/fixtures/
 
 ### Polygon geometry
 
+- [x] Import Houdini 21/22 `Polygon_run` records with run-length vertex counts.
 - [ ] Import all stored polygon primitive groups rather than only the first one.
 - [ ] Support mixed triangle and quad meshes without throwing.
 - [ ] Support arbitrary n-gons in the simplified conversion or return multiple geometry objects.
@@ -255,7 +265,7 @@ Add each type only with representative Houdini 21 fixtures and tests.
 
 ## P2 — Modern C++ and API quality
 
-- [ ] Establish a supported language baseline, likely C++17 or newer.
+- [x] Establish C++20 as the experimental language baseline.
 - [ ] Replace typedef-style pointer aliases with `using` declarations.
 - [ ] Use `nullptr` consistently.
 - [ ] Use scoped enums where API compatibility permits.
@@ -264,7 +274,8 @@ Add each type only with representative Houdini 21 fixtures and tests.
 - [ ] Replace raw owning pointers with RAII types.
 - [ ] Use `std::span` or an equivalent view abstraction if the language baseline permits it.
 - [ ] Remove obsolete commented-out implementation blocks.
-- [ ] Add a formatter and static-analysis configuration.
+- [x] Add a checked-in `.clang-format` configuration.
+- [ ] Add static-analysis configuration.
 - [ ] Keep formatting-only changes separate from behavior changes.
 
 ## P3 — Performance and scalability

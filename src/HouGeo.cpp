@@ -440,12 +440,41 @@ namespace houio
 			int attrComponentSize = AttributeAdapter::storageSize( attrStorage );
 			int dstTupleSize = attrTupleSize;
 			size_t dstComponentSize = attrComponentSize;
+			attr->m_name = attrName;
+			attr->m_type = attrType;
+			attr->m_storage = attrStorage;
+			attr->tupleSize = dstTupleSize;
+			attr->numElements = static_cast<int>(elementCount);
 			//attr->data.resize( elementCount*dstTupleSize*dstComponentSize );
 
 			if( attrData->hasKey("values") )
 			{
 				json::ObjectPtr values = toObject( attrData->getArray("values") );
-				if( values->hasKey("rawpagedata") )
+				if( values->hasKey("tuples") )
+				{
+					json::ArrayPtr tuples = values->getArray("tuples");
+					if( !tuples || tuples->size() != elementCount )
+						throw std::runtime_error( "HouGeo::loadAttribute tuple count mismatch for attribute " + attrName );
+
+					for( sint64 elementIndex=0;elementIndex<elementCount;++elementIndex )
+					{
+						json::ArrayPtr tuple = tuples->getArray(static_cast<int>(elementIndex));
+						if( !tuple || tuple->size() != attrTupleSize )
+							throw std::runtime_error( "HouGeo::loadAttribute tuple size mismatch for attribute " + attrName );
+
+						for( int componentIndex=0;componentIndex<attrTupleSize;++componentIndex )
+						{
+							const size_t destinationIndex = static_cast<size_t>(elementIndex)*static_cast<size_t>(attrTupleSize) + static_cast<size_t>(componentIndex);
+							if( attrStorage == AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+								reinterpret_cast<real32*>(data)[destinationIndex] = tuple->get<real32>(componentIndex);
+							else if( attrStorage == AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+								reinterpret_cast<real64*>(data)[destinationIndex] = tuple->get<real64>(componentIndex);
+							else if( attrStorage == AttributeAdapter::ATTR_STORAGE_INT32 )
+								reinterpret_cast<sint32*>(data)[destinationIndex] = tuple->get<sint32>(componentIndex);
+						}
+					}
+				}
+				else if( values->hasKey("rawpagedata") )
 				{
 					int elementsPerPage = values->get<int>("pagesize");
 
@@ -574,10 +603,6 @@ namespace houio
 						++pageIndex;
 					}
 
-					attr->m_name = attrName;
-					attr->m_type = attrType;
-					attr->m_storage = attrStorage;
-					attr->tupleSize = dstTupleSize;
 				}
 			}
 		}else
@@ -641,6 +666,9 @@ namespace houio
 		else
 		if( primitiveType=="Poly" )
 			loadPolyPrimitive( toObject(primitive->getArray(1)) );
+		else
+		if( primitiveType=="Polygon_run" )
+			loadPolygonRun( toObject(primitive->getArray(1)) );
 		else
 		if( (primitiveType=="run")&&(primdef->hasKey("runtype")) )
 		{
@@ -931,6 +959,7 @@ namespace houio
 	{
 		HouPoly::Ptr pol = std::make_shared<HouPoly>();
 		pol->m_numPolys = (int) run->size();
+		pol->m_closed = true;
 		int vertex = 0;
 		for( int i=0;i<pol->m_numPolys;++i )
 		{
@@ -941,6 +970,52 @@ namespace houio
 			for( int j=0;j<numVertices; ++j, ++vertex )
 				pol->m_vertices.push_back(m_topology->indexBuffer[c->get<sint32>(j)]);
 		}
+		m_primitives.push_back( pol );
+	}
+
+	void HouGeo::loadPolygonRun( json::ObjectPtr polygonRun )
+	{
+		if( !m_topology )
+			throw std::runtime_error( "HouGeo::loadPolygonRun expects topology to be loaded already" );
+		if( !polygonRun->hasKey("startvertex") || !polygonRun->hasKey("nprimitives") || !polygonRun->hasKey("nvertices_rle") )
+			throw std::runtime_error( "HouGeo::loadPolygonRun missing required fields" );
+
+		const int startVertex = polygonRun->get<int>("startvertex", -1);
+		const int expectedPrimitiveCount = polygonRun->get<int>("nprimitives", -1);
+		json::ArrayPtr runLengthData = polygonRun->getArray("nvertices_rle");
+		if( startVertex < 0 || expectedPrimitiveCount < 0 || !runLengthData || (runLengthData->size() % 2) != 0 )
+			throw std::runtime_error( "HouGeo::loadPolygonRun invalid run metadata" );
+
+		HouPoly::Ptr pol = std::make_shared<HouPoly>();
+		pol->m_closed = true;
+
+		size_t topologyIndex = static_cast<size_t>(startVertex);
+		int primitiveCount = 0;
+		for( sint64 i=0;i<runLengthData->size();i+=2 )
+		{
+			const int verticesPerPrimitive = runLengthData->get<int>((int)i);
+			const int repetitionCount = runLengthData->get<int>((int)i+1);
+			if( verticesPerPrimitive <= 0 || repetitionCount <= 0 )
+				throw std::runtime_error( "HouGeo::loadPolygonRun invalid run-length pair" );
+
+			for( int repetition=0;repetition<repetitionCount;++repetition )
+			{
+				const size_t nextTopologyIndex = topologyIndex + static_cast<size_t>(verticesPerPrimitive);
+				if( nextTopologyIndex > m_topology->indexBuffer.size() )
+					throw std::runtime_error( "HouGeo::loadPolygonRun topology range exceeds index buffer" );
+
+				pol->m_perPolyVertexListOffset.push_back((int)pol->m_vertices.size());
+				pol->m_perPolyVertexCount.push_back(verticesPerPrimitive);
+				for( ;topologyIndex<nextTopologyIndex;++topologyIndex )
+					pol->m_vertices.push_back(m_topology->indexBuffer[topologyIndex]);
+				++primitiveCount;
+			}
+		}
+
+		if( primitiveCount != expectedPrimitiveCount )
+			throw std::runtime_error( "HouGeo::loadPolygonRun primitive count mismatch" );
+
+		pol->m_numPolys = primitiveCount;
 		m_primitives.push_back( pol );
 	}
 

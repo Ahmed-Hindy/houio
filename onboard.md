@@ -1,6 +1,6 @@
 # Onboarding
 
-This guide is for developers approaching HouIO for the first time, especially those validating it against Houdini 21 on Windows.
+This guide is for developers approaching HouIO for the first time, especially those validating it against Houdini 21 or 22 on Windows.
 
 ## What to understand first
 
@@ -23,8 +23,9 @@ At the time of this fork:
 - The upstream repository has no license.
 - The latest upstream commit is from 2020.
 - The CMake build is target-based and uses presets.
-- Existing tests still provide limited semantic coverage.
-- Houdini 21 and 22 compatibility is under active validation.
+- Existing historical tests still provide limited semantic coverage.
+- A static Crag `P` and polygon-topology round-trip is validated in Houdini 21.0.631 and 22.0.368.
+- Modern Houdini binary `.bgeo` input is not yet safe; the verified Crag source path uses ASCII `.geo`.
 
 Do not infer modern format support from a successful parse of the supplied fixtures.
 
@@ -74,6 +75,7 @@ The main targets are:
 ```text
 houio                     Static library
 houio_test_logger         Parses and logs fixture files
+houio_roundtrip_geometry  Imports and exports a geometry file through HouIO
 houio_example_readwrite   Demonstrates low-level parsing and writing
 ```
 
@@ -96,7 +98,48 @@ tests/test_box.geo
 tests/test_volume.geo
 ```
 
-A successful run only proves that the historical fixtures still parse. It does not verify semantic correctness or Houdini 21 compatibility.
+A successful run only proves that the historical fixtures still parse. It does not verify semantic correctness or modern Houdini compatibility.
+
+## Run the Crag integration experiment
+
+The one-command harness builds HouIO, generates Crag in a static rest T-pose, round-trips it, and validates the binary output in Houdini 21 and 22:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command `
+  '& ".\tools\houdini\run_crag_roundtrip.ps1"'
+```
+
+Default versions:
+
+```text
+Generator:  Houdini 22.0.368
+Validators: Houdini 21.0.631 and 22.0.368
+```
+
+To generate from Houdini 21 instead:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command `
+  '& ".\tools\houdini\run_crag_roundtrip.ps1" -GeneratorVersion "21.0.631"'
+```
+
+The current experiment proves:
+
+- Rest-pose Crag can be made time-independent.
+- Houdini 21/22 `Polygon_run` records can be imported.
+- 90,085 points, 359,794 vertices, and 89,942 polygons survive the round-trip.
+- HouIO binary output loads in Houdini 21.0.631 and 22.0.368.
+
+It does not yet prove lossless attribute preservation. The source has vertex `N` and `uv`; those are not exported yet. Primitive `name` and `piece` are removed before import because their indexed string representation is not modeled correctly. Modern binary `.bgeo` input also remains unsafe, so the generated source is ASCII `.geo`.
+
+To expose the same workflow through CTest, configure with a hython executable:
+
+```powershell
+cmake --preset windows-msvc-release `
+  -DHOUIO_HYTHON_EXECUTABLE="C:\Program Files\Side Effects Software\Houdini 22.0.368\bin\hython.exe"
+cmake --build --preset windows-msvc-release
+ctest --test-dir build/windows-msvc-release --output-on-failure -R houio.crag
+```
 
 ## Read the code in this order
 

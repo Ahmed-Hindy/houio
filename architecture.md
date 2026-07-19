@@ -51,7 +51,7 @@ BinaryWriter
 | Dense fields | `include/houio/Field.h`, `src/Field.cpp` | Store and sample dense 3D scalar or vector grids. |
 | Math | `include/houio/math/`, `src/math/` | Supply vectors, matrices, bounds, colors, rays, RNG, and half floats. |
 | Vendored templates | `include/ttl/` | Provide the variant implementation used by the JSON layer. |
-| Tests and examples | `tests/` | Provide fixtures and smoke executables. |
+| Tests and examples | `tests/` | Provide historical fixtures, CTest smoke coverage, the round-trip CLI, and optional Houdini integration tests. |
 | Legacy scene exporter | `scene_exporter/` | Export custom scene JSON from old Python 2 Houdini sessions. |
 
 ## 1. Binary JSON layer
@@ -194,7 +194,7 @@ m_primitives
 
 ### Attribute domains
 
-Each Houdini attribute is represented by `HouGeo::HouAttribute`, which wraps the generic `Attribute` buffer for numeric values or a string vector for string attributes.
+Each Houdini attribute is represented by `HouGeo::HouAttribute`, which wraps the generic `Attribute` buffer for numeric values or a string vector for string attributes. Numeric loading supports the legacy paged representation and modern `values.tuples` arrays observed in Houdini 21/22.
 
 The loader uses the root geometry counts to size each domain:
 
@@ -217,7 +217,7 @@ The loader uses the root geometry counts to size each domain:
 - Flattened point-index data
 - Closed state
 
-The loader recognizes direct `Poly` records and `run` records whose `runtype` is `Poly`.
+The loader recognizes direct `Poly` records, legacy `run` records whose `runtype` is `Poly`, and Houdini 21/22 `Polygon_run` records. `Polygon_run` expands run-length encoded vertex counts while validating the topology range and final primitive count.
 
 ### Volume primitives
 
@@ -278,7 +278,7 @@ HouGeoIO::xport(...)
     └─ Finish the binary JSON root array
 ```
 
-The export implementation uses static mutable state for the active adapter and writer. This makes the operation non-reentrant and unsafe for concurrent use.
+The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`, preserving compatibility with its legacy binary schema. The export implementation still uses static mutable state for the active adapter and writer, making the operation non-reentrant and unsafe for concurrent use.
 
 ## 6. Simplified `Geometry`
 

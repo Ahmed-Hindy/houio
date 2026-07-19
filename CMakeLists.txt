@@ -14,6 +14,7 @@ include(CMakePackageConfigHelpers)
 option(HOUIO_BUILD_TESTS "Build HouIO tests" ${PROJECT_IS_TOP_LEVEL})
 option(HOUIO_BUILD_EXAMPLES "Build HouIO examples" ${PROJECT_IS_TOP_LEVEL})
 option(HOUIO_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+set(HOUIO_HYTHON_EXECUTABLE "" CACHE FILEPATH "Optional hython executable for Houdini integration tests")
 
 add_library(
     houio
