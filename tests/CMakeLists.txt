@@ -36,6 +36,11 @@ target_link_libraries(houio_test_malformed_geometry PRIVATE houio::houio)
 target_compile_features(houio_test_malformed_geometry PRIVATE cxx_std_20)
 add_test(NAME houio.malformed_geometry COMMAND houio_test_malformed_geometry)
 
+add_executable(houio_test_volumes test_volumes.cpp)
+target_link_libraries(houio_test_volumes PRIVATE houio::houio)
+target_compile_features(houio_test_volumes PRIVATE cxx_std_20)
+add_test(NAME houio.volumes COMMAND houio_test_volumes)
+
 add_executable(houio_test_export_safety test_export_safety.cpp)
 target_link_libraries(houio_test_export_safety PRIVATE houio::houio Threads::Threads)
 target_compile_features(houio_test_export_safety PRIVATE cxx_std_20)
@@ -94,6 +99,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
         uv_seam
         multiple_polygon_runs
         global_attributes
+        dense_volume
         primitive_groups
     )
 

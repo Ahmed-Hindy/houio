@@ -107,6 +107,28 @@ namespace houio
 					exception.what(), -1, path});
 			}
 		}
+
+		size_t checkedProduct( size_t left, size_t right, const std::string &description )
+		{
+			if( left != 0 && right > std::numeric_limits<size_t>::max() / left )
+				throw std::length_error(description + " exceeds addressable storage");
+			return left * right;
+		}
+
+		size_t volumeVoxelCount( const math::V3i &resolution )
+		{
+			if( resolution.x <= 0 || resolution.y <= 0 || resolution.z <= 0 )
+				throw std::invalid_argument( "Volume resolution dimensions must be positive" );
+			const size_t xy = checkedProduct(static_cast<size_t>(resolution.x), static_cast<size_t>(resolution.y), "Volume resolution");
+			return checkedProduct(xy, static_cast<size_t>(resolution.z), "Volume resolution");
+		}
+
+		size_t volumeIndex( int x, int y, int z, const math::V3i &resolution )
+		{
+			const size_t planeSize = checkedProduct(static_cast<size_t>(resolution.x), static_cast<size_t>(resolution.y), "Volume plane");
+			return static_cast<size_t>(z) * planeSize + static_cast<size_t>(y) * static_cast<size_t>(resolution.x)
+				+ static_cast<size_t>(x);
+		}
 	}
 
 	HouGeo::HouGeo() :
@@ -998,7 +1020,7 @@ namespace houio
 
 		// primitive
 		if( primitiveType=="Volume" )
-			loadVolumePrimitive( toObject(primitive->getArray(1)), sharedPrimitiveData );
+			withSchemaPath("data", [&]() { loadVolumePrimitive(toObject(primitive->getArray(1)), sharedPrimitiveData); });
 		else
 		if( primitiveType=="Poly" )
 			loadPolyPrimitive( toObject(primitive->getArray(1)) );
@@ -1035,226 +1057,231 @@ namespace houio
 
 	void HouGeo::loadVolumePrimitive( json::ObjectPtr volume, SharedPrimitiveData& sharedPrimitiveData )
 	{
+		if( !volume )
+			throw std::invalid_argument( "HouGeo::loadVolumePrimitive received null volume data" );
+		if( !volume->hasKey("res") )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeo::loadVolumePrimitive missing resolution", -1, "res"});
+
 		HouVolume::Ptr vol = std::make_shared<HouVolume>();
 		vol->field = std::make_shared<ScalarField>();
 
-		if( volume->hasKey("res") )
+		withSchemaPath("res", [&]()
 		{
-			json::ArrayPtr res = volume->getArray("res");
-			vol->field->resize(res->get<int>(0), res->get<int>(1), res->get<int>(2));
-		}
-		if( volume->hasKey("vertex") && volume->hasKey("transform") )
+			json::ArrayPtr resolutionValues = volume->getArray("res");
+			if( !resolutionValues || resolutionValues->size() != 3 )
+				throw std::runtime_error( "HouGeo::loadVolumePrimitive resolution must contain three values" );
+			const math::V3i resolution(resolutionValues->get<int>(0), resolutionValues->get<int>(1),
+				resolutionValues->get<int>(2));
+			volumeVoxelCount(resolution);
+			vol->field->resize(resolution);
+		});
+
+		const bool hasVertex = volume->hasKey("vertex");
+		const bool hasTransform = volume->hasKey("transform");
+		if( hasVertex != hasTransform )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeo::loadVolumePrimitive requires vertex and transform together", -1, hasVertex ? "transform" : "vertex"});
+
+		if( hasVertex )
 		{
-			json::ArrayPtr xform = volume->getArray("transform");
-
-			// vertex indexes the indexbuffer (which lives with the topology)
-			// the index buffer references the point (which lives with the point attribute)
-			// from the point we can work out the translation of the volume
-
-			// transform encodes the rotation and scale in an array of 9 values
-			math::Matrix44d houLocalToWorldRotationScale = math::Matrix44d( xform->get<float>(0), xform->get<float>(1), xform->get<float>(2), 0.0,
-																			xform->get<float>(3), xform->get<float>(4), xform->get<float>(5), 0.0,
-																			xform->get<float>(6), xform->get<float>(7), xform->get<float>(8), 0.0,
-																			0.0, 0.0, 0.0, 1.0);
-
-
-			int v = m_topology->indexBuffer[volume->get<int>("vertex")];
-			math::V3f p(0.0f);
-
-			// TODO!!! - make this more generic - kind of hardcode
+			math::Matrix44d rotationScale;
+			withSchemaPath("transform", [&]()
 			{
-				HouAttribute::Ptr pAttr = std::dynamic_pointer_cast<HouAttribute>( getPointAttribute("P") );
-				switch(pAttr->m_storage)
+				json::ArrayPtr transformValues = volume->getArray("transform");
+				if( !transformValues || transformValues->size() != 9 )
+					throw std::runtime_error( "HouGeo::loadVolumePrimitive transform must contain nine values" );
+				rotationScale = math::Matrix44d(
+					transformValues->get<float>(0), transformValues->get<float>(1), transformValues->get<float>(2), 0.0,
+					transformValues->get<float>(3), transformValues->get<float>(4), transformValues->get<float>(5), 0.0,
+					transformValues->get<float>(6), transformValues->get<float>(7), transformValues->get<float>(8), 0.0,
+					0.0, 0.0, 0.0, 1.0);
+			});
+
+			math::V3f position;
+			withSchemaPath("vertex", [&]()
+			{
+				if( !m_topology )
+					throw std::runtime_error( "HouGeo::loadVolumePrimitive requires topology for transformed volumes" );
+				const int topologyVertex = volume->get<int>("vertex");
+				if( topologyVertex < 0 || static_cast<size_t>(topologyVertex) >= m_topology->indexBuffer.size() )
+					throw std::runtime_error( "HouGeo::loadVolumePrimitive vertex index is outside topology" );
+				vol->vertex = topologyVertex;
+
+				const int pointIndex = m_topology->indexBuffer[static_cast<size_t>(topologyVertex)];
+				HouAttribute::Ptr positionAttribute = std::dynamic_pointer_cast<HouAttribute>(getPointAttribute("P"));
+				if( !positionAttribute || !positionAttribute->m_attr )
+					throw std::runtime_error( "HouGeo::loadVolumePrimitive requires a point P attribute" );
+				if( positionAttribute->getTupleSize() < 3 )
+					throw std::runtime_error( "HouGeo::loadVolumePrimitive P requires at least three components" );
+				if( pointIndex < 0 || static_cast<sint64>(pointIndex) >= positionAttribute->getNumElements() )
+					throw std::runtime_error( "HouGeo::loadVolumePrimitive point index is outside P" );
+
+				HouGeoAdapter::RawPointer::Ptr rawPosition = positionAttribute->getRawPointer();
+				if( !rawPosition || !rawPosition->ptr )
+					throw std::runtime_error( "HouGeo::loadVolumePrimitive P has no data" );
+
+				const size_t tupleOffset = static_cast<size_t>(pointIndex)
+					* static_cast<size_t>(positionAttribute->getTupleSize());
+				if( positionAttribute->m_storage == AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 				{
-				// in case of 4 component vector, w component will be ignored...
-				case AttributeAdapter::ATTR_STORAGE_FPREAL32:
-					{
-						//p = *(math::V3f *)&m_pointAttributes.find("P")->second->data[ v*pAttr->tupleSize*sizeof(float) ];
-						p = m_pointAttributes.find("P")->second->m_attr->get<math::V3f>( v );
-					}break;
-				case AttributeAdapter::ATTR_STORAGE_FPREAL64:
-					{
-						//p = *(math::V3d *)&m_pointAttributes.find("P")->second->data[ v*pAttr->tupleSize*sizeof(double) ];
-						p = m_pointAttributes.find("P")->second->m_attr->get<math::V3d>( v );
-					}break;
-				case AttributeAdapter::ATTR_STORAGE_INVALID:
-				case AttributeAdapter::ATTR_STORAGE_INT32:
-				default:
-					break;
+					const real32 *values = static_cast<const real32*>(rawPosition->ptr) + tupleOffset;
+					position = math::V3f(values[0], values[1], values[2]);
 				}
-			}
-			math::Matrix44d houLocalToWorldTranslation = math::Matrix44d::TranslationMatrix(p);
+				else if( positionAttribute->m_storage == AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+				{
+					const real64 *values = static_cast<const real64*>(rawPosition->ptr) + tupleOffset;
+					position = math::V3f(static_cast<real32>(values[0]), static_cast<real32>(values[1]),
+						static_cast<real32>(values[2]));
+				}
+				else
+				{
+					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+						"HouGeo::loadVolumePrimitive supports only fpreal32 or fpreal64 P storage", -1, "P.storage"});
+				}
+			});
 
-			math::Matrix44d localToWorld = math::Matrix44d::ScaleMatrix(2.0)*math::Matrix44d::TranslationMatrix(-1.0,-1.0,-1.0)*houLocalToWorldRotationScale*houLocalToWorldTranslation;
-
-			vol->field->setLocalToWorld( localToWorld );
+			const math::Matrix44d translation = math::Matrix44d::TranslationMatrix(position);
+			const math::Matrix44d localToWorld = math::Matrix44d::ScaleMatrix(2.0)
+				* math::Matrix44d::TranslationMatrix(-1.0, -1.0, -1.0) * rotationScale * translation;
+			vol->field->setLocalToWorld(localToWorld);
 		}
 
-		if( volume->hasKey("sharedvoxels") )
+		const bool hasSharedVoxels = volume->hasKey("sharedvoxels");
+		const bool hasInlineVoxels = volume->hasKey("voxels");
+		if( hasSharedVoxels == hasInlineVoxels )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeo::loadVolumePrimitive requires exactly one voxel payload", -1, "voxels"});
+
+		if( hasSharedVoxels )
 		{
-			std::string dataid = volume->get<std::string>("sharedvoxels");
-			auto it = sharedPrimitiveData.sharedVoxelData.find(dataid);
-			if( it != sharedPrimitiveData.sharedVoxelData.end() )
+			withSchemaPath("sharedvoxels", [&]()
 			{
-				json::ObjectPtr voxels = it->second;
-				loadVoxelData( voxels, vol->field->getResolution(), vol->field->getRawPointer() );
-			}else
-				throw std::runtime_error( "HouGeo::loadVolumePrimitive: error shared voxel data not found\n" );
+				const std::string dataId = volume->get<std::string>("sharedvoxels");
+				const auto sharedData = sharedPrimitiveData.sharedVoxelData.find(dataId);
+				if( sharedData == sharedPrimitiveData.sharedVoxelData.end() )
+					throw std::runtime_error( "HouGeo::loadVolumePrimitive shared voxel data was not found" );
+				loadVoxelData(sharedData->second, vol->field->getResolution(), vol->field->getRawPointer());
+			});
 		}
-
-		if( volume->hasKey("voxels") )
+		else
 		{
-			loadVoxelData( toObject(volume->getArray("voxels")), vol->field->getResolution(), vol->field->getRawPointer() );
+			withSchemaPath("voxels", [&]()
+			{
+				loadVoxelData(toObject(volume->getArray("voxels")), vol->field->getResolution(),
+					vol->field->getRawPointer());
+			});
 		}
 
-		m_primitives.push_back( vol );
+		m_primitives.push_back(vol);
 	}
 
 	void HouGeo::loadVoxelData( json::ObjectPtr voxels, const math::V3i& res, float* volData )
 	{
-		if( voxels->hasKey("tiledarray") )
+		if( !voxels )
+			throw std::invalid_argument( "HouGeo::loadVoxelData received null voxel data" );
+		const size_t voxelCount = volumeVoxelCount(res);
+		if( !volData )
+			throw std::invalid_argument( "HouGeo::loadVoxelData received null volume storage" );
+
+		const bool hasTiledArray = voxels->hasKey("tiledarray");
+		const bool hasConstantArray = voxels->hasKey("constantarray");
+		if( hasTiledArray == hasConstantArray )
+			throw std::runtime_error( "HouGeo::loadVoxelData requires exactly one supported voxel representation" );
+
+		if( hasConstantArray )
 		{
-			json::ObjectPtr tiledarray = toObject(voxels->getArray("tiledarray"));
+			const float constantValue = voxels->get<float>("constantarray");
+			std::fill(volData, volData + voxelCount, constantValue);
+			return;
+		}
 
-			std::vector<int> compressionTypes;
-			// 1 = rawfull
-			// 2 = constant
+		json::ObjectPtr tiledArray = toObject(voxels->getArray("tiledarray"));
+		if( !tiledArray || !tiledArray->hasKey("tiles") )
+			throw std::runtime_error( "HouGeo::loadVoxelData tiled array is missing tiles" );
+		json::ArrayPtr tiles = tiledArray->getArray("tiles");
+		if( !tiles )
+			throw std::runtime_error( "HouGeo::loadVoxelData tiles must be an array" );
 
-			if( tiledarray->hasKey("compressiontypes") )
+		const size_t tilesX = (static_cast<size_t>(res.x) + 15) / 16;
+		const size_t tilesY = (static_cast<size_t>(res.y) + 15) / 16;
+		const size_t tilesZ = (static_cast<size_t>(res.z) + 15) / 16;
+		const size_t expectedTileCount = checkedProduct(checkedProduct(tilesX, tilesY, "Volume tile count"),
+			tilesZ, "Volume tile count");
+		if( expectedTileCount > static_cast<size_t>(std::numeric_limits<int>::max()) )
+			throw std::length_error( "Volume tile count exceeds supported indexing" );
+		if( tiles->size() != static_cast<sint64>(expectedTileCount) )
+			throw std::runtime_error( "HouGeo::loadVoxelData tile count does not match resolution" );
+
+		size_t currentTileIndex = 0;
+		for( size_t tileZ=0;tileZ<tilesZ;++tileZ )
+		{
+			const int voxelOffsetZ = static_cast<int>(tileZ * 16);
+			const int tileSizeZ = std::min(16, res.z - voxelOffsetZ);
+			for( size_t tileY=0;tileY<tilesY;++tileY )
 			{
-				json::ArrayPtr ct = tiledarray->getArray("compressiontypes");
-				for( int cti=0;cti<ct->size();++cti )
+				const int voxelOffsetY = static_cast<int>(tileY * 16);
+				const int tileSizeY = std::min(16, res.y - voxelOffsetY);
+				for( size_t tileX=0;tileX<tilesX;++tileX, ++currentTileIndex )
 				{
-					//std::cout << ct->get<std::string>(cti) << std::endl;
-					if( ct->get<std::string>(cti) == "raw" )
-						compressionTypes.push_back( 0 );
-					else
-					if( ct->get<std::string>(cti) == "rawfull" )
-						compressionTypes.push_back( 1 );
-					else
-					if( ct->get<std::string>(cti) == "constant" )
-						compressionTypes.push_back( 2 );
-					else
-						compressionTypes.push_back( -1 );
-				}
-
-			}
-			if( tiledarray->hasKey("tiles") )
-			{
-				json::ArrayPtr tiles = tiledarray->getArray("tiles");
-				sint64 numTiles = tiles->size();
-
-				// looks like houdini uses some spatial tiling where each tile has
-				// a resolution of 16x16x16 (or less on boundary tiles)
-				// the whole resolution domain is split into such tiles
-				// the first tile starts at 0,0,0 and the ordering is identical
-				// to the ordering of voxel values (x being the fastest and z slowest)
-
-				// get first invalid tileindex in each dimension
-				math::Vec3i tileEnd;
-				tileEnd.x = res.x / 16;
-				tileEnd.y = res.y / 16;
-				tileEnd.z = res.z / 16;
-
-				// if there are some voxels remaining, add another tile
-				if( res.x%16 )
-					++tileEnd.x;
-				if( res.y%16 )
-					++tileEnd.y;
-				if( res.z%16 )
-					++tileEnd.z;
-
-				// sanity check - number of tiles has to match
-				if( (tileEnd.x*tileEnd.y*tileEnd.z)!=numTiles )
-					throw std::runtime_error("HouGeo::loadVolumePrimitive problem");
-
-				int currentTileIndex = 0;
-				math::Vec3i voxelOffset; // start offset (in voxels) for current tile
-				math::Vec3i numVoxels;   // number of voxels for current tile (may differ in each dimension)
-
-				// we iterate all tiles starting from slowest to fastest (inner loop)
-				// in each iteration we compute the amount of remaining voxels which is either 16 or smaller for boundary tiles
-				int remainK = res.z;
-				for( int tk=0; tk<tileEnd.z;++tk )
-				{
-					voxelOffset.z = tk*16;
-					numVoxels.z = std::min( 16,  remainK );
-
-					int remainJ = res.y;
-					for( int tj=0; tj<tileEnd.y;++tj )
+					const int voxelOffsetX = static_cast<int>(tileX * 16);
+					const int tileSizeX = std::min(16, res.x - voxelOffsetX);
+					const size_t tileVoxelCount = checkedProduct(
+						checkedProduct(static_cast<size_t>(tileSizeX), static_cast<size_t>(tileSizeY), "Volume tile"),
+						static_cast<size_t>(tileSizeZ), "Volume tile");
+					const std::string tilePath = "tiledarray.tiles[" + std::to_string(currentTileIndex) + "]";
+					withSchemaPath(tilePath, [&]()
 					{
-						voxelOffset.y = tj*16;
-						numVoxels.y = std::min( 16,  remainJ );
+						json::ArrayPtr tileValues = tiles->getArray(static_cast<int>(currentTileIndex));
+						if( !tileValues )
+							throw std::runtime_error( "HouGeo::loadVoxelData tile must be a flattened object" );
+						json::ObjectPtr tile = toObject(tileValues);
+						if( !tile->hasKey("data") )
+							throw std::runtime_error( "HouGeo::loadVoxelData tile is missing data" );
 
-						int remainI = res.x;
-						for( int ti=0; ti<tileEnd.x;++ti, ++currentTileIndex )
+						const int compression = tile->get<int>("compression", 1);
+						if( compression == 0 || compression == 1 )
 						{
-							voxelOffset.x = ti*16;
-							numVoxels.x = std::min( 16,  remainI );
+							json::ArrayPtr data = tile->getArray("data");
+							if( !data || data->size() != static_cast<sint64>(tileVoxelCount) )
+								throw std::runtime_error( "HouGeo::loadVoxelData raw tile payload size mismatch" );
 
-							json::ObjectPtr tile = toObject(tiles->getArray(currentTileIndex));
-							int tileCompression = 1;
-							if( tile->hasKey("compression") )
-							{
-								tileCompression = tile->get<sint32>("compression");
-							}
-							if( tile->hasKey("data") )
-							{
-								switch( tileCompression )
-								{
-								case 0: // raw
-								case 1: // rawfull
+							size_t sourceIndex = 0;
+							for( int localZ=0;localZ<tileSizeZ;++localZ )
+								for( int localY=0;localY<tileSizeY;++localY )
+									for( int localX=0;localX<tileSizeX;++localX, ++sourceIndex )
 									{
-										json::ArrayPtr data = tile->getArray("data");
-										int numElements = (int)data->size();
-
-										if( (numVoxels.x*numVoxels.y*numVoxels.z)!=numElements )
-											throw std::runtime_error("HouGeo::loadVolumePrimitive problem");
-
-										if( data->isUniform() && (data->m_uniformType == 2) )
-										{
-											int v = 0;
-											for( int k=0;k<numVoxels.z;++k )
-												for( int j=0;j<numVoxels.y;++j, v+=numVoxels.x )
-													// copy a complete scanline directly
-													memcpy( &volData[(tk*16+k)*res.x*res.y + (tj*16+j)*res.x + (ti*16)], &data->m_uniformdata[v*sizeof(float)], numVoxels.x*sizeof(float) );
-										}else
-										{
-											int v = 0;
-											for( int k=0;k<numVoxels.z;++k )
-												for( int j=0;j<numVoxels.y;++j )
-													for( int i=0;i<numVoxels.x;++i,++v )
-														volData[(tk*16+k)*res.x*res.y + (tj*16+j)*res.x + (ti*16+i)] = data->get<float>(v);
-										}
-									}break;
-								case 2: // constant
-									{
-										float data = tile->get<float>("data");
-										int v = 0;
-										for( int k=0;k<numVoxels.z;++k )
-											for( int j=0;j<numVoxels.y;++j )
-												for( int i=0;i<numVoxels.x;++i,++v )
-													volData[(tk*16+k)*res.x*res.y + (tj*16+j)*res.x + (ti*16+i)] = data;
-
-									}break;
-								case -1:
-								default:
-									throw std::runtime_error("HouGeo::loadVolumePrimitive unknown compressiontype");
-									break;
-								};
-							}
-							remainI -=16;
+										const size_t destinationIndex = volumeIndex(voxelOffsetX + localX,
+											voxelOffsetY + localY, voxelOffsetZ + localZ, res);
+										if( destinationIndex >= voxelCount )
+											throw std::out_of_range( "HouGeo::loadVoxelData destination index exceeds volume" );
+										volData[destinationIndex] = data->get<float>(static_cast<int>(sourceIndex));
+									}
 						}
-						remainJ -=16;
-					}
-					remainK -=16;
+						else if( compression == 2 )
+						{
+							const float constantValue = tile->get<float>("data");
+							for( int localZ=0;localZ<tileSizeZ;++localZ )
+								for( int localY=0;localY<tileSizeY;++localY )
+									for( int localX=0;localX<tileSizeX;++localX )
+									{
+										const size_t destinationIndex = volumeIndex(voxelOffsetX + localX,
+											voxelOffsetY + localY, voxelOffsetZ + localZ, res);
+										if( destinationIndex >= voxelCount )
+											throw std::out_of_range( "HouGeo::loadVoxelData destination index exceeds volume" );
+										volData[destinationIndex] = constantValue;
+									}
+						}
+						else
+						{
+							throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+								DiagnosticCategory::unsupported_input,
+								"HouGeo::loadVoxelData does not support tile compression " + std::to_string(compression),
+								-1, "compression"});
+						}
+					});
 				}
 			}
-		}else // /tiledarray
-		if( voxels->hasKey("constantarray") )
-		{
-			float constantValue = voxels->get<float>( "constantarray" );
-			std::fill( volData, volData + res.x*res.y*res.z, constantValue );
 		}
 	}
 

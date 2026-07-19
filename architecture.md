@@ -245,11 +245,13 @@ The loader recognizes direct `Poly` records, legacy `run` records whose `runtype
 
 The legacy volume loader understands:
 
-- 16×16×16 tiles
+- 16×16×16 tiles, including partial boundary tiles
 - Raw and raw-full tiles
 - Constant tiles
 - Constant arrays
 - Shared voxel payloads
+
+Volume loading validates positive three-dimensional resolution, checked voxel and tile products, exact tile counts and payload lengths, topology vertex references, the point `P` lookup used for translation, and the nine-component transform. Unsupported compression modes produce `unsupported_input` diagnostics with per-tile schema paths. `Field::resize()` also rejects negative or overflowing resolutions and handles empty storage without dereferencing an empty vector.
 
 This is a dense volume path. It is not an OpenVDB implementation.
 
@@ -303,7 +305,7 @@ The writer serializes point, vertex, primitive, and global attributes through th
 
 ### Fixture-backed compatibility tests
 
-The optional Houdini integration layer generates minimal fixtures rather than storing version-specific binary blobs in the repository. A manifest records counts, domains, primitive state, and known losses. HouIO round-trips each fixture, and Houdini 21.0.631 and 22.0.368 compare exact attribute metadata and values, primitive topology, open/closed state, and point, vertex, and primitive group membership. The current matrix has no intentional round-trip losses.
+The optional Houdini integration layer generates minimal fixtures rather than storing version-specific binary blobs in the repository. A manifest records counts, domains, primitive state, and known losses. HouIO round-trips each fixture, and Houdini 21.0.631 and 22.0.368 compare exact attribute metadata and values, primitive topology, open/closed state, dense-volume resolution, transform, position and voxel values, and point, vertex, and primitive group membership. The 12-fixture matrix succeeds with either Houdini 21 or Houdini 22 as the generator and has no intentional round-trip losses.
 
 The Crag integration test remains the large-scale gate. It additionally compares all 89,942 polygon topologies and 359,794 vertices exactly, which protects the topology-offset writer path from shared-point corruption.
 

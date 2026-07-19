@@ -272,6 +272,19 @@ def build_global_attributes_geometry() -> hou.Geometry:
     return geometry
 
 
+def build_dense_volume_geometry() -> hou.Geometry:
+    """Build a dense scalar volume spanning multiple x-axis tiles.
+
+    Returns:
+        Dense volume geometry with deterministic values and transform.
+    """
+    geometry = hou.Geometry()
+    bounding_box = hou.BoundingBox(-2.0, -1.0, 3.0, 6.0, 5.0, 7.0)
+    volume = geometry.createVolume(17, 2, 1, bounding_box)
+    volume.setAllVoxels(tuple(float(x + y * 100) for y in range(2) for x in range(17)))
+    return geometry
+
+
 def build_primitive_groups_geometry() -> hou.Geometry:
     """Build overlapping point, vertex, and primitive groups.
 
@@ -329,7 +342,10 @@ def geometry_summary(geometry: hou.Geometry) -> dict[str, object]:
         "point_count": len(geometry.points()),
         "vertex_count": sum(len(primitive.vertices()) for primitive in geometry.prims()),
         "primitive_count": len(geometry.prims()),
-        "closed": [primitive.isClosed() for primitive in geometry.prims()],
+        "closed": [
+            primitive.isClosed() if isinstance(primitive, hou.Polygon) else None
+            for primitive in geometry.prims()
+        ],
         "point_attributes": sorted(attribute.name() for attribute in geometry.pointAttribs()),
         "vertex_attributes": sorted(attribute.name() for attribute in geometry.vertexAttribs()),
         "primitive_attributes": sorted(attribute.name() for attribute in geometry.primAttribs()),
@@ -364,6 +380,7 @@ def main() -> int:
         ("uv_seam", build_uv_seam_geometry, ()),
         ("multiple_polygon_runs", build_multiple_polygon_runs_geometry, ()),
         ("global_attributes", build_global_attributes_geometry, ()),
+        ("dense_volume", build_dense_volume_geometry, ()),
         ("primitive_groups", build_primitive_groups_geometry, ()),
     )
 
