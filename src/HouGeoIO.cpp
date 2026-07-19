@@ -1,4 +1,5 @@
 #include <houio/HouGeoIO.h>
+#include <houio/GeometryIO.h>
 
 #include <cstring>
 #include <limits>
@@ -8,6 +9,14 @@ namespace houio
 {
 	namespace
 	{
+		void appendDiagnostics( DiagnosticList *destination, DiagnosticList diagnostics )
+		{
+			if( !destination )
+				return;
+			for( Diagnostic &diagnostic : diagnostics )
+				destination->push_back(std::move(diagnostic));
+		}
+
 		size_t checkedConversionCount( sint64 count, const std::string &description )
 		{
 			if( count < 0 )
@@ -126,31 +135,9 @@ namespace houio
 
 	Geometry::Ptr HouGeoIO::importGeometry( const std::string &path, DiagnosticList *diagnostics )
 	{
-		std::ifstream input(path.c_str(), std::ios_base::in | std::ios_base::binary);
-		if( !input.good() )
-		{
-			appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::io,
-				"HouGeoIO::importGeometry could not open " + path, -1, ""});
-			return Geometry::Ptr();
-		}
-
-		HouGeo::Ptr hgeo = HouGeoIO::import(&input, diagnostics);
-		if( !hgeo )
-			return Geometry::Ptr();
-
-		std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
-		hgeo->getPrimitives(primitives);
-		if( primitives.empty() )
-			return convertToGeometry(hgeo, HouGeoAdapter::Primitive::Ptr(), diagnostics);
-
-		HouGeo::Primitive::Ptr primitive = primitives.front();
-		if( !std::dynamic_pointer_cast<HouGeo::HouPoly>(primitive) )
-		{
-			appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
-				"HouGeoIO::importGeometry supports only polygon primitives", -1, "primitives[0]"});
-			return Geometry::Ptr();
-		}
-		return convertToGeometry(hgeo, primitive, diagnostics);
+		GeometryReadResult<Geometry::Ptr> result = GeometryIO::readGeometry(path);
+		appendDiagnostics(diagnostics, std::move(result.diagnostics));
+		return result.value;
 	}
 
 	ScalarField::Ptr HouGeoIO::importVolume( const std::string &path )
@@ -160,35 +147,9 @@ namespace houio
 
 	ScalarField::Ptr HouGeoIO::importVolume( const std::string &path, DiagnosticList *diagnostics )
 	{
-		std::ifstream input(path.c_str(), std::ios_base::in | std::ios_base::binary);
-		if( !input.good() )
-		{
-			appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::io,
-				"HouGeoIO::importVolume could not open " + path, -1, ""});
-			return ScalarField::Ptr();
-		}
-
-		HouGeo::Ptr hgeo = HouGeoIO::import(&input, diagnostics);
-		if( !hgeo )
-			return ScalarField::Ptr();
-
-		std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
-		hgeo->getPrimitives(primitives);
-		if( primitives.empty() )
-		{
-			appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
-				"HouGeoIO::importVolume found no primitives", -1, "primitives"});
-			return ScalarField::Ptr();
-		}
-
-		HouGeo::HouVolume::Ptr volume = std::dynamic_pointer_cast<HouGeo::HouVolume>(primitives.front());
-		if( !volume )
-		{
-			appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
-				"HouGeoIO::importVolume expected a volume primitive", -1, "primitives[0]"});
-			return ScalarField::Ptr();
-		}
-		return volume->field;
+		GeometryReadResult<ScalarField::Ptr> result = GeometryIO::readVolume(path);
+		appendDiagnostics(diagnostics, std::move(result.diagnostics));
+		return result.value;
 	}
 
 	// prim -1 means we will get a simple pointsgeometry
@@ -610,14 +571,18 @@ namespace houio
 
 
 
-	bool HouGeoIO::exportVolume( const std::string &filename, ScalarField::Ptr volume )
+	HouGeo::Ptr HouGeoIO::adaptVolume( ScalarField::Ptr volume )
 	{
 		if( !volume )
-			return false;
-		std::ofstream out(filename.c_str(), std::ios_base::out | std::ios_base::binary);
+			return HouGeo::Ptr();
 		HouGeo::Ptr houGeo = std::make_shared<HouGeo>();
 		houGeo->addPrimitive(volume);
-		return HouGeoIO::exportGeometry(&out, houGeo);
+		return houGeo;
+	}
+
+	bool HouGeoIO::exportVolume( const std::string &filename, ScalarField::Ptr volume )
+	{
+		return static_cast<bool>(GeometryIO::writeVolume(filename, volume));
 	}
 
 	bool HouGeoIO::xport( const std::string &filename, ScalarField::Ptr volume )
@@ -625,11 +590,10 @@ namespace houio
 		return exportVolume(filename, volume);
 	}
 
-	bool HouGeoIO::exportGeometry( const std::string &filename, Geometry::Ptr geo )
+	HouGeo::Ptr HouGeoIO::adaptGeometry( Geometry::Ptr geo )
 	{
 		if( !geo )
-			return false;
-		std::ofstream out( filename.c_str(), std::ios_base::out | std::ios_base::binary );
+			return HouGeo::Ptr();
 		HouGeo::Ptr houGeo = std::make_shared<HouGeo>();
 
 
@@ -714,7 +678,12 @@ namespace houio
 		}
 
 
-		return HouGeoIO::exportGeometry(&out, houGeo);
+		return houGeo;
+	}
+
+	bool HouGeoIO::exportGeometry( const std::string &filename, Geometry::Ptr geo )
+	{
+		return static_cast<bool>(GeometryIO::writeGeometry(filename, geo));
 	}
 
 	bool HouGeoIO::xport( const std::string &filename, Geometry::Ptr geo )

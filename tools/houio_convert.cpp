@@ -1,11 +1,16 @@
 #include <houio/GeometryIO.h>
 
-#include <filesystem>
 #include <iostream>
 #include <string>
 
 namespace
 {
+int fail(const std::string &message)
+{
+    std::cerr << "error: " << message << '\n';
+    return 1;
+}
+
 void printDiagnostics(const houio::DiagnosticList &diagnostics)
 {
     for( const houio::Diagnostic &diagnostic : diagnostics )
@@ -19,34 +24,43 @@ void printDiagnostics(const houio::DiagnosticList &diagnostics)
         std::cerr << '\n';
     }
 }
-}
 
-int main()
+int convert(const std::string &inputPath, const std::string &outputPath)
 {
-    const std::filesystem::path outputPath =
-        std::filesystem::temp_directory_path() / "houio_example.bgeo";
-
-    houio::Geometry::Ptr source = houio::Geometry::createQuad(houio::Geometry::QUAD);
-    const houio::GeometryWriteResult writeResult =
-        houio::GeometryIO::writeGeometry(outputPath, source);
-    if( !writeResult )
-    {
-        printDiagnostics(writeResult.diagnostics);
-        return 1;
-    }
-
-    const houio::GeometryReadResult<houio::HouGeo::Ptr> readResult =
-        houio::GeometryIO::readHouGeo(outputPath);
-    std::error_code removeError;
-    std::filesystem::remove(outputPath, removeError);
+    houio::GeometryReadResult<houio::HouGeo::Ptr> readResult =
+        houio::GeometryIO::readHouGeo(inputPath);
     if( !readResult )
     {
         printDiagnostics(readResult.diagnostics);
-        return 1;
+        return fail("HouIO failed to read input file: " + inputPath);
+    }
+
+    const houio::GeometryWriteResult writeResult =
+        houio::GeometryIO::writeHouGeo(outputPath, readResult.value);
+    if( !writeResult )
+    {
+        printDiagnostics(writeResult.diagnostics);
+        return fail("HouIO failed to write output file: " + outputPath);
     }
 
     std::cout << "points=" << readResult.value->pointcount() << '\n';
     std::cout << "vertices=" << readResult.value->vertexcount() << '\n';
     std::cout << "primitives=" << readResult.value->primitivecount() << '\n';
     return 0;
+}
+}
+
+int main(int argc, char *argv[])
+{
+    if( argc != 3 )
+        return fail("usage: houio_convert <input.geo|bgeo|bgeo.sc> <output.bgeo|bgeo.sc>");
+
+    try
+    {
+        return convert(argv[1], argv[2]);
+    }
+    catch( const std::exception &error )
+    {
+        return fail(error.what());
+    }
 }

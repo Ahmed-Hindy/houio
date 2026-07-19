@@ -4,10 +4,13 @@ This document describes HouIO's current architecture as implemented in the repos
 
 ## System overview
 
-HouIO has four main layers:
+HouIO has five main standalone layers plus an optional Houdini bridge:
 
 ```text
-.geo / .bgeo
+.geo / .bgeo / .bgeo.sc
+      │
+      ▼
+Format detection and optional SCF/Blosc decompression
       │
       ▼
 JSON token parser and writers
@@ -29,13 +32,26 @@ The reverse flow writes supported geometry back to Houdini binary JSON:
 Geometry, Field<T>, or a custom HouGeoAdapter
       │
       ▼
-HouGeoIO export orchestration
+GeometryIO / HouGeoIO export orchestration
       │
       ▼
 BinaryWriter
       │
+      ├────────► raw .bgeo
+      │
+      └────────► SCF block compression ────────► .bgeo.sc
+```
+
+Inside Houdini, the separate HOM bridge handles formats that are intentionally not linked into the standalone C++ library:
+
+```text
+.vdb / Houdini SOP geometry
+      │
       ▼
-.bgeo
+houio_hom (hou.Geometry + Convert VDB SOP verb)
+      │
+      ├────────► uncompressed bgeo bytes
+      └────────► houio_convert subprocess
 ```
 
 ## Module map
@@ -45,14 +61,18 @@ BinaryWriter
 | Binary JSON | `include/houio/json.h`, `src/json.cpp` | Tokenize, parse, log, and write Houdini ASCII and binary JSON. |
 | Houdini adapter contracts | `include/houio/HouGeoAdapter.h`, `src/HouGeoAdapter.cpp` | Define the abstract geometry interface consumed by the writer. |
 | Houdini geometry model | `include/houio/HouGeo.h`, `src/HouGeo.cpp` | Interpret Houdini's geometry schema and store attributes, groups, topology, polygons, and volumes. |
-| I/O facade | `include/houio/HouGeoIO.h`, `src/HouGeoIO.cpp` | Coordinate import, conversion, logging, and export. |
+| Path-based I/O facade | `include/houio/GeometryIO.h`, `src/GeometryIO.cpp` | Detect containers, own diagnostics/results, decode SCF, and coordinate path reads/writes. |
+| Legacy and stream I/O | `include/houio/HouGeoIO.h`, `src/HouGeoIO.cpp` | Parse caller-owned streams, adapt convenience models, and preserve compatibility APIs. |
+| SCF wrapper | `src/Scf.h`, `src/Scf.cpp` | Validate SideFX SCF framing and dynamically call C-Blosc for block compression/decompression. |
 | Simplified geometry | `include/houio/Geometry.h`, `src/Geometry.cpp` | Store render-oriented points, indices, and attributes. |
 | Raw attributes | `include/houio/Attribute.h`, `src/Attribute.cpp` | Store fixed-width numeric tuple data in a byte buffer. |
 | Dense fields | `include/houio/Field.h`, `src/Field.cpp` | Store and sample dense 3D scalar or vector grids. |
 | Math | `include/houio/math/`, `src/math/` | Supply vectors, matrices, bounds, colors, rays, RNG, and half floats. |
 | Vendored templates | `include/ttl/` | Provide the variant implementation used by the JSON layer. |
 | Build and package | `CMakeLists.txt`, `CMakePresets.json`, `cmake/` | Define the C++20 target, presets, install tree, package version, and exported `houio::houio` target. |
-| Tests and examples | `tests/` | Provide historical fixtures, binary-token and modern-schema regression tests, an external package consumer, round-trip and inspection CLIs, and optional Houdini integration tests. |
+| Converter tool | `tools/houio_convert.cpp` | Provide an installed path-to-path `.geo`/`.bgeo`/`.bgeo.sc` converter using the public API. |
+| HOM bridge | `python/houio_hom/`, `tools/houdini/install_hom_bridge.ps1` | Integrate with Houdini 21/22, convert scalar VDB/dense volumes, and invoke `houio_convert`. |
+| Tests and examples | `tests/`, `tools/houdini/` | Provide historical fixtures, modern-schema, SCF, HOM, package-consumer, and dual-Houdini regression coverage. |
 | Legacy scene exporter | `scene_exporter/` | Export custom scene JSON from old Python 2 Houdini sessions. |
 
 ## 1. Binary JSON layer
@@ -257,23 +277,27 @@ This is a dense volume path. It is not an OpenVDB implementation.
 
 ## 5. I/O facade
 
-`HouGeoIO` is the main public entry point.
+`GeometryIO` is the preferred path-based facade. `HouGeoIO` remains the lower-level stream boundary and compatibility layer.
 
-### Import flow
+### Path import flow
 
 ```text
-HouGeoIO::import(stream)
-    ├─ Parser parses stream
+GeometryIO::readHouGeo(path, options)
+    ├─ Read with maxFileBytes bound
+    ├─ Detect format from magic, then extension
+    ├─ Validate and decompress SCF when present
+    ├─ HouGeoIO::import(memory stream, ParserLimits)
     ├─ JSONReader builds a value tree
-    ├─ Root flattened array becomes an Object
     └─ HouGeo::load interprets the Houdini schema
 ```
+
+The returned `GeometryReadResult<T>` owns the value, diagnostics, and explicit success flag. Parsed objects do not refer to the source file, decompression buffer, or generic JSON tree after the call returns. The original `HouGeoIO::import(std::istream*)` contract remains synchronous and caller-owned: the stream must remain valid only for the duration of the call.
 
 ### Simplified geometry flow
 
 ```text
-HouGeoIO::importGeometry(path)
-    ├─ Import HouGeo
+GeometryIO::readGeometry(path)
+    ├─ Read HouGeo
     ├─ Select the first stored primitive representation
     └─ Convert supported polygon data into Geometry
 ```
@@ -283,25 +307,52 @@ This path is intentionally limited and lossy. It requires one `P` tuple per decl
 ### Volume flow
 
 ```text
-HouGeoIO::importVolume(path)
-    ├─ Import HouGeo
-    ├─ Select the first primitive
-    └─ Return its ScalarField when it is a HouVolume
+GeometryIO::readVolumes(path)
+    ├─ Read HouGeo
+    ├─ Require every primitive to be a supported dense scalar volume
+    └─ Return all ScalarField objects
+
+GeometryIO::readVolume(path)
+    ├─ Delegate to readVolumes
+    ├─ Return the first field
+    └─ Emit a conversion warning when additional fields are dropped
 ```
 
 ### Export flow
 
 ```text
-HouGeoIO::exportGeometry(...) / exportVolume(...)
+GeometryIO::writeHouGeo(...) / writeGeometry(...) / writeVolume(...)
     ├─ Optionally adapt Geometry or Field<T> into HouGeo
     ├─ Serialize counts and topology
     ├─ Serialize point, vertex, primitive, and global attribute domains
     ├─ Serialize polygon-run or volume primitives
     ├─ Serialize point, vertex, and primitive group masks
-    └─ Finish the binary JSON root array
+    ├─ Finish the binary JSON root array
+    └─ Optionally compress binary output into SCF blocks
 ```
 
-The writer serializes point, vertex, primitive, and global attributes through the same adapter contract. Numeric values are emitted as paged uniform arrays. Per-element strings are deduplicated into a string table plus integer indices. Closed polygons are emitted as `Polygon_run`; open polygons use `PolygonCurve_run`. Each record stores a topology vertex offset plus direct per-primitive vertex counts, avoiding the historical ambiguity between topology offsets and point numbers. Unordered groups are emitted as named signed-int8 membership masks after validating their domain sizes. The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`. Each export owns its `BinaryWriter` and `ExportContext` on the stack, and every serialization helper receives that context explicitly. There is no process-global or thread-local writer state, so independent streams can be exported concurrently. Historical `xport()` overloads delegate to the preferred `exportGeometry()` and `exportVolume()` APIs.
+The writer serializes point, vertex, primitive, and global attributes through the same adapter contract. Numeric values are emitted as paged uniform arrays. Per-element strings are deduplicated into a string table plus integer indices. Closed polygons are emitted as `Polygon_run`; open polygons use `PolygonCurve_run`. Each record stores a topology vertex offset plus direct per-primitive vertex counts, avoiding the historical ambiguity between topology offsets and point numbers. Unordered groups are emitted as named signed-int8 membership masks after validating their domain sizes. The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`.
+
+Each export owns its `BinaryWriter` and `ExportContext` on the stack, and every serialization helper receives that context explicitly. Adapter raw pointers are consumed synchronously and must remain valid until the call returns; HouIO does not retain them. There is no process-global or thread-local writer state, so independent files or streams can be exported concurrently. Historical `HouGeoIO` path APIs and `xport()` delegate to `GeometryIO`, while stream overloads remain available.
+
+### SCF compression boundary
+
+`src/Scf.cpp` implements SideFX's Seekable Compressed Format as a container around ordinary binary bgeo bytes. It validates:
+
+- `scf1` header and `1fcs` footer
+- Big-endian metadata and index lengths
+- Sequential C-Blosc block headers
+- Nominal and final uncompressed block sizes
+- Cumulative compressed offsets in the seek index
+- Configured compressed and decompressed byte limits
+
+C-Blosc is resolved at runtime rather than linked into `houio::houio`. This keeps raw `.geo`/`.bgeo` users dependency-free and lets Houdini sessions use the Blosc version shipped with their active `$HFS`. Invalid wrappers fail before the JSON parser sees any decompressed bytes.
+
+### HOM and OpenVDB boundary
+
+The standalone C++ library deliberately does not load Houdini's private `openvdb_sesi` binary or duplicate OpenVDB's sparse tree model. `GeometryFileFormat::openvdb` exists for detection and actionable diagnostics, not native sparse-grid parsing.
+
+`python/houio_hom` is the supported Houdini-side adapter. It uses `hou.Geometry.loadFromFile()` and `saveToFile()` for Houdini-supported containers, `hou.Geometry.data()` and `load()` for in-memory bgeo bytes, and the `convertvdb` SOP verb for strict scalar VDB/dense-volume conversion. `houio_convert` runs as a subprocess, avoiding a CPython extension ABI tied to one Houdini Python version. Sparse VDBs are densified only by explicit caller choice and are therefore subject to potentially large memory amplification.
 
 ### Fixture-backed compatibility tests
 
@@ -429,6 +480,8 @@ The current implementation assumes:
 4. Client numeric attributes can be exposed through contiguous raw memory.
 5. Legacy dense volumes are acceptable in memory.
 6. Schema support can be extended through explicit conditionals for known record types.
+7. SCF compression can buffer one complete uncompressed bgeo payload before file output.
+8. HOM-assisted VDB conversion may densify sparse grids and is limited to pure scalar-grid sets.
 
 These assumptions are reasonable for small legacy files but become problematic for large modern production geometry.
 
@@ -446,13 +499,17 @@ The parser and schema model are based on reverse-engineered Houdini 13-era data.
 
 `HouGeoIO` owns each writer on the stack and passes an explicit `ExportContext` through topology, attribute, primitive, and group serializers. This removes hidden writer state while preserving exception safety and parallel exports to independent streams.
 
-### Weak error model
+### Split error models
 
-Many failures return null pointers, print to standard output, or throw generic `std::runtime_error` messages without file offsets or schema context.
+`GeometryIO` returns owned results and structured diagnostics, but lower-level legacy APIs still mix null returns, `bool`, `DiagnosticException`, and generic exceptions. New path-based features should use result objects; compatibility overloads should remain thin delegates rather than introduce additional error conventions.
 
 ### Data model mismatch
 
-`Geometry` cannot faithfully represent all Houdini domains and primitive mixtures. It should remain an explicit convenience conversion rather than become the canonical model.
+`Geometry` cannot faithfully represent all Houdini domains and primitive mixtures. It should remain an explicit convenience conversion rather than become the canonical model. `ScalarField` also cannot represent sparse OpenVDB topology, grid classes, inactive values, or arbitrary metadata.
+
+### Optional runtime dependencies
+
+SCF requires a compatible C-Blosc shared library. The loader reports a clear unsupported-input diagnostic when none can be resolved, but deployment must provide that runtime explicitly outside Houdini. The HOM bridge additionally requires Houdini and should not become a hidden dependency of the standalone library.
 
 ### Undefined-behavior exposure
 
@@ -467,8 +524,10 @@ Near-term work should preserve the current layers while improving their contract
 3. Keep `HouGeo` as the lossless-as-supported Houdini model.
 4. Keep `Geometry` as an explicitly lossy convenience representation.
 5. Keep serialization helpers explicit and free of hidden writer state.
-6. Introduce structured diagnostics with byte offsets and schema paths.
-7. Add fixture-driven compatibility tests before supporting additional primitives.
-8. Consider streaming semantic readers only after behavior is covered by tests.
+6. Keep `GeometryIO` as the stable result-based path facade while preserving thin legacy wrappers.
+7. Keep SCF as an optional stream/container layer rather than mixing compression into JSON semantics.
+8. Keep native OpenVDB optional; prefer an external OpenVDB adapter or the explicit HOM bridge over sparse-to-dense behavior in the core parser.
+9. Add fixture-driven compatibility tests before supporting additional primitives.
+10. Consider streaming semantic readers only after behavior is covered by tests.
 
 A large rewrite before fixture coverage would be high risk because the existing code contains undocumented format knowledge.

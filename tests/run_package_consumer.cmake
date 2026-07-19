@@ -24,6 +24,22 @@ if(NOT install_result EQUAL 0)
     message(FATAL_ERROR "HouIO installation failed:\n${install_output}\n${install_error}")
 endif()
 
+set(installed_converter "${package_root}/bin/houio_convert")
+if(CMAKE_HOST_WIN32)
+    string(APPEND installed_converter ".exe")
+endif()
+foreach(installed_file IN ITEMS
+    "${package_root}/include/houio/GeometryIO.h"
+    "${package_root}/share/houio/python/houio_hom/__init__.py"
+    "${package_root}/share/houio/python/houio_hom/bridge.py"
+    "${package_root}/share/houio/houdini/install_hom_bridge.ps1"
+    "${installed_converter}"
+)
+    if(NOT EXISTS "${installed_file}")
+        message(FATAL_ERROR "Expected installed HouIO file is missing: ${installed_file}")
+    endif()
+endforeach()
+
 set(
     configure_command
     "${CMAKE_COMMAND}"

@@ -114,7 +114,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Use stack ownership for writers instead of manual `new` and `delete`.
 - [x] Validate output stream state and propagate write failures.
 - [x] Pass an explicit export context through helper functions instead of a thread-local binding.
-- [ ] Clarify ownership and lifetime requirements for raw pointers exposed by adapters.
+- [x] Clarify ownership and lifetime requirements for raw pointers exposed by adapters.
 
 ### Correctness fixes
 
@@ -130,12 +130,15 @@ The priority labels indicate dependency order rather than estimated effort.
 
 ### Public API documentation
 
-- [ ] Document ownership for every stream, pointer, and returned object.
-- [ ] Document supported primitive and attribute types.
+- [x] Document ownership for public streams, adapter pointers, path results, and returned objects.
+- [x] Document supported primitive and attribute types.
 - [x] Document lossy behavior in `convertToGeometry()`.
 - [x] Document exception and null-return behavior.
 - [ ] Add small compilable examples for import, export, logging, and custom adapters.
 - [x] Add `exportGeometry()` and `exportVolume()` while preserving `xport()` as compatibility wrappers.
+- [x] Add a result-based `GeometryIO` path facade with owned diagnostics and format options.
+- [x] Install a `houio_convert` path-to-path command-line tool.
+- [x] Add `readVolumes()` while retaining a warning-producing first-volume convenience API.
 
 ## P1 — Improve the test architecture
 
@@ -229,14 +232,16 @@ Add each type only with representative Houdini 21 fixtures and tests.
 - [ ] Height fields
 - [ ] Agents and crowds
 - [ ] Instancing records
-- [ ] OpenVDB primitives
+- [ ] Native OpenVDB primitives in the standalone C++ model
+- [x] Add a strict Houdini HOM bridge for scalar VDB-to-dense-volume conversion and VDB output.
 
 ### Compression and wrappers
 
-- [ ] Detect `.bgeo.sc` or other outer compression wrappers.
-- [ ] Decide whether decompression belongs in HouIO or a caller-provided stream layer.
-- [ ] Add compressed fixture tests if support is implemented.
-- [ ] Preserve the parser's ability to operate on arbitrary streams.
+- [x] Detect and validate the SideFX `.bgeo.sc` SCF wrapper.
+- [x] Keep decompression in a format-wrapper layer with dynamically loaded C-Blosc.
+- [x] Add unit, Houdini-written-input, and Houdini-validated-output SCF tests.
+- [x] Preserve the parser's ability to operate on arbitrary uncompressed streams.
+- [ ] Investigate non-SCF outer wrappers only when representative fixtures are available.
 
 ### Volumes
 
@@ -244,8 +249,9 @@ Add each type only with representative Houdini 21 fixtures and tests.
 - [ ] Add vector field support where represented by multiple volumes or tuple data.
 - [ ] Validate all tile metadata before allocation and indexing.
 - [ ] Support additional observed compression types.
-- [ ] Decide whether modern VDB support should use OpenVDB rather than duplicate it.
-- [ ] Avoid automatically converting sparse data into dense memory.
+- [x] Keep native VDB support optional rather than duplicating OpenVDB or linking Houdini's private build.
+- [x] Require explicit HOM conversion before sparse VDB data is expanded into dense memory.
+- [ ] Add an optional public-OpenVDB adapter with sparse-grid preservation when licensing and deployment are defined.
 
 ## P2 — Improve the data model
 

@@ -1,81 +1,65 @@
-#include <houio/HouGeoIO.h>
+#include <houio/GeometryIO.h>
 
-#include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <string>
 
 namespace
 {
-int fail(const std::string& message)
+int fail(const std::string &message)
 {
     std::cerr << "error: " << message << '\n';
     return 1;
 }
 
-int runRoundtrip(const std::string& inputPath, const std::string& outputPath)
+void printDiagnostics(const houio::DiagnosticList &diagnostics)
 {
-    std::ifstream input(inputPath, std::ios::binary);
-    if (!input)
+    for( const houio::Diagnostic &diagnostic : diagnostics )
     {
-        return fail("unable to open input file: " + inputPath);
+        std::cerr << (diagnostic.severity == houio::DiagnosticSeverity::error ? "error" : "warning")
+                  << ": " << diagnostic.message;
+        if( diagnostic.byteOffset >= 0 )
+            std::cerr << " at byte " << diagnostic.byteOffset;
+        if( !diagnostic.path.empty() )
+            std::cerr << " [" << diagnostic.path << ']';
+        std::cerr << '\n';
+    }
+}
+
+int runRoundtrip(const std::string &inputPath, const std::string &outputPath)
+{
+    houio::GeometryReadResult<houio::HouGeo::Ptr> readResult =
+        houio::GeometryIO::readHouGeo(inputPath);
+    if( !readResult )
+    {
+        printDiagnostics(readResult.diagnostics);
+        return fail("HouIO failed to read input file: " + inputPath);
     }
 
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input);
-    if (!geometry)
+    const houio::GeometryWriteResult writeResult =
+        houio::GeometryIO::writeHouGeo(outputPath, readResult.value);
+    if( !writeResult )
     {
-        return fail("HouIO failed to parse input file: " + inputPath);
+        printDiagnostics(writeResult.diagnostics);
+        return fail("HouIO failed to write output file: " + outputPath);
     }
 
-    const std::filesystem::path outputFilePath(outputPath);
-    if (outputFilePath.has_parent_path())
-    {
-        std::error_code directoryError;
-        std::filesystem::create_directories(outputFilePath.parent_path(), directoryError);
-        if (directoryError)
-        {
-            return fail(
-                "unable to create output directory: " + outputFilePath.parent_path().string()
-                + ": " + directoryError.message());
-        }
-    }
-
-    std::ofstream output(outputFilePath, std::ios::binary | std::ios::trunc);
-    if (!output)
-    {
-        return fail("unable to open output file: " + outputPath);
-    }
-
-    if (!houio::HouGeoIO::xport(&output, geometry, true))
-    {
-        return fail("HouIO failed to export output file: " + outputPath);
-    }
-
-    output.flush();
-    if (!output)
-    {
-        return fail("failed while flushing output file: " + outputPath);
-    }
-
-    std::cout << "points=" << geometry->pointcount() << '\n';
-    std::cout << "vertices=" << geometry->vertexcount() << '\n';
-    std::cout << "primitives=" << geometry->primitivecount() << '\n';
+    std::cout << "points=" << readResult.value->pointcount() << '\n';
+    std::cout << "vertices=" << readResult.value->vertexcount() << '\n';
+    std::cout << "primitives=" << readResult.value->primitivecount() << '\n';
     return 0;
 }
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-    if (argc != 3)
-    {
-        return fail("usage: houio_roundtrip_geometry <input.geo|bgeo> <output.bgeo>");
-    }
+    if( argc != 3 )
+        return fail("usage: houio_roundtrip_geometry <input.geo|bgeo|bgeo.sc> <output.bgeo|bgeo.sc>");
 
     try
     {
         return runRoundtrip(argv[1], argv[2]);
     }
-    catch (const std::exception& error)
+    catch( const std::exception &error )
     {
         return fail(error.what());
     }
