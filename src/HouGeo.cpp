@@ -138,9 +138,13 @@ namespace houio
 
 	sint64 HouGeo::pointcount()const
 	{
-		auto it = m_pointAttributes.cbegin();
-		if( it != m_pointAttributes.cend() )
-			return it->second->getNumElements();
+		if( m_pointCount >= 0 )
+			return m_pointCount;
+		for( const auto &entry : m_pointAttributes )
+		{
+			if( entry.second )
+				return entry.second->getNumElements();
+		}
 		return 0;
 	}
 
@@ -304,6 +308,8 @@ namespace houio
 
 	void HouGeo::addPrimitive( ScalarField::Ptr field )
 	{
+		if( !field )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null field" );
 		// add point which will encode the translation of the volume
 		HouAttribute::Ptr pAttr = std::dynamic_pointer_cast<HouAttribute>(getPointAttribute( "P" ));
 
@@ -322,6 +328,8 @@ namespace houio
 
 		math::V3f center = field->localToWorld( math::V3f(0.5f) );
 		int index = pAttr->m_attr->appendElement<math::V4f>(math::V4f(center.x, center.y, center.z, 1.0f));
+		if( m_pointCount >= 0 )
+			++m_pointCount;
 
 		if( !m_topology )
 			m_topology = std::make_shared<HouTopology>();
@@ -344,22 +352,36 @@ namespace houio
 
 	void HouGeo::addPrimitive( PolyPrimitive::Ptr poly )
 	{
-		m_primitives.push_back( poly );
+		if( !poly )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null polygon" );
+		m_primitives.push_back(poly);
 	}
 
 	void HouGeo::setTopology( HouTopology::Ptr topo )
 	{
+		if( !topo )
+			throw std::invalid_argument( "HouGeo::setTopology received null topology" );
 		m_topology = topo;
 	}
 
 
 	void HouGeo::setPointAttribute( HouAttribute::Ptr attr )
 	{
+		if( !attr )
+			throw std::invalid_argument( "HouGeo::setPointAttribute received a null attribute" );
+		if( attr->getName().empty() )
+			throw std::invalid_argument( "HouGeo::setPointAttribute requires a non-empty name" );
+		if( m_pointCount >= 0 && attr->getNumElements() != m_pointCount )
+			throw std::invalid_argument( "HouGeo::setPointAttribute element count does not match pointcount" );
 		m_pointAttributes[attr->getName()] = attr;
 	}
 
 	void HouGeo::setPrimitiveAttribute( const std::string &name, HouAttribute::Ptr attr )
 	{
+		if( !attr )
+			throw std::invalid_argument( "HouGeo::setPrimitiveAttribute received a null attribute" );
+		if( name.empty() )
+			throw std::invalid_argument( "HouGeo::setPrimitiveAttribute requires a non-empty name" );
 		attr->m_name = name;
 		m_primitiveAttributes[name] = attr;
 	}
@@ -486,7 +508,9 @@ namespace houio
 
 	std::string HouGeo::HouAttribute::getString( int index )const
 	{
-		return strings[index];
+		if( index < 0 || static_cast<size_t>(index) >= strings.size() )
+			throw std::out_of_range( "HouAttribute string index is out of range" );
+		return strings[static_cast<size_t>(index)];
 	}
 
 
@@ -513,7 +537,9 @@ namespace houio
 
 	sint64 HouGeo::HouTopology::getNumIndices()const
 	{
-		return indexBuffer.size();
+		if( indexBuffer.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
+			throw std::overflow_error( "HouTopology index count exceeds sint64 range" );
+		return static_cast<sint64>(indexBuffer.size());
 	}
 
 
@@ -540,6 +566,7 @@ namespace houio
 		if( numPoints < 0 || numVertices < 0 || numPrimitives < 0 )
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 				"HouGeo::load received negative geometry counts", -1, "counts"});
+		m_pointCount = numPoints;
 		if( o->hasKey("attributes") )
 		{
 			json::ObjectPtr attributes = toObject(o->getArray("attributes"));
@@ -1450,12 +1477,28 @@ namespace houio
 
 	int HouGeo::HouPoly::numVertices( int poly )const
 	{
-		return m_perPolyVertexCount[poly];
+		if( poly < 0 || poly >= m_numPolys
+			|| static_cast<size_t>(poly) >= m_perPolyVertexCount.size() )
+			throw std::out_of_range( "HouPoly polygon index is out of range" );
+		const int vertexCount = m_perPolyVertexCount[static_cast<size_t>(poly)];
+		if( vertexCount < 0 )
+			throw std::runtime_error( "HouPoly polygon has a negative vertex count" );
+		return vertexCount;
 	}
 
 	int const *HouGeo::HouPoly::vertices( int poly )const
 	{
-		return &m_vertices[m_perPolyVertexListOffset[poly]];
+		const int vertexCount = numVertices(poly);
+		if( static_cast<size_t>(poly) >= m_perPolyVertexListOffset.size() )
+			throw std::runtime_error( "HouPoly polygon offset table is incomplete" );
+		const int offset = m_perPolyVertexListOffset[static_cast<size_t>(poly)];
+		if( offset < 0 )
+			throw std::runtime_error( "HouPoly polygon has a negative vertex offset" );
+		const size_t offsetValue = static_cast<size_t>(offset);
+		const size_t countValue = static_cast<size_t>(vertexCount);
+		if( offsetValue > m_vertices.size() || countValue > m_vertices.size() - offsetValue )
+			throw std::runtime_error( "HouPoly polygon range exceeds stored vertices" );
+		return m_vertices.data() + offsetValue;
 	}
 
 	bool HouGeo::HouPoly::closed()const

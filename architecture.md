@@ -278,7 +278,7 @@ HouGeoIO::importGeometry(path)
     └─ Convert supported polygon data into Geometry
 ```
 
-This path is intentionally limited. It does not merge arbitrary primitive collections or preserve every Houdini semantic. Position and UV conversion use each attribute's declared tuple size as the stride, accepting three- or four-component `P` and two-or-more-component UV data without reading padding that may not exist.
+This path is intentionally limited and lossy. It requires one `P` tuple per declared point, one fixed polygon size, domain-consistent point and vertex attributes, valid polygon ranges, and point references inside `pointcount`. Position and UV conversion use each attribute's declared tuple size as the stride, accepting three- or four-component `P` and two-or-more-component UV data without reading padding that may not exist. Vertex attributes are flattened into the point domain by duplicating points at discontinuities. Primitive/global attributes, groups, mixed polygon sizes, arbitrary n-gons, and unsupported numeric storage are not preserved.
 
 ### Volume flow
 

@@ -60,7 +60,14 @@ namespace houio
 
 		void resize( size_t numElements )
 		{
-			m_data.resize( numElements*numComponents()*elementComponentSize() );
+			const size_t componentCount = static_cast<size_t>(numComponents());
+			const size_t componentBytes = static_cast<size_t>(elementComponentSize());
+			if( componentCount != 0 && numElements > std::numeric_limits<size_t>::max() / componentCount )
+				throw std::length_error( "Attribute element count exceeds addressable storage" );
+			const size_t scalarCount = numElements * componentCount;
+			if( componentBytes != 0 && scalarCount > std::numeric_limits<size_t>::max() / componentBytes )
+				throw std::length_error( "Attribute byte count exceeds addressable storage" );
+			m_data.resize(scalarCount * componentBytes);
 			m_numElements = numElements;
 			m_isDirty = true;
 		}

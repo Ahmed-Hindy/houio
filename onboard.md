@@ -273,7 +273,7 @@ xport
 makeLog
 ```
 
-Pay particular attention to assumptions in `convertToGeometry()`. It does not represent arbitrary Houdini geometry.
+Pay particular attention to assumptions in `convertToGeometry()`. It is a lossy convenience path: it requires `P`, one fixed polygon size, valid point references, and attribute counts matching their owner domains.
 
 ### 6. `include/houio/HouGeoAdapter.h`
 
@@ -397,7 +397,7 @@ A primitive may reference vertex entries, and the topology maps those entries to
 
 ### Point and vertex domains
 
-Houdini point attributes and vertex attributes are distinct. The simplified `Geometry` conversion duplicates points to flatten vertex data into point data.
+Houdini point attributes and vertex attributes are distinct. The simplified `Geometry` conversion validates both domain sizes, then duplicates points to flatten vertex data into point data. Missing `P`, malformed polygon tables, and out-of-range point references return structured diagnostics instead of partially converted geometry.
 
 ### Primitive runs
 

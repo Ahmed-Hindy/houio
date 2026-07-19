@@ -1,9 +1,69 @@
 #include <houio/HouGeoIO.h>
 
-
+#include <cstring>
+#include <limits>
+#include <stdexcept>
 
 namespace houio
 {
+	namespace
+	{
+		size_t checkedConversionCount( sint64 count, const std::string &description )
+		{
+			if( count < 0 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::conversion,
+					description + " cannot be negative", -1, "conversion"});
+			if( count > static_cast<sint64>(std::numeric_limits<int>::max()) )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+					description + " exceeds the simplified Geometry index range", -1, "conversion"});
+			return static_cast<size_t>(count);
+		}
+
+		void validateDomainAttribute( const HouGeoAdapter::AttributeAdapter::Ptr &attribute, sint64 expectedCount,
+			const std::string &path )
+		{
+			if( !attribute )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeoIO::convertToGeometry encountered a null attribute", -1, path});
+			if( attribute->getTupleSize() <= 0 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeoIO::convertToGeometry attribute has an invalid tuple size", -1, path});
+			if( attribute->getNumElements() != expectedCount )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeoIO::convertToGeometry attribute element count does not match its domain", -1, path});
+		}
+
+		HouGeoAdapter::RawPointer::Ptr requireRawAttributeData(
+			const HouGeoAdapter::AttributeAdapter::Ptr &attribute, const std::string &path )
+		{
+			HouGeoAdapter::RawPointer::Ptr rawPointer = attribute->getRawPointer();
+			if( attribute->getNumElements() > 0 && (!rawPointer || !rawPointer->ptr) )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeoIO::convertToGeometry attribute has no raw data", -1, path});
+			return rawPointer;
+		}
+
+		template<typename T>
+		T readRawScalar( const void *rawData, size_t scalarIndex )
+		{
+			T value{};
+			const auto *bytes = static_cast<const unsigned char*>(rawData);
+			std::memcpy(&value, bytes + scalarIndex * sizeof(T), sizeof(T));
+			return value;
+		}
+
+		size_t attributeElementBytes( const Attribute::Ptr &attribute )
+		{
+			if( !attribute || attribute->numComponents() <= 0 || attribute->elementComponentSize() <= 0 )
+				throw std::runtime_error( "Converted attribute has invalid component metadata" );
+			const size_t componentCount = static_cast<size_t>(attribute->numComponents());
+			const size_t componentBytes = static_cast<size_t>(attribute->elementComponentSize());
+			if( componentCount > std::numeric_limits<size_t>::max() / componentBytes )
+				throw std::length_error( "Converted attribute element size overflow" );
+			return componentCount * componentBytes;
+		}
+	}
+
 	thread_local json::BinaryWriter* HouGeoIO::g_writer = nullptr;
 
 	HouGeo::Ptr HouGeoIO::import( std::istream *in )
@@ -149,9 +209,11 @@ namespace houio
 
 			Geometry::Ptr result;
 
-		// cast and get some first numbers...
-		sint64 numPoints = houGeo->pointcount();
-		sint64 numVertices = houGeo->vertexcount();
+		// Cast and validate the domain sizes before allocating convenience geometry.
+		const sint64 numPoints = houGeo->pointcount();
+		const sint64 numVertices = houGeo->vertexcount();
+		const size_t pointCount = checkedConversionCount(numPoints, "Point count");
+		const size_t vertexCount = checkedConversionCount(numVertices, "Vertex count");
 
 		// we only support geometry with non mixed primitives (e.g. triangles only)
 		// this code checks if that is the case...
@@ -162,20 +224,31 @@ namespace houio
 			if( !poly )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 					"HouGeoIO::convertToGeometry supports only polygon primitives", -1, "conversion.primitive"});
-			sint64 numPolys = poly->numPolys();
+			const int numPolys = poly->numPolys();
+			if( numPolys < 0 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeoIO::convertToGeometry polygon count cannot be negative", -1, "conversion.primitive"});
 
-			bool hasConstantVertexCountPerPoly = true;
+			size_t observedVertexCount = 0;
+			numVerticesPerPoly = numPolys > 0 ? poly->numVertices(0) : 0;
+			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
 			{
-				numVerticesPerPoly = numPolys > 0 ? poly->numVertices(0) : 0;
-				for( int i=0;i<numPolys;++i )
-					if(poly->numVertices(i) != numVerticesPerPoly)
-					{
-						hasConstantVertexCountPerPoly = false;
-						break;
-					}
+				const int polygonVertexCount = poly->numVertices(polygonIndex);
+				if( polygonVertexCount != numVerticesPerPoly )
+					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+						"HouGeoIO::convertToGeometry requires a constant polygon vertex count", -1,
+						"conversion.primitive"});
+				if( polygonVertexCount < 0 || static_cast<size_t>(polygonVertexCount) > vertexCount - observedVertexCount )
+					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+						"HouGeoIO::convertToGeometry polygon vertices exceed the vertex domain", -1,
+						"conversion.primitive"});
+				poly->vertices(polygonIndex);
+				observedVertexCount += static_cast<size_t>(polygonVertexCount);
 			}
-			if( !hasConstantVertexCountPerPoly )
-				throw std::runtime_error( "convertHouGeoPrimitive: non constant polygon primitvies" );
+			if( observedVertexCount != vertexCount )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeoIO::convertToGeometry polygon vertex total does not match vertexcount", -1,
+					"conversion.primitive"});
 		}
 
 		// create the right kind of geometry depending on vertexcount per primitive (point, line or triangle geometry)
@@ -217,31 +290,36 @@ namespace houio
 		{
 			std::string attrName = *it;
 			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->getPointAttribute(attrName);
-			int numComponents = houAttr->getTupleSize();
+			const std::string attributePath = "attributes.pointattributes." + attrName;
+			validateDomainAttribute(houAttr, numPoints, attributePath);
+			const int numComponents = houAttr->getTupleSize();
 
 			Attribute::Ptr attr;
 			if( attrName == "P" )
 			{
 				if( numComponents < 3 )
 					throw std::runtime_error( "HouGeoIO::convertToGeometry: P requires at least three components" );
-				HouGeoAdapter::RawPointer::Ptr rawPointer = houAttr->getRawPointer();
-				if( !rawPointer || !rawPointer->ptr )
-					throw std::runtime_error( "HouGeoIO::convertToGeometry: P has no data" );
+				HouGeoAdapter::RawPointer::Ptr rawPointer = requireRawAttributeData(houAttr, attributePath);
 
 				attr = result->getAttr("P");
-				for( sint64 pointIndex=0;pointIndex<numPoints;++pointIndex )
+				if( !attr )
+					throw std::runtime_error( "HouGeoIO::convertToGeometry target geometry has no P attribute" );
+				for( size_t pointIndex=0;pointIndex<pointCount;++pointIndex )
 				{
 					math::Vec3f position;
-					const size_t tupleOffset = static_cast<size_t>(pointIndex)*static_cast<size_t>(numComponents);
+					const size_t tupleOffset = pointIndex * static_cast<size_t>(numComponents);
 					if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 					{
-						const real32* values = static_cast<const real32*>(rawPointer->ptr) + tupleOffset;
-						position = math::Vec3f(values[0], values[1], values[2]);
+						position = math::Vec3f(readRawScalar<real32>(rawPointer->ptr, tupleOffset),
+							readRawScalar<real32>(rawPointer->ptr, tupleOffset + 1),
+							readRawScalar<real32>(rawPointer->ptr, tupleOffset + 2));
 					}
 					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
 					{
-						const real64* values = static_cast<const real64*>(rawPointer->ptr) + tupleOffset;
-						position = math::Vec3f(static_cast<real32>(values[0]), static_cast<real32>(values[1]), static_cast<real32>(values[2]));
+						position = math::Vec3f(
+							static_cast<real32>(readRawScalar<real64>(rawPointer->ptr, tupleOffset)),
+							static_cast<real32>(readRawScalar<real64>(rawPointer->ptr, tupleOffset + 1)),
+							static_cast<real32>(readRawScalar<real64>(rawPointer->ptr, tupleOffset + 2)));
 					}
 					else
 						throw std::runtime_error( "HouGeoIO::convertToGeometry: unsupported P storage" );
@@ -252,25 +330,23 @@ namespace houio
 			{
 				if( numComponents < 2 )
 					throw std::runtime_error( "HouGeoIO::convertToGeometry: UV requires at least two components" );
-				HouGeoAdapter::RawPointer::Ptr rawPointer = houAttr->getRawPointer();
-				if( !rawPointer || !rawPointer->ptr )
-					throw std::runtime_error( "HouGeoIO::convertToGeometry: UV has no data" );
+				HouGeoAdapter::RawPointer::Ptr rawPointer = requireRawAttributeData(houAttr, attributePath);
 
 				attrName = "UV";
 				attr = Attribute::createV2f();
-				for( sint64 pointIndex=0;pointIndex<numPoints;++pointIndex )
+				for( size_t pointIndex=0;pointIndex<pointCount;++pointIndex )
 				{
 					math::Vec2f uv;
-					const size_t tupleOffset = static_cast<size_t>(pointIndex)*static_cast<size_t>(numComponents);
+					const size_t tupleOffset = pointIndex * static_cast<size_t>(numComponents);
 					if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 					{
-						const real32* values = static_cast<const real32*>(rawPointer->ptr) + tupleOffset;
-						uv = math::Vec2f(values[0], values[1]);
+						uv = math::Vec2f(readRawScalar<real32>(rawPointer->ptr, tupleOffset),
+							readRawScalar<real32>(rawPointer->ptr, tupleOffset + 1));
 					}
 					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
 					{
-						const real64* values = static_cast<const real64*>(rawPointer->ptr) + tupleOffset;
-						uv = math::Vec2f(static_cast<real32>(values[0]), static_cast<real32>(values[1]));
+						uv = math::Vec2f(static_cast<real32>(readRawScalar<real64>(rawPointer->ptr, tupleOffset)),
+							static_cast<real32>(readRawScalar<real64>(rawPointer->ptr, tupleOffset + 1)));
 					}
 					else
 						throw std::runtime_error( "HouGeoIO::convertToGeometry: unsupported UV storage" );
@@ -278,20 +354,31 @@ namespace houio
 				}
 			}else
 			if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
-				attr = Attribute::create( numComponents, Attribute::FLOAT, (unsigned char *)houAttr->getRawPointer()->ptr, houAttr->getNumElements() );
-			else
-			if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
 			{
-				attr = Attribute::create( numComponents, Attribute::INT, (unsigned char *)houAttr->getRawPointer()->ptr, houAttr->getNumElements() );
-
-			}else
+				HouGeoAdapter::RawPointer::Ptr rawPointer = requireRawAttributeData(houAttr, attributePath);
+				attr = Attribute::create(numComponents, Attribute::FLOAT,
+					static_cast<const unsigned char*>(rawPointer ? rawPointer->ptr : nullptr), houAttr->getNumElements());
+			}
+			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
+			{
+				HouGeoAdapter::RawPointer::Ptr rawPointer = requireRawAttributeData(houAttr, attributePath);
+				attr = Attribute::create(numComponents, Attribute::INT,
+					static_cast<const unsigned char*>(rawPointer ? rawPointer->ptr : nullptr), houAttr->getNumElements());
+			}
+			else
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry cannot convert point attribute " + attrName,
 					-1, "attributes.pointattributes." + attrName});
 
 			if( attr )
-				result->setAttr( attrName, attr );
+				result->setAttr(attrName, attr);
 		}
+
+		Attribute::Ptr convertedPositions = result->getAttr("P");
+		if( !convertedPositions || convertedPositions->numElements() != static_cast<int>(pointCount) )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeoIO::convertToGeometry requires one converted P value per point", -1,
+				"attributes.pointattributes.P"});
 
 		// convert vertex attributes ---
 		std::vector<std::pair<Attribute::Ptr, Attribute::Ptr>> vertex2pointAttr;
@@ -299,34 +386,33 @@ namespace houio
 		{
 			std::string attrName = *it;
 			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->getVertexAttribute(attrName);
-
-			int numComponents = houAttr->getTupleSize();
+			const std::string attributePath = "attributes.vertexattributes." + attrName;
+			validateDomainAttribute(houAttr, numVertices, attributePath);
+			const int numComponents = houAttr->getTupleSize();
 
 			Attribute::Ptr attr;
 			if( (attrName == "UV")||(attrName == "uv") )
 			{
 				if( numComponents < 2 )
 					throw std::runtime_error( "HouGeoIO::convertToGeometry: vertex UV requires at least two components" );
-				HouGeoAdapter::RawPointer::Ptr rawPointer = houAttr->getRawPointer();
-				if( !rawPointer || !rawPointer->ptr )
-					throw std::runtime_error( "HouGeoIO::convertToGeometry: vertex UV has no data" );
+				HouGeoAdapter::RawPointer::Ptr rawPointer = requireRawAttributeData(houAttr, attributePath);
 
 				attrName = "UV";
 				attr = Attribute::createV2f();
 
-				for( sint64 vertexIndex=0;vertexIndex<numVertices;++vertexIndex )
+				for( size_t vertexIndex=0;vertexIndex<vertexCount;++vertexIndex )
 				{
 					math::Vec2f uv;
-					const size_t tupleOffset = static_cast<size_t>(vertexIndex)*static_cast<size_t>(numComponents);
+					const size_t tupleOffset = vertexIndex * static_cast<size_t>(numComponents);
 					if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 					{
-						const real32* values = static_cast<const real32*>(rawPointer->ptr) + tupleOffset;
-						uv = math::Vec2f(values[0], values[1]);
+						uv = math::Vec2f(readRawScalar<real32>(rawPointer->ptr, tupleOffset),
+							readRawScalar<real32>(rawPointer->ptr, tupleOffset + 1));
 					}
 					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
 					{
-						const real64* values = static_cast<const real64*>(rawPointer->ptr) + tupleOffset;
-						uv = math::Vec2f(static_cast<real32>(values[0]), static_cast<real32>(values[1]));
+						uv = math::Vec2f(static_cast<real32>(readRawScalar<real64>(rawPointer->ptr, tupleOffset)),
+							static_cast<real32>(readRawScalar<real64>(rawPointer->ptr, tupleOffset + 1)));
 					}
 					else
 						throw std::runtime_error( "HouGeoIO::convertToGeometry: unsupported vertex UV storage" );
@@ -334,7 +420,11 @@ namespace houio
 				}
 			}else
 			if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
-				attr = Attribute::create( numComponents, Attribute::FLOAT, (unsigned char *)houAttr->getRawPointer()->ptr, houAttr->getNumElements() );
+			{
+				HouGeoAdapter::RawPointer::Ptr rawPointer = requireRawAttributeData(houAttr, attributePath);
+				attr = Attribute::create(numComponents, Attribute::FLOAT,
+					static_cast<const unsigned char*>(rawPointer ? rawPointer->ptr : nullptr), houAttr->getNumElements());
+			}
 
 
 			if( !attr )
@@ -347,8 +437,8 @@ namespace houio
 
 			// create point attribute which we will derive from this vertex attribute
 			Attribute::Ptr pointAttr = attr->copy();
-			pointAttr->resize( (int)numPoints );
-			memset( pointAttr->getRawPointer(), 0, numPoints*pointAttr->elementComponentSize()*pointAttr->numComponents() );
+			pointAttr->resize(pointCount);
+			std::fill(pointAttr->m_data.begin(), pointAttr->m_data.end(), static_cast<unsigned char>(0));
 
 			result->setAttr( attrName, pointAttr );
 			vertex2pointAttr.push_back( std::make_pair( attr, pointAttr ) );
@@ -359,84 +449,94 @@ namespace houio
 		if( houPrim )
 		{
 			HouGeo::HouPoly::Ptr poly = std::dynamic_pointer_cast<HouGeo::HouPoly>(houPrim);
-			sint64 numPolys = poly->numPolys();
+			if( !poly )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+					"HouGeoIO::convertToGeometry expected a polygon primitive", -1, "conversion.primitive"});
+			const int numPolys = poly->numPolys();
 
+			// Geometry has no face-varying domain, so points are split when vertex values differ.
+			std::vector<bool> pointsToSplit(pointCount, false);
+			std::vector<bool> pointsInitialized(pointCount, false);
+			std::vector<int> firstVertex(pointCount, -1);
 
-			// since opengl doesnt support face varying data we also dont support it in our geometry
-			// therefore we need convert our vertex attribute to point attributes and duplicate those points
-			// which have different vertex data
-			const int *vertex_ptr = poly->vertices();
-
-			std::vector<bool> pointsToSplit(numPoints, false);
-			std::vector<bool> pointsInitialized(numPoints, false);
-
-			// mark all points which have to be duplicated
-			std::vector<int> firstVertex(numPoints, -1);
-			for( int i=0;i<numVertices;++i )
+			size_t globalVertexIndex = 0;
+			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
 			{
-				int point = vertex_ptr[i];
-				if( !pointsToSplit[point] )
+				const int polygonVertexCount = poly->numVertices(polygonIndex);
+				const int *polygonVertices = poly->vertices(polygonIndex);
+				for( int localVertexIndex=0;localVertexIndex<polygonVertexCount;++localVertexIndex, ++globalVertexIndex )
 				{
-					if( firstVertex[point] >=0 )
+					if( globalVertexIndex >= vertexCount )
+						throw std::runtime_error( "Polygon traversal exceeded the vertex domain" );
+					const int point = polygonVertices[localVertexIndex];
+					if( point < 0 || static_cast<size_t>(point) >= pointCount )
+						throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+							"Polygon references a point outside pointcount", -1, "conversion.primitive"});
+					const size_t pointIndex = static_cast<size_t>(point);
+					if( pointsToSplit[pointIndex] )
+						continue;
+
+					if( firstVertex[pointIndex] >= 0 )
 					{
-						// compare
-						for( std::vector<std::pair<Attribute::Ptr, Attribute::Ptr>>::iterator it = vertex2pointAttr.begin(), end = vertex2pointAttr.end(); it != end; ++it )
-							if( memcmp( it->first->getRawPointer(i), it->first->getRawPointer(firstVertex[point]), it->first->elementComponentSize()*it->first->numComponents() ) )
+						for( const auto &attributePair : vertex2pointAttr )
+						{
+							const size_t elementBytes = attributeElementBytes(attributePair.first);
+							if( std::memcmp(attributePair.first->getRawPointer(static_cast<int>(globalVertexIndex)),
+								attributePair.first->getRawPointer(firstVertex[pointIndex]), elementBytes) != 0 )
 							{
-								pointsToSplit[point] = true;
-								//result->getAttr("Cd")->set( point, 1.0f, 0.0f, 0.0f );
+								pointsToSplit[pointIndex] = true;
 								break;
 							}
-					}else
-						firstVertex[point] = i;
+						}
+					}
+					else
+					{
+						firstVertex[pointIndex] = static_cast<int>(globalVertexIndex);
+					}
 				}
 			}
+			if( globalVertexIndex != vertexCount )
+				throw std::runtime_error( "Polygon traversal did not consume the complete vertex domain" );
 
-			int vertexIndex = 0;
-			for( int i=0;i<numPolys;++i )
+			globalVertexIndex = 0;
+			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
 			{
-				int numVerts = poly->numVertices(i);
-				std::vector<int> vertices;
-				vertices.reserve(4);
+				const int polygonVertexCount = poly->numVertices(polygonIndex);
+				const int *polygonVertices = poly->vertices(polygonIndex);
+				std::vector<unsigned int> vertices;
+				vertices.reserve(static_cast<size_t>(polygonVertexCount));
 
-				for( int j=0;j<numVerts;++j, ++vertexIndex )
+				for( int localVertexIndex=0;localVertexIndex<polygonVertexCount;++localVertexIndex, ++globalVertexIndex )
 				{
-					unsigned int finalPointIndex = vertex_ptr[j];
+					const int point = polygonVertices[localVertexIndex];
+					if( point < 0 || static_cast<size_t>(point) >= pointCount || globalVertexIndex >= vertexCount )
+						throw std::runtime_error( "Polygon traversal contains an invalid point or vertex index" );
+					const size_t pointIndex = static_cast<size_t>(point);
+					unsigned int finalPointIndex = static_cast<unsigned int>(pointIndex);
 
-					if( pointsToSplit[finalPointIndex] && pointsInitialized[finalPointIndex] )
-					{
+					if( pointsToSplit[pointIndex] && pointsInitialized[pointIndex] )
 						finalPointIndex = result->duplicatePoint(finalPointIndex);
-						// copy vertex attributes to duplicated point location
-						for( std::vector<std::pair<Attribute::Ptr, Attribute::Ptr>>::iterator it = vertex2pointAttr.begin(), end = vertex2pointAttr.end(); it != end; ++it )
-							memcpy( it->second->getRawPointer(finalPointIndex), it->first->getRawPointer(vertexIndex), it->first->elementComponentSize()*it->first->numComponents());
-					}
-					else if( !pointsInitialized[finalPointIndex]  )
+					else if( !pointsInitialized[pointIndex] )
+						pointsInitialized[pointIndex] = true;
+
+					for( const auto &attributePair : vertex2pointAttr )
 					{
-						pointsInitialized[finalPointIndex] = true;
-						// copy vertex attributes to duplicated point location
-						for( std::vector<std::pair<Attribute::Ptr, Attribute::Ptr>>::iterator it = vertex2pointAttr.begin(), end = vertex2pointAttr.end(); it != end; ++it )
-							memcpy( it->second->getRawPointer(finalPointIndex), it->first->getRawPointer(vertexIndex), it->first->elementComponentSize()*it->first->numComponents());
+						const size_t elementBytes = attributeElementBytes(attributePair.first);
+						std::memcpy(attributePair.second->getRawPointer(static_cast<int>(finalPointIndex)),
+							attributePair.first->getRawPointer(static_cast<int>(globalVertexIndex)), elementBytes);
 					}
-
-					//if( vertex2pointAttr[0].first->get<math::Vec2f>(vertexIndex).x == result->getAttr("UV")->get<math::Vec2f>(finalPointIndex).x )
-					//	result->getAttr("Cd")->set(finalPointIndex, 1.0f, 0.0f, 0.0f);
-
 					vertices.push_back(finalPointIndex);
 				}
 
-				if( numVerts == 2 )
-					result->addLine( vertices[0], vertices[1] );
-				else
-				if( numVerts == 3 )
-					result->addTriangle( vertices[0], vertices[1], vertices[2] );
-				else
-				if( numVerts == 4 )
-					result->addQuad( vertices[0], vertices[1], vertices[2], vertices[3] );
-
-				vertex_ptr+=numVerts;
+				if( polygonVertexCount == 2 )
+					result->addLine(vertices[0], vertices[1]);
+				else if( polygonVertexCount == 3 )
+					result->addTriangle(vertices[0], vertices[1], vertices[2]);
+				else if( polygonVertexCount == 4 )
+					result->addQuad(vertices[0], vertices[1], vertices[2], vertices[3]);
 			}
 
-			// houdini polys are CW - opengl defaults to CCW
+			// Houdini polygons are clockwise; the convenience geometry expects counter-clockwise order.
 			result->reverse();
 		}
 			return result;

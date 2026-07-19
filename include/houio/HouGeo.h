@@ -162,6 +162,7 @@ namespace houio
 		std::map<std::string, std::vector<bool>>                                  m_vertexGroups;
 		std::map<std::string, std::vector<bool>>                                  m_primitiveGroups;
 		HouTopology::Ptr                                                           m_topology;
+		sint64                                                               m_pointCount = -1;
 	};
 
 

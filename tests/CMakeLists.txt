@@ -41,6 +41,11 @@ target_link_libraries(houio_test_volumes PRIVATE houio::houio)
 target_compile_features(houio_test_volumes PRIVATE cxx_std_20)
 add_test(NAME houio.volumes COMMAND houio_test_volumes)
 
+add_executable(houio_test_conversion_safety test_conversion_safety.cpp)
+target_link_libraries(houio_test_conversion_safety PRIVATE houio::houio)
+target_compile_features(houio_test_conversion_safety PRIVATE cxx_std_20)
+add_test(NAME houio.conversion_safety COMMAND houio_test_conversion_safety)
+
 add_executable(houio_test_export_safety test_export_safety.cpp)
 target_link_libraries(houio_test_export_safety PRIVATE houio::houio Threads::Threads)
 target_compile_features(houio_test_export_safety PRIVATE cxx_std_20)
