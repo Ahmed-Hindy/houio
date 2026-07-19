@@ -113,9 +113,10 @@ namespace houio
 			binary(false),
 			byteOffset(0),
 			tokenOffset(-1),
+			knownInputBytes(-1),
 			limits(parserLimits)
 		{
-			if( limits.maxStringBytes < 0 || limits.maxUniformArrayElements < 0 )
+			if( limits.maxInputBytes < 0 || limits.maxStringBytes < 0 || limits.maxUniformArrayElements < 0 )
 				throw std::invalid_argument( "Parser limits cannot be negative" );
 			if( limits.maxNestingDepth == 0 )
 				throw std::invalid_argument( "Parser nesting depth must be greater than zero" );
@@ -143,13 +144,16 @@ namespace houio
 			binary = false;
 			byteOffset = 0;
 			tokenOffset = -1;
+			knownInputBytes = -1;
 			handler = h;
 			stream = in;
 
 			try
 			{
+				validateSeekableInputSize();
 				if( !parseStream() )
 					fail(DiagnosticCategory::malformed_input, "Parser state machine rejected the input", byteOffset);
+				validateTrailingInput();
 				return true;
 			}
 			catch( const DiagnosticException &exception )
@@ -182,6 +186,133 @@ namespace houio
 			if( offset < 0 )
 				offset = byteOffset;
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, category, message, offset, ""});
+		}
+
+		void Parser::validateSeekableInputSize()
+		{
+			const std::ios::iostate originalState = stream->rdstate();
+			const std::istream::pos_type originalPosition = stream->tellg();
+			if( originalPosition == std::istream::pos_type(-1) )
+			{
+				stream->clear(originalState);
+				return;
+			}
+
+			stream->clear();
+			stream->seekg(0, std::ios::end);
+			const std::istream::pos_type endPosition = stream->tellg();
+			if( endPosition == std::istream::pos_type(-1) || endPosition < originalPosition )
+			{
+				stream->clear();
+				stream->seekg(originalPosition);
+				stream->clear(originalState);
+				return;
+			}
+
+			const std::streamoff inputBytes = endPosition - originalPosition;
+			stream->clear();
+			stream->seekg(originalPosition);
+			if( !stream->good() )
+				fail(DiagnosticCategory::io, "Parser could not restore the input stream position", 0);
+			stream->clear(originalState);
+
+			if( inputBytes > std::numeric_limits<sint64>::max() )
+				fail(DiagnosticCategory::malformed_input, "Parser input size exceeds the supported range", 0);
+			knownInputBytes = static_cast<sint64>(inputBytes);
+			if( knownInputBytes > limits.maxInputBytes )
+				fail(DiagnosticCategory::malformed_input, "Parser input byte limit exceeded", 0);
+		}
+
+		void Parser::validateTrailingInput()
+		{
+			bool lineComment = false;
+			char value = 0;
+			while( stream->get(value) )
+			{
+				if( byteOffset >= limits.maxInputBytes )
+					fail(DiagnosticCategory::malformed_input, "Parser input byte limit exceeded", byteOffset);
+				++byteOffset;
+				if( binary )
+					fail(DiagnosticCategory::malformed_input, "Parser encountered trailing binary data", byteOffset - 1);
+
+				if( lineComment )
+				{
+					if( value == '\n' || value == '\r' )
+						lineComment = false;
+					continue;
+				}
+				if( std::isspace(static_cast<unsigned char>(value)) )
+					continue;
+				if( value == '/' )
+				{
+					char secondSlash = 0;
+					if( !stream->get(secondSlash) )
+						fail(DiagnosticCategory::malformed_input, "Parser encountered trailing data", byteOffset - 1);
+					if( byteOffset >= limits.maxInputBytes )
+						fail(DiagnosticCategory::malformed_input, "Parser input byte limit exceeded", byteOffset);
+					++byteOffset;
+					if( secondSlash != '/' )
+						fail(DiagnosticCategory::malformed_input, "Parser encountered trailing data", byteOffset - 2);
+					lineComment = true;
+					continue;
+				}
+				fail(DiagnosticCategory::malformed_input, "Parser encountered trailing data", byteOffset - 1);
+			}
+			if( stream->bad() )
+				fail(DiagnosticCategory::io, "Parser failed while checking trailing input", byteOffset);
+		}
+
+		void Parser::validateUniformArrayPayload( Token::Type type, sint64 elementCount )
+		{
+			if( elementCount < 0 )
+				fail(DiagnosticCategory::malformed_input, "Parser uniform array has a negative element count");
+			if( type == Token::JID_STRING )
+				return;
+
+			const uint64 count = static_cast<uint64>(elementCount);
+			auto checkedPayloadSize = [&]( uint64 elementSize )
+			{
+				if( elementSize != 0 && count > std::numeric_limits<uint64>::max() / elementSize )
+					fail(DiagnosticCategory::malformed_input, "Parser uniform-array payload size overflow");
+				return count * elementSize;
+			};
+
+			uint64 payloadBytes = 0;
+			switch( type )
+			{
+			case Token::JID_BOOL:
+				if( count > std::numeric_limits<uint64>::max() - 31 )
+					fail(DiagnosticCategory::malformed_input, "Parser uniform-array payload size overflow");
+				payloadBytes = ((count + 31) / 32) * sizeof(uint32);
+				break;
+			case Token::JID_INT8:
+			case Token::JID_UINT8:
+				payloadBytes = count;
+				break;
+			case Token::JID_INT16:
+				payloadBytes = checkedPayloadSize(sizeof(sword));
+				break;
+			case Token::JID_INT32:
+			case Token::JID_REAL32:
+				payloadBytes = checkedPayloadSize(sizeof(sint32));
+				break;
+			case Token::JID_INT64:
+			case Token::JID_REAL64:
+				payloadBytes = checkedPayloadSize(sizeof(sint64));
+				break;
+			default:
+				fail(DiagnosticCategory::unsupported_input, "Parser encountered an unsupported uniform-array type");
+			}
+
+			if( payloadBytes > static_cast<uint64>(std::numeric_limits<sint64>::max()) )
+				fail(DiagnosticCategory::malformed_input, "Parser uniform-array payload exceeds the supported range");
+			const sint64 signedPayloadBytes = static_cast<sint64>(payloadBytes);
+			if( byteOffset < 0 || byteOffset > limits.maxInputBytes
+				|| signedPayloadBytes > limits.maxInputBytes - byteOffset )
+				fail(DiagnosticCategory::malformed_input, "Parser input byte limit exceeded", byteOffset);
+			if( knownInputBytes >= 0 && (byteOffset > knownInputBytes
+				|| signedPayloadBytes > knownInputBytes - byteOffset) )
+				fail(DiagnosticCategory::malformed_input, "Parser uniform-array payload exceeds the available input", knownInputBytes);
 		}
 
 		bool Parser::parseStream()
@@ -373,6 +504,7 @@ namespace houio
 					const sint64 elementCount = readLength();
 					if( elementCount > limits.maxUniformArrayElements )
 						fail(DiagnosticCategory::malformed_input, "Parser uniform-array element limit exceeded");
+					validateUniformArrayPayload(t.uaType, elementCount);
 					t.value = elementCount;
 					return true;
 				}
@@ -1002,20 +1134,18 @@ namespace houio
 
 		void Value::cpyTo( char *dst )const
 		{
+			if( !dst )
+				throw std::invalid_argument( "Value::cpyTo received a null destination" );
 			switch( m_value.which() )
 			{
-				//bool
-				case 0: memcpy( dst, &ttl::var::get<bool>(m_value), sizeof(bool));break;
-				//sint32
-				case 1: memcpy( dst, &ttl::var::get<sint32>(m_value), sizeof(sint32));break;
-				//real32
-				case 2:	memcpy( dst, &ttl::var::get<real32>(m_value), sizeof(real32));break;
-				//real64
-				case 3: memcpy( dst, &ttl::var::get<real64>(m_value), sizeof(real64));break;
-				//ubyte
-				case 4: memcpy( dst, &ttl::var::get<ubyte>(m_value), sizeof(ubyte));break;
-				//sint64
-				case 5: memcpy( dst, &ttl::var::get<sint64>(m_value), sizeof(sint64));break;
+			case 0: std::memcpy(dst, &ttl::var::get<bool>(m_value), sizeof(bool));break;
+			case 1: std::memcpy(dst, &ttl::var::get<sint32>(m_value), sizeof(sint32));break;
+			case 2: std::memcpy(dst, &ttl::var::get<real32>(m_value), sizeof(real32));break;
+			case 3: std::memcpy(dst, &ttl::var::get<real64>(m_value), sizeof(real64));break;
+			case 4: throw std::invalid_argument( "Value::cpyTo does not support strings" );
+			case 5: std::memcpy(dst, &ttl::var::get<ubyte>(m_value), sizeof(ubyte));break;
+			case 6: std::memcpy(dst, &ttl::var::get<sint64>(m_value), sizeof(sint64));break;
+			default: throw std::runtime_error( "Value::cpyTo encountered an invalid variant type" );
 			}
 		}
 
@@ -1086,7 +1216,7 @@ namespace houio
 		}
 
 		// Array ----
-		Array::Array() : m_isUniform(false), m_uniformdata(0), m_numUniformElements(0)
+		Array::Array() : m_isUniform(false), m_uniformdata(nullptr), m_numUniformElements(0), m_uniformType(-1)
 		{
 		}
 
@@ -1131,31 +1261,65 @@ namespace houio
 		{
 			if( m_isUniform )
 				return m_numUniformElements;
-			return m_values.size();
+			if( m_values.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
+				throw std::length_error( "Array size exceeds sint64 range" );
+			return static_cast<sint64>(m_values.size());
 		}
 
 		Value Array::getValue( const int index )
 		{
-			if( m_isUniform )
+			const sint64 elementCount = size();
+			if( index < 0 || static_cast<sint64>(index) >= elementCount )
+				throw std::out_of_range( "Array index is out of range" );
+			if( !m_isUniform )
+				return m_values[static_cast<size_t>(index)];
+			if( !m_uniformdata )
+				throw std::runtime_error( "Uniform array has no storage" );
+
+			const size_t elementIndex = static_cast<size_t>(index);
+			switch( m_uniformType )
 			{
-				switch( m_uniformType )
-				{
-					//bool
-				case 0: return Value::create<bool>( *((bool *)(&m_uniformdata[sizeof(bool)*index])) );break;
-					//sint32
-				case 1: return Value::create<sint32>( *((sint32 *)(&m_uniformdata[sizeof(sint32)*index])) );break;
-					//real32
-				case 2: return Value::create<real32>( *((real32 *)(&m_uniformdata[sizeof(real32)*index])) );break;
-					//real64
-				case 3: return Value::create<real64>( *((real64 *)(&m_uniformdata[sizeof(real64)*index])) );break;
-				case 4: return Value::create<std::string>("error in Array::getValue - uniform string arrays not supported");break;
-					//ubyte
-				case 5: return Value::create<ubyte>( *((ubyte *)(&m_uniformdata[sizeof(ubyte)*index])) );break;
-					//sint64
-				case 6: return Value::create<sint64>( *((sint64 *)(&m_uniformdata[sizeof(sint64)*index])) );break;
-				}
+			case 0:
+			{
+				bool value = false;
+				std::memcpy(&value, m_uniformdata + sizeof(bool) * elementIndex, sizeof(value));
+				return Value::create<bool>(value);
 			}
-			return m_values[index];
+			case 1:
+			{
+				sint32 value = 0;
+				std::memcpy(&value, m_uniformdata + sizeof(sint32) * elementIndex, sizeof(value));
+				return Value::create<sint32>(value);
+			}
+			case 2:
+			{
+				real32 value = 0.0f;
+				std::memcpy(&value, m_uniformdata + sizeof(real32) * elementIndex, sizeof(value));
+				return Value::create<real32>(value);
+			}
+			case 3:
+			{
+				real64 value = 0.0;
+				std::memcpy(&value, m_uniformdata + sizeof(real64) * elementIndex, sizeof(value));
+				return Value::create<real64>(value);
+			}
+			case 4:
+				throw std::runtime_error( "Uniform string arrays use expanded storage" );
+			case 5:
+			{
+				ubyte value = 0;
+				std::memcpy(&value, m_uniformdata + sizeof(ubyte) * elementIndex, sizeof(value));
+				return Value::create<ubyte>(value);
+			}
+			case 6:
+			{
+				sint64 value = 0;
+				std::memcpy(&value, m_uniformdata + sizeof(sint64) * elementIndex, sizeof(value));
+				return Value::create<sint64>(value);
+			}
+			default:
+				throw std::runtime_error( "Uniform array has an invalid storage type" );
+			}
 		}
 
 
@@ -1221,12 +1385,15 @@ namespace houio
 		
 		sint64 Object::size()const
 		{
-			return m_values.size();
+			if( m_values.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
+				throw std::length_error( "Object size exceeds sint64 range" );
+			return static_cast<sint64>(m_values.size());
 		}
 
 		void Object::append( const std::string &key, const Value &value )
 		{
-			m_values.insert( std::make_pair(key, value) );
+			if( !m_values.emplace(key, value).second )
+				throw std::runtime_error( "Object contains duplicate key " + key );
 		}
 
 		void Object::append( const std::string &key, ObjectPtr object )
@@ -1234,7 +1401,7 @@ namespace houio
 			Value v;
 			v.m_type = Value::TYPE_OBJECT;
 			v.m_object = object;
-			m_values.insert( std::make_pair(key, v) );
+			append(key, v);
 		}
 
 		void Object::append(const std::string &key, ArrayPtr array)
@@ -1242,7 +1409,7 @@ namespace houio
 			Value v;
 			v.m_type = Value::TYPE_ARRAY;
 			v.m_array = array;
-			m_values.insert( std::make_pair(key, v) );
+			append(key, v);
 		}
 
 		// JSONReader ===============================================

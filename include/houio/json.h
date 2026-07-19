@@ -21,6 +21,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstring>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
@@ -157,6 +158,7 @@ namespace houio
 		// Parser ==================================================
 		struct ParserLimits
 		{
+			sint64 maxInputBytes = 1024LL * 1024LL * 1024LL;
 			sint64 maxStringBytes = 64 * 1024 * 1024;
 			sint64 maxUniformArrayElements = 64 * 1024 * 1024;
 			size_t maxNestingDepth = 1024;
@@ -186,8 +188,11 @@ namespace houio
 			bool parse( std::istream *in, Handler *h );
 			bool parse( std::istream *in, Handler *h, DiagnosticList *diagnostics );
 			bool                          parseStream();
+			void             validateSeekableInputSize();
+			void                 validateTrailingInput();
+			void validateUniformArrayPayload( Token::Type type, sint64 elementCount );
 			bool                  readToken( Token &t );
-			bool            readBinaryToken( Token &t, ubyte test = -1 );
+			bool            readBinaryToken( Token &t, ubyte test = 0xff );
 			bool     readASCIIToken( Token &t, char c );
 			bool           readBinaryStringDefinition();
 			bool                       undefineString();
@@ -214,6 +219,7 @@ namespace houio
 			bool                                 binary;
 			sint64                              byteOffset;
 			sint64                              tokenOffset;
+			sint64                         knownInputBytes;
 
 			std::map<sint64, std::string>       strings; // common strings are references by ids
 			ParserLimits                         limits;
@@ -246,6 +252,12 @@ namespace houio
 				throw std::length_error( "Parser::read byte count exceeds streamsize range" );
 
 			const std::streamsize byteCount = static_cast<std::streamsize>(elementCount * sizeof(T));
+			if( byteOffset < 0 || byteOffset > limits.maxInputBytes
+				|| byteCount > limits.maxInputBytes - byteOffset )
+				fail(DiagnosticCategory::malformed_input, "Parser input byte limit exceeded", byteOffset);
+			if( knownInputBytes >= 0 && (byteOffset > knownInputBytes
+				|| byteCount > knownInputBytes - byteOffset) )
+				fail(DiagnosticCategory::malformed_input, "Parser::read encountered truncated input", knownInputBytes);
 			stream->read(reinterpret_cast<char*>(dst), byteCount);
 			const std::streamsize bytesRead = stream->gcount();
 			byteOffset += static_cast<sint64>(bytesRead);
@@ -537,21 +549,18 @@ namespace houio
 				indent();
 				if( numElements < 0 )
 					throw std::length_error( "JSONLogger::uaBool received a negative element count" );
-				std::vector<bool> data(static_cast<size_t>(numElements));
 				sint64 elementsRemaining = numElements;
-				size_t destinationIndex = 0;
+				out << "jsonArray [";
 				while( elementsRemaining > 0 )
 				{
 					const uint32 bits = parser->read<uint32>();
 					const int bitCount = static_cast<int>(std::min<sint64>(elementsRemaining, 32));
 					for( int bitIndex=0;bitIndex<bitCount;++bitIndex )
-						data[destinationIndex++] = (bits & (uint32(1) << bitIndex)) != 0;
+						out << ((bits & (uint32(1) << bitIndex)) != 0 ? 1 : 0) << " ";
 					elementsRemaining -= bitCount;
 				}
-				out << "jsonArray [";std::flush(out);
-				for( std::vector<bool>::iterator it = data.begin(); it != data.end();++it )
-					out << (int)(*it) << " ";std::flush(out);
-				out << "]\n";std::flush(out);
+				out << "]\n";
+				std::flush(out);
 			}
 
 			virtual void uaReal32( sint64 numElements, Parser *parser )
@@ -589,13 +598,19 @@ namespace houio
 				indent();
 				if( numElements < 0 )
 					throw std::length_error( "JSONLogger::uaUInt8 received a negative element count" );
-				std::vector<ubyte> data(static_cast<size_t>(numElements));
-				if( !data.empty() )
-					parser->read<ubyte>(data.data(), numElements);
-				out << "jsonArray<uint8> [";std::flush(out);
-				for( std::vector<ubyte>::iterator it = data.begin(); it != data.end();++it )
-					out << (int)(*it) << " ";std::flush(out);
-				out << "]\n";std::flush(out);
+				out << "jsonArray<uint8> [";
+				sint64 elementsRemaining = numElements;
+				while( elementsRemaining > 0 )
+				{
+					const size_t chunkSize = static_cast<size_t>(std::min<sint64>(elementsRemaining, 4096));
+					std::vector<ubyte> data(chunkSize);
+					parser->read<ubyte>(data.data(), static_cast<sint64>(chunkSize));
+					for( ubyte value : data )
+						out << static_cast<int>(value) << " ";
+					elementsRemaining -= static_cast<sint64>(chunkSize);
+				}
+				out << "]\n";
+				std::flush(out);
 			}
 
 			virtual void uaString( sint64 numElements, Parser *parser )
@@ -603,14 +618,11 @@ namespace houio
 				indent();
 				if( numElements < 0 )
 					throw std::length_error( "JSONLogger::uaString received a negative element count" );
-				std::vector<std::string> data;
-				data.reserve(static_cast<size_t>(numElements));
+				out << "jsonArray<string> [";
 				for(sint64 i=0;i<numElements;++i)
-					data.push_back( parser->readBinaryString() );
-				out << "jsonArray<string> [";std::flush(out);
-				for( std::vector<std::string>::iterator it = data.begin(); it != data.end();++it )
-					out << *it << " ";std::flush(out);
-				out << "]\n";std::flush(out);
+					out << parser->readBinaryString() << " ";
+				out << "]\n";
+				std::flush(out);
 			}
 
 			template<typename T>
@@ -619,13 +631,19 @@ namespace houio
 				indent();
 				if( numElements < 0 )
 					throw std::length_error( "JSONLogger uniform array received a negative element count" );
-				std::vector<T> data(static_cast<size_t>(numElements));
-				if( !data.empty() )
-					parser->read<T>(data.data(), numElements);
-				out << "jsonArray"<<type<<" ("<< numElements << ") [";std::flush(out);
-				for( typename std::vector<T>::iterator it = data.begin(); it != data.end();++it )
-					out << *it << " ";std::flush(out);
-				out << "]---\n";std::flush(out);
+				out << "jsonArray"<<type<<" ("<< numElements << ") [";
+				sint64 elementsRemaining = numElements;
+				while( elementsRemaining > 0 )
+				{
+					const size_t chunkSize = static_cast<size_t>(std::min<sint64>(elementsRemaining, 4096));
+					std::vector<T> data(chunkSize);
+					parser->read<T>(data.data(), static_cast<sint64>(chunkSize));
+					for( const T &value : data )
+						out << value << " ";
+					elementsRemaining -= static_cast<sint64>(chunkSize);
+				}
+				out << "]---\n";
+				std::flush(out);
 			}
 
 			std::ostream &out;
@@ -1019,6 +1037,21 @@ namespace houio
 				throw std::length_error( "JSONReader::jsonUA allocation size overflow" );
 
 			typedef ttl::meta::find_equivalent_type<const T&, Value::Variant::list> found;
+			std::vector<T> convertedData;
+			sint64 elementsRemaining = numElements;
+			constexpr size_t chunkCapacity = 4096;
+			while( elementsRemaining > 0 )
+			{
+				const size_t chunkSize = static_cast<size_t>(std::min<sint64>(elementsRemaining, chunkCapacity));
+				std::vector<S> sourceData(chunkSize);
+				parser->read<S>(sourceData.data(), static_cast<sint64>(chunkSize));
+				const size_t previousSize = convertedData.size();
+				convertedData.resize(previousSize + chunkSize);
+				for( size_t elementIndex=0;elementIndex<chunkSize;++elementIndex )
+					convertedData[previousSize + elementIndex] = static_cast<T>(sourceData[elementIndex]);
+				elementsRemaining -= static_cast<sint64>(chunkSize);
+			}
+
 			Value v = Value::createArray();
 			ArrayPtr ua = v.asArray();
 			ua->m_isUniform = true;
@@ -1029,14 +1062,8 @@ namespace houio
 			ua->m_uniformdata = static_cast<unsigned char*>(std::malloc(destinationBytes));
 			if( destinationBytes > 0 && !ua->m_uniformdata )
 				throw std::bad_alloc();
-
-			std::vector<S> sourceData(elementCount);
-			if( !sourceData.empty() )
-				parser->read<S>(sourceData.data(), numElements);
-
-			T *destinationData = reinterpret_cast<T*>(ua->m_uniformdata);
-			for( size_t elementIndex=0;elementIndex<elementCount;++elementIndex )
-				destinationData[elementIndex] = static_cast<T>(sourceData[elementIndex]);
+			if( destinationBytes > 0 )
+				std::memcpy(ua->m_uniformdata, convertedData.data(), destinationBytes);
 
 			if( m_root.isArray() )
 				m_root.asArray()->append(v);

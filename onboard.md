@@ -232,7 +232,7 @@ Parser::readBinaryToken
 Parser::readASCIIToken
 ```
 
-Then follow uniform-array callbacks into `JSONReader`. `ParserLimits` bounds string bytes, uniform-array elements, and nesting depth. Checked reads throw on truncation before handlers allocate or consume incomplete payloads.
+Then follow uniform-array callbacks into `JSONReader`. `ParserLimits` bounds total input bytes, string bytes, uniform-array elements, and nesting depth. Seekable streams are checked up front, streaming inputs are bounded while reading, payload sizes are validated before handler allocation, and complete-document checks reject trailing data.
 
 ### 4. `HouGeo::load()` in `src/HouGeo.cpp`
 
@@ -316,7 +316,7 @@ Investigate:
 - Length encodings
 - Uniform-array storage types
 - Truncation or outer compression
-- Configured `ParserLimits` versus the observed string, array, and nesting sizes
+- Configured `ParserLimits` versus the observed total input, string, array, and nesting sizes
 - Undefined shared string-token references
 
 ### Schema failure
@@ -393,7 +393,7 @@ A primitive may reference vertex entries, and the topology maps those entries to
 
 ### Malformed input baseline
 
-`houio.malformed_geometry` exercises semantic rejection for odd or duplicate flattened keys, negative domain counts, invalid topology, malformed group masks, unsupported ordered group selections, unsupported primitive records, schema paths, and I/O diagnostics. `houio.binary_json` additionally verifies byte offsets, parser categories, string and uniform-array limits, nesting limits, truncated reads, and token references.
+`houio.malformed_geometry` exercises semantic rejection for odd or duplicate flattened keys, negative domain counts, invalid topology, malformed group masks, unsupported ordered group selections, unsupported primitive records, schema paths, and I/O diagnostics. `houio.binary_json` additionally verifies byte offsets, total-input, string, uniform-array, and nesting limits, truncated reads, declared payload sizes, trailing data, duplicate native map keys, token references, and generic array bounds.
 
 ### Point and vertex domains
 

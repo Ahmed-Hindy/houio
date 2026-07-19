@@ -1,7 +1,9 @@
 #include <houio/json.h>
 
+#include <cstring>
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -9,6 +11,25 @@
 namespace
 {
 constexpr unsigned char binaryMagic[] = {0x7f, 0x4e, 0x53, 0x4a, 0x62};
+
+class NonSeekableBuffer : public std::stringbuf
+{
+public:
+    explicit NonSeekableBuffer(const std::string& value) : std::stringbuf(value, std::ios::in)
+    {
+    }
+
+protected:
+    pos_type seekoff(off_type, std::ios_base::seekdir, std::ios_base::openmode) override
+    {
+        return pos_type(off_type(-1));
+    }
+
+    pos_type seekpos(pos_type, std::ios_base::openmode) override
+    {
+        return pos_type(off_type(-1));
+    }
+};
 
 int fail(const std::string& message)
 {
@@ -165,6 +186,141 @@ int verifyLengthValidation()
         "oversized uniform array");
 }
 
+int verifyInputBudgetAndTrailingData()
+{
+    const std::string binaryData = binaryDocument({0x5b, 0x11, 0x05, 0x5d});
+    houio::json::ParserLimits limits;
+    limits.maxInputBytes = static_cast<houio::sint64>(binaryData.size() - 1);
+    if (const int result = expectParseFailure(binaryData, limits, "seekable input byte limit"); result != 0)
+    {
+        return result;
+    }
+
+    NonSeekableBuffer buffer(binaryData);
+    std::istream nonSeekableInput(&buffer);
+    houio::json::JSONReader reader;
+    houio::json::Parser streamingParser(limits);
+    try
+    {
+        streamingParser.parse(&nonSeekableInput, &reader);
+        return fail("streaming input byte limit was not rejected");
+    }
+    catch (const std::exception&)
+    {
+    }
+
+    std::string trailingBinary = binaryData;
+    trailingBinary.push_back('\0');
+    limits = houio::json::ParserLimits();
+    if (const int result = expectParseFailure(trailingBinary, limits, "trailing binary data"); result != 0)
+    {
+        return result;
+    }
+
+    std::istringstream asciiInput("[1]  \n// trailing comment\n");
+    houio::json::JSONReader asciiReader;
+    houio::json::Parser asciiParser;
+    if (!asciiParser.parse(&asciiInput, &asciiReader))
+    {
+        return fail("valid trailing ASCII whitespace and comments were rejected");
+    }
+
+    std::istringstream invalidAsciiInput("[1] 2");
+    houio::json::JSONReader invalidAsciiReader;
+    houio::DiagnosticList diagnostics;
+    if (asciiParser.parse(&invalidAsciiInput, &invalidAsciiReader, &diagnostics) || diagnostics.empty())
+    {
+        return fail("trailing ASCII value was not rejected");
+    }
+
+    limits.maxInputBytes = -1;
+    try
+    {
+        houio::json::Parser invalidParser(limits);
+        return fail("negative input byte limit was accepted");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+    return 0;
+}
+
+int verifyArrayAndValueSafety()
+{
+    const std::string binaryData = binaryDocument({
+        0x5b,
+        0x40, 0x11, 0x02, 0x04, 0x06,
+        0x5d,
+    });
+    std::istringstream input(binaryData, std::ios::in | std::ios::binary);
+    houio::json::JSONReader reader;
+    houio::json::Parser parser;
+    if (!parser.parse(&input, &reader))
+    {
+        return fail("failed to parse array safety fixture");
+    }
+    houio::json::ArrayPtr values = reader.getRoot().asArray()->getArray(0);
+    try
+    {
+        values->get<int>(-1);
+        return fail("negative array index was accepted");
+    }
+    catch (const std::out_of_range&)
+    {
+    }
+    try
+    {
+        values->get<int>(2);
+        return fail("past-end array index was accepted");
+    }
+    catch (const std::out_of_range&)
+    {
+    }
+
+    houio::sint64 integerValue = 0x102030405060708LL;
+    char integerBytes[sizeof(integerValue)]{};
+    houio::json::Value::create<houio::sint64>(integerValue).cpyTo(integerBytes);
+    houio::sint64 integerCopy = 0;
+    std::memcpy(&integerCopy, integerBytes, sizeof(integerCopy));
+    if (integerCopy != integerValue)
+    {
+        return fail("int64 Value::cpyTo changed the value");
+    }
+
+    try
+    {
+        char destination = 0;
+        houio::json::Value::create<std::string>("text").cpyTo(&destination);
+        return fail("string Value::cpyTo was accepted");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+
+    std::istringstream duplicateMap("{\"a\":1,\"a\":2}");
+    houio::json::JSONReader duplicateReader;
+    houio::DiagnosticList diagnostics;
+    if (parser.parse(&duplicateMap, &duplicateReader, &diagnostics) || diagnostics.empty())
+    {
+        return fail("duplicate native map key was not rejected");
+    }
+    return 0;
+}
+
+int verifyDeclaredPayloadValidation()
+{
+    houio::json::ParserLimits limits;
+    limits.maxUniformArrayElements = std::numeric_limits<houio::sint64>::max();
+    limits.maxInputBytes = 1024;
+    return expectParseFailure(
+        binaryDocument({
+            0x5b, 0x40, 0x14, 0xf8,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+            0x5d,
+        }),
+        limits, "overflowing declared uniform-array payload");
+}
+
 int verifyTokenAndNestingValidation()
 {
     houio::json::ParserLimits limits;
@@ -263,6 +419,18 @@ int main()
         return result;
     }
     if (const int result = verifyLengthValidation(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyInputBudgetAndTrailingData(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyArrayAndValueSafety(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyDeclaredPayloadValidation(); result != 0)
     {
         return result;
     }
