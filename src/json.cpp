@@ -47,6 +47,8 @@ namespace houio
 				p->handler->jsonInt32( ttl::var::get<sint32>( value ) );
 			else if (type == JID_INT64)
 				p->handler->jsonInt64( ttl::var::get<sint64>( value ) );
+			else if (type == JID_REAL16)
+				p->handler->jsonReal32( ttl::var::get<real32>( value ) );
 			else if (type == JID_REAL32)
 				p->handler->jsonReal32( ttl::var::get<real32>( value ) );
 			else if (type == JID_REAL64)
@@ -65,6 +67,7 @@ namespace houio
 				case Token::JID_INT16:p->handler->uaInt16( numElements, p );break;
 				case Token::JID_INT32:p->handler->uaInt32( numElements, p );break;
 				case Token::JID_INT64:p->handler->uaInt64( numElements, p );break;
+				case Token::JID_REAL16:p->handler->uaReal16( numElements, p );break;
 				case Token::JID_REAL32:p->handler->uaReal32( numElements, p );break;
 				case Token::JID_REAL64:p->handler->uaReal64( numElements, p );break;
 				case Token::JID_UINT8:p->handler->uaUInt8( numElements, p );break;
@@ -83,7 +86,6 @@ namespace houio
 				case Token::JID_KEY_SEPARATOR:
 				case Token::JID_VALUE_SEPARATOR:
 				case Token::JID_MAGIC:
-				case Token::JID_REAL16:
 				case Token::JID_UINT16:
 				default:
 					p->fail(DiagnosticCategory::unsupported_input,
@@ -290,7 +292,8 @@ namespace houio
 				payloadBytes = count;
 				break;
 			case Token::JID_INT16:
-				payloadBytes = checkedPayloadSize(sizeof(sword));
+			case Token::JID_REAL16:
+				payloadBytes = checkedPayloadSize(sizeof(uword));
 				break;
 			case Token::JID_INT32:
 			case Token::JID_REAL32:
@@ -477,6 +480,7 @@ namespace houio
 			case Token::JID_INT16: t.value = read<sword>();return true;
 			case Token::JID_INT32: t.value = read<sint32>();return true;
 			case Token::JID_INT64: t.value = read<sint64>();return true;
+			case Token::JID_REAL16: t.value = halfBitsToFloat(read<uword>());return true;
 			case Token::JID_REAL32: t.value = read<real32>();return true;
 			case Token::JID_REAL64: t.value = read<real64>();return true;
 			case Token::JID_UINT8: t.value = read<ubyte>();return true;
@@ -492,6 +496,7 @@ namespace houio
 					case Token::JID_INT16:
 					case Token::JID_INT32:
 					case Token::JID_INT64:
+					case Token::JID_REAL16:
 					case Token::JID_REAL32:
 					case Token::JID_REAL64:
 					case Token::JID_UINT8:
@@ -953,6 +958,18 @@ namespace houio
 		{
 			writeId( Token::JID_REAL64 );
 			write<real64>(value );
+		}
+
+		bool BinaryWriter::jsonUniformArrayReal16( const uword *data, sint64 numElements )
+		{
+			if( numElements < 0 )
+				throw std::length_error( "BinaryWriter::jsonUniformArrayReal16 received a negative element count" );
+			if( numElements > 0 && !data )
+				throw std::invalid_argument( "BinaryWriter::jsonUniformArrayReal16 received null data" );
+			return writeId(Token::JID_UNIFORM_ARRAY)
+				&& write<sbyte>(static_cast<sbyte>(Token::JID_REAL16))
+				&& writeLength(numElements)
+				&& write<uword>(data, numElements);
 		}
 
 		void BinaryWriter::jsonBool( const bool &value )
@@ -1519,6 +1536,16 @@ namespace houio
 				for( int bitIndex=0;bitIndex<bitCount;++bitIndex )
 					jsonBool( (bits & (uint32(1) << bitIndex)) != 0 );
 			}
+			jsonEndArray();
+		}
+
+		void JSONReader::uaReal16( sint64 numElements, Parser *parser )
+		{
+			if( numElements < 0 )
+				throw std::length_error( "JSONReader::uaReal16 received a negative element count" );
+			jsonBeginArray();
+			for( sint64 elementIndex=0;elementIndex<numElements;++elementIndex )
+				jsonReal32(halfBitsToFloat(parser->read<uword>()));
 			jsonEndArray();
 		}
 

@@ -22,7 +22,8 @@ namespace houio
 			INVALID,
 			INT,
 			FLOAT,
-			INT64
+			INT64,
+			HALF
 		};
 
 		Attribute( int numComponents=3, ComponentType componentType = FLOAT );

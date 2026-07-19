@@ -74,10 +74,11 @@ namespace houio
 
 	HouGeoAdapter::AttributeAdapter::Storage HouGeoAdapter::AttributeAdapter::storage( const std::string &storageName )
 	{
-		if( storageName == "fpreal32" )
+		if( storageName == "fpreal16" )
+			return ATTR_STORAGE_FPREAL16;
+		else if( storageName == "fpreal32" )
 			return ATTR_STORAGE_FPREAL32;
-		else
-		if( storageName == "fpreal64" )
+		else if( storageName == "fpreal64" )
 			return ATTR_STORAGE_FPREAL64;
 		else
 		if( storageName == "int32" )
@@ -91,6 +92,7 @@ namespace houio
 	{
 		switch(storage)
 		{
+		case ATTR_STORAGE_FPREAL16:return sizeof(uword);break;
 		case ATTR_STORAGE_FPREAL32:return sizeof(float);break;
 		case ATTR_STORAGE_FPREAL64:return sizeof(double);break;
 		case ATTR_STORAGE_INT32:return sizeof(sint32);break;

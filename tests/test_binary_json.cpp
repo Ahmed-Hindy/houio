@@ -186,6 +186,45 @@ int verifyLengthValidation()
         "oversized uniform array");
 }
 
+int verifyFloat16Tokens()
+{
+    const std::string scalarData = binaryDocument({0x5b, 0x18, 0x00, 0x3c, 0x5d});
+    std::istringstream scalarInput(scalarData, std::ios::in | std::ios::binary);
+    houio::json::JSONReader scalarReader;
+    houio::json::Parser parser;
+    if (!parser.parse(&scalarInput, &scalarReader)
+        || scalarReader.getRoot().asArray()->get<houio::real32>(0) != 1.0f)
+    {
+        return fail("standalone Float16 token was not decoded");
+    }
+
+    const houio::uword halfValues[] = {
+        houio::floatToHalfBits(0.5f),
+        houio::floatToHalfBits(-2.0f),
+        houio::floatToHalfBits(3.25f),
+    };
+    std::ostringstream output(std::ios::out | std::ios::binary);
+    houio::json::BinaryWriter writer(&output);
+    writer.jsonMagic();
+    writer.jsonBeginArray();
+    writer.jsonUniformArrayReal16(halfValues, 3);
+    writer.jsonEndArray();
+
+    std::istringstream input(output.str(), std::ios::in | std::ios::binary);
+    houio::json::JSONReader reader;
+    if (!parser.parse(&input, &reader))
+    {
+        return fail("failed to parse Float16 uniform array");
+    }
+    houio::json::ArrayPtr values = reader.getRoot().asArray()->getArray(0);
+    if (!values || values->size() != 3 || values->get<houio::real32>(0) != 0.5f
+        || values->get<houio::real32>(1) != -2.0f || values->get<houio::real32>(2) != 3.25f)
+    {
+        return fail("Float16 uniform array values changed");
+    }
+    return 0;
+}
+
 int verifyWideScalarFidelity()
 {
     std::ostringstream output(std::ios::out | std::ios::binary);
@@ -380,7 +419,7 @@ int verifyStructuredDiagnostics()
         return result;
     }
     return expectDiagnosticFailure(
-        binaryDocument({0x5b, 0x40, 0x18, 0x00, 0x5d}),
+        binaryDocument({0x5b, 0x40, 0x22, 0x00, 0x5d}),
         houio::DiagnosticCategory::unsupported_input, 7, "unsupported array diagnostic");
 }
 
@@ -445,6 +484,10 @@ int main()
         return result;
     }
     if (const int result = verifyLengthValidation(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyFloat16Tokens(); result != 0)
     {
         return result;
     }

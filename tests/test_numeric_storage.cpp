@@ -13,6 +13,19 @@ int fail(const std::string& message)
     return 1;
 }
 
+houio::uword readHalfBits(const houio::HouGeoAdapter::AttributeAdapter::Ptr& attribute, int index)
+{
+    houio::HouGeoAdapter::RawPointer::Ptr rawPointer = attribute->getRawPointer();
+    if (!rawPointer || !rawPointer->ptr)
+    {
+        throw std::runtime_error("Float16 attribute has no raw data");
+    }
+    houio::uword value = 0;
+    const auto* bytes = static_cast<const unsigned char*>(rawPointer->ptr);
+    std::memcpy(&value, bytes + static_cast<size_t>(index) * sizeof(value), sizeof(value));
+    return value;
+}
+
 houio::sint64 readInt64(const houio::HouGeoAdapter::AttributeAdapter::Ptr& attribute, int index)
 {
     houio::HouGeoAdapter::RawPointer::Ptr rawPointer = attribute->getRawPointer();
@@ -24,6 +37,37 @@ houio::sint64 readInt64(const houio::HouGeoAdapter::AttributeAdapter::Ptr& attri
     const auto* bytes = static_cast<const unsigned char*>(rawPointer->ptr);
     std::memcpy(&value, bytes + static_cast<size_t>(index) * sizeof(value), sizeof(value));
     return value;
+}
+
+int verifyHalfConversion()
+{
+    for (unsigned int value = 0; value <= 0xffffu; ++value)
+    {
+        const houio::uword halfBits = static_cast<houio::uword>(value);
+        const houio::uword roundTrip = houio::floatToHalfBits(houio::halfBitsToFloat(halfBits));
+        if (roundTrip != halfBits)
+        {
+            return fail("Float16 conversion did not preserve all 16-bit encodings");
+        }
+    }
+    return 0;
+}
+
+int verifyHalfAttribute(const houio::HouGeo::Ptr& geometry)
+{
+    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->getPointAttribute("half_value");
+    if (!attribute
+        || attribute->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16
+        || attribute->getTupleSize() != 1 || attribute->getNumElements() != 2)
+    {
+        return fail("Float16 attribute metadata was not preserved");
+    }
+    if (readHalfBits(attribute, 0) != houio::floatToHalfBits(0.5f)
+        || readHalfBits(attribute, 1) != houio::floatToHalfBits(-2.0f))
+    {
+        return fail("Float16 attribute bits were changed");
+    }
+    return 0;
 }
 
 int verifyInt64Attribute(const houio::HouGeo::Ptr& geometry)
@@ -52,6 +96,11 @@ int verifyInt64Attribute(const houio::HouGeo::Ptr& geometry)
 
 int main()
 {
+    if (const int result = verifyHalfConversion(); result != 0)
+    {
+        return result;
+    }
+
     houio::HouGeo::Ptr geometry = houio::HouGeo::create();
 
     houio::Attribute::Ptr positions = houio::Attribute::createV3f();
@@ -64,7 +113,16 @@ int main()
     identifiers->appendElement<houio::sint64>(-1099511627777LL);
     geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("large_id", identifiers));
 
+    houio::Attribute::Ptr halfValues = std::make_shared<houio::Attribute>(1, houio::Attribute::HALF);
+    halfValues->appendElement<houio::uword>(houio::floatToHalfBits(0.5f));
+    halfValues->appendElement<houio::uword>(houio::floatToHalfBits(-2.0f));
+    geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("half_value", halfValues));
+
     if (const int result = verifyInt64Attribute(geometry); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyHalfAttribute(geometry); result != 0)
     {
         return result;
     }
@@ -76,5 +134,23 @@ int main()
     }
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
-    return verifyInt64Attribute(houio::HouGeoIO::import(&input));
+    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(&input);
+    if (const int result = verifyInt64Attribute(imported); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyHalfAttribute(imported); result != 0)
+    {
+        return result;
+    }
+
+    houio::Geometry::Ptr converted = houio::HouGeoIO::convertToGeometry(
+        imported, houio::HouGeoAdapter::Primitive::Ptr());
+    houio::Attribute::Ptr convertedHalf = converted ? converted->getAttr("half_value") : nullptr;
+    if (!convertedHalf || convertedHalf->elementComponentType() != houio::Attribute::HALF
+        || convertedHalf->numElements() != 2)
+    {
+        return fail("simplified conversion did not preserve Float16 attribute storage");
+    }
+    return 0;
 }

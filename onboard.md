@@ -127,7 +127,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_fixture_roundtrips.ps1
 ```
 
-The matrix covers empty geometry; typed point attributes including signed 64-bit integers; triangle, quad, mixed-size, and n-gon polygon runs; open polygon curves; UV seams; multiple primitive records; global and primitive attributes; a dense scalar volume spanning multiple tiles; and overlapping point, vertex, and primitive groups. Validation checks counts, attribute data types, numeric precision and values, primitive type, open/closed state, point topology, dense-volume resolution, transform, position and voxel values, and every group membership. The suite succeeds with either Houdini 21.0.631 or Houdini 22.0.368 as the generator.
+The matrix covers empty geometry; typed point attributes including Float16 and signed 64-bit integers; triangle, quad, mixed-size, and n-gon polygon runs; open polygon curves; UV seams; multiple primitive records; global and primitive attributes; a dense scalar volume spanning multiple tiles; and overlapping point, vertex, and primitive groups. Validation checks counts, attribute data types, numeric precision and values, primitive type, open/closed state, point topology, dense-volume resolution, transform, position and voxel values, and every group membership. The suite succeeds with either Houdini 21.0.631 or Houdini 22.0.368 as the generator.
 
 Generated sources, outputs, and `manifest.json` live under:
 

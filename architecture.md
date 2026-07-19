@@ -210,7 +210,7 @@ m_primitives
 
 ### Attribute domains
 
-Each Houdini attribute is represented by `HouGeo::HouAttribute`, which wraps the generic `Attribute` buffer for numeric values or expanded per-element strings. Numeric loading supports legacy paged data, modern `values.tuples`, and component-oriented `values.arrays`. Signed 32-bit and 64-bit integers plus 32-bit and 64-bit floating-point values retain their declared storage through import and export. String loading expands indexed string tables, including constant-page-compressed index payloads used by Houdini 21/22.
+Each Houdini attribute is represented by `HouGeo::HouAttribute`, which wraps the generic `Attribute` buffer for numeric values or expanded per-element strings. Numeric loading supports legacy paged data, modern `values.tuples`, and component-oriented `values.arrays`. Signed 32-bit and 64-bit integers plus 16-bit, 32-bit, and 64-bit floating-point values retain their declared storage through import and export. String loading expands indexed string tables, including constant-page-compressed index payloads used by Houdini 21/22.
 
 The loader uses the root geometry counts to size each domain:
 
