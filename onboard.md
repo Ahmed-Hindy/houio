@@ -269,7 +269,8 @@ import
 importGeometry
 importVolume
 convertToGeometry
-xport
+exportGeometry / exportVolume
+xport compatibility wrappers
 makeLog
 ```
 
@@ -417,9 +418,9 @@ It selects the first stored primitive representation and only creates line, tria
 
 The diagnostics-aware overload reports empty primitive lists and non-volume first primitives through schema or unsupported-input diagnostics. Dense-volume loading also validates resolution, topology and `P` references, the transform tuple, tile count, tile payload sizes, and compression modes. The historical overload returns null for convenience-import failures.
 
-### Export uses a scoped thread-local binding
+### Export uses an explicit context
 
-Each export owns its writer on the stack. A scoped thread-local pointer connects the legacy helper functions to that writer and is restored after exceptions. Parallel exports are covered when each thread uses an independent stream.
+Each export owns its writer and `ExportContext` on the stack. Topology, attribute, primitive, and group helpers receive that context explicitly. No global or thread-local writer state remains, and parallel exports are covered when each thread uses an independent stream.
 
 ### ASCII geometry export is not implemented
 

@@ -57,7 +57,7 @@ houio::HouGeo::Ptr createInvalidPointGeometry()
 bool roundtripOnce(const houio::HouGeoAdapter::Ptr& source)
 {
     std::ostringstream output(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::xport(&output, source, true))
+    if (!houio::HouGeoIO::exportGeometry(&output, source, true))
     {
         return false;
     }
@@ -66,6 +66,27 @@ bool roundtripOnce(const houio::HouGeoAdapter::Ptr& source)
     houio::HouGeo::Ptr imported = houio::HouGeoIO::import(&input);
     return imported && imported->pointcount() == 4 && imported->vertexcount() == 0
            && imported->primitivecount() == 0;
+}
+
+int verifyCompatibilityWrapper(const houio::HouGeoAdapter::Ptr& validGeometry)
+{
+    std::ostringstream preferredOutput(std::ios::out | std::ios::binary);
+    std::ostringstream compatibilityOutput(std::ios::out | std::ios::binary);
+    if (!houio::HouGeoIO::exportGeometry(&preferredOutput, validGeometry, true)
+        || !houio::HouGeoIO::xport(&compatibilityOutput, validGeometry, true))
+    {
+        return fail("preferred or compatibility export API failed");
+    }
+    if (preferredOutput.str() != compatibilityOutput.str())
+    {
+        return fail("xport compatibility wrapper changed the exported bytes");
+    }
+    if (houio::HouGeoIO::exportGeometry(nullptr, validGeometry, true)
+        || houio::HouGeoIO::exportGeometry(&preferredOutput, houio::HouGeoAdapter::Ptr(), true))
+    {
+        return fail("exportGeometry accepted a null stream or geometry");
+    }
+    return 0;
 }
 
 int verifyExceptionRecovery(const houio::HouGeoAdapter::Ptr& validGeometry)
@@ -185,6 +206,10 @@ int main()
 {
     const houio::HouGeoAdapter::Ptr validGeometry = createPointGeometry();
 
+    if (const int result = verifyCompatibilityWrapper(validGeometry); result != 0)
+    {
+        return result;
+    }
     if (const int result = verifyExceptionRecovery(validGeometry); result != 0)
     {
         return result;

@@ -108,12 +108,12 @@ The priority labels indicate dependency order rather than estimated effort.
 ### Export safety
 
 - [x] Remove unused `g_geo` and process-global writer ownership.
-- [x] Use a scoped thread-local binding for the active per-export writer.
+- [x] Retire the interim scoped thread-local writer binding after introducing `ExportContext`.
 - [x] Restore the previous binding after normal completion or exceptions.
 - [x] Make concurrent exports safe when streams are independent.
 - [x] Use stack ownership for writers instead of manual `new` and `delete`.
 - [x] Validate output stream state and propagate write failures.
-- [ ] Pass an explicit export context through helper functions instead of a thread-local binding.
+- [x] Pass an explicit export context through helper functions instead of a thread-local binding.
 - [ ] Clarify ownership and lifetime requirements for raw pointers exposed by adapters.
 
 ### Correctness fixes
@@ -135,7 +135,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Document lossy behavior in `convertToGeometry()`.
 - [x] Document exception and null-return behavior.
 - [ ] Add small compilable examples for import, export, logging, and custom adapters.
-- [ ] Decide whether to preserve the historical `xport` spelling or add a compatible `exportGeometry` API.
+- [x] Add `exportGeometry()` and `exportVolume()` while preserving `xport()` as compatibility wrappers.
 
 ## P1 — Improve the test architecture
 

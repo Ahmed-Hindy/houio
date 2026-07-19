@@ -292,7 +292,7 @@ HouGeoIO::importVolume(path)
 ### Export flow
 
 ```text
-HouGeoIO::xport(...)
+HouGeoIO::exportGeometry(...) / exportVolume(...)
     ├─ Optionally adapt Geometry or Field<T> into HouGeo
     ├─ Serialize counts and topology
     ├─ Serialize point, vertex, primitive, and global attribute domains
@@ -301,7 +301,7 @@ HouGeoIO::xport(...)
     └─ Finish the binary JSON root array
 ```
 
-The writer serializes point, vertex, primitive, and global attributes through the same adapter contract. Numeric values are emitted as paged uniform arrays. Per-element strings are deduplicated into a string table plus integer indices. Closed polygons are emitted as `Polygon_run`; open polygons use `PolygonCurve_run`. Each record stores a topology vertex offset plus direct per-primitive vertex counts, avoiding the historical ambiguity between topology offsets and point numbers. Unordered groups are emitted as named signed-int8 membership masks after validating their domain sizes. The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`. Each export owns its `BinaryWriter` on the stack. A scoped thread-local binding lets the legacy helper functions reach the active writer while restoring the previous binding after normal completion or exceptions. Independent streams can therefore be exported concurrently.
+The writer serializes point, vertex, primitive, and global attributes through the same adapter contract. Numeric values are emitted as paged uniform arrays. Per-element strings are deduplicated into a string table plus integer indices. Closed polygons are emitted as `Polygon_run`; open polygons use `PolygonCurve_run`. Each record stores a topology vertex offset plus direct per-primitive vertex counts, avoiding the historical ambiguity between topology offsets and point numbers. Unordered groups are emitted as named signed-int8 membership masks after validating their domain sizes. The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`. Each export owns its `BinaryWriter` and `ExportContext` on the stack, and every serialization helper receives that context explicitly. There is no process-global or thread-local writer state, so independent streams can be exported concurrently. Historical `xport()` overloads delegate to the preferred `exportGeometry()` and `exportVolume()` APIs.
 
 ### Fixture-backed compatibility tests
 
@@ -442,9 +442,9 @@ The parser and schema model are based on reverse-engineered Houdini 13-era data.
 
 `JSONReader` builds a generic document tree before `HouGeo` builds a second semantic representation. Large files can therefore consume substantially more memory than their final geometry representation.
 
-### Transitional writer binding
+### Explicit export context
 
-`HouGeoIO` no longer owns a process-global writer. The active stack-owned writer is exposed to legacy serialization helpers through a scoped thread-local pointer. This is exception-safe and permits parallel exports to independent streams, but passing an explicit export context through the helpers would remove the remaining implicit state.
+`HouGeoIO` owns each writer on the stack and passes an explicit `ExportContext` through topology, attribute, primitive, and group serializers. This removes hidden writer state while preserving exception safety and parallel exports to independent streams.
 
 ### Weak error model
 
@@ -466,7 +466,7 @@ Near-term work should preserve the current layers while improving their contract
 2. Make `HouGeoAdapter` the stable export boundary.
 3. Keep `HouGeo` as the lossless-as-supported Houdini model.
 4. Keep `Geometry` as an explicitly lossy convenience representation.
-5. Replace the transitional thread-local writer binding with an explicit export context parameter.
+5. Keep serialization helpers explicit and free of hidden writer state.
 6. Introduce structured diagnostics with byte offsets and schema paths.
 7. Add fixture-driven compatibility tests before supporting additional primitives.
 8. Consider streaming semantic readers only after behavior is covered by tests.
