@@ -40,7 +40,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Assert topology and representative attribute values.
 - [ ] Assert legacy volume resolution, transform, and sample values.
 - [x] Add malformed semantic input tests.
-- [ ] Add truncated binary input tests.
+- [x] Add truncated binary input tests.
 - [ ] Make test failures return non-zero process exit codes.
 
 ### Continuous integration
@@ -91,10 +91,10 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Check stream byte counts after every fixed-size binary read.
 - [x] Reject negative binary lengths before allocation or container-size conversion.
 - [x] Add configurable string-size, uniform-array-size, and nesting-depth limits.
-- [ ] Add a configurable full-file byte limit for seekable and streaming inputs.
+- [x] Add a configurable full-file byte limit for seekable and streaming inputs.
 - [x] Detect integer overflow in parser and writer byte-count calculations.
 - [x] Add regression coverage for uniform signed-int8 widening.
-- [ ] Validate all uniform-array element types and storage sizes before reading.
+- [x] Validate all supported uniform-array element types and storage sizes before reading.
 - [x] Validate string token references before lookup.
 - [x] Reject odd-length, non-string-keyed, and duplicate-key flattened objects.
 - [x] Validate topology counts and point-reference ranges.
@@ -275,7 +275,7 @@ Add each type only with representative Houdini 21 fixtures and tests.
 
 - [ ] Separate file I/O from the field container.
 - [ ] Audit coordinate conventions and transform composition.
-- [ ] Add overflow-safe allocation checks.
+- [x] Add overflow-safe allocation checks.
 - [ ] Add const sampling APIs.
 - [ ] Test boundary behavior and interpolation.
 - [ ] Decide whether the custom field format should remain public.

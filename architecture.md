@@ -88,7 +88,7 @@ The parser handles:
 
 The parser determines whether the input is binary by inspecting the stream's opening data. Every fixed-size read validates the exact byte count. Binary lengths reject negative values before conversion to container sizes, and string-token references must resolve to an existing definition.
 
-`ParserLimits` provides per-parser bounds for string bytes, uniform-array elements, and nesting depth. The default limits are 64 MiB per string, 64 million uniform-array elements, and 1,024 nested containers. `HouGeoIO::import()` uses those defaults, while its limits overload exposes the same controls to applications.
+`ParserLimits` provides per-parser bounds for total input bytes, string bytes, uniform-array elements, and nesting depth. The defaults are 1 GiB per document, 64 MiB per string, 64 million uniform-array elements, and 1,024 nested containers. Seekable streams are checked before parsing, while non-seekable streams enforce the same budget as bytes are consumed. Uniform-array payload sizes are validated before handler allocation, trailing data is rejected, and duplicate native map keys fail explicitly. `HouGeoIO::import()` uses these defaults, while its limits overload exposes the same controls to applications.
 
 ### Diagnostics
 

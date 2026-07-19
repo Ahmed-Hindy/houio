@@ -107,10 +107,11 @@ The logger is useful because Houdini geometry uses flattened key/value arrays an
 
 ### Configure parser safety limits
 
-Binary parsing uses conservative defaults for individual strings, uniform-array element counts, and nesting depth. Applications that accept untrusted or unusually large files can override them:
+Binary parsing uses conservative defaults for total input bytes, individual strings, uniform-array element counts, and nesting depth. Applications that accept untrusted or unusually large files can override them:
 
 ```cpp
 houio::json::ParserLimits limits;
+limits.maxInputBytes = 256LL * 1024LL * 1024LL;
 limits.maxStringBytes = 8 * 1024 * 1024;
 limits.maxUniformArrayElements = 16 * 1024 * 1024;
 limits.maxNestingDepth = 256;
@@ -119,7 +120,7 @@ std::ifstream input("mesh.bgeo", std::ios::binary);
 houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input, limits);
 ```
 
-Fixed-size reads reject truncated streams, encoded lengths cannot be negative, allocation byte counts are overflow-checked, and undefined string-token references are rejected. The defaults allow the tested Crag geometry without adjustment.
+Seekable inputs are size-checked before parsing, streaming inputs are bounded as bytes are consumed, and the parser validates the complete document rather than ignoring trailing data. Fixed-size reads reject truncated streams, uniform-array payload sizes are checked before handler allocation, encoded lengths cannot be negative, allocation byte counts are overflow-checked, duplicate map keys are rejected, and undefined string-token references fail explicitly. The defaults allow the tested Crag geometry without adjustment.
 
 ### Capture structured diagnostics
 
