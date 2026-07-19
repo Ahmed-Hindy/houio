@@ -64,8 +64,6 @@ namespace houio
 		}
 	}
 
-	thread_local json::BinaryWriter* HouGeoIO::g_writer = nullptr;
-
 	HouGeo::Ptr HouGeoIO::import( std::istream *in )
 	{
 		return import(in, json::ParserLimits(), nullptr);
@@ -612,17 +610,25 @@ namespace houio
 
 
 
-	// convinience funcion for quickly saving volume to bgeo
-	bool HouGeoIO::xport( const std::string& filename, ScalarField::Ptr volume )
+	bool HouGeoIO::exportVolume( const std::string &filename, ScalarField::Ptr volume )
 	{
-		std::ofstream out( filename.c_str(), std::ios_base::out | std::ios_base::binary );
+		if( !volume )
+			return false;
+		std::ofstream out(filename.c_str(), std::ios_base::out | std::ios_base::binary);
 		HouGeo::Ptr houGeo = std::make_shared<HouGeo>();
 		houGeo->addPrimitive(volume);
-		return HouGeoIO::xport( &out, houGeo );
+		return HouGeoIO::exportGeometry(&out, houGeo);
 	}
 
-	bool HouGeoIO::xport(const std::string &filename, Geometry::Ptr geo)
+	bool HouGeoIO::xport( const std::string &filename, ScalarField::Ptr volume )
 	{
+		return exportVolume(filename, volume);
+	}
+
+	bool HouGeoIO::exportGeometry( const std::string &filename, Geometry::Ptr geo )
+	{
+		if( !geo )
+			return false;
 		std::ofstream out( filename.c_str(), std::ios_base::out | std::ios_base::binary );
 		HouGeo::Ptr houGeo = std::make_shared<HouGeo>();
 
@@ -708,7 +714,12 @@ namespace houio
 		}
 
 
-		return HouGeoIO::xport( &out, houGeo );
+		return HouGeoIO::exportGeometry(&out, houGeo);
+	}
+
+	bool HouGeoIO::xport( const std::string &filename, Geometry::Ptr geo )
+	{
+		return exportGeometry(filename, geo);
 	}
 
 	bool HouGeoIO::xport( const std::string& filename, const std::vector<math::V3f>& points )
@@ -744,38 +755,25 @@ namespace houio
 
 	bool HouGeoIO::xport( std::ostream *out, HouGeoAdapter::Ptr geo, bool binary )
 	{
+		return exportGeometry(out, geo, binary);
+	}
+
+	bool HouGeoIO::exportGeometry( std::ostream *out, HouGeoAdapter::Ptr geo, bool binary )
+	{
 		if( !out || !geo || !out->good() )
 			return false;
 		if( !binary )
 			return false;
 
 		json::BinaryWriter writer(out);
-		struct WriterBinding
-		{
-			WriterBinding(json::BinaryWriter*& writerSlot, json::BinaryWriter& activeWriter)
-				: slot(writerSlot), previous(writerSlot)
-			{
-				slot = &activeWriter;
-			}
-
-			~WriterBinding()
-			{
-				slot = previous;
-			}
-
-			WriterBinding(const WriterBinding&) = delete;
-			WriterBinding& operator=(const WriterBinding&) = delete;
-
-			json::BinaryWriter*& slot;
-			json::BinaryWriter* previous;
-		};
-		WriterBinding writerBinding(g_writer, writer);
+		ExportContext context(writer);
+		json::BinaryWriter* const g_writer = &context.writer;
 
 		const sint64 pointCount = geo->pointcount();
 		const sint64 vertexCount = geo->vertexcount();
 		const sint64 primitiveCount = geo->primitivecount();
 		if( pointCount < 0 || vertexCount < 0 || primitiveCount < 0 )
-			throw std::runtime_error( "HouGeoIO::xport received negative geometry counts" );
+			throw std::runtime_error( "HouGeoIO::exportGeometry received negative geometry counts" );
 
 		g_writer->jsonBeginArray();
 
@@ -792,7 +790,7 @@ namespace houio
 		g_writer->jsonString( "topology" );
 		g_writer->jsonBeginArray();
 			if( geo->getTopology() )
-				exportTopology( geo->getTopology() );
+				exportTopology(context, geo->getTopology());
 		g_writer->jsonEndArray();
 
 
@@ -806,7 +804,7 @@ namespace houio
 				std::vector<std::string> pointAttrNames;
 				geo->getPointAttributeNames(pointAttrNames);
 				for( std::vector<std::string>::iterator it = pointAttrNames.begin(); it != pointAttrNames.end(); ++it )
-					exportAttribute( geo->getPointAttribute(*it) );
+					exportAttribute(context, geo->getPointAttribute(*it));
 			g_writer->jsonEndArray(); // pointattributes
 
 			// -- vertex attributes
@@ -815,7 +813,7 @@ namespace houio
 				std::vector<std::string> vertexAttrNames;
 				geo->getVertexAttributeNames(vertexAttrNames);
 				for( std::vector<std::string>::iterator it = vertexAttrNames.begin(); it != vertexAttrNames.end(); ++it )
-					exportAttribute( geo->getVertexAttribute(*it) );
+					exportAttribute(context, geo->getVertexAttribute(*it));
 			g_writer->jsonEndArray(); // vertexattributes
 
 
@@ -825,7 +823,7 @@ namespace houio
 				std::vector<std::string> primitiveAttrNames;
 				geo->getPrimitiveAttributeNames(primitiveAttrNames);
 				for( std::vector<std::string>::iterator it = primitiveAttrNames.begin(); it != primitiveAttrNames.end(); ++it )
-					exportAttribute( geo->getPrimitiveAttribute(*it) );
+					exportAttribute(context, geo->getPrimitiveAttribute(*it));
 			g_writer->jsonEndArray(); // primitiveattributes
 
 			// -- global attributes
@@ -834,7 +832,7 @@ namespace houio
 				std::vector<std::string> globalAttrNames;
 				geo->getGlobalAttributeNames(globalAttrNames);
 				for( std::vector<std::string>::iterator it = globalAttrNames.begin(); it != globalAttrNames.end(); ++it )
-					exportAttribute( geo->getGlobalAttribute(*it) );
+					exportAttribute(context, geo->getGlobalAttribute(*it));
 			g_writer->jsonEndArray(); // globalattributes
 		g_writer->jsonEndArray(); // attributes
 
@@ -853,12 +851,12 @@ namespace houio
 			{
 				if( auto volume = std::dynamic_pointer_cast<HouGeoAdapter::VolumePrimitive>(prim) )
 				{
-					exportPrimitive(volume);
+					exportPrimitive(context, volume);
 					++topologyVertexOffset;
 				}
 				else if( auto poly = std::dynamic_pointer_cast<HouGeoAdapter::PolyPrimitive>(prim) )
 				{
-					exportPrimitive(poly, topologyVertexOffset);
+					exportPrimitive(context, poly, topologyVertexOffset);
 					for( int polygonIndex=0;polygonIndex<poly->numPolys();++polygonIndex )
 						topologyVertexOffset += poly->numVertices(polygonIndex);
 				}
@@ -877,8 +875,8 @@ namespace houio
 				std::vector<bool> membership;
 				if( !geo->getPointGroupMembership(name, membership)
 					|| membership.size() != static_cast<size_t>(pointCount) )
-					throw std::runtime_error( "HouGeoIO::xport invalid point group " + name );
-				exportGroup(name, membership);
+					throw std::runtime_error( "HouGeoIO::exportGeometry invalid point group " + name );
+				exportGroup(context, name, membership);
 			}
 			g_writer->jsonEndArray();
 		}
@@ -894,8 +892,8 @@ namespace houio
 				std::vector<bool> membership;
 				if( !geo->getVertexGroupMembership(name, membership)
 					|| membership.size() != static_cast<size_t>(vertexCount) )
-					throw std::runtime_error( "HouGeoIO::xport invalid vertex group " + name );
-				exportGroup(name, membership);
+					throw std::runtime_error( "HouGeoIO::exportGeometry invalid vertex group " + name );
+				exportGroup(context, name, membership);
 			}
 			g_writer->jsonEndArray();
 		}
@@ -911,8 +909,8 @@ namespace houio
 				std::vector<bool> membership;
 				if( !geo->getPrimitiveGroupMembership(name, membership)
 					|| membership.size() != static_cast<size_t>(primitiveCount) )
-					throw std::runtime_error( "HouGeoIO::xport invalid primitive group " + name );
-				exportGroup(name, membership);
+					throw std::runtime_error( "HouGeoIO::exportGeometry invalid primitive group " + name );
+				exportGroup(context, name, membership);
 			}
 			g_writer->jsonEndArray();
 		}
@@ -927,8 +925,9 @@ namespace houio
 
 
 
-	bool HouGeoIO::exportAttribute( HouGeoAdapter::AttributeAdapter::Ptr attr )
+	bool HouGeoIO::exportAttribute( ExportContext &context, HouGeoAdapter::AttributeAdapter::Ptr attr )
 	{
+		json::BinaryWriter* const g_writer = &context.writer;
 		if( !attr )
 			return false;
 
@@ -1123,8 +1122,11 @@ namespace houio
 
 	// export topo
 	// TODO: datatype is int ~~~~
-	bool HouGeoIO::exportTopology( HouGeoAdapter::Topology::Ptr topo )
+	bool HouGeoIO::exportTopology( ExportContext &context, HouGeoAdapter::Topology::Ptr topo )
 	{
+		json::BinaryWriter* const g_writer = &context.writer;
+		if( !topo )
+			return false;
 		std::vector<sint32> indices;
 		topo->getIndices(indices);
 		
@@ -1160,8 +1162,9 @@ namespace houio
 	}
 
 
-	bool HouGeoIO::exportGroup( const std::string &name, const std::vector<bool> &membership )
+	bool HouGeoIO::exportGroup( ExportContext &context, const std::string &name, const std::vector<bool> &membership )
 	{
+		json::BinaryWriter* const g_writer = &context.writer;
 		if( name.empty() )
 			throw std::runtime_error( "HouGeoIO::exportGroup requires a non-empty name" );
 
@@ -1190,8 +1193,11 @@ namespace houio
 		return true;
 	}
 
-	bool HouGeoIO::exportPrimitive( HouGeoAdapter::VolumePrimitive::Ptr volume )
+	bool HouGeoIO::exportPrimitive( ExportContext &context, HouGeoAdapter::VolumePrimitive::Ptr volume )
 	{
+		json::BinaryWriter* const g_writer = &context.writer;
+		if( !volume )
+			return false;
 		math::V3i res = volume->getResolution();
 
 		g_writer->jsonBeginArray();
@@ -1338,8 +1344,9 @@ namespace houio
 		return true;
 	}
 
-	bool HouGeoIO::exportPrimitive( HouGeoAdapter::PolyPrimitive::Ptr poly, int startVertex )
+	bool HouGeoIO::exportPrimitive( ExportContext &context, HouGeoAdapter::PolyPrimitive::Ptr poly, int startVertex )
 	{
+		json::BinaryWriter* const g_writer = &context.writer;
 		if( !poly || startVertex < 0 || poly->numPolys() <= 0 )
 			return false;
 

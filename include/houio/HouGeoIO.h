@@ -23,18 +23,28 @@ namespace houio
 		static Geometry::Ptr                    convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim );
 		static Geometry::Ptr                    convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim, DiagnosticList *diagnostics );
 
-		static bool                             xport( const std::string& filename, ScalarField::Ptr volume ); // convinience funcion for quickly saving volume to bgeo
-		static bool                             xport( const std::string& filename, Geometry::Ptr geo ); // convinience funcion for quickly saving geometry to bgeo
+		static bool                             exportVolume( const std::string &filename, ScalarField::Ptr volume );
+		static bool                             exportGeometry( const std::string &filename, Geometry::Ptr geo );
+		static bool                             exportGeometry( std::ostream *out, HouGeoAdapter::Ptr geo, bool binary = true );
+
+		// Historical compatibility wrappers. New code should use exportVolume() or exportGeometry().
+		static bool                             xport( const std::string& filename, ScalarField::Ptr volume );
+		static bool                             xport( const std::string& filename, Geometry::Ptr geo );
 		static bool                             xport( const std::string& filename, const std::vector<math::V3f>& points );
 		static bool                             xport( const std::string& filename, const std::map<std::string, std::vector<math::V3f>>& pattr_v3f );
-		static bool                             xport( std::ostream *out, HouGeoAdapter::Ptr geo , bool binary = true);
+		static bool                             xport( std::ostream *out, HouGeoAdapter::Ptr geo, bool binary = true );
 
 	private:
-		static bool                             exportAttribute( HouGeoAdapter::AttributeAdapter::Ptr attr );
-		static bool                             exportTopology( HouGeoAdapter::Topology::Ptr topo );
-		static bool                             exportPrimitive( HouGeoAdapter::VolumePrimitive::Ptr volume );
-		static bool                             exportPrimitive( HouGeoAdapter::PolyPrimitive::Ptr poly, int startVertex );
-		static bool                             exportGroup( const std::string &name, const std::vector<bool> &membership );
-		static thread_local json::BinaryWriter* g_writer;
+		struct ExportContext
+		{
+			explicit ExportContext( json::BinaryWriter &activeWriter ) : writer(activeWriter) {}
+			json::BinaryWriter &writer;
+		};
+
+		static bool                             exportAttribute( ExportContext &context, HouGeoAdapter::AttributeAdapter::Ptr attr );
+		static bool                             exportTopology( ExportContext &context, HouGeoAdapter::Topology::Ptr topo );
+		static bool                             exportPrimitive( ExportContext &context, HouGeoAdapter::VolumePrimitive::Ptr volume );
+		static bool                             exportPrimitive( ExportContext &context, HouGeoAdapter::PolyPrimitive::Ptr poly, int startVertex );
+		static bool                             exportGroup( ExportContext &context, const std::string &name, const std::vector<bool> &membership );
 	};
 }
