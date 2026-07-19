@@ -210,7 +210,7 @@ m_primitives
 
 ### Attribute domains
 
-Each Houdini attribute is represented by `HouGeo::HouAttribute`, which wraps the generic `Attribute` buffer for numeric values or expanded per-element strings. Numeric loading supports legacy paged data, modern `values.tuples`, and component-oriented `values.arrays`. String loading expands indexed string tables, including constant-page-compressed index payloads used by Houdini 21/22.
+Each Houdini attribute is represented by `HouGeo::HouAttribute`, which wraps the generic `Attribute` buffer for numeric values or expanded per-element strings. Numeric loading supports legacy paged data, modern `values.tuples`, and component-oriented `values.arrays`. Signed 32-bit and 64-bit integers plus 32-bit and 64-bit floating-point values retain their declared storage through import and export. String loading expands indexed string tables, including constant-page-compressed index payloads used by Houdini 21/22.
 
 The loader uses the root geometry counts to size each domain:
 
@@ -305,7 +305,7 @@ The writer serializes point, vertex, primitive, and global attributes through th
 
 ### Fixture-backed compatibility tests
 
-The optional Houdini integration layer generates minimal fixtures rather than storing version-specific binary blobs in the repository. A manifest records counts, domains, primitive state, and known losses. HouIO round-trips each fixture, and Houdini 21.0.631 and 22.0.368 compare exact attribute metadata and values, primitive topology, open/closed state, dense-volume resolution, transform, position and voxel values, and point, vertex, and primitive group membership. The 12-fixture matrix succeeds with either Houdini 21 or Houdini 22 as the generator and has no intentional round-trip losses.
+The optional Houdini integration layer generates minimal fixtures rather than storing version-specific binary blobs in the repository. A manifest records counts, domains, primitive state, and known losses. HouIO round-trips each fixture, and Houdini 21.0.631 and 22.0.368 compare exact attribute data types, numeric precision and values, primitive topology, open/closed state, dense-volume resolution, transform, position and voxel values, and point, vertex, and primitive group membership. The 13-fixture matrix succeeds with either Houdini 21 or Houdini 22 as the generator and has no intentional round-trip losses.
 
 The Crag integration test remains the large-scale gate. It additionally compares all 89,942 polygon topologies and 359,794 vertices exactly, which protects the topology-offset writer path from shared-point corruption.
 

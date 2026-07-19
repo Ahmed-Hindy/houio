@@ -21,7 +21,11 @@ namespace houio
 		{
 		case INT:
 			{
-				m_componentSize=sizeof(int);
+				m_componentSize=sizeof(sint32);
+			}break;
+		case INT64:
+			{
+				m_componentSize=sizeof(sint64);
 			}break;
 		default:
 		case FLOAT:
@@ -121,7 +125,7 @@ namespace houio
 		{
 		case INT:return sizeof(sint32);
 		case FLOAT:return sizeof(real32);
-		//case REAL64:return sizeof(real64);
+		case INT64:return sizeof(sint64);
 		default:
 			throw std::runtime_error( "unknown component type" );
 		};
@@ -141,9 +145,10 @@ namespace houio
 		//else
 		if( ct == "int32" )
 			return INT;
-		else
-		if( ct == "int" )
+		else if( ct == "int" )
 			return INT;
+		else if( ct == "int64" )
+			return INT64;
 		return INVALID;
 	}
 

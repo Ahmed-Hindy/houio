@@ -60,6 +60,49 @@ def create_polygon(geometry: hou.Geometry, points: Sequence[hou.Point], indices:
     return polygon
 
 
+def add_numeric_point_attribute(
+    geometry: hou.Geometry, name: str, type_index: int, precision_index: int, values: Sequence[int | float]
+) -> hou.Geometry:
+    """Add a point attribute with an explicit Houdini numeric precision.
+
+    Args:
+        geometry: Source geometry.
+        name: Attribute name.
+        type_index: Attribute Create SOP type menu index.
+        precision_index: Attribute Create SOP precision menu index.
+        values: Scalar values in point order.
+
+    Returns:
+        Geometry containing the explicitly typed attribute.
+    """
+    if len(values) != len(geometry.points()):
+        raise ValueError(f"{name}: value count does not match point count")
+
+    verb = hou.sopNodeTypeCategory().nodeVerb("attribcreate::2.0")
+    if verb is None:
+        raise RuntimeError("Houdini does not provide the attribcreate::2.0 SOP verb")
+    attribute_parameters = verb.parms()["numattr"][0].copy()
+    attribute_parameters.update(
+        {
+            "name#": name,
+            "class#": 2,
+            "type#": type_index,
+            "precision#": precision_index,
+            "size#": 1,
+            "value#v": hou.Vector4(float(values[0]), 0.0, 0.0, 0.0),
+        }
+    )
+    verb.setParms({"numattr": (attribute_parameters,)})
+    result = hou.Geometry()
+    verb.execute(result, [geometry])
+    attribute = result.findPointAttrib(name)
+    if attribute is None:
+        raise RuntimeError(f"Houdini did not create point attribute {name}")
+    for point, value in zip(result.points(), values):
+        point.setAttribValue(attribute, value)
+    return result
+
+
 def build_empty_geometry() -> hou.Geometry:
     """Build geometry with no elements.
 
@@ -99,6 +142,23 @@ def build_point_attributes_geometry() -> hou.Geometry:
         point.setAttribValue(label_attribute, label)
 
     return geometry
+
+
+def build_numeric_precision_geometry() -> hou.Geometry:
+    """Build point attributes using explicit 64-bit integer storage.
+
+    Returns:
+        Point geometry with values outside the signed 32-bit range.
+    """
+    geometry = hou.Geometry()
+    create_points(geometry, ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)))
+    return add_numeric_point_attribute(
+        geometry,
+        "large_id",
+        type_index=1,
+        precision_index=3,
+        values=(1099511627776, -1099511627777, 4294967299),
+    )
 
 
 def build_triangles_geometry() -> hou.Geometry:
@@ -372,6 +432,7 @@ def main() -> int:
     fixtures: tuple[tuple[str, FixtureBuilder, tuple[str, ...]], ...] = (
         ("empty", build_empty_geometry, ()),
         ("point_attributes", build_point_attributes_geometry, ()),
+        ("numeric_precision", build_numeric_precision_geometry, ()),
         ("triangles", build_triangles_geometry, ()),
         ("quads", build_quads_geometry, ()),
         ("mixed_polygons", build_mixed_polygons_geometry, ()),

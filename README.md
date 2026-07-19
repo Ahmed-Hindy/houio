@@ -225,10 +225,10 @@ Conversion to `Geometry` is intentionally render-oriented and lossy. Face-varyin
 
 ## Houdini 21/22 minimal fixture matrix
 
-The generated fixture matrix isolates modern schema behavior into 12 small binary files:
+The generated fixture matrix isolates modern schema behavior into 13 small binary files:
 
 - Empty and point-only geometry
-- Point `P`, `Cd`, float, integer, and string attributes
+- Point `P`, `Cd`, float, 32-bit integer, 64-bit integer, and string attributes
 - Triangle-only, quad-only, mixed-size, and n-gon polygon runs
 - Open polygon curves and multiple closed/open primitive records
 - Vertex-domain UV seams
@@ -244,7 +244,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_fixture_roundtrips.ps1
 ```
 
-Houdini 22.0.368 generates the sources by default. HouIO round-trips each file, then Houdini 21.0.631 and 22.0.368 compare exact counts, attribute metadata and values, primitive type, open/closed state, point topology, dense-volume resolution, transform, position and voxels, and group membership. The same suite also succeeds when Houdini 21.0.631 generates the sources. Generated files stay under the configured build directory rather than being committed as opaque binary assets. The current fixture matrix has no intentional round-trip losses.
+Houdini 22.0.368 generates the sources by default. HouIO round-trips each file, then Houdini 21.0.631 and 22.0.368 compare exact counts, attribute data type and numeric precision, attribute values, primitive type, open/closed state, point topology, dense-volume resolution, transform, position and voxels, and group membership. The same suite also succeeds when Houdini 21.0.631 generates the sources. Generated files stay under the configured build directory rather than being committed as opaque binary assets. The current fixture matrix has no intentional round-trip losses.
 
 ## Houdini 21/22 Crag experiment
 

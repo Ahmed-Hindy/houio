@@ -57,7 +57,9 @@ namespace houio
 			virtual void              jsonKey( const std::string &key ) = 0;
 			virtual void                  jsonBool( const bool &value ) = 0;
 			virtual void               jsonInt32( const sint32 &value ) = 0;
+			virtual void               jsonInt64( const sint64 &value ) = 0;
 			virtual void              jsonReal32( const real32 &value ) = 0;
+			virtual void              jsonReal64( const real64 &value ) = 0;
 			virtual void   uaBool( sint64 numElements, Parser *parser ) = 0;
 			virtual void uaReal32( sint64 numElements, Parser *parser ) = 0;
 			virtual void uaReal64( sint64 numElements, Parser *parser ) = 0;
@@ -524,10 +526,22 @@ namespace houio
 				out << "jsonInt32 " << value << "\n";std::flush(out);
 			}
 
+			virtual void jsonInt64( const sint64 &value )
+			{
+				indent();
+				out << "jsonInt64 " << value << "\n";std::flush(out);
+			}
+
 			virtual void jsonReal32( const real32 &value )
 			{
 				indent();
 				out << "jsonReal32 " << value << "\n";std::flush(out);
+			}
+
+			virtual void jsonReal64( const real64 &value )
+			{
+				indent();
+				out << "jsonReal64 " << value << "\n";std::flush(out);
 			}
 
 			virtual void jsonBeginMap()
@@ -732,10 +746,14 @@ namespace houio
 		{
 			D &dest;
 			VariantConverter( D &_dest ) : dest(_dest){}
+			void operator()( const std::string &value )
+			{
+				dest = fromString<D>(value);
+			}
 			template< typename T >
 			void operator()( T d )
 			{
-				dest = (D)d;
+				dest = static_cast<D>(d);
 			}
 		};
 
@@ -983,7 +1001,9 @@ namespace houio
 			virtual void                 jsonKey( const std::string &key );
 			virtual void                     jsonBool( const bool &value );
 			virtual void                  jsonInt32( const sint32 &value );
+			virtual void                  jsonInt64( const sint64 &value );
 			virtual void                 jsonReal32( const real32 &value );
+			virtual void                 jsonReal64( const real64 &value );
 			virtual void      uaBool( sint64 numElements, Parser *parser );
 			virtual void    uaReal32( sint64 numElements, Parser *parser );
 			virtual void    uaReal64( sint64 numElements, Parser *parser );

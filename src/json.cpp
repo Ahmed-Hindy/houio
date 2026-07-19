@@ -46,11 +46,11 @@ namespace houio
 			else if (type == JID_INT32)
 				p->handler->jsonInt32( ttl::var::get<sint32>( value ) );
 			else if (type == JID_INT64)
-				p->handler->jsonInt32( (int)ttl::var::get<sint64>( value ) );
+				p->handler->jsonInt64( ttl::var::get<sint64>( value ) );
 			else if (type == JID_REAL32)
 				p->handler->jsonReal32( ttl::var::get<real32>( value ) );
 			else if (type == JID_REAL64)
-				p->handler->jsonReal32( (real32)ttl::var::get<real64>( value ) );
+				p->handler->jsonReal64( ttl::var::get<real64>( value ) );
 			else if (type == JID_UINT8)
 				p->handler->jsonInt32( ttl::var::get<ubyte>( value ) );
 			else if (type == JID_UINT16)
@@ -1488,9 +1488,19 @@ namespace houio
 			jsonValue<sint32>(value);
 		}
 
+		void JSONReader::jsonInt64( const sint64 &value )
+		{
+			jsonValue<sint64>(value);
+		}
+
 		void JSONReader::jsonReal32( const real32 &value )
 		{
 			jsonValue<real32>(value);
+		}
+
+		void JSONReader::jsonReal64( const real64 &value )
+		{
+			jsonValue<real64>(value);
 		}
 
 
