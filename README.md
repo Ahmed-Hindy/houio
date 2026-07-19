@@ -79,7 +79,7 @@ if (!result)
 }
 ```
 
-`GeometryIO` is the preferred path-based API. Result objects own their diagnostics, expose explicit success state, and do not require output pointers. The returned `std::shared_ptr` owns the parsed geometry independently of the input file and temporary decompression buffers.
+`GeometryIO` is the preferred path-based API. Result objects own their diagnostics, expose explicit success state, and do not require output pointers. The returned `std::shared_ptr` owns the parsed geometry independently of the input file and temporary decompression buffers. `GeometryReadOptions::maxFileBytes` defaults to 512 MiB for the on-disk container, while `parserLimits.maxInputBytes` independently bounds the raw or decompressed document.
 
 Use `readGeometry()` for the deliberately lossy render-oriented model. It requires point `P`, one fixed polygon size, valid point references, and domain-consistent attributes. Use `readHouGeo()` when mixed polygon sizes, primitive/global attributes, groups, multiple primitive records, or exact supported Houdini storage must survive.
 
@@ -112,7 +112,7 @@ const houio::GeometryWriteResult result =
 
 The output extension selects raw `.bgeo` or compressed `.bgeo.sc`. `GeometryWriteOptions` controls SCF block size, compression level, shuffling, compressor name, and an optional explicit C-Blosc library path.
 
-`HouGeoIO::importGeometry()`, `importVolume()`, `exportGeometry()`, `exportVolume()`, and the historical `xport()` overloads remain source-compatible wrappers. Stream-based serialization still uses an explicit stack-owned export context and supports independent concurrent streams. ASCII geometry export remains unsupported.
+`HouGeoIO::importGeometry()`, `importVolume()`, `exportGeometry()`, `exportVolume()`, and the historical `xport()` overloads remain source-compatible wrappers. The no-diagnostics import overloads throw `DiagnosticException` on failure; overloads receiving a `DiagnosticList` append errors and return null. Stream-based serialization still uses an explicit stack-owned export context and supports independent concurrent streams. ASCII geometry export remains unsupported.
 
 ### Inspect a file's structure
 
@@ -163,7 +163,7 @@ for (const houio::Diagnostic& diagnostic : diagnostics)
 
 `DiagnosticCategory::malformed_input` identifies invalid stream encoding, while `unsupported_input` identifies valid records HouIO does not implement. Semantic failures use `schema`, file access uses `io`, and lossy convenience conversion warnings use `conversion`.
 
-The original overloads remain available. Parser failures continue to throw when no diagnostic list is supplied, while the diagnostics-aware overloads capture those failures and return null. `importGeometry()`, `importVolume()`, and `convertToGeometry()` also accept diagnostic lists. `importVolume()` now reports an empty primitive list instead of indexing it.
+The original overloads remain available. Parser and path-import failures throw `DiagnosticException` when no diagnostic list is supplied, while diagnostics-aware overloads capture those failures and return null. `importGeometry()`, `importVolume()`, and `convertToGeometry()` also accept diagnostic lists. `importVolume()` now reports an empty primitive list instead of indexing it.
 
 ## `.bgeo.sc` support
 
@@ -174,7 +174,7 @@ HouIO dynamically loads C-Blosc so the core library has no required compression 
 1. `GeometryReadOptions::bloscLibraryPath` or `GeometryWriteOptions::bloscLibraryPath`.
 2. `HOUIO_BLOSC_LIBRARY`.
 3. `$HFS/bin/blosc.dll` on Windows.
-4. Standard platform library names such as `libblosc.so.1`.
+4. Standard platform library names such as `blosc.dll` or `libblosc.so.1`.
 
 Inside Houdini, the supplied package sets `HOUIO_BLOSC_LIBRARY` to the Blosc runtime shipped with the active Houdini version. Outside Houdini, install C-Blosc or pass its shared-library path explicitly.
 
@@ -192,7 +192,7 @@ Both directions are tested against Houdini-generated files, and Houdini 21 and 2
 The standalone C++ library does not link to Houdini's private OpenVDB build and does not yet model sparse OpenVDB trees natively. The `python/houio_hom` package provides the supported Houdini-side path:
 
 - Houdini reads and writes `.bgeo`, `.bgeo.sc`, `.geo`, and `.vdb` through HOM.
-- Scalar VDB grids can be converted to dense Houdini volumes with the `convertvdb` SOP verb before HouIO processing.
+- 32-bit float VDB grids can be converted to dense Houdini volumes with the `convertvdb` SOP verb before HouIO processing.
 - Dense HouIO volumes can be converted back to VDB grids before `.vdb` output.
 - `hou.Geometry.data()` and `hou.Geometry.load()` bridge uncompressed bgeo bytes without temporary Houdini nodes.
 - `houio_convert` can be launched from HOM without loading a Python extension into Houdini's process.
@@ -224,7 +224,8 @@ print(len(geometry.prims()))
 from houio_hom import roundtrip_current_sop
 
 # Replaces the writable Python SOP geometry with HouIO's round-trip output.
-roundtrip_current_sop()
+# Float VDB primitives are explicitly densified before the subprocess call.
+roundtrip_current_sop(timeout_seconds=300.0)
 ```
 
 ### Headless hython
@@ -235,7 +236,7 @@ hython -m houio_hom encode density.bgeo density.bgeo.sc
 hython -m houio_hom encode density.bgeo density.vdb
 ```
 
-VDB conversion is deliberately strict: the geometry must contain only VDB primitives when converting to dense volumes, or only dense volumes when converting to VDB. Sparse grids become dense in memory, so this path is intended for bounded scalar fields, not large production VDBs.
+VDB conversion is deliberately bounded. VDB-to-volume conversion accepts 32-bit float grids and preserves unrelated primitives in mixed Houdini geometry. Volume-to-VDB conversion requires a pure dense-volume set because Houdini's `.vdb` writer silently omits mesh primitives. Sparse grids become dense in memory, so this path is intended for bounded fields, not large production VDBs. Converter subprocess calls default to a 300-second timeout, which can be changed or disabled per call.
 
 ## Building
 

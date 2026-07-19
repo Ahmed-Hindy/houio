@@ -40,6 +40,33 @@ namespace houio
                 DiagnosticSeverity::error, category, std::move(message), -1, std::move(path)});
         }
 
+        bool validateReadOptions(const GeometryReadOptions &options, DiagnosticList &diagnostics)
+        {
+            const json::ParserLimits &limits = options.parserLimits;
+            if( limits.maxInputBytes < 0 || limits.maxStringBytes < 0
+                || limits.maxUniformArrayElements < 0 )
+            {
+                appendResultError(diagnostics, DiagnosticCategory::malformed_input,
+                    "Parser limits cannot be negative", "options.parserLimits");
+                return false;
+            }
+            if( limits.maxNestingDepth == 0 )
+            {
+                appendResultError(diagnostics, DiagnosticCategory::malformed_input,
+                    "Parser nesting depth must be greater than zero", "options.parserLimits.maxNestingDepth");
+                return false;
+            }
+            if( static_cast<unsigned long long>(limits.maxInputBytes)
+                > std::numeric_limits<std::size_t>::max() )
+            {
+                appendResultError(diagnostics, DiagnosticCategory::unsupported_input,
+                    "Parser input limit exceeds this platform's addressable size",
+                    "options.parserLimits.maxInputBytes");
+                return false;
+            }
+            return true;
+        }
+
         GeometryFileFormat detectFormatFromName(const std::filesystem::path &path)
         {
             const std::string filename = lowercase(path.filename().string());
@@ -196,6 +223,9 @@ namespace houio
         const std::filesystem::path &path, const GeometryReadOptions &options)
     {
         GeometryReadResult<HouGeo::Ptr> result;
+        if( !validateReadOptions(options, result.diagnostics) )
+            return result;
+
         std::vector<char> fileBytes;
         if( !readFileBytes(path, options.maxFileBytes, fileBytes, result.diagnostics) )
             return result;
@@ -206,7 +236,7 @@ namespace houio
         if( format == GeometryFileFormat::bgeo_scf )
         {
             detail::ScfReadOptions scfOptions;
-            scfOptions.maxOutputBytes = options.parserLimits.maxInputBytes;
+            scfOptions.maxOutputBytes = static_cast<std::size_t>(options.parserLimits.maxInputBytes);
             scfOptions.bloscLibraryPath = options.bloscLibraryPath;
             if( !detail::decompressScf(parserBytes, decodedBytes, scfOptions, &result.diagnostics) )
                 return result;
@@ -226,10 +256,23 @@ namespace houio
             return result;
         }
 
-        std::string parserStorage(parserBytes.data(), parserBytes.size());
+        std::string parserStorage;
+        parserStorage.assign(parserBytes.begin(), parserBytes.end());
         std::istringstream input(parserStorage, std::ios::in | std::ios::binary);
-        result.value = HouGeoIO::import(&input, options.parserLimits, &result.diagnostics);
-        result.succeeded = static_cast<bool>(result.value);
+        try
+        {
+            result.value = HouGeoIO::import(&input, options.parserLimits, &result.diagnostics);
+            result.succeeded = static_cast<bool>(result.value);
+        }
+        catch( const DiagnosticException &exception )
+        {
+            result.diagnostics.push_back(exception.diagnostic());
+        }
+        catch( const std::exception &exception )
+        {
+            appendResultError(result.diagnostics, DiagnosticCategory::malformed_input,
+                exception.what(), "file");
+        }
         return result;
     }
 
@@ -419,13 +462,26 @@ namespace houio
         const ScalarField::Ptr &volume, const GeometryWriteOptions &options)
     {
         GeometryWriteResult result;
-        const HouGeo::Ptr adaptedVolume = HouGeoIO::adaptVolume(volume);
-        if( !adaptedVolume )
+        try
         {
-            appendResultError(result.diagnostics, DiagnosticCategory::io,
-                "Cannot write a null scalar volume");
+            const HouGeo::Ptr adaptedVolume = HouGeoIO::adaptVolume(volume);
+            if( !adaptedVolume )
+            {
+                appendResultError(result.diagnostics, DiagnosticCategory::io,
+                    "Cannot write a null scalar volume");
+                return result;
+            }
+            return writeHouGeo(path, adaptedVolume, options);
+        }
+        catch( const DiagnosticException &exception )
+        {
+            result.diagnostics.push_back(exception.diagnostic());
             return result;
         }
-        return writeHouGeo(path, adaptedVolume, options);
+        catch( const std::exception &exception )
+        {
+            appendResultError(result.diagnostics, DiagnosticCategory::conversion, exception.what());
+            return result;
+        }
     }
 }

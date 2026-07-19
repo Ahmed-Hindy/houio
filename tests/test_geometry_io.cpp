@@ -1,4 +1,5 @@
 #include <houio/GeometryIO.h>
+#include <houio/HouGeoIO.h>
 
 #include <cstdint>
 #include <cstdlib>
@@ -166,6 +167,53 @@ int verifyMultipleVolumes(const std::filesystem::path &directory)
     return 0;
 }
 
+int verifyInvalidReadOptions(const std::filesystem::path &directory)
+{
+    houio::GeometryReadOptions options;
+    options.parserLimits.maxInputBytes = -1;
+    const auto invalidLimitResult =
+        houio::GeometryIO::readHouGeo(directory / "points.bgeo", options);
+    if( invalidLimitResult
+        || !containsCategory(invalidLimitResult.diagnostics, houio::DiagnosticCategory::malformed_input) )
+    {
+        return fail("invalid parser limits were not captured by GeometryIO");
+    }
+
+    options = houio::GeometryReadOptions();
+    options.parserLimits.maxNestingDepth = 0;
+    const auto invalidDepthResult =
+        houio::GeometryIO::readHouGeo(directory / "points.bgeo", options);
+    if( invalidDepthResult
+        || !containsCategory(invalidDepthResult.diagnostics, houio::DiagnosticCategory::malformed_input) )
+    {
+        return fail("invalid parser nesting depth was not captured by GeometryIO");
+    }
+    return 0;
+}
+
+int verifyLegacyFailureContract(const std::filesystem::path &directory)
+{
+    const std::filesystem::path missingPath = directory / "missing.bgeo";
+    bool threwDiagnostic = false;
+    try
+    {
+        static_cast<void>(houio::HouGeoIO::importGeometry(missingPath.string()));
+    }
+    catch( const houio::DiagnosticException &exception )
+    {
+        threwDiagnostic = exception.diagnostic().category == houio::DiagnosticCategory::io;
+    }
+    if( !threwDiagnostic )
+        return fail("legacy importGeometry did not throw without a diagnostic list");
+
+    houio::DiagnosticList diagnostics;
+    const houio::Geometry::Ptr geometry =
+        houio::HouGeoIO::importGeometry(missingPath.string(), &diagnostics);
+    if( geometry || !containsCategory(diagnostics, houio::DiagnosticCategory::io) )
+        return fail("legacy diagnostics overload did not return an I/O diagnostic");
+    return 0;
+}
+
 int verifyVdbContract(const std::filesystem::path &directory)
 {
     const std::filesystem::path path = directory / "density.cache";
@@ -196,6 +244,10 @@ int main()
     if( const int result = verifyScfRoundtrip(testDirectory); result != 0 )
         return result;
     if( const int result = verifyMultipleVolumes(testDirectory); result != 0 )
+        return result;
+    if( const int result = verifyInvalidReadOptions(testDirectory); result != 0 )
+        return result;
+    if( const int result = verifyLegacyFailureContract(testDirectory); result != 0 )
         return result;
     if( const int result = verifyVdbContract(testDirectory); result != 0 )
         return result;

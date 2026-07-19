@@ -17,6 +17,18 @@ namespace houio
 				destination->push_back(std::move(diagnostic));
 		}
 
+		[[noreturn]] void throwReadFailure(
+			const DiagnosticList &diagnostics, const std::string &fallbackMessage )
+		{
+			for( const Diagnostic &diagnostic : diagnostics )
+			{
+				if( diagnostic.severity == DiagnosticSeverity::error )
+					throw DiagnosticException(diagnostic);
+			}
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::io,
+				fallbackMessage, -1, "file"});
+		}
+
 		size_t checkedConversionCount( sint64 count, const std::string &description )
 		{
 			if( count < 0 )
@@ -130,11 +142,16 @@ namespace houio
 
 	Geometry::Ptr HouGeoIO::importGeometry( const std::string &path )
 	{
-		return importGeometry(path, nullptr);
+		GeometryReadResult<Geometry::Ptr> result = GeometryIO::readGeometry(path);
+		if( !result )
+			throwReadFailure(result.diagnostics, "HouGeoIO::importGeometry failed for " + path);
+		return result.value;
 	}
 
 	Geometry::Ptr HouGeoIO::importGeometry( const std::string &path, DiagnosticList *diagnostics )
 	{
+		if( !diagnostics )
+			return importGeometry(path);
 		GeometryReadResult<Geometry::Ptr> result = GeometryIO::readGeometry(path);
 		appendDiagnostics(diagnostics, std::move(result.diagnostics));
 		return result.value;
@@ -142,11 +159,16 @@ namespace houio
 
 	ScalarField::Ptr HouGeoIO::importVolume( const std::string &path )
 	{
-		return importVolume(path, nullptr);
+		GeometryReadResult<ScalarField::Ptr> result = GeometryIO::readVolume(path);
+		if( !result )
+			throwReadFailure(result.diagnostics, "HouGeoIO::importVolume failed for " + path);
+		return result.value;
 	}
 
 	ScalarField::Ptr HouGeoIO::importVolume( const std::string &path, DiagnosticList *diagnostics )
 	{
+		if( !diagnostics )
+			return importVolume(path);
 		GeometryReadResult<ScalarField::Ptr> result = GeometryIO::readVolume(path);
 		appendDiagnostics(diagnostics, std::move(result.diagnostics));
 		return result.value;

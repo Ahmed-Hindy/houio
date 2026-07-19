@@ -76,6 +76,7 @@ add_test(
         "-DHOUIO_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
         "-DHOUIO_BUILD_CONFIG=$<CONFIG>"
         "-DHOUIO_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+        "-DHOUIO_EXPECT_TOOLS=${HOUIO_BUILD_TOOLS}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package_consumer.cmake"
 )
 
@@ -190,6 +191,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
         houio.fixtures.triangles.scf_roundtrip
         PROPERTIES
             FIXTURES_REQUIRED houio_fixture_sources
+            FIXTURES_SETUP houio_triangle_scf_output
             ENVIRONMENT "HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
     )
 
@@ -205,7 +207,8 @@ if(HOUIO_HYTHON_EXECUTABLE)
     )
     set_tests_properties(
         houio.fixtures.triangles.scf_validate
-        PROPERTIES DEPENDS houio.fixtures.triangles.scf_roundtrip
+        PROPERTIES
+            FIXTURES_REQUIRED "houio_fixture_sources;houio_triangle_scf_output"
     )
 
     if(TARGET houio_convert)
@@ -236,6 +239,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
             houio.fixtures.triangles.houdini_scf_read
             PROPERTIES
                 FIXTURES_REQUIRED houio_houdini_scf_source
+                FIXTURES_SETUP houio_houdini_scf_output
                 ENVIRONMENT "HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
         )
 
@@ -251,7 +255,8 @@ if(HOUIO_HYTHON_EXECUTABLE)
         )
         set_tests_properties(
             houio.fixtures.triangles.houdini_scf_validate
-            PROPERTIES DEPENDS houio.fixtures.triangles.houdini_scf_read
+            PROPERTIES
+                FIXTURES_REQUIRED "houio_fixture_sources;houio_houdini_scf_output"
         )
     endif()
 

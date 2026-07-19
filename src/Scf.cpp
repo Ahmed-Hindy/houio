@@ -149,6 +149,7 @@ namespace houio::detail
                 const std::string houdiniRoot = environmentValue("HFS");
                 if( !houdiniRoot.empty() )
                     candidates.emplace_back(std::filesystem::path(houdiniRoot) / "bin" / "blosc.dll");
+                candidates.emplace_back("blosc.dll");
 #else
 #if defined(__APPLE__)
                 candidates.emplace_back("libblosc.dylib");
@@ -201,15 +202,27 @@ namespace houio::detail
             bool open(const std::filesystem::path &path)
             {
 #if defined(_WIN32)
+                std::filesystem::path loadPath = path;
+                std::error_code pathError;
+                const bool pathExists = std::filesystem::exists(path, pathError);
+                if( path.is_relative() && (path.has_parent_path() || (!pathError && pathExists)) )
+                {
+                    const std::filesystem::path absolutePath = std::filesystem::absolute(path, pathError);
+                    if( !pathError )
+                        loadPath = absolutePath;
+                }
+
                 DLL_DIRECTORY_COOKIE directoryCookie = nullptr;
-                const std::filesystem::path parentDirectory = path.parent_path();
+                const std::filesystem::path parentDirectory = loadPath.parent_path();
+                DWORD searchFlags = LOAD_LIBRARY_SEARCH_DEFAULT_DIRS;
                 if( !parentDirectory.empty() )
+                {
                     directoryCookie = AddDllDirectory(parentDirectory.wstring().c_str());
-                DWORD searchFlags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR
-                    | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS;
+                    searchFlags |= LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR;
+                }
                 if( directoryCookie )
                     searchFlags |= LOAD_LIBRARY_SEARCH_USER_DIRS;
-                handle = LoadLibraryExW(path.wstring().c_str(), nullptr, searchFlags);
+                handle = LoadLibraryExW(loadPath.wstring().c_str(), nullptr, searchFlags);
                 const DWORD loadError = handle ? ERROR_SUCCESS : GetLastError();
                 if( directoryCookie )
                     RemoveDllDirectory(directoryCookie);
@@ -456,7 +469,15 @@ namespace houio::detail
             compressedPosition = actualCompressedEnd;
         }
 
-        return compressedPosition == indexStart;
+        if( compressedPosition != indexStart )
+        {
+            appendError(diagnostics, DiagnosticCategory::malformed_input,
+                "SCF compressed payload does not end at the seek index",
+                static_cast<sint64>(compressedPosition));
+            output.clear();
+            return false;
+        }
+        return true;
     }
 
     bool compressScf(std::span<const char> input, std::vector<char> &output,

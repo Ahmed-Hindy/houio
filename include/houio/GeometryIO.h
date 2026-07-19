@@ -35,6 +35,7 @@ namespace houio
     {
         GeometryFileFormat format = GeometryFileFormat::automatic;
         json::ParserLimits parserLimits;
+        /// Maximum bytes in the on-disk container before optional SCF decompression.
         std::size_t maxFileBytes = 512ULL * 1024ULL * 1024ULL;
         std::string bloscLibraryPath;
     };
@@ -121,6 +122,7 @@ namespace houio
 
         /// Read the supported Houdini-oriented representation without lossy
         /// conversion. Supports ASCII .geo, binary .bgeo, and SCF .bgeo.sc.
+        /// Invalid options and file failures are returned as diagnostics.
         [[nodiscard]] static GeometryReadResult<HouGeo::Ptr> readHouGeo(
             const std::filesystem::path &path, const GeometryReadOptions &options = {});
         /// Read the first supported polygon representation into the lossy

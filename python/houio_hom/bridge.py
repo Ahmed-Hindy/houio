@@ -12,6 +12,7 @@ from typing import Optional, Union
 import hou
 
 PathLike = Union[str, Path]
+DEFAULT_CONVERTER_TIMEOUT_SECONDS = 300.0
 
 
 def _resolve_converter(executable: Optional[PathLike]) -> Path:
@@ -31,12 +32,16 @@ def _resolve_converter(executable: Optional[PathLike]) -> Path:
         root = Path(repository_root)
         candidates.extend(
             (
+                root / "bin" / "houio_convert.exe",
+                root / "bin" / "houio_convert",
                 root / "build" / "windows-msvc-release" / "houio_convert.exe",
                 root
                 / "build"
                 / "windows-msvc-release"
                 / "Release"
                 / "houio_convert.exe",
+                root / "build" / "windows-gcc-mingw" / "houio_convert.exe",
+                root / "build" / "windows-gcc-mingw" / "Release" / "houio_convert.exe",
                 root / "build" / "linux-gcc-release" / "houio_convert",
             )
         )
@@ -76,22 +81,32 @@ def convert_vdb_to_volume(geometry: hou.Geometry) -> hou.Geometry:
     """Convert every VDB primitive to a dense Houdini volume.
 
     Args:
-        geometry: Source geometry containing one or more VDB primitives.
+        geometry: Source geometry containing one or more 32-bit Float VDB
+            primitives. Unrelated primitives are preserved.
 
     Returns:
-        Independent geometry with VDB primitives converted to dense volumes.
+        Independent geometry with Float VDB primitives converted to dense volumes.
 
     Raises:
-        ValueError: If the source contains no VDB primitive or conversion does
-            not produce dense volumes.
+        ValueError: If the source contains no VDB primitive, contains another VDB
+            storage type, or conversion does not produce the expected volumes.
         hou.OperationFailed: If Houdini cannot execute the Convert VDB verb.
     """
     polygon_count, volume_count, vdb_count = _primitive_counts(geometry)
     if vdb_count == 0:
         raise ValueError("Geometry contains no VDB primitives")
-    if polygon_count != 0 or volume_count != 0 or vdb_count != len(geometry.prims()):
+    unsupported_types = sorted(
+        {
+            str(primitive.vdbType())
+            for primitive in geometry.prims()
+            if isinstance(primitive, hou.VDB)
+            and primitive.vdbType() != hou.vdbType.Float
+        }
+    )
+    if unsupported_types:
         raise ValueError(
-            "VDB conversion requires geometry containing only VDB primitives"
+            "HouIO densification supports only 32-bit float VDB grids; found "
+            + ", ".join(unsupported_types)
         )
 
     verb = hou.sopNodeTypeCategory().nodeVerb("convertvdb")
@@ -105,11 +120,14 @@ def convert_vdb_to_volume(geometry: hou.Geometry) -> hou.Geometry:
         result
     )
     if (
-        result_polygon_count != 0
-        or result_volume_count != len(result.prims())
+        result_polygon_count != polygon_count
+        or result_volume_count != volume_count + vdb_count
         or remaining_vdb_count != 0
+        or len(result.prims()) != len(geometry.prims())
     ):
-        raise ValueError("Convert VDB did not produce a pure dense-volume result")
+        raise ValueError(
+            "Convert VDB did not preserve non-VDB primitives or produce the expected dense volumes"
+        )
     return result
 
 
@@ -179,8 +197,9 @@ def load_for_houio(path: PathLike, *, convert_vdb: bool = True) -> hou.Geometry:
     """Load any Houdini-supported geometry file for HouIO consumption.
 
     `.bgeo.sc` is transparently decompressed by Houdini. When `convert_vdb` is
-    enabled, OpenVDB primitives are converted to dense volumes because HouIO's
-    native VDB primitive model is not implemented yet.
+    enabled, 32-bit Float VDB primitives are converted to dense volumes because
+    HouIO's native VDB primitive model is not implemented yet. Unrelated Houdini
+    primitives are preserved.
 
     Args:
         path: Geometry file supported by Houdini's File SOP.
@@ -260,6 +279,7 @@ def convert_with_houio(
     output_path: PathLike,
     *,
     executable: Optional[PathLike] = None,
+    timeout_seconds: Optional[float] = DEFAULT_CONVERTER_TIMEOUT_SECONDS,
 ) -> None:
     """Run the HouIO converter from a Houdini Python session.
 
@@ -272,10 +292,12 @@ def convert_with_houio(
         input_path: Input `.geo`, `.bgeo`, `.bgeo.sc`, or scalar `.vdb` file.
         output_path: Output `.bgeo`, `.bgeo.sc`, or `.vdb` file.
         executable: Optional explicit path to `houio_convert`.
+        timeout_seconds: Maximum converter runtime, or `None` to disable the timeout.
 
     Raises:
         FileNotFoundError: If `houio_convert` cannot be resolved.
         subprocess.CalledProcessError: If HouIO reports a conversion failure.
+        subprocess.TimeoutExpired: If the converter exceeds `timeout_seconds`.
     """
     source = Path(input_path)
     destination = Path(output_path)
@@ -300,6 +322,7 @@ def convert_with_houio(
             check=False,
             capture_output=True,
             text=True,
+            timeout=timeout_seconds,
         )
         if completed.returncode != 0:
             raise subprocess.CalledProcessError(
@@ -314,42 +337,67 @@ def convert_with_houio(
 
 
 def roundtrip_node_geometry(
-    node: hou.SopNode, *, executable: Optional[PathLike] = None
+    node: hou.SopNode,
+    *,
+    executable: Optional[PathLike] = None,
+    timeout_seconds: Optional[float] = DEFAULT_CONVERTER_TIMEOUT_SECONDS,
 ) -> hou.Geometry:
     """Round-trip a cooked SOP node through HouIO and return new geometry.
 
     Args:
         node: SOP node whose cooked geometry should be processed.
         executable: Optional explicit path to `houio_convert`.
+        timeout_seconds: Maximum converter runtime, or `None` to disable the timeout.
 
     Returns:
-        Newly allocated geometry loaded from HouIO's output.
+        Newly allocated geometry loaded from HouIO's output. Float VDB grids are
+        returned as dense volumes because HouIO has no sparse VDB model.
     """
     converter = _resolve_converter(executable)
+    source_geometry = _copy_geometry(node.geometry())
+    _, _, vdb_count = _primitive_counts(source_geometry)
+    if vdb_count > 0:
+        source_geometry = convert_vdb_to_volume(source_geometry)
+
     with tempfile.TemporaryDirectory(prefix="houio_node_") as temporary_directory:
         temporary_root = Path(temporary_directory)
         input_path = temporary_root / "input.bgeo"
         output_path = temporary_root / "output.bgeo"
-        input_path.write_bytes(geometry_to_bgeo_bytes(node.geometry()))
-        convert_with_houio(input_path, output_path, executable=converter)
+        input_path.write_bytes(geometry_to_bgeo_bytes(source_geometry))
+        convert_with_houio(
+            input_path,
+            output_path,
+            executable=converter,
+            timeout_seconds=timeout_seconds,
+        )
         return geometry_from_bgeo_bytes(output_path.read_bytes())
 
 
-def roundtrip_current_sop(*, executable: Optional[PathLike] = None) -> hou.Geometry:
+def roundtrip_current_sop(
+    *,
+    executable: Optional[PathLike] = None,
+    timeout_seconds: Optional[float] = DEFAULT_CONVERTER_TIMEOUT_SECONDS,
+) -> hou.Geometry:
     """Replace the current writable Python SOP geometry with HouIO output.
 
     Args:
         executable: Optional explicit path to `houio_convert`.
+        timeout_seconds: Maximum converter runtime, or `None` to disable the timeout.
 
     Returns:
-        The current Python SOP's modifiable geometry.
+        The current Python SOP's modifiable geometry. Float VDB primitives are
+        replaced with dense volumes.
 
     Raises:
         hou.GeometryPermissionError: If called outside a writable Python SOP
             cook context.
     """
     current_node = hou.pwd()
-    processed = roundtrip_node_geometry(current_node, executable=executable)
+    processed = roundtrip_node_geometry(
+        current_node,
+        executable=executable,
+        timeout_seconds=timeout_seconds,
+    )
     target = current_node.geometry()
     target.clear()
     target.merge(processed)

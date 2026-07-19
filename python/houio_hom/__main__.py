@@ -65,7 +65,7 @@ def _create_parser() -> argparse.ArgumentParser:
 
     decode_parser = subparsers.add_parser(
         "decode",
-        help="Convert .bgeo.sc or scalar .vdb input to uncompressed .bgeo bytes.",
+        help="Convert .bgeo.sc or 32-bit Float .vdb input to uncompressed .bgeo bytes.",
     )
     decode_parser.add_argument("input", type=Path)
     decode_parser.add_argument("output", type=Path)

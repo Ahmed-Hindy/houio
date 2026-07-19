@@ -6,6 +6,8 @@
 
 namespace houio
 {
+	class GeometryIO;
+
 	struct HouGeoIO
 	{
 		static HouGeo::Ptr                      import( std::istream *in );
@@ -23,8 +25,6 @@ namespace houio
 		static Geometry::Ptr                    convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim );
 		static Geometry::Ptr                    convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim, DiagnosticList *diagnostics );
 
-		static HouGeo::Ptr                      adaptVolume( ScalarField::Ptr volume );
-		static HouGeo::Ptr                      adaptGeometry( Geometry::Ptr geo );
 		static bool                             exportVolume( const std::string &filename, ScalarField::Ptr volume );
 		static bool                             exportGeometry( const std::string &filename, Geometry::Ptr geo );
 		static bool                             exportGeometry( std::ostream *out, HouGeoAdapter::Ptr geo, bool binary = true );
@@ -37,6 +37,11 @@ namespace houio
 		static bool                             xport( std::ostream *out, HouGeoAdapter::Ptr geo, bool binary = true );
 
 	private:
+		friend class GeometryIO;
+
+		static HouGeo::Ptr                      adaptVolume( ScalarField::Ptr volume );
+		static HouGeo::Ptr                      adaptGeometry( Geometry::Ptr geo );
+
 		struct ExportContext
 		{
 			explicit ExportContext( json::BinaryWriter &activeWriter ) : writer(activeWriter) {}

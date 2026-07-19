@@ -46,6 +46,9 @@ $resolvedPythonRoot = Convert-ToPackagePath -Path $pythonRoot
 if ([string]::IsNullOrWhiteSpace($ConverterExecutable)) {
     $converterCandidates = @(
         (Join-Path $RepositoryRoot "build\windows-msvc-release\houio_convert.exe")
+        (Join-Path $RepositoryRoot "build\windows-msvc-release\Release\houio_convert.exe")
+        (Join-Path $RepositoryRoot "build\windows-gcc-mingw\houio_convert.exe")
+        (Join-Path $RepositoryRoot "build\windows-gcc-mingw\Release\houio_convert.exe")
         (Join-Path $RepositoryRoot "bin\houio_convert.exe")
         (Join-Path $RepositoryRoot "bin\houio_convert")
     )
@@ -55,6 +58,10 @@ if ([string]::IsNullOrWhiteSpace($ConverterExecutable)) {
             break
         }
     }
+}
+if (-not [string]::IsNullOrWhiteSpace($ConverterExecutable) -and
+    -not (Test-Path -LiteralPath $ConverterExecutable -PathType Leaf)) {
+    throw "Could not find houio_convert at $ConverterExecutable"
 }
 $resolvedConverter = if ([string]::IsNullOrWhiteSpace($ConverterExecutable)) {
     ""

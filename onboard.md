@@ -432,7 +432,7 @@ Raw `.geo` and `.bgeo` remain dependency-free. `.bgeo.sc` dynamically resolves C
 
 ### Native VDB is intentionally unsupported
 
-`GeometryIO` detects `.vdb` and reports the HOM bridge requirement. `houio_hom` can explicitly convert pure scalar VDB sets to dense volumes and back, but sparse grids may expand dramatically in memory. Do not use this bridge as a general OpenVDB replacement.
+`GeometryIO` detects `.vdb` and reports the HOM bridge requirement. `houio_hom` can explicitly densify 32-bit Float VDB grids while preserving unrelated Houdini primitives. Conversion back to `.vdb` requires a pure dense-volume set because Houdini's writer drops mesh primitives. Sparse grids may expand dramatically in memory, so do not use this bridge as a general OpenVDB replacement.
 
 ### Export uses an explicit context
 
@@ -444,7 +444,7 @@ The high-level stream export returns `false` for `binary=false` and writes no pa
 
 ### Prefer `GeometryIO` result objects
 
-The historical low-level parser path still throws when no diagnostic list is supplied. `GeometryIO` owns its diagnostics and explicit success state, avoiding caller-managed output lists. New path-based functionality should use this result model while stream-level compatibility APIs preserve their existing behavior.
+The historical low-level parser path and no-diagnostics path import wrappers throw `DiagnosticException` on failure. Diagnostics-aware overloads return null and append records. `GeometryIO` owns its diagnostics and explicit success state, avoiding caller-managed output lists; invalid parser options are also captured rather than escaping as `std::invalid_argument`.
 
 ### Adapter pointer lifetime is synchronous
 
