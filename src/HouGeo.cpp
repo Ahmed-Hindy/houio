@@ -137,6 +137,12 @@ namespace houio
 				throw std::invalid_argument( "Numeric attribute storage is null" );
 			switch( storage )
 			{
+			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16:
+			{
+				const uword converted = floatToHalfBits(value.as<real32>());
+				std::memcpy(data + destinationIndex * sizeof(converted), &converted, sizeof(converted));
+				break;
+			}
 			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32:
 			{
 				const real32 converted = value.as<real32>();
@@ -461,6 +467,8 @@ namespace houio
 		{
 		case Attribute::FLOAT:
 			m_storage = ATTR_STORAGE_FPREAL32;break;
+		case Attribute::HALF:
+			m_storage = ATTR_STORAGE_FPREAL16;break;
 		//case ::Attribute::REAL64:
 		//	m_storage = ATTR_STORAGE_FPREAL64;break;
 		case Attribute::INT:
@@ -1183,7 +1191,13 @@ namespace houio
 
 				const size_t tupleOffset = static_cast<size_t>(pointIndex)
 					* static_cast<size_t>(positionAttribute->getTupleSize());
-				if( positionAttribute->m_storage == AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+				if( positionAttribute->m_storage == AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+				{
+					const uword *values = static_cast<const uword*>(rawPosition->ptr) + tupleOffset;
+					position = math::V3f(halfBitsToFloat(values[0]), halfBitsToFloat(values[1]),
+						halfBitsToFloat(values[2]));
+				}
+				else if( positionAttribute->m_storage == AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 				{
 					const real32 *values = static_cast<const real32*>(rawPosition->ptr) + tupleOffset;
 					position = math::V3f(values[0], values[1], values[2]);
@@ -1197,7 +1211,7 @@ namespace houio
 				else
 				{
 					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
-						"HouGeo::loadVolumePrimitive supports only fpreal32 or fpreal64 P storage", -1, "P.storage"});
+						"HouGeo::loadVolumePrimitive supports only floating-point P storage", -1, "P.storage"});
 				}
 			});
 

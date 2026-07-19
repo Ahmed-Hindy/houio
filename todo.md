@@ -194,9 +194,9 @@ tests/fixtures/
 - [x] Preserve vertex `N` and `uv` exactly in the Crag round-trip.
 - [x] Preserve Crag primitive string `name` and integer `piece` exactly.
 - [x] Verify signed 64-bit integer import and export handling.
-- [ ] Verify half-float attribute handling.
+- [x] Verify half-float attribute import and export handling.
 - [ ] Add unsigned integer storage where the format uses it.
-- [ ] Preserve all supported numeric storage types without forced narrowing. Signed int32/int64 and fpreal32/fpreal64 are covered; half and unsigned storage remain.
+- [ ] Preserve all supported numeric storage types without forced narrowing. Signed int32/int64 and fpreal16/fpreal32/fpreal64 are covered; unsigned storage remains.
 - [x] Decode indexed string tables, including constant-page-compressed indices.
 - [ ] Preserve attribute type information and semantic metadata.
 - [x] Support vertex attribute export.

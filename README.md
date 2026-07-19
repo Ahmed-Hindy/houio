@@ -228,7 +228,7 @@ Conversion to `Geometry` is intentionally render-oriented and lossy. Face-varyin
 The generated fixture matrix isolates modern schema behavior into 13 small binary files:
 
 - Empty and point-only geometry
-- Point `P`, `Cd`, float, 32-bit integer, 64-bit integer, and string attributes
+- Point `P`, `Cd`, Float16/Float32/Float64, 32-bit integer, 64-bit integer, and string attributes
 - Triangle-only, quad-only, mixed-size, and n-gon polygon runs
 - Open polygon curves and multiple closed/open primitive records
 - Vertex-domain UV seams

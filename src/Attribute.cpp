@@ -27,6 +27,10 @@ namespace houio
 			{
 				m_componentSize=sizeof(sint64);
 			}break;
+		case HALF:
+			{
+				m_componentSize=sizeof(uword);
+			}break;
 		default:
 		case FLOAT:
 			{
@@ -126,6 +130,7 @@ namespace houio
 		case INT:return sizeof(sint32);
 		case FLOAT:return sizeof(real32);
 		case INT64:return sizeof(sint64);
+		case HALF:return sizeof(uword);
 		default:
 			throw std::runtime_error( "unknown component type" );
 		};
@@ -149,6 +154,8 @@ namespace houio
 			return INT;
 		else if( ct == "int64" )
 			return INT64;
+		else if( ct == "fpreal16" )
+			return HALF;
 		return INVALID;
 	}
 

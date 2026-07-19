@@ -34,6 +34,7 @@
 #include <vector>
 
 #include <houio/Diagnostic.h>
+#include <houio/HalfFloat.h>
 #include <houio/types.h>
 #include <ttl/var/variant.hpp>
 
@@ -46,7 +47,7 @@ namespace houio
 	{
 		struct Parser;
 
-		// note: currently all different int types (sint32, sint64 etc. will be routed to jsonInt32)
+		// Scalar handlers preserve 32-bit and 64-bit integer and floating-point widths.
 		struct Handler
 		{
 			virtual void                               jsonBeginArray() = 0;
@@ -61,6 +62,7 @@ namespace houio
 			virtual void              jsonReal32( const real32 &value ) = 0;
 			virtual void              jsonReal64( const real64 &value ) = 0;
 			virtual void   uaBool( sint64 numElements, Parser *parser ) = 0;
+			virtual void uaReal16( sint64 numElements, Parser *parser ) = 0;
 			virtual void uaReal32( sint64 numElements, Parser *parser ) = 0;
 			virtual void uaReal64( sint64 numElements, Parser *parser ) = 0;
 			virtual void   uaInt8( sint64 numElements, Parser *parser ) = 0;
@@ -314,6 +316,7 @@ namespace houio
 			bool                 jsonUniformArray( const std::vector<T> &data );
 			template<typename T>
 			bool          jsonUniformArray( const T *data, sint64 numElements );
+			bool       jsonUniformArrayReal16( const uword *data, sint64 numElements );
 
 			bool                                      writeId( Token::Type id );
 			bool                            writeLength( const sint64 &length );
@@ -574,6 +577,16 @@ namespace houio
 					elementsRemaining -= bitCount;
 				}
 				out << "]\n";
+				std::flush(out);
+			}
+
+			virtual void uaReal16( sint64 numElements, Parser *parser )
+			{
+				indent();
+				out << "jsonArray<real16> (" << numElements << ") [";
+				for( sint64 elementIndex=0;elementIndex<numElements;++elementIndex )
+					out << halfBitsToFloat(parser->read<uword>()) << " ";
+				out << "]---\n";
 				std::flush(out);
 			}
 
@@ -1005,6 +1018,7 @@ namespace houio
 			virtual void                 jsonReal32( const real32 &value );
 			virtual void                 jsonReal64( const real64 &value );
 			virtual void      uaBool( sint64 numElements, Parser *parser );
+			virtual void    uaReal16( sint64 numElements, Parser *parser );
 			virtual void    uaReal32( sint64 numElements, Parser *parser );
 			virtual void    uaReal64( sint64 numElements, Parser *parser );
 			virtual void      uaInt8( sint64 numElements, Parser *parser );

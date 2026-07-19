@@ -152,12 +152,19 @@ def build_numeric_precision_geometry() -> hou.Geometry:
     """
     geometry = hou.Geometry()
     create_points(geometry, ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)))
-    return add_numeric_point_attribute(
+    geometry = add_numeric_point_attribute(
         geometry,
         "large_id",
         type_index=1,
         precision_index=3,
         values=(1099511627776, -1099511627777, 4294967299),
+    )
+    return add_numeric_point_attribute(
+        geometry,
+        "half_value",
+        type_index=0,
+        precision_index=1,
+        values=(0.5, -2.0, 3.25),
     )
 
 
