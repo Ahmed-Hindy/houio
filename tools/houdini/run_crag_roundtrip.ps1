@@ -81,7 +81,24 @@ foreach ($validationVersion in $ValidationVersions) {
         "--expect-points",
         "90085",
         "--expect-primitives",
-        "89942"
+        "89942",
+        "--expect-point-attribute",
+        "P",
+        "--expect-vertex-attribute",
+        "N",
+        "--expect-vertex-attribute",
+        "uv"
+    )
+    Invoke-NativeCommand -Executable $validationHython -Arguments @(
+        (Join-Path $repositoryRoot "tools\houdini\compare_geometry.py"),
+        $sourceGeometry,
+        $roundtripGeometry,
+        "--point-attribute",
+        "P",
+        "--vertex-attribute",
+        "N",
+        "--vertex-attribute",
+        "uv"
     )
 }
 

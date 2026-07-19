@@ -19,6 +19,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("input", type=Path, help="Geometry file to validate")
     parser.add_argument("--expect-points", type=int)
     parser.add_argument("--expect-primitives", type=int)
+    parser.add_argument("--expect-point-attribute", action="append", default=[])
+    parser.add_argument("--expect-vertex-attribute", action="append", default=[])
+    parser.add_argument("--expect-primitive-attribute", action="append", default=[])
+    parser.add_argument("--expect-global-attribute", action="append", default=[])
     return parser.parse_args()
 
 
@@ -68,6 +72,22 @@ def main() -> int:
     if file_node.isTimeDependent():
         raise RuntimeError("The generated File SOP is unexpectedly time dependent.")
 
+    point_attributes = sorted(attribute.name() for attribute in geometry.pointAttribs())
+    vertex_attributes = sorted(attribute.name() for attribute in geometry.vertexAttribs())
+    primitive_attributes = sorted(attribute.name() for attribute in geometry.primAttribs())
+    global_attributes = sorted(attribute.name() for attribute in geometry.globalAttribs())
+
+    expected_attributes = {
+        "point": (args.expect_point_attribute, point_attributes),
+        "vertex": (args.expect_vertex_attribute, vertex_attributes),
+        "primitive": (args.expect_primitive_attribute, primitive_attributes),
+        "global": (args.expect_global_attribute, global_attributes),
+    }
+    for domain, (expected, actual) in expected_attributes.items():
+        missing = sorted(set(expected) - set(actual))
+        if missing:
+            raise RuntimeError(f"Missing expected {domain} attributes: {', '.join(missing)}")
+
     summary = {
         "houdini_version": hou.applicationVersionString(),
         "input": str(input_path),
@@ -75,10 +95,10 @@ def main() -> int:
         "point_count": point_count,
         "vertex_count": vertex_count,
         "primitive_count": primitive_count,
-        "point_attributes": sorted(attribute.name() for attribute in geometry.pointAttribs()),
-        "vertex_attributes": sorted(attribute.name() for attribute in geometry.vertexAttribs()),
-        "primitive_attributes": sorted(attribute.name() for attribute in geometry.primAttribs()),
-        "global_attributes": sorted(attribute.name() for attribute in geometry.globalAttribs()),
+        "point_attributes": point_attributes,
+        "vertex_attributes": vertex_attributes,
+        "primitive_attributes": primitive_attributes,
+        "global_attributes": global_attributes,
     }
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0

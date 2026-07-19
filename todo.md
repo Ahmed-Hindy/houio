@@ -63,7 +63,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Generate and round-trip uncompressed Houdini 21/22 Crag `.bgeo` data.
 - [x] Record the exact Houdini builds used by the Crag experiment.
 - [ ] Test points with `P`, `Cd`, float, integer, and string attributes.
-- [ ] Test point, vertex, primitive, and global attribute domains.
+- [ ] Test point, vertex, primitive, and global attribute domains comprehensively.
 - [ ] Test triangle-only polygon runs.
 - [ ] Test quad-only polygon runs.
 - [ ] Test vertex UV seams.
@@ -180,7 +180,7 @@ tests/fixtures/
 
 - [x] Decode modern numeric `values.tuples` arrays.
 - [x] Promote three-component `P` to the writer's four-component representation.
-- [ ] Preserve vertex `N` and `uv` in the Crag round-trip.
+- [x] Preserve vertex `N` and `uv` exactly in the Crag round-trip.
 - [ ] Preserve indexed primitive string attributes such as Crag `name` and `piece`.
 - [ ] Verify 64-bit integer handling.
 - [ ] Verify half-float attribute handling.
@@ -188,7 +188,7 @@ tests/fixtures/
 - [ ] Preserve all supported numeric storage types without forced narrowing.
 - [ ] Correctly decode string tables and index arrays.
 - [ ] Preserve attribute type information and semantic metadata.
-- [ ] Support vertex attribute export.
+- [x] Support vertex attribute export.
 - [ ] Restore and test global attribute export.
 - [ ] Verify primitive attribute export for polygon runs.
 - [ ] Support attribute packing layouts comprehensively.

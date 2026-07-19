@@ -129,8 +129,9 @@ The current experiment proves:
 - Houdini 21/22 `Polygon_run` records can be imported.
 - 90,085 points, 359,794 vertices, and 89,942 polygons survive the round-trip.
 - HouIO binary output loads in Houdini 21.0.631 and 22.0.368.
+- Point `P` and vertex `N` and `uv` match the source exactly, with a maximum absolute difference of `0.0`.
 
-It does not yet prove lossless attribute preservation. The binary source has vertex `N` and `uv`; those are not exported yet. Primitive `name` and `piece` are removed before import because their indexed string representation is not modeled correctly.
+Primitive `name` and `piece` are still removed before import because their indexed string representation is not modeled correctly.
 
 To expose the same workflow through CTest, configure with a hython executable:
 

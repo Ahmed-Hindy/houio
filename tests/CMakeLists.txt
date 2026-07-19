@@ -66,6 +66,19 @@ if(HOUIO_HYTHON_EXECUTABLE)
     )
 
     add_test(
+        NAME houio.crag.compare
+        COMMAND
+            "${HOUIO_HYTHON_EXECUTABLE}"
+            "${PROJECT_SOURCE_DIR}/tools/houdini/compare_geometry.py"
+            "${HOUIO_CRAG_SOURCE}"
+            "${HOUIO_CRAG_OUTPUT}"
+            --point-attribute P
+            --vertex-attribute N
+            --vertex-attribute uv
+    )
+    set_tests_properties(houio.crag.compare PROPERTIES FIXTURES_REQUIRED houio_crag_output)
+
+    add_test(
         NAME houio.crag.validate
         COMMAND
             "${HOUIO_HYTHON_EXECUTABLE}"
@@ -73,6 +86,9 @@ if(HOUIO_HYTHON_EXECUTABLE)
             "${HOUIO_CRAG_OUTPUT}"
             --expect-points 90085
             --expect-primitives 89942
+            --expect-point-attribute P
+            --expect-vertex-attribute N
+            --expect-vertex-attribute uv
     )
     set_tests_properties(houio.crag.validate PROPERTIES FIXTURES_REQUIRED houio_crag_output)
 endif()

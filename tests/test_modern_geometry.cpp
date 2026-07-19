@@ -47,6 +47,50 @@ const char* modernQuadGeometry()
                         ]
                     ]
                 ]
+            ],
+            "vertexattributes", [
+                [
+                    [
+                        "scope", "public",
+                        "type", "numeric",
+                        "name", "N"
+                    ],
+                    [
+                        "size", 3,
+                        "storage", "fpreal32",
+                        "values", [
+                            "size", 3,
+                            "storage", "fpreal32",
+                            "tuples", [
+                                [0, 0, 1],
+                                [0, 0, 1],
+                                [0, 0, 1],
+                                [0, 0, 1]
+                            ]
+                        ]
+                    ]
+                ],
+                [
+                    [
+                        "scope", "public",
+                        "type", "numeric",
+                        "name", "uv"
+                    ],
+                    [
+                        "size", 2,
+                        "storage", "fpreal32",
+                        "values", [
+                            "size", 2,
+                            "storage", "fpreal32",
+                            "tuples", [
+                                [0, 0],
+                                [1, 0],
+                                [1, 1],
+                                [0, 1]
+                            ]
+                        ]
+                    ]
+                ]
             ]
         ],
         "primitives", [
@@ -83,6 +127,25 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
         return fail(
             "unexpected P metadata: tuple_size=" + std::to_string(position->getTupleSize())
             + ", elements=" + std::to_string(position->getNumElements()));
+    }
+
+    houio::HouGeoAdapter::AttributeAdapter::Ptr normals = geometry->getVertexAttribute("N");
+    if (!normals || normals->getTupleSize() != 3 || normals->getNumElements() != 4)
+    {
+        return fail("vertex N attribute was not preserved");
+    }
+
+    houio::HouGeoAdapter::AttributeAdapter::Ptr uv = geometry->getVertexAttribute("uv");
+    if (!uv || uv->getTupleSize() != 2 || uv->getNumElements() != 4)
+    {
+        return fail("vertex uv attribute was not preserved");
+    }
+
+    const auto* normalData = static_cast<const houio::real32*>(normals->getRawPointer()->ptr);
+    const auto* uvData = static_cast<const houio::real32*>(uv->getRawPointer()->ptr);
+    if (!normalData || normalData[2] != 1.0f || !uvData || uvData[4] != 1.0f || uvData[5] != 1.0f)
+    {
+        return fail("representative vertex attribute values were not preserved");
     }
 
     std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;

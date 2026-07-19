@@ -522,6 +522,15 @@ namespace houio
 					exportAttribute( geo->getPointAttribute(*it) );
 			g_writer->jsonEndArray(); // pointattributes
 
+			// -- vertex attributes
+			g_writer->jsonString( "vertexattributes" );
+			g_writer->jsonBeginArray();
+				std::vector<std::string> vertexAttrNames;
+				geo->getVertexAttributeNames(vertexAttrNames);
+				for( std::vector<std::string>::iterator it = vertexAttrNames.begin(); it != vertexAttrNames.end(); ++it )
+					exportAttribute( geo->getVertexAttribute(*it) );
+			g_writer->jsonEndArray(); // vertexattributes
+
 
 			// -- primitive attributes
 			g_writer->jsonString( "primitiveattributes" );

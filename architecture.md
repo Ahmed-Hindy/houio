@@ -273,12 +273,12 @@ HouGeoIO::importVolume(path)
 HouGeoIO::xport(...)
     ├─ Optionally adapt Geometry or Field<T> into HouGeo
     ├─ Serialize counts and topology
-    ├─ Serialize supported attribute domains
+    ├─ Serialize point, vertex, and primitive attribute domains
     ├─ Serialize polygon or volume primitives
     └─ Finish the binary JSON root array
 ```
 
-The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`, preserving compatibility with its legacy binary schema. Each export owns its `BinaryWriter` on the stack. A scoped thread-local binding lets the legacy helper functions reach the active writer while restoring the previous binding after normal completion or exceptions. Independent streams can therefore be exported concurrently.
+The writer serializes point, vertex, and primitive attributes through the same adapter contract. It promotes a three-component floating-point `P` attribute to four components with `w = 1`, preserving compatibility with its legacy binary schema. Each export owns its `BinaryWriter` on the stack. A scoped thread-local binding lets the legacy helper functions reach the active writer while restoring the previous binding after normal completion or exceptions. Independent streams can therefore be exported concurrently.
 
 ## 6. Simplified `Geometry`
 
