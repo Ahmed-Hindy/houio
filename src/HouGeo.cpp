@@ -163,6 +163,63 @@ namespace houio
 		return HouGeoAdapter::AttributeAdapter::Ptr();
 	}
 
+	void HouGeo::getPointGroupNames( std::vector<std::string> &names )const
+	{
+		names.clear();
+		for( const auto &entry : m_pointGroups )
+			names.push_back(entry.first);
+	}
+
+	bool HouGeo::getPointGroupMembership( const std::string &name, std::vector<bool> &membership )const
+	{
+		auto it = m_pointGroups.find(name);
+		if( it == m_pointGroups.end() )
+		{
+			membership.clear();
+			return false;
+		}
+		membership = it->second;
+		return true;
+	}
+
+	void HouGeo::getVertexGroupNames( std::vector<std::string> &names )const
+	{
+		names.clear();
+		for( const auto &entry : m_vertexGroups )
+			names.push_back(entry.first);
+	}
+
+	bool HouGeo::getVertexGroupMembership( const std::string &name, std::vector<bool> &membership )const
+	{
+		auto it = m_vertexGroups.find(name);
+		if( it == m_vertexGroups.end() )
+		{
+			membership.clear();
+			return false;
+		}
+		membership = it->second;
+		return true;
+	}
+
+	void HouGeo::getPrimitiveGroupNames( std::vector<std::string> &names )const
+	{
+		names.clear();
+		for( const auto &entry : m_primitiveGroups )
+			names.push_back(entry.first);
+	}
+
+	bool HouGeo::getPrimitiveGroupMembership( const std::string &name, std::vector<bool> &membership )const
+	{
+		auto it = m_primitiveGroups.find(name);
+		if( it == m_primitiveGroups.end() )
+		{
+			membership.clear();
+			return false;
+		}
+		membership = it->second;
+		return true;
+	}
+
 
 	bool HouGeo::hasPrimitiveAttribute( const std::string &name )const
 	{
@@ -261,6 +318,21 @@ namespace houio
 	{
 		attr->m_name = name;
 		m_primitiveAttributes[name] = attr;
+	}
+
+	void HouGeo::setPointGroup( const std::string &name, const std::vector<bool> &membership )
+	{
+		m_pointGroups[name] = membership;
+	}
+
+	void HouGeo::setVertexGroup( const std::string &name, const std::vector<bool> &membership )
+	{
+		m_vertexGroups[name] = membership;
+	}
+
+	void HouGeo::setPrimitiveGroup( const std::string &name, const std::vector<bool> &membership )
+	{
+		m_primitiveGroups[name] = membership;
 	}
 
 	// Attribute ==============================
@@ -417,6 +489,8 @@ namespace houio
 			numVertices = o->get<int>("vertexcount", 0);
 		if( o->hasKey("primitivecount") )
 			numPrimitives = o->get<int>("primitivecount", 0);
+		if( numPoints < 0 || numVertices < 0 || numPrimitives < 0 )
+			throw std::runtime_error( "HouGeo::load received negative geometry counts" );
 		if( o->hasKey("attributes") )
 		{
 			json::ObjectPtr attributes = toObject(o->getArray("attributes"));
@@ -468,7 +542,13 @@ namespace houio
 		}
 		if( o->hasKey("topology") )
 		{
-			loadTopology( toObject(o->getArray("topology")) );
+			loadTopology(toObject(o->getArray("topology")), numPoints);
+			if( m_topology->getNumIndices() != numVertices )
+				throw std::runtime_error( "HouGeo::load topology count does not match vertexcount" );
+		}
+		else if( numVertices != 0 )
+		{
+			throw std::runtime_error( "HouGeo::load missing topology for non-empty vertex domain" );
 		}
 		if( o->hasKey("sharedprimitivedata") )
 		{
@@ -491,15 +571,70 @@ namespace houio
 		if( o->hasKey("primitives") )
 		{
 			json::ArrayPtr primitives = o->getArray("primitives");
-			int numPrimitives = (int)primitives->size();
-			for( int j=0;j<numPrimitives;++j )
+			int primitiveRecordCount = (int)primitives->size();
+			for( int j=0;j<primitiveRecordCount;++j )
 			{
 				json::ArrayPtr primitive = primitives->getArray(j);
 				loadPrimitive( primitive, sharedPrimitiveData );
 			}
 		}
+		if( o->hasKey("pointgroups") )
+			loadGroups(o->getArray("pointgroups"), numPoints, m_pointGroups);
+		if( o->hasKey("vertexgroups") )
+			loadGroups(o->getArray("vertexgroups"), numVertices, m_vertexGroups);
+		if( o->hasKey("primitivegroups") )
+			loadGroups(o->getArray("primitivegroups"), numPrimitives, m_primitiveGroups);
 	}
 
+
+	void HouGeo::loadGroups( json::ArrayPtr groups, sint64 elementCount,
+		std::map<std::string, std::vector<bool>> &destination )
+	{
+		if( !groups || elementCount < 0 )
+			throw std::runtime_error( "HouGeo::loadGroups received invalid group data" );
+
+		for( sint64 groupIndex=0;groupIndex<groups->size();++groupIndex )
+		{
+			json::ArrayPtr group = groups->getArray(static_cast<int>(groupIndex));
+			if( !group || group->size() != 2 )
+				throw std::runtime_error( "HouGeo::loadGroups expected definition and data arrays" );
+
+			json::ObjectPtr definition = toObject(group->getArray(0));
+			json::ObjectPtr data = toObject(group->getArray(1));
+			const std::string name = definition->get<std::string>("name", "");
+			if( name.empty() )
+				throw std::runtime_error( "HouGeo::loadGroups encountered a group without a name" );
+			if( destination.find(name) != destination.end() )
+				throw std::runtime_error( "HouGeo::loadGroups encountered duplicate group " + name );
+			if( !data->hasKey("selection") )
+				throw std::runtime_error( "HouGeo::loadGroups missing selection for group " + name );
+
+			json::ArrayPtr selection = data->getArray("selection");
+			if( !selection || selection->size() != 2 || !selection->getValue(0).isString()
+				|| selection->get<std::string>(0) != "unordered" )
+				throw std::runtime_error( "HouGeo::loadGroups supports only unordered selections for group " + name );
+
+			json::ArrayPtr encodedMembership = selection->getArray(1);
+			if( !encodedMembership || encodedMembership->size() != 2
+				|| !encodedMembership->getValue(0).isString()
+				|| encodedMembership->get<std::string>(0) != "i8" )
+				throw std::runtime_error( "HouGeo::loadGroups requires i8 membership encoding for group " + name );
+
+			json::ArrayPtr membershipValues = encodedMembership->getArray(1);
+			if( !membershipValues || membershipValues->size() != elementCount )
+				throw std::runtime_error( "HouGeo::loadGroups membership count mismatch for group " + name );
+
+			std::vector<bool> membership(static_cast<size_t>(elementCount), false);
+			for( sint64 elementIndex=0;elementIndex<elementCount;++elementIndex )
+			{
+				const int value = membershipValues->get<int>(static_cast<int>(elementIndex));
+				if( value != 0 && value != 1 )
+					throw std::runtime_error( "HouGeo::loadGroups membership must contain only zero or one for group " + name );
+				membership[static_cast<size_t>(elementIndex)] = value != 0;
+			}
+			destination.emplace(name, std::move(membership));
+		}
+	}
 
 	HouGeo::HouAttribute::Ptr HouGeo::loadAttribute( json::ArrayPtr attribute, sint64 elementCount )
 	{
@@ -760,8 +895,11 @@ namespace houio
 	}
 
 
-	void HouGeo::loadTopology( json::ObjectPtr o )
+	void HouGeo::loadTopology( json::ObjectPtr o, sint64 pointCount )
 	{
+		if( !o || pointCount < 0 )
+			throw std::runtime_error( "HouGeo::loadTopology received invalid topology metadata" );
+
 		HouTopology::Ptr top = std::make_shared<HouTopology>();
 		if( o->hasKey("pointref") )
 		{
@@ -769,9 +907,16 @@ namespace houio
 			if( pointref->hasKey("indices") )
 			{
 				json::ArrayPtr indices = pointref->getArray("indices");
-				sint64 numElements = indices->size();
-				for(int i=0;i<numElements;++i)
-					top->indexBuffer.push_back( indices->get<int>(i) );
+				if( !indices )
+					throw std::runtime_error( "HouGeo::loadTopology missing index array" );
+				const sint64 numElements = indices->size();
+				for( sint64 i=0;i<numElements;++i )
+				{
+					const int pointIndex = indices->get<int>(static_cast<int>(i));
+					if( pointIndex < 0 || static_cast<sint64>(pointIndex) >= pointCount )
+						throw std::runtime_error( "HouGeo::loadTopology point index out of range" );
+					top->indexBuffer.push_back(pointIndex);
+				}
 			}
 		}
 		m_topology = top;
@@ -1076,13 +1221,20 @@ namespace houio
 		if( poly->hasKey( "vertex" ) )
 		{
 			json::ArrayPtr vertex = poly->getArray("vertex");
-			// these are indices into, well, indices...
-			int numVertices = (int) vertex->size();
+			if( !vertex )
+				throw std::runtime_error( "HouGeo::loadPolyPrimitive missing vertex array" );
+			// These values index the topology array rather than the point domain directly.
+			const int numVertices = static_cast<int>(vertex->size());
 			pol->m_numPolys = 1;
 			pol->m_perPolyVertexCount.push_back(numVertices);
 			pol->m_perPolyVertexListOffset.push_back(0);
-			for(int i=0;i<numVertices;++i)
-				pol->m_vertices.push_back( m_topology->indexBuffer[vertex->get<sint32>(i)] );
+			for( int i=0;i<numVertices;++i )
+			{
+				const int topologyIndex = vertex->get<sint32>(i);
+				if( topologyIndex < 0 || static_cast<size_t>(topologyIndex) >= m_topology->indexBuffer.size() )
+					throw std::runtime_error( "HouGeo::loadPolyPrimitive topology index out of range" );
+				pol->m_vertices.push_back(m_topology->indexBuffer[static_cast<size_t>(topologyIndex)]);
+			}
 		}
 
 		m_primitives.push_back( pol );
@@ -1090,18 +1242,33 @@ namespace houio
 
 	void HouGeo::loadPolyPrimitiveRun( json::ObjectPtr def, json::ArrayPtr run )
 	{
+		if( !m_topology )
+			throw std::runtime_error( "HouGeo::loadPolyPrimitiveRun expects topology to be loaded already" );
+		if( !def || !run )
+			throw std::runtime_error( "HouGeo::loadPolyPrimitiveRun received invalid run data" );
+
 		HouPoly::Ptr pol = std::make_shared<HouPoly>();
-		pol->m_numPolys = (int) run->size();
+		pol->m_numPolys = static_cast<int>(run->size());
 		pol->m_closed = true;
 		int vertex = 0;
 		for( int i=0;i<pol->m_numPolys;++i )
 		{
-			json::ArrayPtr c = run->getArray(i)->getArray(0);
-			int numVertices = (int)c->size();
+			json::ArrayPtr runEntry = run->getArray(i);
+			if( !runEntry || runEntry->size() == 0 )
+				throw std::runtime_error( "HouGeo::loadPolyPrimitiveRun invalid polygon entry" );
+			json::ArrayPtr c = runEntry->getArray(0);
+			if( !c )
+				throw std::runtime_error( "HouGeo::loadPolyPrimitiveRun missing polygon vertices" );
+			const int numVertices = static_cast<int>(c->size());
 			pol->m_perPolyVertexCount.push_back(numVertices);
 			pol->m_perPolyVertexListOffset.push_back(vertex);
 			for( int j=0;j<numVertices; ++j, ++vertex )
-				pol->m_vertices.push_back(m_topology->indexBuffer[c->get<sint32>(j)]);
+			{
+				const int topologyIndex = c->get<sint32>(j);
+				if( topologyIndex < 0 || static_cast<size_t>(topologyIndex) >= m_topology->indexBuffer.size() )
+					throw std::runtime_error( "HouGeo::loadPolyPrimitiveRun topology index out of range" );
+				pol->m_vertices.push_back(m_topology->indexBuffer[static_cast<size_t>(topologyIndex)]);
+			}
 		}
 		m_primitives.push_back( pol );
 	}
@@ -1200,17 +1367,22 @@ namespace houio
 	// turns json array into jsonObject (every first entry is key, every second is value)
 	json::ObjectPtr HouGeo::toObject( json::ArrayPtr a )
 	{
-		json::ObjectPtr o = json::Object::create();
+		if( !a )
+			throw std::runtime_error( "HouGeo::toObject received a null array" );
+		if( (a->size() % 2) != 0 )
+			throw std::runtime_error( "HouGeo::toObject requires an even-length key/value array" );
 
-		int numElements = (int)a->size();
+		json::ObjectPtr o = json::Object::create();
+		const int numElements = static_cast<int>(a->size());
 		for( int i=0;i<numElements;i+=2 )
 		{
-			if( a->getValue(i).isString() )
-			{
-				std::string key = a->get<std::string>(i);
-				json::Value value = a->getValue(i+1);
-				o->append( key, value );
-			}
+			if( !a->getValue(i).isString() )
+				throw std::runtime_error( "HouGeo::toObject requires string keys" );
+
+			const std::string key = a->get<std::string>(i);
+			if( o->hasKey(key) )
+				throw std::runtime_error( "HouGeo::toObject encountered duplicate key " + key );
+			o->append(key, a->getValue(i+1));
 		}
 
 		return o;

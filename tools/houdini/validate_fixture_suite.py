@@ -171,7 +171,7 @@ def geometry_summary(geometry: hou.Geometry) -> dict[str, Any]:
         geometry: Geometry to summarize.
 
     Returns:
-        Counts, attributes, topology, and primitive groups.
+        Counts, attributes, topology, and all group domains.
     """
     return {
         "point_count": len(geometry.points()),
@@ -181,6 +181,14 @@ def geometry_summary(geometry: hou.Geometry) -> dict[str, Any]:
             domain: attribute_summary(geometry, domain) for domain in ATTRIBUTE_DOMAINS
         },
         "primitives": primitive_summary(geometry),
+        "point_groups": {
+            group.name(): [point.number() for point in group.points()]
+            for group in geometry.pointGroups()
+        },
+        "vertex_groups": {
+            group.name(): [vertex.number() for vertex in group.vertices()]
+            for group in geometry.vertexGroups()
+        },
         "primitive_groups": {
             group.name(): [primitive.number() for primitive in group.prims()]
             for group in geometry.primGroups()
@@ -226,12 +234,13 @@ def validate_manifest_source(fixture_name: str, expected: dict[str, Any], actual
             f"{fixture_name}: source closed state changed: {actual_closed} != {expected['closed']}"
         )
 
-    actual_group_names = sorted(actual["primitive_groups"])
-    if actual_group_names != expected["primitive_groups"]:
-        raise RuntimeError(
-            f"{fixture_name}: source primitive groups changed: "
-            f"{actual_group_names} != {expected['primitive_groups']}"
-        )
+    for group_key in ("point_groups", "vertex_groups", "primitive_groups"):
+        actual_group_names = sorted(actual[group_key])
+        if actual_group_names != expected[group_key]:
+            raise RuntimeError(
+                f"{fixture_name}: source {group_key} changed: "
+                f"{actual_group_names} != {expected[group_key]}"
+            )
 
 
 def compare_roundtrip(fixture_name: str, source: dict[str, Any], candidate: dict[str, Any], known_losses: set[str]) -> None:
@@ -254,17 +263,18 @@ def compare_roundtrip(fixture_name: str, source: dict[str, Any], candidate: dict
                 f"candidate={candidate[key]!r}"
             )
 
-    if "primitive_groups" in known_losses:
-        if candidate["primitive_groups"]:
+    for group_key in ("point_groups", "vertex_groups", "primitive_groups"):
+        if group_key in known_losses:
+            if candidate[group_key]:
+                raise RuntimeError(
+                    f"{fixture_name}: {group_key} are unsupported but candidate contained "
+                    f"{candidate[group_key]!r}"
+                )
+        elif candidate[group_key] != source[group_key]:
             raise RuntimeError(
-                f"{fixture_name}: primitive groups are unsupported but candidate contained "
-                f"{candidate['primitive_groups']!r}"
+                f"{fixture_name}: {group_key} mismatch: "
+                f"{candidate[group_key]!r} != {source[group_key]!r}"
             )
-    elif candidate["primitive_groups"] != source["primitive_groups"]:
-        raise RuntimeError(
-            f"{fixture_name}: primitive group mismatch: "
-            f"{candidate['primitive_groups']!r} != {source['primitive_groups']!r}"
-        )
 
 
 def main() -> int:

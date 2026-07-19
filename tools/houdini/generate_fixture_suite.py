@@ -273,10 +273,10 @@ def build_global_attributes_geometry() -> hou.Geometry:
 
 
 def build_primitive_groups_geometry() -> hou.Geometry:
-    """Build polygons assigned to two primitive groups.
+    """Build overlapping point, vertex, and primitive groups.
 
     Returns:
-        Geometry with primitive groups and primitive attributes.
+        Geometry with all supported group domains and primitive attributes.
     """
     geometry = hou.Geometry()
     points = create_points(
@@ -285,6 +285,22 @@ def build_primitive_groups_geometry() -> hou.Geometry:
     )
     left_polygon = create_polygon(geometry, points, (0, 1, 2))
     right_polygon = create_polygon(geometry, points, (0, 2, 3))
+
+    left_points_group = geometry.createPointGroup("left_points")
+    shared_points_group = geometry.createPointGroup("shared_points")
+    for point_index in (0, 3):
+        left_points_group.add(points[point_index])
+    for point_index in (0, 2):
+        shared_points_group.add(points[point_index])
+
+    first_face_vertices_group = geometry.createVertexGroup("first_face_vertices")
+    shared_point_vertices_group = geometry.createVertexGroup("shared_point_vertices")
+    for vertex in left_polygon.vertices():
+        first_face_vertices_group.add(vertex)
+    for primitive in geometry.prims():
+        for vertex in primitive.vertices():
+            if vertex.point().number() in (0, 2):
+                shared_point_vertices_group.add(vertex)
 
     left_group = geometry.createPrimGroup("left")
     right_group = geometry.createPrimGroup("right")
@@ -318,6 +334,8 @@ def geometry_summary(geometry: hou.Geometry) -> dict[str, object]:
         "vertex_attributes": sorted(attribute.name() for attribute in geometry.vertexAttribs()),
         "primitive_attributes": sorted(attribute.name() for attribute in geometry.primAttribs()),
         "global_attributes": sorted(attribute.name() for attribute in geometry.globalAttribs()),
+        "point_groups": sorted(group.name() for group in geometry.pointGroups()),
+        "vertex_groups": sorted(group.name() for group in geometry.vertexGroups()),
         "primitive_groups": sorted(group.name() for group in geometry.primGroups()),
     }
 
@@ -346,7 +364,7 @@ def main() -> int:
         ("uv_seam", build_uv_seam_geometry, ()),
         ("multiple_polygon_runs", build_multiple_polygon_runs_geometry, ()),
         ("global_attributes", build_global_attributes_geometry, ()),
-        ("primitive_groups", build_primitive_groups_geometry, ("primitive_groups",)),
+        ("primitive_groups", build_primitive_groups_geometry, ()),
     )
 
     manifest_entries = []

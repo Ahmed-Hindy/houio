@@ -127,7 +127,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_fixture_roundtrips.ps1
 ```
 
-The matrix covers empty geometry; typed point attributes; triangle, quad, mixed-size, and n-gon polygon runs; open polygon curves; UV seams; multiple primitive records; global attributes; and primitive attributes. Validation checks counts, attribute metadata and values, primitive type, open/closed state, and point topology.
+The matrix covers empty geometry; typed point attributes; triangle, quad, mixed-size, and n-gon polygon runs; open polygon curves; UV seams; multiple primitive records; global and primitive attributes; and overlapping point, vertex, and primitive groups. Validation checks counts, attribute metadata and values, primitive type, open/closed state, point topology, and every group membership.
 
 Generated sources, outputs, and `manifest.json` live under:
 
@@ -135,7 +135,7 @@ Generated sources, outputs, and `manifest.json` live under:
 build/windows-msvc-release/tests/fixtures/
 ```
 
-Primitive-group membership is an explicit known loss. The source fixture proves that the groups exist, and validation requires the output to omit them until HouIO gains a group representation.
+The fixture matrix currently has no intentional round-trip losses. Group support is limited to unordered membership masks; ordered selections are rejected explicitly.
 
 ## Run the Crag integration experiment
 
@@ -381,7 +381,11 @@ The export path expects Houdini's `P` attribute to contain four components. The 
 
 ### Topology indirection
 
-A primitive may reference vertex entries, and the topology maps those entries to point indices. Do not assume every primitive index is already a point index.
+A primitive may reference vertex entries, and the topology maps those entries to point indices. Do not assume every primitive index is already a point index. The loader now rejects topology-count mismatches, point references outside the declared point domain, and polygon references outside the topology buffer.
+
+### Malformed input baseline
+
+`houio.malformed_geometry` exercises semantic rejection for odd or duplicate flattened keys, negative domain counts, invalid topology, malformed group masks, and unsupported ordered group selections. These checks complement parser-token tests; they do not yet provide file-size, nesting-depth, or allocation limits.
 
 ### Point and vertex domains
 

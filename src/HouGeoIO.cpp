@@ -548,16 +548,22 @@ namespace houio
 		};
 		WriterBinding writerBinding(g_writer, writer);
 
+		const sint64 pointCount = geo->pointcount();
+		const sint64 vertexCount = geo->vertexcount();
+		const sint64 primitiveCount = geo->primitivecount();
+		if( pointCount < 0 || vertexCount < 0 || primitiveCount < 0 )
+			throw std::runtime_error( "HouGeoIO::xport received negative geometry counts" );
+
 		g_writer->jsonBeginArray();
 
 		g_writer->jsonString( "pointcount" );
-		g_writer->jsonInt( geo->pointcount() );
+		g_writer->jsonInt( pointCount );
 
 		g_writer->jsonString( "vertexcount" );
-		g_writer->jsonInt( geo->vertexcount() );
+		g_writer->jsonInt( vertexCount );
 
 		g_writer->jsonString( "primitivecount" );
-		g_writer->jsonInt( geo->primitivecount() );
+		g_writer->jsonInt( primitiveCount );
 
 		// -- topology (required)
 		g_writer->jsonString( "topology" );
@@ -611,7 +617,7 @@ namespace houio
 
 
 		// -- primitives
-		if( geo->primitivecount() > 0 )
+		if( primitiveCount > 0 )
 		{
 			g_writer->jsonString( "primitives" );
 			g_writer->jsonBeginArray();
@@ -637,7 +643,56 @@ namespace houio
 			g_writer->jsonEndArray(); // primitives
 		}
 
+		std::vector<std::string> pointGroupNames;
+		geo->getPointGroupNames(pointGroupNames);
+		if( !pointGroupNames.empty() )
+		{
+			g_writer->jsonString("pointgroups");
+			g_writer->jsonBeginArray();
+			for( const std::string &name : pointGroupNames )
+			{
+				std::vector<bool> membership;
+				if( !geo->getPointGroupMembership(name, membership)
+					|| membership.size() != static_cast<size_t>(pointCount) )
+					throw std::runtime_error( "HouGeoIO::xport invalid point group " + name );
+				exportGroup(name, membership);
+			}
+			g_writer->jsonEndArray();
+		}
 
+		std::vector<std::string> vertexGroupNames;
+		geo->getVertexGroupNames(vertexGroupNames);
+		if( !vertexGroupNames.empty() )
+		{
+			g_writer->jsonString("vertexgroups");
+			g_writer->jsonBeginArray();
+			for( const std::string &name : vertexGroupNames )
+			{
+				std::vector<bool> membership;
+				if( !geo->getVertexGroupMembership(name, membership)
+					|| membership.size() != static_cast<size_t>(vertexCount) )
+					throw std::runtime_error( "HouGeoIO::xport invalid vertex group " + name );
+				exportGroup(name, membership);
+			}
+			g_writer->jsonEndArray();
+		}
+
+		std::vector<std::string> primitiveGroupNames;
+		geo->getPrimitiveGroupNames(primitiveGroupNames);
+		if( !primitiveGroupNames.empty() )
+		{
+			g_writer->jsonString("primitivegroups");
+			g_writer->jsonBeginArray();
+			for( const std::string &name : primitiveGroupNames )
+			{
+				std::vector<bool> membership;
+				if( !geo->getPrimitiveGroupMembership(name, membership)
+					|| membership.size() != static_cast<size_t>(primitiveCount) )
+					throw std::runtime_error( "HouGeoIO::xport invalid primitive group " + name );
+				exportGroup(name, membership);
+			}
+			g_writer->jsonEndArray();
+		}
 
 		g_writer->jsonEndArray(); // /root
 
@@ -845,6 +900,36 @@ namespace houio
 		return true;
 	}
 
+
+	bool HouGeoIO::exportGroup( const std::string &name, const std::vector<bool> &membership )
+	{
+		if( name.empty() )
+			throw std::runtime_error( "HouGeoIO::exportGroup requires a non-empty name" );
+
+		std::vector<sbyte> encodedMembership;
+		encodedMembership.reserve(membership.size());
+		for( bool selected : membership )
+			encodedMembership.push_back(selected ? 1 : 0);
+
+		g_writer->jsonBeginArray();
+			g_writer->jsonBeginArray();
+				g_writer->jsonString("name");
+				g_writer->jsonString(name);
+			g_writer->jsonEndArray();
+
+			g_writer->jsonBeginArray();
+				g_writer->jsonString("selection");
+				g_writer->jsonBeginArray();
+					g_writer->jsonString("unordered");
+					g_writer->jsonBeginArray();
+						g_writer->jsonString("i8");
+						g_writer->jsonUniformArray(encodedMembership);
+					g_writer->jsonEndArray();
+				g_writer->jsonEndArray();
+			g_writer->jsonEndArray();
+		g_writer->jsonEndArray();
+		return true;
+	}
 
 	bool HouGeoIO::exportPrimitive( HouGeoAdapter::VolumePrimitive::Ptr volume )
 	{

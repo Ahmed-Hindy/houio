@@ -44,7 +44,7 @@ BinaryWriter
 | --- | --- | --- |
 | Binary JSON | `include/houio/json.h`, `src/json.cpp` | Tokenize, parse, log, and write Houdini ASCII and binary JSON. |
 | Houdini adapter contracts | `include/houio/HouGeoAdapter.h`, `src/HouGeoAdapter.cpp` | Define the abstract geometry interface consumed by the writer. |
-| Houdini geometry model | `include/houio/HouGeo.h`, `src/HouGeo.cpp` | Interpret Houdini's geometry schema and store attributes, topology, polygons, and volumes. |
+| Houdini geometry model | `include/houio/HouGeo.h`, `src/HouGeo.cpp` | Interpret Houdini's geometry schema and store attributes, groups, topology, polygons, and volumes. |
 | I/O facade | `include/houio/HouGeoIO.h`, `src/HouGeoIO.cpp` | Coordinate import, conversion, logging, and export. |
 | Simplified geometry | `include/houio/Geometry.h`, `src/Geometry.cpp` | Store render-oriented points, indices, and attributes. |
 | Raw attributes | `include/houio/Attribute.h`, `src/Attribute.cpp` | Store fixed-width numeric tuple data in a byte buffer. |
@@ -189,6 +189,9 @@ m_pointAttributes
 m_vertexAttributes
 m_primitiveAttributes
 m_globalAttributes
+m_pointGroups
+m_vertexGroups
+m_primitiveGroups
 m_topology
 m_primitives
 ```
@@ -207,6 +210,10 @@ The loader uses the root geometry counts to size each domain:
 ### Topology
 
 `HouTopology` stores the point-reference index buffer. Houdini primitive records may reference entries in this topology rather than point indices directly.
+
+### Groups
+
+Point, vertex, and primitive groups are stored as maps from names to boolean membership masks. The loader currently accepts Houdini's unordered `i8` selection encoding, validates each mask against its declared domain count, and rejects duplicate names, non-binary values, and ordered selections. The adapter exposes default no-op group accessors so existing custom exporters remain source compatible.
 
 ### Polygon primitives
 
@@ -276,14 +283,15 @@ HouGeoIO::xport(...)
     ├─ Serialize counts and topology
     ├─ Serialize point, vertex, primitive, and global attribute domains
     ├─ Serialize polygon-run or volume primitives
+    ├─ Serialize point, vertex, and primitive group masks
     └─ Finish the binary JSON root array
 ```
 
-The writer serializes point, vertex, primitive, and global attributes through the same adapter contract. Numeric values are emitted as paged uniform arrays. Per-element strings are deduplicated into a string table plus integer indices. Closed polygons are emitted as `Polygon_run`; open polygons use `PolygonCurve_run`. Each record stores a topology vertex offset plus direct per-primitive vertex counts, avoiding the historical ambiguity between topology offsets and point numbers. The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`. Each export owns its `BinaryWriter` on the stack. A scoped thread-local binding lets the legacy helper functions reach the active writer while restoring the previous binding after normal completion or exceptions. Independent streams can therefore be exported concurrently.
+The writer serializes point, vertex, primitive, and global attributes through the same adapter contract. Numeric values are emitted as paged uniform arrays. Per-element strings are deduplicated into a string table plus integer indices. Closed polygons are emitted as `Polygon_run`; open polygons use `PolygonCurve_run`. Each record stores a topology vertex offset plus direct per-primitive vertex counts, avoiding the historical ambiguity between topology offsets and point numbers. Unordered groups are emitted as named signed-int8 membership masks after validating their domain sizes. The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`. Each export owns its `BinaryWriter` on the stack. A scoped thread-local binding lets the legacy helper functions reach the active writer while restoring the previous binding after normal completion or exceptions. Independent streams can therefore be exported concurrently.
 
 ### Fixture-backed compatibility tests
 
-The optional Houdini integration layer generates minimal fixtures rather than storing version-specific binary blobs in the repository. A manifest records counts, domains, primitive state, and known losses. HouIO round-trips each fixture, and Houdini 21.0.631 and 22.0.368 compare exact attribute metadata and values, primitive topology, and open/closed state. Primitive-group membership is currently the only intentional loss in this matrix.
+The optional Houdini integration layer generates minimal fixtures rather than storing version-specific binary blobs in the repository. A manifest records counts, domains, primitive state, and known losses. HouIO round-trips each fixture, and Houdini 21.0.631 and 22.0.368 compare exact attribute metadata and values, primitive topology, open/closed state, and point, vertex, and primitive group membership. The current matrix has no intentional round-trip losses.
 
 The Crag integration test remains the large-scale gate. It additionally compares all 89,942 polygon topologies and 359,794 vertices exactly, which protects the topology-offset writer path from shared-point corruption.
 

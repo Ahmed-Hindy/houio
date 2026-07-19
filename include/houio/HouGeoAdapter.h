@@ -119,6 +119,12 @@ namespace houio
 		virtual AttributeAdapter::Ptr getVertexAttribute( const std::string &name );
 		virtual void                  getGlobalAttributeNames( std::vector<std::string> &names )const;
 		virtual AttributeAdapter::Ptr getGlobalAttribute( const std::string &name );
+		virtual void                  getPointGroupNames( std::vector<std::string> &names )const;
+		virtual bool                  getPointGroupMembership( const std::string &name, std::vector<bool> &membership )const;
+		virtual void                  getVertexGroupNames( std::vector<std::string> &names )const;
+		virtual bool                  getVertexGroupMembership( const std::string &name, std::vector<bool> &membership )const;
+		virtual void                  getPrimitiveGroupNames( std::vector<std::string> &names )const;
+		virtual bool                  getPrimitiveGroupMembership( const std::string &name, std::vector<bool> &membership )const;
 		virtual bool                  hasPrimitiveAttribute( const std::string &name )const;
 		virtual void                  getPrimitiveAttributeNames( std::vector<std::string> &names )const=0;
 		virtual AttributeAdapter::Ptr getPrimitiveAttribute( const std::string &name )=0;

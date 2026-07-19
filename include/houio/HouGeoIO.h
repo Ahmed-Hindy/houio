@@ -25,6 +25,7 @@ namespace houio
 		static bool                             exportTopology( HouGeoAdapter::Topology::Ptr topo );
 		static bool                             exportPrimitive( HouGeoAdapter::VolumePrimitive::Ptr volume );
 		static bool                             exportPrimitive( HouGeoAdapter::PolyPrimitive::Ptr poly, int startVertex );
+		static bool                             exportGroup( const std::string &name, const std::vector<bool> &membership );
 		static thread_local json::BinaryWriter* g_writer;
 	};
 }

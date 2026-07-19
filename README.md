@@ -30,6 +30,7 @@ See [todo.md](todo.md) for the modernization plan.
 - Parse Houdini ASCII and binary JSON.
 - Inspect unknown Houdini geometry structures using a JSON logger.
 - Read point, vertex, primitive, and global attribute domains.
+- Preserve unordered point, vertex, and primitive groups.
 - Read legacy polygon runs, Houdini 21/22 `Polygon_run` records, and open `PolygonCurve_run` records.
 - Read legacy dense Houdini volumes, including tiled and constant storage.
 - Write point, polygon, and dense-volume `.bgeo` files.
@@ -159,6 +160,10 @@ HouIO models these Houdini attribute domains:
 
 Numeric support is primarily focused on 32-bit float, 64-bit float, and 32-bit integer storage. String support is partial.
 
+### Groups
+
+The Houdini-oriented model preserves unordered point, vertex, and primitive groups as named boolean membership masks. Group masks are validated against the declared domain count during import and export. Ordered group selections are rejected because their semantics are not implemented.
+
 ### Primitives
 
 The Houdini-oriented layer currently recognizes:
@@ -189,7 +194,7 @@ The generated fixture matrix isolates modern schema behavior into 11 small binar
 - Vertex-domain UV seams
 - Numeric and string global attributes
 - Primitive string and integer attributes
-- Primitive groups as an explicit known loss
+- Overlapping point, vertex, and primitive groups
 
 Run the complete matrix with both installed Houdini versions:
 
@@ -198,9 +203,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_fixture_roundtrips.ps1
 ```
 
-Houdini 22.0.368 generates the sources by default. HouIO round-trips each file, then Houdini 21.0.631 and 22.0.368 compare exact counts, attribute metadata and values, primitive type, open/closed state, and point topology. Generated files stay under the configured build directory rather than being committed as opaque binary assets.
-
-Primitive-group membership is not represented by the current HouIO data model and is intentionally asserted as a documented loss. The primitive attributes on the same fixture still round-trip exactly.
+Houdini 22.0.368 generates the sources by default. HouIO round-trips each file, then Houdini 21.0.631 and 22.0.368 compare exact counts, attribute metadata and values, primitive type, open/closed state, point topology, and group membership. Generated files stay under the configured build directory rather than being committed as opaque binary assets. The current fixture matrix has no intentional round-trip losses.
 
 ## Houdini 21/22 Crag experiment
 
@@ -247,7 +250,7 @@ ctest --preset windows-msvc-asan
 
 ## Contributing
 
-Before changing schema parsing, add or preserve a fixture that demonstrates the relevant encoding. Format handling is reverse-engineered and small assumptions can affect unrelated files.
+Before changing schema parsing, add or preserve a fixture that demonstrates the relevant encoding. Format handling is reverse-engineered and small assumptions can affect unrelated files. Semantic loading rejects malformed flattened objects, negative counts, invalid group masks, topology-count mismatches, and out-of-range point or polygon topology references.
 
 Recommended workflow:
 

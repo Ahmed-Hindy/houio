@@ -186,6 +186,39 @@ namespace houio
 		return AttributeAdapter::Ptr();
 	}
 
+	void HouGeoAdapter::getPointGroupNames( std::vector<std::string> &names )const
+	{
+		names.clear();
+	}
+
+	bool HouGeoAdapter::getPointGroupMembership( const std::string & /*name*/, std::vector<bool> &membership )const
+	{
+		membership.clear();
+		return false;
+	}
+
+	void HouGeoAdapter::getVertexGroupNames( std::vector<std::string> &names )const
+	{
+		names.clear();
+	}
+
+	bool HouGeoAdapter::getVertexGroupMembership( const std::string & /*name*/, std::vector<bool> &membership )const
+	{
+		membership.clear();
+		return false;
+	}
+
+	void HouGeoAdapter::getPrimitiveGroupNames( std::vector<std::string> &names )const
+	{
+		names.clear();
+	}
+
+	bool HouGeoAdapter::getPrimitiveGroupMembership( const std::string & /*name*/, std::vector<bool> &membership )const
+	{
+		membership.clear();
+		return false;
+	}
+
 	bool HouGeoAdapter::hasPrimitiveAttribute( const std::string &name )const
 	{
 		return false;

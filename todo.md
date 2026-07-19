@@ -39,7 +39,8 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Assert point, vertex, and primitive counts.
 - [x] Assert topology and representative attribute values.
 - [ ] Assert legacy volume resolution, transform, and sample values.
-- [ ] Add malformed and truncated input tests.
+- [x] Add malformed semantic input tests.
+- [ ] Add truncated binary input tests.
 - [ ] Make test failures return non-zero process exit codes.
 
 ### Continuous integration
@@ -68,6 +69,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Test quad-only polygon runs.
 - [x] Test vertex UV seams.
 - [x] Test empty geometry.
+- [x] Test overlapping point, vertex, and primitive groups.
 - [ ] Test dense scalar volumes if Houdini 21 still emits the legacy representation.
 - [ ] Document unsupported Houdini 21 records rather than silently ignoring them.
 
@@ -91,8 +93,11 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Add regression coverage for uniform signed-int8 widening.
 - [ ] Validate all uniform-array element types and storage sizes before reading.
 - [ ] Validate string token references before lookup.
-- [ ] Reject odd-length flattened key/value arrays.
-- [ ] Add bounds checks before all array and topology indexing.
+- [x] Reject odd-length, non-string-keyed, and duplicate-key flattened objects.
+- [x] Validate topology counts and point-reference ranges.
+- [x] Validate direct polygon and polygon-run topology references.
+- [x] Validate unordered group masks and reject unsupported ordered selections.
+- [ ] Add bounds checks before all remaining array and topology indexing.
 - [ ] Add fuzz testing for the JSON parser.
 - [x] Add and run an MSVC AddressSanitizer preset.
 - [ ] Add UndefinedBehaviorSanitizer coverage on a supported compiler.
@@ -160,7 +165,7 @@ tests/fixtures/
 - [ ] Unit-test string definition and reference handling.
 - [x] Unit-test modern uniform signed-int8 arrays.
 - [ ] Unit-test uniform arrays for every other supported storage type.
-- [ ] Unit-test flattened-array conversion.
+- [x] Unit-test malformed flattened-array rejection.
 - [ ] Unit-test attribute packing and constant pages.
 - [x] Unit-test topology loading.
 - [ ] Unit-test polygon and polygon-run loading.
@@ -199,7 +204,7 @@ tests/fixtures/
 ### Polygon geometry
 
 - [x] Import Houdini 21/22 `Polygon_run` records with run-length vertex counts.
-- [ ] Import all stored polygon primitive groups rather than only the first one.
+- [x] Import and export unordered point, vertex, and primitive groups.
 - [x] Support mixed triangle and quad meshes without throwing.
 - [ ] Support arbitrary n-gons in the simplified conversion or return multiple geometry objects.
 - [x] Preserve open and closed polygon state.
