@@ -51,7 +51,8 @@ BinaryWriter
 | Dense fields | `include/houio/Field.h`, `src/Field.cpp` | Store and sample dense 3D scalar or vector grids. |
 | Math | `include/houio/math/`, `src/math/` | Supply vectors, matrices, bounds, colors, rays, RNG, and half floats. |
 | Vendored templates | `include/ttl/` | Provide the variant implementation used by the JSON layer. |
-| Tests and examples | `tests/` | Provide historical fixtures, binary-token and modern-schema regression tests, round-trip and inspection CLIs, and optional Houdini integration tests. |
+| Build and package | `CMakeLists.txt`, `CMakePresets.json`, `cmake/` | Define the C++20 target, presets, install tree, package version, and exported `houio::houio` target. |
+| Tests and examples | `tests/` | Provide historical fixtures, binary-token and modern-schema regression tests, an external package consumer, round-trip and inspection CLIs, and optional Houdini integration tests. |
 | Legacy scene exporter | `scene_exporter/` | Export custom scene JSON from old Python 2 Houdini sessions. |
 
 ## 1. Binary JSON layer
@@ -256,7 +257,7 @@ HouGeoIO::importGeometry(path)
     └─ Convert supported polygon data into Geometry
 ```
 
-This path is intentionally limited. It does not merge arbitrary primitive collections or preserve every Houdini semantic.
+This path is intentionally limited. It does not merge arbitrary primitive collections or preserve every Houdini semantic. Position and UV conversion use each attribute's declared tuple size as the stride, accepting three- or four-component `P` and two-or-more-component UV data without reading padding that may not exist.
 
 ### Volume flow
 

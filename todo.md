@@ -28,7 +28,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Verify a C++20 static build with Visual Studio 2022 and Ninja.
 - [ ] Verify builds with Clang or GCC on Linux.
 - [ ] Decide whether `houio.pro` remains supported or should be removed.
-- [ ] Ensure install and package-config rules work from a clean consumer project.
+- [x] Verify install and package-config rules from a clean external consumer project.
 
 ### Test baseline
 
@@ -181,6 +181,7 @@ tests/fixtures/
 - [x] Decode modern numeric `values.tuples` arrays.
 - [x] Decode modern component-oriented numeric `values.arrays`.
 - [x] Promote three-component `P` to the writer's four-component representation.
+- [x] Use declared tuple strides when converting `P` and UV into the simplified mesh model.
 - [x] Preserve vertex `N` and `uv` exactly in the Crag round-trip.
 - [x] Preserve Crag primitive string `name` and integer `piece` exactly.
 - [ ] Verify 64-bit integer handling.

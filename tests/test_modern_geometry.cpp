@@ -215,6 +215,28 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
         return fail("Polygon_run was not expanded correctly");
     }
 
+    houio::Geometry::Ptr converted = houio::HouGeoIO::convertToGeometry(geometry, primitives.front());
+    if (!converted || converted->numPrimitives() != 1)
+    {
+        return fail("failed to convert modern geometry to the simplified mesh model");
+    }
+
+    houio::Attribute::Ptr convertedPositions = converted->getAttr("P");
+    houio::Attribute::Ptr convertedUv = converted->getAttr("UV");
+    if (!convertedPositions || convertedPositions->numElements() != 4 || !convertedUv
+        || convertedUv->numElements() != 4)
+    {
+        return fail("simplified mesh conversion lost P or UV elements");
+    }
+
+    const houio::math::V3f convertedPosition = convertedPositions->get<houio::math::V3f>(2);
+    const houio::math::V2f convertedUvValue = convertedUv->get<houio::math::V2f>(2);
+    if (convertedPosition.x != 1.0f || convertedPosition.y != 1.0f
+        || convertedUvValue.x != 1.0f || convertedUvValue.y != 1.0f)
+    {
+        return fail("simplified mesh conversion used an incorrect tuple stride");
+    }
+
     return 0;
 }
 }

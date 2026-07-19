@@ -164,25 +164,59 @@ namespace houio
 			Attribute::Ptr attr;
 			if( attrName == "P" )
 			{
+				if( numComponents < 3 )
+					throw std::runtime_error( "HouGeoIO::convertToGeometry: P requires at least three components" );
+				HouGeoAdapter::RawPointer::Ptr rawPointer = houAttr->getRawPointer();
+				if( !rawPointer || !rawPointer->ptr )
+					throw std::runtime_error( "HouGeoIO::convertToGeometry: P has no data" );
+
 				attr = result->getAttr("P");
-				float *ptr = (float*)houGeo->getPointAttribute( attrName )->getRawPointer()->ptr;
-				for( int i=0;i<numPoints;++i )
+				for( sint64 pointIndex=0;pointIndex<numPoints;++pointIndex )
 				{
-					math::Vec3f p;
-					p.x = *ptr++; p.y = *ptr++; p.z = *ptr++;ptr++;
-					attr->appendElement( p );
+					math::Vec3f position;
+					const size_t tupleOffset = static_cast<size_t>(pointIndex)*static_cast<size_t>(numComponents);
+					if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+					{
+						const real32* values = static_cast<const real32*>(rawPointer->ptr) + tupleOffset;
+						position = math::Vec3f(values[0], values[1], values[2]);
+					}
+					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+					{
+						const real64* values = static_cast<const real64*>(rawPointer->ptr) + tupleOffset;
+						position = math::Vec3f(static_cast<real32>(values[0]), static_cast<real32>(values[1]), static_cast<real32>(values[2]));
+					}
+					else
+						throw std::runtime_error( "HouGeoIO::convertToGeometry: unsupported P storage" );
+					attr->appendElement(position);
 				}
 			}else
 			if( (attrName == "UV")||(attrName == "uv") )
 			{
-				float *ptr = (float*)houGeo->getPointAttribute( attrName )->getRawPointer()->ptr;
+				if( numComponents < 2 )
+					throw std::runtime_error( "HouGeoIO::convertToGeometry: UV requires at least two components" );
+				HouGeoAdapter::RawPointer::Ptr rawPointer = houAttr->getRawPointer();
+				if( !rawPointer || !rawPointer->ptr )
+					throw std::runtime_error( "HouGeoIO::convertToGeometry: UV has no data" );
+
 				attrName = "UV";
 				attr = Attribute::createV2f();
-				for( int i=0;i<numPoints;++i )
+				for( sint64 pointIndex=0;pointIndex<numPoints;++pointIndex )
 				{
 					math::Vec2f uv;
-					uv.x = *ptr++; uv.y = *ptr++;ptr++;
-					attr->appendElement( uv );
+					const size_t tupleOffset = static_cast<size_t>(pointIndex)*static_cast<size_t>(numComponents);
+					if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+					{
+						const real32* values = static_cast<const real32*>(rawPointer->ptr) + tupleOffset;
+						uv = math::Vec2f(values[0], values[1]);
+					}
+					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+					{
+						const real64* values = static_cast<const real64*>(rawPointer->ptr) + tupleOffset;
+						uv = math::Vec2f(static_cast<real32>(values[0]), static_cast<real32>(values[1]));
+					}
+					else
+						throw std::runtime_error( "HouGeoIO::convertToGeometry: unsupported UV storage" );
+					attr->appendElement(uv);
 				}
 			}else
 			if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
@@ -195,7 +229,8 @@ namespace houio
 			}else
 				std::cout << "HouGeoIO::convertToGeometry: warning: unable to handle storage type " << houAttr->getStorage() << " for attribute " << attrName << std::endl;
 
-			result->setAttr( attrName, attr );
+			if( attr )
+				result->setAttr( attrName, attr );
 		}
 
 		// convert vertex attributes ---
@@ -210,20 +245,43 @@ namespace houio
 			Attribute::Ptr attr;
 			if( (attrName == "UV")||(attrName == "uv") )
 			{
-				float *ptr = (float*)houGeo->getVertexAttribute( attrName )->getRawPointer()->ptr;
+				if( numComponents < 2 )
+					throw std::runtime_error( "HouGeoIO::convertToGeometry: vertex UV requires at least two components" );
+				HouGeoAdapter::RawPointer::Ptr rawPointer = houAttr->getRawPointer();
+				if( !rawPointer || !rawPointer->ptr )
+					throw std::runtime_error( "HouGeoIO::convertToGeometry: vertex UV has no data" );
+
 				attrName = "UV";
 				attr = Attribute::createV2f();
 
-				for( int i=0;i<numVertices;++i )
+				for( sint64 vertexIndex=0;vertexIndex<numVertices;++vertexIndex )
 				{
 					math::Vec2f uv;
-					uv.x = *ptr++; uv.y = *ptr++;ptr++;
-					attr->appendElement( uv );
+					const size_t tupleOffset = static_cast<size_t>(vertexIndex)*static_cast<size_t>(numComponents);
+					if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+					{
+						const real32* values = static_cast<const real32*>(rawPointer->ptr) + tupleOffset;
+						uv = math::Vec2f(values[0], values[1]);
+					}
+					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+					{
+						const real64* values = static_cast<const real64*>(rawPointer->ptr) + tupleOffset;
+						uv = math::Vec2f(static_cast<real32>(values[0]), static_cast<real32>(values[1]));
+					}
+					else
+						throw std::runtime_error( "HouGeoIO::convertToGeometry: unsupported vertex UV storage" );
+					attr->appendElement(uv);
 				}
 			}else
 			if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 				attr = Attribute::create( numComponents, Attribute::FLOAT, (unsigned char *)houAttr->getRawPointer()->ptr, houAttr->getNumElements() );
 
+
+			if( !attr )
+			{
+				std::cout << "HouGeoIO::convertToGeometry: warning: unable to convert vertex attribute " << attrName << std::endl;
+				continue;
+			}
 
 			// create point attribute which we will derive from this vertex attribute
 			Attribute::Ptr pointAttr = attr->copy();

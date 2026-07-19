@@ -79,7 +79,17 @@ houio_roundtrip_geometry  Imports and exports a geometry file through HouIO
 houio_example_readwrite   Demonstrates low-level parsing and writing
 ```
 
-The logger is registered with CTest.
+The logger and clean package-consumer project are registered with CTest.
+
+### Verify the installed package
+
+The packaging test installs HouIO to a clean prefix, configures a separate CMake project with `find_package(houio 0.2 CONFIG REQUIRED)`, builds it, and runs an export/import round-trip:
+
+```powershell
+ctest --test-dir build/windows-msvc-release --output-on-failure -R houio.package_consumer
+```
+
+This catches broken install destinations, package version files, exported target names, include directories, and transitive link requirements.
 
 ## Run the smoke executable
 

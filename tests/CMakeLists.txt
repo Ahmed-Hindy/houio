@@ -21,6 +21,19 @@ target_link_libraries(houio_test_export_safety PRIVATE houio::houio Threads::Thr
 target_compile_features(houio_test_export_safety PRIVATE cxx_std_20)
 add_test(NAME houio.export_safety COMMAND houio_test_export_safety)
 
+add_test(
+    NAME houio.package_consumer
+    COMMAND
+        "${CMAKE_COMMAND}"
+        "-DHOUIO_BINARY_DIR=${PROJECT_BINARY_DIR}"
+        "-DHOUIO_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+        "-DHOUIO_GENERATOR=${CMAKE_GENERATOR}"
+        "-DHOUIO_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+        "-DHOUIO_BUILD_CONFIG=$<CONFIG>"
+        "-DHOUIO_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package_consumer.cmake"
+)
+
 add_executable(houio_roundtrip_geometry roundtrip_geometry.cpp)
 target_link_libraries(houio_roundtrip_geometry PRIVATE houio::houio)
 target_compile_features(houio_roundtrip_geometry PRIVATE cxx_std_20)

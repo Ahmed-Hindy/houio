@@ -43,7 +43,7 @@ include/houio/       Public C++ headers
 include/ttl/         Vendored variant and template utilities
 src/                 Library implementation
 src/math/            Math implementation
-tests/               Smoke-test executables and Houdini 13 fixtures
+tests/               Unit, packaging, and Houdini integration tests
 scene_exporter/      Separate legacy Houdini Python 2 scene exporter
 cmake/               CMake package configuration
 ```
@@ -116,7 +116,25 @@ cmake --build --preset windows-msvc-release
 ctest --preset windows-msvc-release
 ```
 
-The release preset uses Ninja, builds the examples, and registers the historical logger executable with CTest. Houdini integration tests are registered when `HOUIO_HYTHON_EXECUTABLE` points to an installed `hython.exe`.
+The release preset uses Ninja, builds the tools and examples, and runs unit, package-consumer, and optional Houdini integration tests. Houdini integration tests are registered when `HOUIO_HYTHON_EXECUTABLE` points to an installed `hython.exe`.
+
+## Installing and consuming
+
+Install the configured build to a prefix:
+
+```powershell
+cmake --install build/windows-msvc-release --prefix C:\houio
+```
+
+A separate CMake project can then consume HouIO without source-tree paths:
+
+```cmake
+find_package(houio 0.2 CONFIG REQUIRED)
+
+target_link_libraries(my_target PRIVATE houio::houio)
+```
+
+`houio.package_consumer` validates this contract by installing to a clean temporary prefix, configuring an external project, building it through `find_package`, and running a geometry export/import round-trip. The same test runs in CI.
 
 ## Supported data model
 
