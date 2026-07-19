@@ -189,6 +189,8 @@ Both directions are tested against Houdini-generated files, and Houdini 21 and 2
 
 ## Houdini HOM and `.vdb` workflows
 
+For an end-to-end Windows setup using Houdini 22, including build, package installation, Python Shell, shelf, Python SOP, `hython`, VDB, and troubleshooting examples, see [Using HouIO in Houdini 22 on Windows](docs/houdini-22-windows.md).
+
 The standalone C++ library does not link to Houdini's private OpenVDB build and does not yet model sparse OpenVDB trees natively. The `python/houio_hom` package provides the supported Houdini-side path:
 
 - Houdini reads and writes `.bgeo`, `.bgeo.sc`, `.geo`, and `.vdb` through HOM.
@@ -400,4 +402,5 @@ Recommended workflow:
 
 - [architecture.md](architecture.md) — modules, data flow, abstractions, and architectural risks
 - [onboard.md](onboard.md) — environment setup and code-reading path
+- [docs/houdini-22-windows.md](docs/houdini-22-windows.md) — complete Houdini 22 setup and usage on Windows
 - [todo.md](todo.md) — prioritized maintenance and compatibility work
