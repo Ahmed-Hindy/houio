@@ -88,13 +88,14 @@ The priority labels indicate dependency order rather than estimated effort.
 ### Parser safety
 
 - [x] Fix the fast-fail caused by unsupported uniform signed-int8 arrays in modern binary `Polygon_run` data.
-- [ ] Check stream state after every fixed-size read.
-- [ ] Validate binary lengths before allocation.
-- [ ] Add configurable file-size, array-size, and nesting-depth limits.
-- [ ] Detect integer overflow in byte-count calculations.
+- [x] Check stream byte counts after every fixed-size binary read.
+- [x] Reject negative binary lengths before allocation or container-size conversion.
+- [x] Add configurable string-size, uniform-array-size, and nesting-depth limits.
+- [ ] Add a configurable full-file byte limit for seekable and streaming inputs.
+- [x] Detect integer overflow in parser and writer byte-count calculations.
 - [x] Add regression coverage for uniform signed-int8 widening.
 - [ ] Validate all uniform-array element types and storage sizes before reading.
-- [ ] Validate string token references before lookup.
+- [x] Validate string token references before lookup.
 - [x] Reject odd-length, non-string-keyed, and duplicate-key flattened objects.
 - [x] Validate topology counts and point-reference ranges.
 - [x] Validate direct polygon and polygon-run topology references.
@@ -166,7 +167,8 @@ tests/fixtures/
 - [ ] Unit-test every supported token type.
 - [ ] Unit-test string definition and reference handling.
 - [x] Unit-test modern uniform signed-int8 arrays.
-- [ ] Unit-test uniform arrays for every other supported storage type.
+- [ ] Unit-test uniform arrays for every other supported numeric storage type.
+- [x] Unit-test multiword uniform bool arrays.
 - [x] Unit-test malformed flattened-array rejection.
 - [ ] Unit-test attribute packing and constant pages.
 - [x] Unit-test topology loading.

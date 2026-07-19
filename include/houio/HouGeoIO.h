@@ -8,6 +8,7 @@ namespace houio
 	struct HouGeoIO
 	{
 		static HouGeo::Ptr                      import( std::istream *in );
+		static HouGeo::Ptr                      import( std::istream *in, const json::ParserLimits &limits );
 		static Geometry::Ptr                    importGeometry( const std::string &path );
 		static ScalarField::Ptr                 importVolume(const std::string &path);
 		static void                             makeLog( const std::string &path, std::ostream *out );

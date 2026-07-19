@@ -86,7 +86,9 @@ The parser handles:
 - Uniform numeric arrays, including modern signed-int8 polygon run-length data
 - Arrays and maps
 
-The parser determines whether the input is binary by inspecting the stream's opening data.
+The parser determines whether the input is binary by inspecting the stream's opening data. Every fixed-size read validates the exact byte count. Binary lengths reject negative values before conversion to container sizes, and string-token references must resolve to an existing definition.
+
+`ParserLimits` provides per-parser bounds for string bytes, uniform-array elements, and nesting depth. The default limits are 64 MiB per string, 64 million uniform-array elements, and 1,024 nested containers. `HouGeoIO::import()` uses those defaults, while its limits overload exposes the same controls to applications.
 
 ### Event handlers
 
@@ -109,7 +111,7 @@ Two handlers are central:
 
 #### `JSONReader`
 
-Builds an in-memory tree from `Value`, `Array`, and `Object`. Uniform arrays may retain packed storage to reduce per-element overhead.
+Builds an in-memory tree from `Value`, `Array`, and `Object`. Uniform arrays may retain packed storage to reduce per-element overhead. Their source and destination allocation sizes are checked before allocation, and temporary source storage is RAII-owned.
 
 #### `JSONLogger`
 

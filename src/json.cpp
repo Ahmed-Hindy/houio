@@ -103,15 +103,32 @@ namespace houio
 
 		// Parser ==================================================
 
+		Parser::Parser() : Parser(ParserLimits())
+		{
+		}
+
+		Parser::Parser( const ParserLimits &parserLimits ) :
+			state(STATE_INVALID),
+			handler(nullptr),
+			stream(nullptr),
+			binary(false),
+			limits(parserLimits)
+		{
+			if( limits.maxStringBytes < 0 || limits.maxUniformArrayElements < 0 )
+				throw std::invalid_argument( "Parser limits cannot be negative" );
+			if( limits.maxNestingDepth == 0 )
+				throw std::invalid_argument( "Parser nesting depth must be greater than zero" );
+		}
+
 		bool Parser::parse( std::istream *in,  Handler *h )
 		{
-			if( !in->good() )
+			if( !in || !h || !in->good() )
 				return false;
 
-			// make sure length is > 0
-
-			// (re)initialize
+			// (re)initialize all per-document state.
 			state = STATE_START;
+			stateStack = std::stack<State>();
+			strings.clear();
 			binary = false;
 			handler = h;
 			stream = in;
@@ -251,7 +268,7 @@ namespace houio
 			return true;
 		}
 
-		bool Parser::readBinaryToken( Token &t, ubyte test )
+		bool Parser::readBinaryToken( Token &t, ubyte )
 		{
 			while( (t.type == Token::JID_TOKENDEF) || (t.type == Token::JID_TOKENUNDEF) )
 			{
@@ -271,13 +288,13 @@ namespace houio
 				return true;
 			case Token::JID_TOKENREF:
 				{
-					//Common strings may be encoded using a shared string table.  Each
-					//string token defined (defineToken()) is given an integer "handle"
-					//which can be used to reference the token.  Reating a token involves
-					//reading the integer handle and looking up the value in the Tokens map.
-					sint64 stringId = readLength();
+					// Common strings may be encoded using a shared string table.
+					const sint64 stringId = readLength();
+					const auto stringIterator = strings.find(stringId);
+					if( stringIterator == strings.end() )
+						throw std::runtime_error( "Parser::readBinaryToken referenced an undefined string token" );
 					t.type = Token::JID_STRING;
-					t.value = strings[stringId];
+					t.value = stringIterator->second;
 				}return true;
 			case Token::JID_TRUE: t.value = true;t.type = Token::JID_BOOL; return true;
 			case Token::JID_FALSE: t.value = false;t.type = Token::JID_BOOL; return true;
@@ -293,10 +310,27 @@ namespace houio
 			case Token::JID_STRING: t.value = readBinaryString();return true;
 			case Token::JID_UNIFORM_ARRAY:
 				{
-					// Read the type information which will be saved in seperate member
-					t.uaType = (Token::Type) read<sbyte>();
-					// value will be number of items
-					t.value = readLength();
+					t.uaType = static_cast<Token::Type>(read<sbyte>());
+					switch( t.uaType )
+					{
+					case Token::JID_BOOL:
+					case Token::JID_INT8:
+					case Token::JID_INT16:
+					case Token::JID_INT32:
+					case Token::JID_INT64:
+					case Token::JID_REAL32:
+					case Token::JID_REAL64:
+					case Token::JID_UINT8:
+					case Token::JID_STRING:
+						break;
+					default:
+						throw std::runtime_error( "Parser::readBinaryToken encountered an unsupported uniform-array type" );
+					}
+
+					const sint64 elementCount = readLength();
+					if( elementCount > limits.maxUniformArrayElements )
+						throw std::length_error( "Parser uniform-array element limit exceeded" );
+					t.value = elementCount;
 					return true;
 				}
 			default:
@@ -405,9 +439,8 @@ namespace houio
 
 		void Parser::pushState( State s )
 		{
-			// if we just started we dont need to track the current state
-			//if( state != STATE_START )
-			// otherwise we will need to remember
+			if( stateStack.size() >= limits.maxNestingDepth )
+				throw std::length_error( "Parser nesting depth limit exceeded" );
 			stateStack.push( s );
 
 			// set new state
@@ -480,7 +513,7 @@ namespace houio
 
 		sint64 Parser::readLength()
 		{
-			//In the binary format, length is encoded in a multi-byte format.
+			// In the binary format, length is encoded in a multi-byte format.
 			//For lenthgs < 0xf1 (240) the lenths are stored as a single byte.
 			//If the length is longer than 240 bytes, the value of the first byte
 			//determines the number of bytes that follow used to store the
@@ -489,46 +522,39 @@ namespace houio
 			//0xf4 = 4 bytes (32 bit unsigned length)
 			//0xf8 = 8 bytes (64 bit signed length)
 			//Other values (i.e. 0xf1 or 0xfa) are considered errors.
-			ubyte n = read<ubyte>();
+			const ubyte n = read<ubyte>();
+			sint64 length = 0;
 			switch( n )
 			{
-			case 0xf2:return read<uword>();
-			case 0xf4:return read<uint32>();
-			case 0xf8:return read<sint64>();
+			case 0xf2:length = read<uword>();break;
+			case 0xf4:length = read<uint32>();break;
+			case 0xf8:length = read<sint64>();break;
 			default:
-				if (n < 0xf1)
-					return n;
+				if( n < 0xf1 )
+					length = n;
 				else
 				{
-					// kind of an error
 					std::ostringstream stringStream;
-					stringStream << "unknown length id " << n;
+					stringStream << "unknown length id " << static_cast<int>(n);
 					throw std::runtime_error(stringStream.str());
 				}
-			};
-			return 0;
+			}
+			if( length < 0 )
+				throw std::length_error( "Parser::readLength decoded a negative length" );
+			return length;
 		}
 
 		std::string Parser::readBinaryString()
 		{
-			// A binary string is encoded by storing it's length (encoded)
-			// followed by the string data.  The trailing <null> character is not
-			// stored in the file.
-			sint64 l = readLength();
-			std::string s;
-			if( l>0 )
-			{
-				s.resize( l );
-				stream->read( (char *)&s[0], l );
-			}
+			// A binary string stores an encoded byte length followed by raw bytes.
+			const sint64 length = readLength();
+			if( length > limits.maxStringBytes )
+				throw std::length_error( "Parser binary-string byte limit exceeded" );
 
-			if( s == "constantpageflags" )
-			{
-				int debug = 0;
-				debug++;
-			}
-
-			return s;
+			std::string value(static_cast<size_t>(length), '\0');
+			if( length > 0 )
+				read(value.data(), length);
+			return value;
 		}
 
 		// Read a quoted string one character at a time
@@ -624,6 +650,8 @@ namespace houio
 
 		BinaryWriter::BinaryWriter( std::ostream *out )
 		{
+			if( !out )
+				throw std::invalid_argument( "BinaryWriter requires a valid output stream" );
 			stream = out;
 			jsonMagic();
 		}
@@ -635,22 +663,19 @@ namespace houio
 
 		bool BinaryWriter::writeLength( const sint64 &length )
 		{
+			if( length < 0 )
+				throw std::length_error( "BinaryWriter::writeLength cannot encode a negative length" );
 			if( length < 0xf1 )
-				return write<ubyte>( (ubyte)length );
-			else if( length < 0xffff )
+				return write<ubyte>(static_cast<ubyte>(length));
+			if( length <= std::numeric_limits<uword>::max() )
 			{
-				write<ubyte>( 0xf2 );
-				return write<uword>( (uword)length );
-			}else if( length < 0xffffffff )
-			{
-				write<ubyte>( 0xf4 );
-				return write<uint32>( (uint32)length );
-			}else
-			{
-				write<ubyte>( 0xf8 );
-				return write<sint64>( length );
+				return write<ubyte>(0xf2) && write<uword>(static_cast<uword>(length));
 			}
-			return false;
+			if( length <= std::numeric_limits<uint32>::max() )
+			{
+				return write<ubyte>(0xf4) && write<uint32>(static_cast<uint32>(length));
+			}
+			return write<ubyte>(0xf8) && write<sint64>(length);
 		}
 
 		bool BinaryWriter::jsonMagic()
@@ -680,9 +705,13 @@ namespace houio
 
 		void BinaryWriter::jsonString( const std::string &value )
 		{
-			writeId( Token::JID_STRING );
-			writeLength( value.size() );
-			write<sbyte>( (const sbyte *)&value[0], (sint64)value.size() );
+			if( value.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
+				throw std::length_error( "BinaryWriter::jsonString exceeds sint64 range" );
+			const sint64 length = static_cast<sint64>(value.size());
+			writeId(Token::JID_STRING);
+			writeLength(length);
+			if( !value.empty() )
+				write<char>(value.data(), length);
 		}
 
 		void BinaryWriter::jsonKey( const std::string &key )
@@ -1253,23 +1282,20 @@ namespace houio
 
 		void JSONReader::uaBool( sint64 numElements, Parser *parser )
 		{
-			//In binary JSON files, uniform bool arrays are stored as bit
-			//streams.  This method decodes the bit-stream, calling jsonBool()
-			//for each element of the bit array.
+			if( numElements < 0 )
+				throw std::length_error( "JSONReader::uaBool received a negative element count" );
 
 			jsonBeginArray();
-			int count = (int) numElements;
-			while( count > 0 )
+			sint64 elementsRemaining = numElements;
+			while( elementsRemaining > 0 )
 			{
-				uint32 bits;
-				parser->read<uint32>( &bits, 1 );
-				int nbits = std::min( count, 32 );
-				count -= nbits;
-				for( int i=0;i<nbits;++i )
-					jsonBool( (bits & (1 << i)) != 0 );
+				const uint32 bits = parser->read<uint32>();
+				const int bitCount = static_cast<int>(std::min<sint64>(elementsRemaining, 32));
+				elementsRemaining -= bitCount;
+				for( int bitIndex=0;bitIndex<bitCount;++bitIndex )
+					jsonBool( (bits & (uint32(1) << bitIndex)) != 0 );
 			}
 			jsonEndArray();
-
 		}
 
 		void JSONReader::uaReal32( sint64 numElements, Parser *parser )

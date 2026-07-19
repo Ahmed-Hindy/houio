@@ -8,8 +8,13 @@ namespace houio
 
 	HouGeo::Ptr HouGeoIO::import( std::istream *in )
 	{
+		return import(in, json::ParserLimits());
+	}
+
+	HouGeo::Ptr HouGeoIO::import( std::istream *in, const json::ParserLimits &limits )
+	{
 		json::JSONReader reader;
-		json::Parser p;
+		json::Parser p(limits);
 
 		//core::Timer timer;
 		//timer.start();

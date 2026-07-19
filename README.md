@@ -105,6 +105,22 @@ houio::HouGeoIO::makeLog("mesh.bgeo", &std::cout);
 
 The logger is useful because Houdini geometry uses flattened key/value arrays and has changed across Houdini versions.
 
+### Configure parser safety limits
+
+Binary parsing uses conservative defaults for individual strings, uniform-array element counts, and nesting depth. Applications that accept untrusted or unusually large files can override them:
+
+```cpp
+houio::json::ParserLimits limits;
+limits.maxStringBytes = 8 * 1024 * 1024;
+limits.maxUniformArrayElements = 16 * 1024 * 1024;
+limits.maxNestingDepth = 256;
+
+std::ifstream input("mesh.bgeo", std::ios::binary);
+houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input, limits);
+```
+
+Fixed-size reads reject truncated streams, encoded lengths cannot be negative, allocation byte counts are overflow-checked, and undefined string-token references are rejected. The defaults allow the tested Crag geometry without adjustment.
+
 ## Building
 
 HouIO builds as a static C++20 library using target-based CMake.

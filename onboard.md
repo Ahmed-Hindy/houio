@@ -232,7 +232,7 @@ Parser::readBinaryToken
 Parser::readASCIIToken
 ```
 
-Then follow uniform-array callbacks into `JSONReader`.
+Then follow uniform-array callbacks into `JSONReader`. `ParserLimits` bounds string bytes, uniform-array elements, and nesting depth. Checked reads throw on truncation before handlers allocate or consume incomplete payloads.
 
 ### 4. `HouGeo::load()` in `src/HouGeo.cpp`
 
@@ -310,6 +310,8 @@ Investigate:
 - Length encodings
 - Uniform-array storage types
 - Truncation or outer compression
+- Configured `ParserLimits` versus the observed string, array, and nesting sizes
+- Undefined shared string-token references
 
 ### Schema failure
 
