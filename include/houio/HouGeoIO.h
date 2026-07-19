@@ -1,4 +1,5 @@
 #pragma once
+#include <houio/Diagnostic.h>
 #include <houio/HouGeo.h>
 #include <houio/Geometry.h>
 
@@ -8,12 +9,17 @@ namespace houio
 	struct HouGeoIO
 	{
 		static HouGeo::Ptr                      import( std::istream *in );
+		static HouGeo::Ptr                      import( std::istream *in, DiagnosticList *diagnostics );
 		static HouGeo::Ptr                      import( std::istream *in, const json::ParserLimits &limits );
+		static HouGeo::Ptr                      import( std::istream *in, const json::ParserLimits &limits, DiagnosticList *diagnostics );
 		static Geometry::Ptr                    importGeometry( const std::string &path );
+		static Geometry::Ptr                    importGeometry( const std::string &path, DiagnosticList *diagnostics );
 		static ScalarField::Ptr                 importVolume(const std::string &path);
+		static ScalarField::Ptr                 importVolume(const std::string &path, DiagnosticList *diagnostics);
 		static void                             makeLog( const std::string &path, std::ostream *out );
 
 		static Geometry::Ptr                    convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim ); // converts primitive with the given index to geometry
+		static Geometry::Ptr                    convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim, DiagnosticList *diagnostics );
 
 		static bool                             xport( const std::string& filename, ScalarField::Ptr volume ); // convinience funcion for quickly saving volume to bgeo
 		static bool                             xport( const std::string& filename, Geometry::Ptr geo ); // convinience funcion for quickly saving geometry to bgeo

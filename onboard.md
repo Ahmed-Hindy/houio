@@ -291,11 +291,17 @@ They are not a complete model of Houdini geometry.
 
 ## Debugging a file
 
-When a file fails, begin with the generic logger rather than the semantic geometry loader.
+When a file fails, capture structured diagnostics first, then use the generic logger when you need to inspect the decoded record stream.
 
 ```cpp
+houio::DiagnosticList diagnostics;
+std::ifstream input("problem.bgeo", std::ios::binary);
+houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input, &diagnostics);
+
 houio::HouGeoIO::makeLog("problem.bgeo", &std::cout);
 ```
+
+Parser diagnostics include byte offsets. Semantic diagnostics include paths such as `topology`, `attributes.pointattributes[0]`, or `primitives[2].definition.type`. Categories distinguish malformed input, unsupported input, schema errors, I/O failures, and convenience-conversion warnings.
 
 This separates two failure categories:
 
@@ -387,7 +393,7 @@ A primitive may reference vertex entries, and the topology maps those entries to
 
 ### Malformed input baseline
 
-`houio.malformed_geometry` exercises semantic rejection for odd or duplicate flattened keys, negative domain counts, invalid topology, malformed group masks, and unsupported ordered group selections. These checks complement parser-token tests; they do not yet provide file-size, nesting-depth, or allocation limits.
+`houio.malformed_geometry` exercises semantic rejection for odd or duplicate flattened keys, negative domain counts, invalid topology, malformed group masks, unsupported ordered group selections, unsupported primitive records, schema paths, and I/O diagnostics. `houio.binary_json` additionally verifies byte offsets, parser categories, string and uniform-array limits, nesting limits, truncated reads, and token references.
 
 ### Point and vertex domains
 
@@ -407,9 +413,9 @@ A JSON `Array` may store values in a packed uniform buffer rather than individua
 
 It selects the first stored primitive representation and only creates line, triangle, or quad geometry when the polygon vertex count is constant.
 
-### `importVolume()` assumes a primitive exists
+### `importVolume()` requires a volume primitive
 
-The function currently accesses the first primitive without first validating that the primitive list is non-empty.
+The diagnostics-aware overload reports empty primitive lists and non-volume first primitives through schema or unsupported-input diagnostics. The historical overload returns null for these convenience-import failures.
 
 ### Export uses a scoped thread-local binding
 
@@ -419,9 +425,9 @@ Each export owns its writer on the stack. A scoped thread-local pointer connects
 
 The high-level stream export returns `false` for `binary=false` and writes no partial output. Use binary `.bgeo` output until the geometry serializer is generalized for `ASCIIWriter`.
 
-### Error reporting is inconsistent
+### Prefer diagnostics-aware import overloads
 
-Failures may return null, print to standard output, or throw a generic exception. Add context when touching a failure path.
+The historical low-level parser path still throws when no diagnostic list is supplied. Diagnostics-aware `import()`, `importGeometry()`, `importVolume()`, and `convertToGeometry()` overloads capture failures and return null. New import-facing failure paths should preserve categories, parser offsets, and semantic paths instead of printing to standard output.
 
 ### Raw attribute memory requires care
 

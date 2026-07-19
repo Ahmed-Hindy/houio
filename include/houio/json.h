@@ -32,6 +32,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include <houio/Diagnostic.h>
 #include <houio/types.h>
 #include <ttl/var/variant.hpp>
 
@@ -126,18 +127,15 @@ namespace houio
 		// UTILITY FUNCTIONS ======================================
 
 		template<typename T>
-		T fromString(const std::string& s)
+		T fromString(const std::string& value)
 		{
-			std::istringstream stream (s);
-			T t;
-			try
-			{
-				stream >> t;
-			}catch(...)
-			{
-				std::cout << "error during string conversion..." << std::endl;
-			}
-			return t;
+			std::istringstream stream(value);
+			T result{};
+			stream >> result;
+			if( stream.fail() )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::malformed_input, "Unable to parse JSON scalar " + value, -1, ""});
+			return result;
 		}
 
 		template<class T>
@@ -185,7 +183,8 @@ namespace houio
 			Parser();
 			explicit Parser( const ParserLimits &limits );
 
-			bool parse( std::istream *in,  Handler *h );
+			bool parse( std::istream *in, Handler *h );
+			bool parse( std::istream *in, Handler *h, DiagnosticList *diagnostics );
 			bool                          parseStream();
 			bool                  readToken( Token &t );
 			bool            readBinaryToken( Token &t, ubyte test = -1 );
@@ -195,6 +194,7 @@ namespace houio
 			void                   pushState( State s );
 			void                    setState( State s );
 			void                             popState();
+			[[noreturn]] void fail( DiagnosticCategory category, const std::string &message, sint64 offset = -1 );
 
 
 			template<typename T>
@@ -212,6 +212,8 @@ namespace houio
 			Handler                            *handler;
 			std::istream                        *stream;
 			bool                                 binary;
+			sint64                              byteOffset;
+			sint64                              tokenOffset;
 
 			std::map<sint64, std::string>       strings; // common strings are references by ids
 			ParserLimits                         limits;
@@ -245,8 +247,10 @@ namespace houio
 
 			const std::streamsize byteCount = static_cast<std::streamsize>(elementCount * sizeof(T));
 			stream->read(reinterpret_cast<char*>(dst), byteCount);
-			if( stream->gcount() != byteCount )
-				throw std::runtime_error( "Parser::read encountered truncated input" );
+			const std::streamsize bytesRead = stream->gcount();
+			byteOffset += static_cast<sint64>(bytesRead);
+			if( bytesRead != byteCount )
+				fail(DiagnosticCategory::malformed_input, "Parser::read encountered truncated input", byteOffset);
 		}
 
 

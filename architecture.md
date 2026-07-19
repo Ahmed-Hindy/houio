@@ -90,6 +90,16 @@ The parser determines whether the input is binary by inspecting the stream's ope
 
 `ParserLimits` provides per-parser bounds for string bytes, uniform-array elements, and nesting depth. The default limits are 64 MiB per string, 64 million uniform-array elements, and 1,024 nested containers. `HouGeoIO::import()` uses those defaults, while its limits overload exposes the same controls to applications.
 
+### Diagnostics
+
+`include/houio/Diagnostic.h` defines the shared diagnostic boundary for parsing, semantic loading, and convenience conversion. Each record contains severity, category, message, optional byte position represented by `-1` when unavailable, and an optional schema path.
+
+Parser reads maintain a monotonic byte offset. Truncated fixed-size values report the first missing byte, token failures report the token or storage-type byte, and parser-generated diagnostics distinguish malformed encodings from recognized-but-unsupported encodings. The diagnostics-aware parser overload catches these failures and returns `false`; the historical overload continues to throw.
+
+`HouGeo::load()` wraps attribute, topology, primitive, and group boundaries with schema paths. Unknown primitive types and unsupported group encodings preserve the `unsupported_input` category while gaining paths such as `primitives[0].definition.type`. Other semantic exceptions are promoted to `schema` diagnostics.
+
+`HouGeoIO` exposes diagnostics-aware overloads for low-level import, simplified geometry import, volume import, and conversion. The caller owns the `DiagnosticList`. These overloads return null on error and never write error messages to standard output.
+
 ### Event handlers
 
 `Handler` is the SAX-style boundary. It receives events such as:
