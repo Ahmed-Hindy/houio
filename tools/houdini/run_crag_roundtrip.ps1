@@ -87,7 +87,11 @@ foreach ($validationVersion in $ValidationVersions) {
         "--expect-vertex-attribute",
         "N",
         "--expect-vertex-attribute",
-        "uv"
+        "uv",
+        "--expect-primitive-attribute",
+        "name",
+        "--expect-primitive-attribute",
+        "piece"
     )
     Invoke-NativeCommand -Executable $validationHython -Arguments @(
         (Join-Path $repositoryRoot "tools\houdini\compare_geometry.py"),
@@ -98,7 +102,11 @@ foreach ($validationVersion in $ValidationVersions) {
         "--vertex-attribute",
         "N",
         "--vertex-attribute",
-        "uv"
+        "uv",
+        "--primitive-string-attribute",
+        "name",
+        "--primitive-int-attribute",
+        "piece"
     )
 }
 

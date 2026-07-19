@@ -179,18 +179,19 @@ tests/fixtures/
 ### Attributes
 
 - [x] Decode modern numeric `values.tuples` arrays.
+- [x] Decode modern component-oriented numeric `values.arrays`.
 - [x] Promote three-component `P` to the writer's four-component representation.
 - [x] Preserve vertex `N` and `uv` exactly in the Crag round-trip.
-- [ ] Preserve indexed primitive string attributes such as Crag `name` and `piece`.
+- [x] Preserve Crag primitive string `name` and integer `piece` exactly.
 - [ ] Verify 64-bit integer handling.
 - [ ] Verify half-float attribute handling.
 - [ ] Add unsigned integer storage where the format uses it.
 - [ ] Preserve all supported numeric storage types without forced narrowing.
-- [ ] Correctly decode string tables and index arrays.
+- [x] Decode indexed string tables, including constant-page-compressed indices.
 - [ ] Preserve attribute type information and semantic metadata.
 - [x] Support vertex attribute export.
 - [ ] Restore and test global attribute export.
-- [ ] Verify primitive attribute export for polygon runs.
+- [x] Verify primitive string and integer attribute export for polygon runs.
 - [ ] Support attribute packing layouts comprehensively.
 - [ ] Support constant-page encodings comprehensively.
 

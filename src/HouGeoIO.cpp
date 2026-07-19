@@ -704,10 +704,24 @@ namespace houio
 			g_writer->jsonString( "storage" );
 			g_writer->jsonString( "int32" );
 
+			std::map<std::string, sint32> stringLookup;
+			std::vector<std::string> stringTable;
+			std::vector<sint32> indices;
+			stringTable.reserve(static_cast<size_t>(attr->getNumElements()));
+			indices.reserve(static_cast<size_t>(attr->getNumElements()));
+			for( int i=0;i<attr->getNumElements();++i )
+			{
+				const std::string value = attr->getString(i);
+				auto insertion = stringLookup.emplace(value, static_cast<sint32>(stringTable.size()));
+				if( insertion.second )
+					stringTable.push_back(value);
+				indices.push_back(insertion.first->second);
+			}
+
 			g_writer->jsonString( "strings" );
 			g_writer->jsonBeginArray();
-				for( int i=0;i<attr->getNumElements();++i )
-					g_writer->jsonString( attr->getString(i) );
+				for( const std::string& value : stringTable )
+					g_writer->jsonString(value);
 			g_writer->jsonEndArray();
 
 			g_writer->jsonString( "indices" );
@@ -722,9 +736,6 @@ namespace houio
 				g_writer->jsonInt32( 1024 );
 
 				g_writer->jsonString( "rawpagedata" );
-				std::vector<int> indices;
-				for( int i=0;i<attr->getNumElements();++i )
-					indices.push_back(i);
 				g_writer->jsonUniformArray(indices);
 
 			g_writer->jsonEndArray();

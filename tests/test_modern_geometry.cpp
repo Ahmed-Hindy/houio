@@ -91,6 +91,41 @@ const char* modernQuadGeometry()
                         ]
                     ]
                 ]
+            ],
+            "primitiveattributes", [
+                [
+                    [
+                        "scope", "public",
+                        "type", "string",
+                        "name", "name"
+                    ],
+                    [
+                        "size", 1,
+                        "storage", "int32",
+                        "strings", ["body", "prop"],
+                        "indices", [
+                            "size", 1,
+                            "storage", "int32",
+                            "arrays", [[1]]
+                        ]
+                    ]
+                ],
+                [
+                    [
+                        "scope", "public",
+                        "type", "numeric",
+                        "name", "piece"
+                    ],
+                    [
+                        "size", 1,
+                        "storage", "int32",
+                        "values", [
+                            "size", 1,
+                            "storage", "int32",
+                            "arrays", [[7]]
+                        ]
+                    ]
+                ]
             ]
         ],
         "primitives", [
@@ -146,6 +181,25 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
     if (!normalData || normalData[2] != 1.0f || !uvData || uvData[4] != 1.0f || uvData[5] != 1.0f)
     {
         return fail("representative vertex attribute values were not preserved");
+    }
+
+    houio::HouGeoAdapter::AttributeAdapter::Ptr name = geometry->getPrimitiveAttribute("name");
+    if (!name || name->getType() != houio::HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING
+        || name->getNumElements() != 1 || name->getString(0) != "prop")
+    {
+        return fail("indexed primitive string attribute was not preserved");
+    }
+
+    houio::HouGeoAdapter::AttributeAdapter::Ptr piece = geometry->getPrimitiveAttribute("piece");
+    if (!piece || piece->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32
+        || piece->getTupleSize() != 1 || piece->getNumElements() != 1)
+    {
+        return fail("primitive integer attribute metadata was not preserved");
+    }
+    const auto* pieceData = static_cast<const houio::sint32*>(piece->getRawPointer()->ptr);
+    if (!pieceData || pieceData[0] != 7)
+    {
+        return fail("primitive integer attribute value was not preserved");
     }
 
     std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;

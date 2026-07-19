@@ -194,7 +194,7 @@ m_primitives
 
 ### Attribute domains
 
-Each Houdini attribute is represented by `HouGeo::HouAttribute`, which wraps the generic `Attribute` buffer for numeric values or a string vector for string attributes. Numeric loading supports the legacy paged representation and modern `values.tuples` arrays observed in Houdini 21/22.
+Each Houdini attribute is represented by `HouGeo::HouAttribute`, which wraps the generic `Attribute` buffer for numeric values or expanded per-element strings. Numeric loading supports legacy paged data, modern `values.tuples`, and component-oriented `values.arrays`. String loading expands indexed string tables, including constant-page-compressed index payloads used by Houdini 21/22.
 
 The loader uses the root geometry counts to size each domain:
 
@@ -278,7 +278,7 @@ HouGeoIO::xport(...)
     └─ Finish the binary JSON root array
 ```
 
-The writer serializes point, vertex, and primitive attributes through the same adapter contract. It promotes a three-component floating-point `P` attribute to four components with `w = 1`, preserving compatibility with its legacy binary schema. Each export owns its `BinaryWriter` on the stack. A scoped thread-local binding lets the legacy helper functions reach the active writer while restoring the previous binding after normal completion or exceptions. Independent streams can therefore be exported concurrently.
+The writer serializes point, vertex, and primitive attributes through the same adapter contract. Numeric values are emitted as paged uniform arrays. Per-element strings are deduplicated into a string table plus integer indices. The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`, preserving compatibility with its legacy binary schema. Each export owns its `BinaryWriter` on the stack. A scoped thread-local binding lets the legacy helper functions reach the active writer while restoring the previous binding after normal completion or exceptions. Independent streams can therefore be exported concurrently.
 
 ## 6. Simplified `Geometry`
 

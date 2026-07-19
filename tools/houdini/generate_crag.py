@@ -142,6 +142,11 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path, help="Output .geo or .bgeo path")
+    parser.add_argument(
+        "--strip-primitive-attributes",
+        action="store_true",
+        help="Remove Crag's name and piece primitive attributes.",
+    )
     return parser.parse_args()
 
 
@@ -169,25 +174,29 @@ def main() -> int:
     unpack_node = geometry_container.createNode("unpack", "unpack_crag")
     unpack_node.setInput(0, crag_node)
 
-    attribute_delete_node = geometry_container.createNode("attribdelete", "strip_primitive_metadata")
-    attribute_delete_node.setInput(0, unpack_node)
-    primitive_delete_parm = attribute_delete_node.parm("primdel")
-    if primitive_delete_parm is None:
-        raise RuntimeError("Attribute Delete SOP does not expose the expected 'primdel' parameter.")
-    primitive_delete_parm.set("name piece")
+    output_node = unpack_node
+    if args.strip_primitive_attributes:
+        output_node = geometry_container.createNode("attribdelete", "strip_primitive_metadata")
+        output_node.setInput(0, unpack_node)
+        primitive_delete_parm = output_node.parm("primdel")
+        if primitive_delete_parm is None:
+            raise RuntimeError(
+                "Attribute Delete SOP does not expose the expected 'primdel' parameter."
+            )
+        primitive_delete_parm.set("name piece")
 
-    attribute_delete_node.setDisplayFlag(True)
-    attribute_delete_node.setRenderFlag(True)
-    attribute_delete_node.cook(force=True)
+    output_node.setDisplayFlag(True)
+    output_node.setRenderFlag(True)
+    output_node.cook(force=True)
 
-    geometry = attribute_delete_node.geometry()
+    geometry = output_node.geometry()
     if len(geometry.points()) == 0 or len(geometry.prims()) == 0:
         raise RuntimeError("Crag cooked to empty geometry.")
 
     geometry.saveToFile(str(output_path))
     print(
         json.dumps(
-            geometry_summary(attribute_delete_node, output_path, changes),
+            geometry_summary(output_node, output_path, changes),
             indent=2,
             sort_keys=True,
         )

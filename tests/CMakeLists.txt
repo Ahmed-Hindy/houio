@@ -29,6 +29,10 @@ add_executable(houio_inspect_json inspect_json.cpp)
 target_link_libraries(houio_inspect_json PRIVATE houio::houio)
 target_compile_features(houio_inspect_json PRIVATE cxx_std_20)
 
+add_executable(houio_inspect_attributes inspect_attributes.cpp)
+target_link_libraries(houio_inspect_attributes PRIVATE houio::houio)
+target_compile_features(houio_inspect_attributes PRIVATE cxx_std_20)
+
 if(HOUIO_BUILD_EXAMPLES)
     add_executable(houio_example_readwrite example_readwrite.cpp)
     target_link_libraries(houio_example_readwrite PRIVATE houio::houio)
@@ -75,6 +79,8 @@ if(HOUIO_HYTHON_EXECUTABLE)
             --point-attribute P
             --vertex-attribute N
             --vertex-attribute uv
+            --primitive-string-attribute name
+            --primitive-int-attribute piece
     )
     set_tests_properties(houio.crag.compare PROPERTIES FIXTURES_REQUIRED houio_crag_output)
 
@@ -89,6 +95,8 @@ if(HOUIO_HYTHON_EXECUTABLE)
             --expect-point-attribute P
             --expect-vertex-attribute N
             --expect-vertex-attribute uv
+            --expect-primitive-attribute name
+            --expect-primitive-attribute piece
     )
     set_tests_properties(houio.crag.validate PROPERTIES FIXTURES_REQUIRED houio_crag_output)
 endif()

@@ -165,12 +165,12 @@ The harness:
 2. Enables its rest T-pose.
 3. Removes the time expression from the animation-frame parameter.
 4. Unpacks the 67 packed pieces into polygon geometry.
-5. Removes indexed primitive string attributes that HouIO does not yet preserve correctly.
+5. Preserves Crag's primitive `name` string and `piece` integer attributes.
 6. Saves a binary `.bgeo` source file.
 7. Imports it through HouIO and exports a new binary `.bgeo`.
-8. Validates the result in Houdini 21.0.631 and Houdini 22.0.368.
+8. Validates and compares the result in Houdini 21.0.631 and Houdini 22.0.368.
 
-The verified geometry contains 90,085 points, 359,794 vertices, and 89,942 polygons. The output is static and preserves polygon topology, point `P`, and vertex `N` and `uv`. Houdini value-level comparison reports a maximum absolute difference of `0.0` for all three attributes. Primitive `name` and `piece` are still removed because their indexed string representation is not modeled correctly.
+The verified geometry contains 90,085 points, 359,794 vertices, and 89,942 polygons. The output is static and preserves polygon topology, point `P`, vertex `N` and `uv`, primitive string `name`, and primitive integer `piece`. Houdini reports a maximum absolute difference of `0.0` for the floating-point attributes and exact matches for all 89,942 primitive string and integer values.
 
 Houdini 21/22 encode this mesh with `Polygon_run` and run-length vertex counts. HouIO now reads that record and promotes three-component `P` data to the four-component representation used by its legacy writer.
 

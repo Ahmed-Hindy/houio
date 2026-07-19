@@ -21,6 +21,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("candidate", type=Path, help="Geometry file to compare")
     parser.add_argument("--point-attribute", action="append", default=[])
     parser.add_argument("--vertex-attribute", action="append", default=[])
+    parser.add_argument("--primitive-string-attribute", action="append", default=[])
+    parser.add_argument("--primitive-int-attribute", action="append", default=[])
     parser.add_argument("--tolerance", type=float, default=0.0)
     return parser.parse_args()
 
@@ -59,8 +61,8 @@ def load_geometry(path: Path, node_name: str) -> hou.Geometry:
     return file_node.geometry().freeze()
 
 
-def compare_values(domain: str, attribute_name: str, source_values: Sequence[float],
-                   candidate_values: Sequence[float], tolerance: float) -> dict[str, object]:
+def compare_float_values(domain: str, attribute_name: str, source_values: Sequence[float],
+                         candidate_values: Sequence[float], tolerance: float) -> dict[str, object]:
     """Compare two flat floating-point attribute arrays.
 
     Args:
@@ -106,8 +108,47 @@ def compare_values(domain: str, attribute_name: str, source_values: Sequence[flo
     }
 
 
-def attribute_values(geometry: hou.Geometry, domain: str,
-                     attribute_name: str) -> Sequence[float]:
+def compare_exact_values(domain: str, attribute_name: str, source_values: Sequence[object],
+                         candidate_values: Sequence[object]) -> dict[str, object]:
+    """Compare two attribute arrays exactly.
+
+    Args:
+        domain: Houdini attribute domain name.
+        attribute_name: Attribute to compare.
+        source_values: Reference values.
+        candidate_values: Candidate values.
+
+    Returns:
+        Comparison summary.
+
+    Raises:
+        RuntimeError: If array lengths or values differ.
+    """
+    if len(source_values) != len(candidate_values):
+        raise RuntimeError(
+            f"{domain} attribute {attribute_name!r} length mismatch: "
+            f"{len(source_values)} != {len(candidate_values)}"
+        )
+
+    for index, (source_value, candidate_value) in enumerate(
+        zip(source_values, candidate_values)
+    ):
+        if source_value != candidate_value:
+            raise RuntimeError(
+                f"{domain} attribute {attribute_name!r} differs at index {index}: "
+                f"{source_value!r} != {candidate_value!r}"
+            )
+
+    return {
+        "domain": domain,
+        "attribute": attribute_name,
+        "value_count": len(source_values),
+        "exact_match": True,
+    }
+
+
+def float_attribute_values(geometry: hou.Geometry, domain: str,
+                           attribute_name: str) -> Sequence[float]:
     """Read flat floating-point values from a Houdini attribute domain.
 
     Args:
@@ -129,13 +170,45 @@ def attribute_values(geometry: hou.Geometry, domain: str,
         attribute = geometry.findVertexAttrib(attribute_name)
         value_reader = geometry.vertexFloatAttribValues
     else:
-        raise ValueError(f"Unsupported attribute domain: {domain}")
+        raise ValueError(f"Unsupported floating-point attribute domain: {domain}")
 
     if attribute is None:
         raise RuntimeError(f"Missing {domain} attribute: {attribute_name}")
     if attribute.dataType() != hou.attribData.Float:
         raise RuntimeError(f"{domain} attribute {attribute_name!r} is not floating point")
     return value_reader(attribute_name)
+
+
+def primitive_attribute_values(geometry: hou.Geometry, attribute_name: str,
+                               data_type: hou.attribData) -> Sequence[object]:
+    """Read flat primitive attribute values of an exact Houdini data type.
+
+    Args:
+        geometry: Houdini geometry.
+        attribute_name: Primitive attribute name.
+        data_type: Expected Houdini attribute data type.
+
+    Returns:
+        Flat primitive attribute values.
+
+    Raises:
+        RuntimeError: If the attribute is missing or has the wrong type.
+        ValueError: If the requested type is unsupported.
+    """
+    attribute = geometry.findPrimAttrib(attribute_name)
+    if attribute is None:
+        raise RuntimeError(f"Missing primitive attribute: {attribute_name}")
+    if attribute.dataType() != data_type:
+        raise RuntimeError(
+            f"Primitive attribute {attribute_name!r} has type {attribute.dataType()}, "
+            f"expected {data_type}"
+        )
+
+    if data_type == hou.attribData.String:
+        return geometry.primStringAttribValues(attribute_name)
+    if data_type == hou.attribData.Int:
+        return geometry.primIntAttribValues(attribute_name)
+    raise ValueError(f"Unsupported primitive attribute type: {data_type}")
 
 
 def main() -> int:
@@ -173,13 +246,42 @@ def main() -> int:
     ):
         for attribute_name in attribute_names:
             comparisons.append(
-                compare_values(
-                    domain, attribute_name,
-                    attribute_values(source_geometry, domain, attribute_name),
-                    attribute_values(candidate_geometry, domain, attribute_name),
+                compare_float_values(
+                    domain,
+                    attribute_name,
+                    float_attribute_values(source_geometry, domain, attribute_name),
+                    float_attribute_values(candidate_geometry, domain, attribute_name),
                     args.tolerance,
                 )
             )
+
+    for attribute_name in args.primitive_string_attribute:
+        comparisons.append(
+            compare_exact_values(
+                "primitive",
+                attribute_name,
+                primitive_attribute_values(
+                    source_geometry, attribute_name, hou.attribData.String
+                ),
+                primitive_attribute_values(
+                    candidate_geometry, attribute_name, hou.attribData.String
+                ),
+            )
+        )
+
+    for attribute_name in args.primitive_int_attribute:
+        comparisons.append(
+            compare_exact_values(
+                "primitive",
+                attribute_name,
+                primitive_attribute_values(
+                    source_geometry, attribute_name, hou.attribData.Int
+                ),
+                primitive_attribute_values(
+                    candidate_geometry, attribute_name, hou.attribData.Int
+                ),
+            )
+        )
 
     summary = {
         "houdini_version": hou.applicationVersionString(),

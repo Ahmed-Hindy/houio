@@ -130,8 +130,7 @@ The current experiment proves:
 - 90,085 points, 359,794 vertices, and 89,942 polygons survive the round-trip.
 - HouIO binary output loads in Houdini 21.0.631 and 22.0.368.
 - Point `P` and vertex `N` and `uv` match the source exactly, with a maximum absolute difference of `0.0`.
-
-Primitive `name` and `piece` are still removed before import because their indexed string representation is not modeled correctly.
+- Primitive string `name` and primitive integer `piece` match all 89,942 source values exactly.
 
 To expose the same workflow through CTest, configure with a hython executable:
 
