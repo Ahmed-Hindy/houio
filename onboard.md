@@ -40,7 +40,7 @@ Use a native MSVC toolchain:
 - Ninja
 - Houdini 21 and 22 for producing compatibility fixtures
 
-MSVC is preferable to MinGW when HouIO may later be used alongside HDK code or other Houdini-adjacent native libraries.
+MSVC is preferable to MinGW when HouIO may later be used alongside HDK code or other Houdini-adjacent native libraries. GCC remains part of the portability baseline and is exercised through the `linux-gcc-release` preset and Ubuntu CI.
 
 ## Clone and remotes
 
@@ -80,6 +80,14 @@ houio_example_readwrite   Demonstrates low-level parsing and writing
 ```
 
 The logger and clean package-consumer project are registered with CTest.
+
+For a non-Houdini Linux portability check:
+
+```bash
+cmake --preset linux-gcc-release
+cmake --build --preset linux-gcc-release
+ctest --preset linux-gcc-release
+```
 
 ### Verify the installed package
 

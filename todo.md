@@ -26,7 +26,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Add proper `BUILD_INTERFACE` and `INSTALL_INTERFACE` include paths.
 - [x] Define the namespaced CMake target `houio::houio`.
 - [x] Verify a C++20 static build with Visual Studio 2022 and Ninja.
-- [ ] Verify builds with Clang or GCC on Linux.
+- [x] Verify the C++20 build and package-consumer tests with GCC; Linux CI uses Ubuntu and GCC.
 - [ ] Decide whether `houio.pro` remains supported or should be removed.
 - [x] Verify install and package-config rules from a clean external consumer project.
 
@@ -45,7 +45,7 @@ The priority labels indicate dependency order rather than estimated effort.
 ### Continuous integration
 
 - [x] Add Windows MSVC CI.
-- [ ] Add Linux Clang or GCC CI.
+- [x] Add Linux GCC CI.
 - [x] Add Debug and Release CMake presets.
 - [x] Run CTest with failure output enabled.
 - [x] Enable warnings without immediately treating legacy warnings as errors.

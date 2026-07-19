@@ -29,3 +29,19 @@ jobs:
 
       - name: Test
         run: ctest --preset windows-msvc-release
+
+  linux-gcc:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake --preset linux-gcc-release
+
+      - name: Build
+        run: cmake --build --preset linux-gcc-release
+
+      - name: Test
+        run: ctest --preset linux-gcc-release

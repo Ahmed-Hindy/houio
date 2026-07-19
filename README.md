@@ -118,6 +118,16 @@ ctest --preset windows-msvc-release
 
 The release preset uses Ninja, builds the tools and examples, and runs unit, package-consumer, and optional Houdini integration tests. Houdini integration tests are registered when `HOUIO_HYTHON_EXECUTABLE` points to an installed `hython.exe`.
 
+Linux and other GCC-based environments can use the matching C++20 preset:
+
+```bash
+cmake --preset linux-gcc-release
+cmake --build --preset linux-gcc-release
+ctest --preset linux-gcc-release
+```
+
+CI verifies both Visual Studio 2022 on Windows and GCC on Ubuntu.
+
 ## Installing and consuming
 
 Install the configured build to a prefix:
