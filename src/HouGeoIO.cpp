@@ -4,8 +4,7 @@
 
 namespace houio
 {
-	HouGeoAdapter*                  HouGeoIO::g_geo = 0;
-	json::BinaryWriter*             HouGeoIO::g_writer = 0;
+	thread_local json::BinaryWriter* HouGeoIO::g_writer = nullptr;
 
 	HouGeo::Ptr HouGeoIO::import( std::istream *in )
 	{
@@ -464,11 +463,32 @@ namespace houio
 
 	bool HouGeoIO::xport( std::ostream *out, HouGeoAdapter::Ptr geo, bool binary )
 	{
-		if( binary )
-			g_writer = new json::BinaryWriter( out );
-		else
-			// todo: ascii writer...
-			g_writer = new json::BinaryWriter( out );
+		if( !out || !geo || !out->good() )
+			return false;
+		if( !binary )
+			return false;
+
+		json::BinaryWriter writer(out);
+		struct WriterBinding
+		{
+			WriterBinding(json::BinaryWriter*& writerSlot, json::BinaryWriter& activeWriter)
+				: slot(writerSlot), previous(writerSlot)
+			{
+				slot = &activeWriter;
+			}
+
+			~WriterBinding()
+			{
+				slot = previous;
+			}
+
+			WriterBinding(const WriterBinding&) = delete;
+			WriterBinding& operator=(const WriterBinding&) = delete;
+
+			json::BinaryWriter*& slot;
+			json::BinaryWriter* previous;
+		};
+		WriterBinding writerBinding(g_writer, writer);
 
 		g_writer->jsonBeginArray();
 
@@ -550,10 +570,7 @@ namespace houio
 
 		g_writer->jsonEndArray(); // /root
 
-		// done
-		delete g_writer;g_writer=0;
-
-		return true;
+		return out->good();
 	}
 
 

@@ -366,13 +366,13 @@ It selects the first stored primitive representation and only creates line, tria
 
 The function currently accesses the first primitive without first validating that the primitive list is non-empty.
 
-### Export is not thread-safe
+### Export uses a scoped thread-local binding
 
-`HouGeoIO` uses static mutable writer state. Do not run concurrent exports through the current API.
+Each export owns its writer on the stack. A scoped thread-local pointer connects the legacy helper functions to that writer and is restored after exceptions. Parallel exports are covered when each thread uses an independent stream.
 
-### The `binary` flag is misleading
+### ASCII geometry export is not implemented
 
-The high-level stream export currently creates `BinaryWriter` in both branches.
+The high-level stream export returns `false` for `binary=false` and writes no partial output. Use binary `.bgeo` output until the geometry serializer is generalized for `ASCIIWriter`.
 
 ### Error reporting is inconsistent
 

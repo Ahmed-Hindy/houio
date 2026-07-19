@@ -116,7 +116,7 @@ Prints a readable representation of the parsed stream. This is an important reve
 
 ### Writers
 
-`BinaryWriter` writes SideFX binary JSON. `ASCIIWriter` exists, but the high-level geometry export path currently selects `BinaryWriter` even when its `binary` argument is false.
+`BinaryWriter` writes SideFX binary JSON. `ASCIIWriter` exists, but the high-level geometry exporter depends on binary-only uniform-array methods. The stream export API therefore returns `false` for `binary=false` without writing partial output.
 
 ## 2. Flattened Houdini objects
 
@@ -278,7 +278,7 @@ HouGeoIO::xport(...)
     └─ Finish the binary JSON root array
 ```
 
-The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`, preserving compatibility with its legacy binary schema. The export implementation still uses static mutable state for the active adapter and writer, making the operation non-reentrant and unsafe for concurrent use.
+The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`, preserving compatibility with its legacy binary schema. Each export owns its `BinaryWriter` on the stack. A scoped thread-local binding lets the legacy helper functions reach the active writer while restoring the previous binding after normal completion or exceptions. Independent streams can therefore be exported concurrently.
 
 ## 6. Simplified `Geometry`
 
@@ -413,9 +413,9 @@ The parser and schema model are based on reverse-engineered Houdini 13-era data.
 
 `JSONReader` builds a generic document tree before `HouGeo` builds a second semantic representation. Large files can therefore consume substantially more memory than their final geometry representation.
 
-### Global writer state
+### Transitional writer binding
 
-`HouGeoIO` stores its active writer in static mutable pointers. This blocks safe parallel exports and complicates exception safety.
+`HouGeoIO` no longer owns a process-global writer. The active stack-owned writer is exposed to legacy serialization helpers through a scoped thread-local pointer. This is exception-safe and permits parallel exports to independent streams, but passing an explicit export context through the helpers would remove the remaining implicit state.
 
 ### Weak error model
 
@@ -437,7 +437,7 @@ Near-term work should preserve the current layers while improving their contract
 2. Make `HouGeoAdapter` the stable export boundary.
 3. Keep `HouGeo` as the lossless-as-supported Houdini model.
 4. Keep `Geometry` as an explicitly lossy convenience representation.
-5. Replace global writer state with an export context object.
+5. Replace the transitional thread-local writer binding with an explicit export context parameter.
 6. Introduce structured diagnostics with byte offsets and schema paths.
 7. Add fixture-driven compatibility tests before supporting additional primitives.
 8. Consider streaming semantic readers only after behavior is covered by tests.

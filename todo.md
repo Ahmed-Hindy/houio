@@ -99,12 +99,13 @@ The priority labels indicate dependency order rather than estimated effort.
 
 ### Export safety
 
-- [ ] Replace `HouGeoIO::g_writer` and `g_geo` static state with a per-export context.
-- [ ] Make export re-entrant.
-- [ ] Make concurrent exports safe when streams are independent.
-- [ ] Use RAII for writers instead of manual `new` and `delete`.
-- [ ] Ensure exceptions cannot leave stale global state.
-- [ ] Validate output stream state and propagate write failures.
+- [x] Remove unused `g_geo` and process-global writer ownership.
+- [x] Use a scoped thread-local binding for the active per-export writer.
+- [x] Restore the previous binding after normal completion or exceptions.
+- [x] Make concurrent exports safe when streams are independent.
+- [x] Use stack ownership for writers instead of manual `new` and `delete`.
+- [x] Validate output stream state and propagate write failures.
+- [ ] Pass an explicit export context through helper functions instead of a thread-local binding.
 - [ ] Clarify ownership and lifetime requirements for raw pointers exposed by adapters.
 
 ### Correctness fixes
@@ -274,7 +275,8 @@ Add each type only with representative Houdini 21 fixtures and tests.
 - [ ] Use scoped enums where API compatibility permits.
 - [ ] Add `override`, `final`, and `noexcept` where correct.
 - [ ] Apply const-correctness consistently.
-- [ ] Replace raw owning pointers with RAII types.
+- [x] Replace the high-level export writer's raw ownership with RAII.
+- [ ] Replace remaining raw owning pointers with RAII types.
 - [ ] Use `std::span` or an equivalent view abstraction if the language baseline permits it.
 - [ ] Remove obsolete commented-out implementation blocks.
 - [x] Add a checked-in `.clang-format` configuration.

@@ -1,3 +1,5 @@
+find_package(Threads REQUIRED)
+
 add_executable(houio_test_logger main.cpp)
 target_link_libraries(houio_test_logger PRIVATE houio::houio)
 target_compile_features(houio_test_logger PRIVATE cxx_std_20)
@@ -13,6 +15,11 @@ add_executable(houio_test_modern_geometry test_modern_geometry.cpp)
 target_link_libraries(houio_test_modern_geometry PRIVATE houio::houio)
 target_compile_features(houio_test_modern_geometry PRIVATE cxx_std_20)
 add_test(NAME houio.modern_geometry COMMAND houio_test_modern_geometry)
+
+add_executable(houio_test_export_safety test_export_safety.cpp)
+target_link_libraries(houio_test_export_safety PRIVATE houio::houio Threads::Threads)
+target_compile_features(houio_test_export_safety PRIVATE cxx_std_20)
+add_test(NAME houio.export_safety COMMAND houio_test_export_safety)
 
 add_executable(houio_roundtrip_geometry roundtrip_geometry.cpp)
 target_link_libraries(houio_roundtrip_geometry PRIVATE houio::houio)

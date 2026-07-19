@@ -91,7 +91,7 @@ houio::Geometry::Ptr geometry = houio::Geometry::createTriangleGeometry();
 bool exported = houio::HouGeoIO::xport("output.bgeo", geometry);
 ```
 
-The public API uses the historical name `xport` rather than `export`.
+The public API uses the historical name `xport` rather than `export`. Stream-based exports are stack-owned and safe to run concurrently when each call uses an independent stream. The `binary=false` path is explicitly unsupported and returns `false` without writing partial output.
 
 ### Inspect a file's structure
 
