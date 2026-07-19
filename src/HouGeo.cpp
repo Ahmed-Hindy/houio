@@ -667,7 +667,7 @@ namespace houio
 		if( primitiveType=="Poly" )
 			loadPolyPrimitive( toObject(primitive->getArray(1)) );
 		else
-		if( primitiveType=="Polygon_run" )
+		if( primitiveType=="Polygon_run" || primitiveType=="p_r" )
 			loadPolygonRun( toObject(primitive->getArray(1)) );
 		else
 		if( (primitiveType=="run")&&(primdef->hasKey("runtype")) )
@@ -977,12 +977,16 @@ namespace houio
 	{
 		if( !m_topology )
 			throw std::runtime_error( "HouGeo::loadPolygonRun expects topology to be loaded already" );
-		if( !polygonRun->hasKey("startvertex") || !polygonRun->hasKey("nprimitives") || !polygonRun->hasKey("nvertices_rle") )
+
+		const std::string startVertexKey = polygonRun->hasKey("startvertex") ? "startvertex" : "s_v";
+		const std::string primitiveCountKey = polygonRun->hasKey("nprimitives") ? "nprimitives" : "n_p";
+		const std::string runLengthKey = polygonRun->hasKey("nvertices_rle") ? "nvertices_rle" : "r_v";
+		if( !polygonRun->hasKey(startVertexKey) || !polygonRun->hasKey(primitiveCountKey) || !polygonRun->hasKey(runLengthKey) )
 			throw std::runtime_error( "HouGeo::loadPolygonRun missing required fields" );
 
-		const int startVertex = polygonRun->get<int>("startvertex", -1);
-		const int expectedPrimitiveCount = polygonRun->get<int>("nprimitives", -1);
-		json::ArrayPtr runLengthData = polygonRun->getArray("nvertices_rle");
+		const int startVertex = polygonRun->get<int>(startVertexKey, -1);
+		const int expectedPrimitiveCount = polygonRun->get<int>(primitiveCountKey, -1);
+		json::ArrayPtr runLengthData = polygonRun->getArray(runLengthKey);
 		if( startVertex < 0 || expectedPrimitiveCount < 0 || !runLengthData || (runLengthData->size() % 2) != 0 )
 			throw std::runtime_error( "HouGeo::loadPolygonRun invalid run metadata" );
 

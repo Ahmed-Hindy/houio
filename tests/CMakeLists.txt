@@ -4,9 +4,23 @@ target_compile_features(houio_test_logger PRIVATE cxx_std_20)
 target_compile_definitions(houio_test_logger PRIVATE TESTS_FILE_PATH="${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME houio.logger COMMAND houio_test_logger)
 
+add_executable(houio_test_binary_json test_binary_json.cpp)
+target_link_libraries(houio_test_binary_json PRIVATE houio::houio)
+target_compile_features(houio_test_binary_json PRIVATE cxx_std_20)
+add_test(NAME houio.binary_json COMMAND houio_test_binary_json)
+
+add_executable(houio_test_modern_geometry test_modern_geometry.cpp)
+target_link_libraries(houio_test_modern_geometry PRIVATE houio::houio)
+target_compile_features(houio_test_modern_geometry PRIVATE cxx_std_20)
+add_test(NAME houio.modern_geometry COMMAND houio_test_modern_geometry)
+
 add_executable(houio_roundtrip_geometry roundtrip_geometry.cpp)
 target_link_libraries(houio_roundtrip_geometry PRIVATE houio::houio)
 target_compile_features(houio_roundtrip_geometry PRIVATE cxx_std_20)
+
+add_executable(houio_inspect_json inspect_json.cpp)
+target_link_libraries(houio_inspect_json PRIVATE houio::houio)
+target_compile_features(houio_inspect_json PRIVATE cxx_std_20)
 
 if(HOUIO_BUILD_EXAMPLES)
     add_executable(houio_example_readwrite example_readwrite.cpp)
@@ -21,7 +35,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
     endif()
 
     set(HOUIO_CRAG_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/crag")
-    set(HOUIO_CRAG_SOURCE "${HOUIO_CRAG_TEST_DIR}/crag_tpose.geo")
+    set(HOUIO_CRAG_SOURCE "${HOUIO_CRAG_TEST_DIR}/crag_tpose.bgeo")
     set(HOUIO_CRAG_OUTPUT "${HOUIO_CRAG_TEST_DIR}/crag_tpose_houio.bgeo")
 
     add_test(

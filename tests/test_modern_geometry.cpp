@@ -1,0 +1,123 @@
+#include <houio/HouGeoIO.h>
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+namespace
+{
+int fail(const std::string& message)
+{
+    std::cerr << "error: " << message << '\n';
+    return 1;
+}
+
+const char* modernQuadGeometry()
+{
+    return R"JSON([
+        "pointcount", 4,
+        "vertexcount", 4,
+        "primitivecount", 1,
+        "topology", [
+            "pointref", [
+                "indices", [0, 1, 2, 3]
+            ]
+        ],
+        "attributes", [
+            "pointattributes", [
+                [
+                    [
+                        "scope", "public",
+                        "type", "numeric",
+                        "name", "P"
+                    ],
+                    [
+                        "size", 3,
+                        "storage", "fpreal32",
+                        "values", [
+                            "size", 3,
+                            "storage", "fpreal32",
+                            "tuples", [
+                                [0, 0, 0],
+                                [1, 0, 0],
+                                [1, 1, 0],
+                                [0, 1, 0]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ],
+        "primitives", [
+            [
+                ["type", "Polygon_run"],
+                [
+                    "startvertex", 0,
+                    "nprimitives", 1,
+                    "nvertices_rle", [4, 1]
+                ]
+            ]
+        ]
+    ])JSON";
+}
+
+int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTupleSize)
+{
+    if (!geometry)
+    {
+        return fail("geometry is null");
+    }
+    if (geometry->pointcount() != 4 || geometry->vertexcount() != 4 || geometry->primitivecount() != 1)
+    {
+        return fail("unexpected geometry counts");
+    }
+
+    houio::HouGeoAdapter::AttributeAdapter::Ptr position = geometry->getPointAttribute("P");
+    if (!position)
+    {
+        return fail("modern tuple-based P attribute is missing");
+    }
+    if (position->getTupleSize() != expectedPositionTupleSize || position->getNumElements() != 4)
+    {
+        return fail(
+            "unexpected P metadata: tuple_size=" + std::to_string(position->getTupleSize())
+            + ", elements=" + std::to_string(position->getNumElements()));
+    }
+
+    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
+    geometry->getPrimitives(primitives);
+    if (primitives.size() != 1)
+    {
+        return fail("unexpected primitive container count");
+    }
+
+    const auto polygon = std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(primitives.front());
+    if (!polygon || polygon->numPolys() != 1 || polygon->numVertices(0) != 4)
+    {
+        return fail("Polygon_run was not expanded correctly");
+    }
+
+    return 0;
+}
+}
+
+int main()
+{
+    std::istringstream source(modernQuadGeometry());
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&source);
+    if (const int result = verifyGeometry(geometry, 3); result != 0)
+    {
+        return result;
+    }
+
+    std::ostringstream binaryOutput(std::ios::out | std::ios::binary);
+    if (!houio::HouGeoIO::xport(&binaryOutput, geometry, true))
+    {
+        return fail("failed to export modern quad geometry");
+    }
+
+    std::istringstream binaryInput(binaryOutput.str(), std::ios::in | std::ios::binary);
+    houio::HouGeo::Ptr roundtripGeometry = houio::HouGeoIO::import(&binaryInput);
+    return verifyGeometry(roundtripGeometry, 4);
+}

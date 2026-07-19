@@ -11,18 +11,9 @@ int fail(const std::string& message)
     std::cerr << "error: " << message << '\n';
     return 1;
 }
-}
 
-int main(int argc, char* argv[])
+int runRoundtrip(const std::string& inputPath, const std::string& outputPath)
 {
-    if (argc != 3)
-    {
-        return fail("usage: houio_roundtrip_geometry <input.geo|bgeo> <output.bgeo>");
-    }
-
-    const std::string inputPath = argv[1];
-    const std::string outputPath = argv[2];
-
     std::ifstream input(inputPath, std::ios::binary);
     if (!input)
     {
@@ -56,4 +47,22 @@ int main(int argc, char* argv[])
     std::cout << "vertices=" << geometry->vertexcount() << '\n';
     std::cout << "primitives=" << geometry->primitivecount() << '\n';
     return 0;
+}
+}
+
+int main(int argc, char* argv[])
+{
+    if (argc != 3)
+    {
+        return fail("usage: houio_roundtrip_geometry <input.geo|bgeo> <output.bgeo>");
+    }
+
+    try
+    {
+        return runRoundtrip(argv[1], argv[2]);
+    }
+    catch (const std::exception& error)
+    {
+        return fail(error.what());
+    }
 }

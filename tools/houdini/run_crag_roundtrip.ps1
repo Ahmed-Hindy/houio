@@ -58,7 +58,7 @@ Invoke-NativeCommand -Executable $cmake -Arguments @("--build", "--preset", $Bui
 
 $generatorHython = Get-HythonPath -Version $GeneratorVersion
 $outputDirectory = Join-Path $repositoryRoot "build\crag\h$($GeneratorVersion.Split('.')[0])"
-$sourceGeometry = Join-Path $outputDirectory "crag_tpose.geo"
+$sourceGeometry = Join-Path $outputDirectory "crag_tpose.bgeo"
 $roundtripGeometry = Join-Path $outputDirectory "crag_tpose_houio.bgeo"
 $roundtripExecutable = Join-Path $repositoryRoot "build\$BuildPreset\tests\houio_roundtrip_geometry.exe"
 

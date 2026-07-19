@@ -55,6 +55,7 @@ namespace houio
 			virtual void   uaBool( sint64 numElements, Parser *parser ) = 0;
 			virtual void uaReal32( sint64 numElements, Parser *parser ) = 0;
 			virtual void uaReal64( sint64 numElements, Parser *parser ) = 0;
+			virtual void   uaInt8( sint64 numElements, Parser *parser ) = 0;
 			virtual void  uaInt16( sint64 numElements, Parser *parser ) = 0;
 			virtual void  uaInt32( sint64 numElements, Parser *parser ) = 0;
 			virtual void  uaInt64( sint64 numElements, Parser *parser ) = 0;
@@ -510,6 +511,11 @@ namespace houio
 				ua<real64>( numElements, parser, "<real64>" );
 			}
 
+			virtual void uaInt8( sint64 numElements, Parser *parser )
+			{
+				ua<sbyte>( numElements, parser, "<int8>" );
+			}
+
 			virtual void uaInt16( sint64 numElements, Parser *parser )
 			{
 				ua<sword>( numElements, parser, "<int16>" );
@@ -904,6 +910,7 @@ namespace houio
 			virtual void      uaBool( sint64 numElements, Parser *parser );
 			virtual void    uaReal32( sint64 numElements, Parser *parser );
 			virtual void    uaReal64( sint64 numElements, Parser *parser );
+			virtual void      uaInt8( sint64 numElements, Parser *parser );
 			virtual void     uaInt16( sint64 numElements, Parser *parser );
 			virtual void     uaInt32( sint64 numElements, Parser *parser );
 			virtual void     uaInt64( sint64 numElements, Parser *parser );

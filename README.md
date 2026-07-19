@@ -166,15 +166,15 @@ The harness:
 3. removes the time expression from the animation-frame parameter.
 4. Unpacks the 67 packed pieces into polygon geometry.
 5. Removes indexed primitive string attributes that HouIO does not yet preserve correctly.
-6. Saves an ASCII `.geo` source file.
-7. Imports it through HouIO and exports binary `.bgeo`.
+6. Saves a binary `.bgeo` source file.
+7. Imports it through HouIO and exports a new binary `.bgeo`.
 8. Validates the result in Houdini 21.0.631 and Houdini 22.0.368.
 
 The verified geometry contains 90,085 points, 359,794 vertices, and 89,942 polygons. The output is static and preserves `P` plus polygon topology. Vertex `N` and `uv`, and primitive `name` and `piece`, are intentionally not part of this first preservation milestone.
 
 Houdini 21/22 encode this mesh with `Polygon_run` and run-length vertex counts. HouIO now reads that record and promotes three-component `P` data to the four-component representation used by its legacy writer.
 
-Modern Houdini binary `.bgeo` input remains unresolved: a Houdini 22-generated binary Crag currently triggers a fast-fail in the legacy binary parser. The verified path therefore uses ASCII `.geo` as input and binary `.bgeo` as output. `.bgeo.sc` is also unsupported.
+Modern Houdini binary `.bgeo` input is now covered for this geometry path. The missing compatibility feature was uniform signed-int8 arrays, used by compact binary `Polygon_run` run-length data. `.bgeo.sc` remains unsupported because HouIO does not implement its outer compression layer.
 
 To register the same chain with CTest:
 
@@ -183,6 +183,14 @@ cmake --preset windows-msvc-release `
   -DHOUIO_HYTHON_EXECUTABLE="C:\Program Files\Side Effects Software\Houdini 22.0.368\bin\hython.exe"
 cmake --build --preset windows-msvc-release
 ctest --test-dir build/windows-msvc-release --output-on-failure -R houio.crag
+```
+
+An AddressSanitizer preset is available for parser and round-trip debugging:
+
+```powershell
+cmake --preset windows-msvc-asan
+cmake --build --preset windows-msvc-asan
+ctest --preset windows-msvc-asan
 ```
 
 ## Contributing

@@ -51,7 +51,7 @@ BinaryWriter
 | Dense fields | `include/houio/Field.h`, `src/Field.cpp` | Store and sample dense 3D scalar or vector grids. |
 | Math | `include/houio/math/`, `src/math/` | Supply vectors, matrices, bounds, colors, rays, RNG, and half floats. |
 | Vendored templates | `include/ttl/` | Provide the variant implementation used by the JSON layer. |
-| Tests and examples | `tests/` | Provide historical fixtures, CTest smoke coverage, the round-trip CLI, and optional Houdini integration tests. |
+| Tests and examples | `tests/` | Provide historical fixtures, binary-token and modern-schema regression tests, round-trip and inspection CLIs, and optional Houdini integration tests. |
 | Legacy scene exporter | `scene_exporter/` | Export custom scene JSON from old Python 2 Houdini sessions. |
 
 ## 1. Binary JSON layer
@@ -82,7 +82,7 @@ The parser handles:
 - SideFX binary JSON identifiers
 - Compact integer lengths
 - String definitions, references, and undefinitions
-- Uniform numeric arrays
+- Uniform numeric arrays, including modern signed-int8 polygon run-length data
 - Arrays and maps
 
 The parser determines whether the input is binary by inspecting the stream's opening data.
@@ -217,7 +217,7 @@ The loader uses the root geometry counts to size each domain:
 - Flattened point-index data
 - Closed state
 
-The loader recognizes direct `Poly` records, legacy `run` records whose `runtype` is `Poly`, and Houdini 21/22 `Polygon_run` records. `Polygon_run` expands run-length encoded vertex counts while validating the topology range and final primitive count.
+The loader recognizes direct `Poly` records, legacy `run` records whose `runtype` is `Poly`, and Houdini 21/22 `Polygon_run` records. Binary Houdini files may compact these names to `p_r`, `s_v`, `n_p`, and `r_v`; the semantic loader accepts both spellings. `Polygon_run` expands run-length encoded vertex counts while validating the topology range and final primitive count.
 
 ### Volume primitives
 

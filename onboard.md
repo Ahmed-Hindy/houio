@@ -25,7 +25,7 @@ At the time of this fork:
 - The CMake build is target-based and uses presets.
 - Existing historical tests still provide limited semantic coverage.
 - A static Crag `P` and polygon-topology round-trip is validated in Houdini 21.0.631 and 22.0.368.
-- Modern Houdini binary `.bgeo` input is not yet safe; the verified Crag source path uses ASCII `.geo`.
+- Modern Houdini binary `.bgeo` input is validated for the static Crag path.
 
 Do not infer modern format support from a successful parse of the supplied fixtures.
 
@@ -130,7 +130,7 @@ The current experiment proves:
 - 90,085 points, 359,794 vertices, and 89,942 polygons survive the round-trip.
 - HouIO binary output loads in Houdini 21.0.631 and 22.0.368.
 
-It does not yet prove lossless attribute preservation. The source has vertex `N` and `uv`; those are not exported yet. Primitive `name` and `piece` are removed before import because their indexed string representation is not modeled correctly. Modern binary `.bgeo` input also remains unsafe, so the generated source is ASCII `.geo`.
+It does not yet prove lossless attribute preservation. The binary source has vertex `N` and `uv`; those are not exported yet. Primitive `name` and `piece` are removed before import because their indexed string representation is not modeled correctly.
 
 To expose the same workflow through CTest, configure with a hython executable:
 
@@ -139,6 +139,14 @@ cmake --preset windows-msvc-release `
   -DHOUIO_HYTHON_EXECUTABLE="C:\Program Files\Side Effects Software\Houdini 22.0.368\bin\hython.exe"
 cmake --build --preset windows-msvc-release
 ctest --test-dir build/windows-msvc-release --output-on-failure -R houio.crag
+```
+
+Use the AddressSanitizer preset when changing binary parsing or raw attribute storage:
+
+```powershell
+cmake --preset windows-msvc-asan
+cmake --build --preset windows-msvc-asan
+ctest --preset windows-msvc-asan
 ```
 
 ## Read the code in this order

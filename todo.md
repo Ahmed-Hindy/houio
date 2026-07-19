@@ -60,7 +60,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Add optional CTest generation, round-trip, and Houdini validation stages.
 - [x] Validate binary HouIO output in both Houdini 21.0.631 and 22.0.368.
 - [ ] Generate minimal purpose-specific Houdini 21/22 `.geo` fixtures for individual schema features.
-- [ ] Generate matching uncompressed Houdini 21/22 `.bgeo` fixtures after the modern binary parser is safe.
+- [x] Generate and round-trip uncompressed Houdini 21/22 Crag `.bgeo` data.
 - [x] Record the exact Houdini builds used by the Crag experiment.
 - [ ] Test points with `P`, `Cd`, float, integer, and string attributes.
 - [ ] Test point, vertex, primitive, and global attribute domains.
@@ -83,17 +83,19 @@ The priority labels indicate dependency order rather than estimated effort.
 
 ### Parser safety
 
-- [ ] Diagnose and fix the fast-fail when importing Houdini 22-generated binary Crag `.bgeo`.
+- [x] Fix the fast-fail caused by unsupported uniform signed-int8 arrays in modern binary `Polygon_run` data.
 - [ ] Check stream state after every fixed-size read.
 - [ ] Validate binary lengths before allocation.
 - [ ] Add configurable file-size, array-size, and nesting-depth limits.
 - [ ] Detect integer overflow in byte-count calculations.
-- [ ] Validate uniform-array element types and storage sizes.
+- [x] Add regression coverage for uniform signed-int8 widening.
+- [ ] Validate all uniform-array element types and storage sizes before reading.
 - [ ] Validate string token references before lookup.
 - [ ] Reject odd-length flattened key/value arrays.
 - [ ] Add bounds checks before all array and topology indexing.
 - [ ] Add fuzz testing for the JSON parser.
-- [ ] Run AddressSanitizer and UndefinedBehaviorSanitizer on supported platforms.
+- [x] Add and run an MSVC AddressSanitizer preset.
+- [ ] Add UndefinedBehaviorSanitizer coverage on a supported compiler.
 
 ### Export safety
 
@@ -155,14 +157,15 @@ tests/fixtures/
 - [ ] Unit-test binary integer length encodings.
 - [ ] Unit-test every supported token type.
 - [ ] Unit-test string definition and reference handling.
-- [ ] Unit-test uniform arrays for every supported storage type.
+- [x] Unit-test modern uniform signed-int8 arrays.
+- [ ] Unit-test uniform arrays for every other supported storage type.
 - [ ] Unit-test flattened-array conversion.
 - [ ] Unit-test attribute packing and constant pages.
 - [ ] Unit-test topology loading.
 - [ ] Unit-test polygon and polygon-run loading.
 - [ ] Unit-test tiled and constant volume loading.
-- [ ] Add semantic round-trip tests.
-- [ ] Add cross-version fixture tests.
+- [x] Add a compact modern `Polygon_run` semantic round-trip test.
+- [x] Add optional Houdini 21/22 Crag integration tests.
 
 ### Test framework
 
