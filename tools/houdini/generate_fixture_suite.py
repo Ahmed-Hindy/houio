@@ -168,6 +168,26 @@ def build_numeric_precision_geometry() -> hou.Geometry:
     )
 
 
+def build_paged_attributes_geometry() -> hou.Geometry:
+    """Build enough points to force multiple attribute pages.
+
+    Returns:
+        Point geometry with constant pages and a partial final page.
+    """
+    geometry = hou.Geometry()
+    point_count = 2050
+    points = create_points(
+        geometry,
+        tuple((float(index), float(index % 7), 0.0) for index in range(point_count)),
+    )
+    constant_attribute = geometry.addAttrib(hou.attribType.Point, "page_constant", 0.0)
+    varying_attribute = geometry.addAttrib(hou.attribType.Point, "page_id", 0)
+    for point_index, point in enumerate(points):
+        point.setAttribValue(constant_attribute, float(point_index // 1024 + 1))
+        point.setAttribValue(varying_attribute, point_index * 3 - 17)
+    return geometry
+
+
 def build_triangles_geometry() -> hou.Geometry:
     """Build two closed triangles.
 
@@ -440,6 +460,7 @@ def main() -> int:
         ("empty", build_empty_geometry, ()),
         ("point_attributes", build_point_attributes_geometry, ()),
         ("numeric_precision", build_numeric_precision_geometry, ()),
+        ("paged_attributes", build_paged_attributes_geometry, ()),
         ("triangles", build_triangles_geometry, ()),
         ("quads", build_quads_geometry, ()),
         ("mixed_polygons", build_mixed_polygons_geometry, ()),

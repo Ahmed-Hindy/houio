@@ -51,6 +51,11 @@ target_link_libraries(houio_test_numeric_storage PRIVATE houio::houio)
 target_compile_features(houio_test_numeric_storage PRIVATE cxx_std_20)
 add_test(NAME houio.numeric_storage COMMAND houio_test_numeric_storage)
 
+add_executable(houio_test_attribute_pages test_attribute_pages.cpp)
+target_link_libraries(houio_test_attribute_pages PRIVATE houio::houio)
+target_compile_features(houio_test_attribute_pages PRIVATE cxx_std_20)
+add_test(NAME houio.attribute_pages COMMAND houio_test_attribute_pages)
+
 add_executable(houio_test_export_safety test_export_safety.cpp)
 target_link_libraries(houio_test_export_safety PRIVATE houio::houio Threads::Threads)
 target_compile_features(houio_test_export_safety PRIVATE cxx_std_20)
@@ -102,6 +107,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
         empty
         point_attributes
         numeric_precision
+        paged_attributes
         triangles
         quads
         mixed_polygons
