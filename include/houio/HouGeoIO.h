@@ -8,6 +8,7 @@ namespace houio
 	struct HouGeoIO
 	{
 		static HouGeo::Ptr                      import( std::istream *in );
+		static HouGeo::Ptr                      import( std::istream *in, const json::ParserLimits &limits );
 		static Geometry::Ptr                    importGeometry( const std::string &path );
 		static ScalarField::Ptr                 importVolume(const std::string &path);
 		static void                             makeLog( const std::string &path, std::ostream *out );
@@ -24,8 +25,8 @@ namespace houio
 		static bool                             exportAttribute( HouGeoAdapter::AttributeAdapter::Ptr attr );
 		static bool                             exportTopology( HouGeoAdapter::Topology::Ptr topo );
 		static bool                             exportPrimitive( HouGeoAdapter::VolumePrimitive::Ptr volume );
-		static bool                             exportPrimitive( HouGeoAdapter::PolyPrimitive::Ptr poly );
-		static HouGeoAdapter*                   g_geo;
-		static json::BinaryWriter*              g_writer;
+		static bool                             exportPrimitive( HouGeoAdapter::PolyPrimitive::Ptr poly, int startVertex );
+		static bool                             exportGroup( const std::string &name, const std::vector<bool> &membership );
+		static thread_local json::BinaryWriter* g_writer;
 	};
 }

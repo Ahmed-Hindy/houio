@@ -1,2 +1,4 @@
 *.user*
-./build*
+*.pyc
+__pycache__/
+/build/

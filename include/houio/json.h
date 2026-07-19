@@ -20,13 +20,17 @@
 //
 #pragma once
 
+#include <algorithm>
+#include <cstdlib>
 #include <iostream>
+#include <limits>
+#include <map>
+#include <memory>
+#include <new>
 #include <sstream>
 #include <stack>
-#include <memory>
-#include <map>
+#include <stdexcept>
 #include <vector>
-#include <algorithm>
 
 #include <houio/types.h>
 #include <ttl/var/variant.hpp>
@@ -55,6 +59,7 @@ namespace houio
 			virtual void   uaBool( sint64 numElements, Parser *parser ) = 0;
 			virtual void uaReal32( sint64 numElements, Parser *parser ) = 0;
 			virtual void uaReal64( sint64 numElements, Parser *parser ) = 0;
+			virtual void   uaInt8( sint64 numElements, Parser *parser ) = 0;
 			virtual void  uaInt16( sint64 numElements, Parser *parser ) = 0;
 			virtual void  uaInt32( sint64 numElements, Parser *parser ) = 0;
 			virtual void  uaInt64( sint64 numElements, Parser *parser ) = 0;
@@ -152,6 +157,13 @@ namespace houio
 		}
 
 		// Parser ==================================================
+		struct ParserLimits
+		{
+			sint64 maxStringBytes = 64 * 1024 * 1024;
+			sint64 maxUniformArrayElements = 64 * 1024 * 1024;
+			size_t maxNestingDepth = 1024;
+		};
+
 		struct Parser
 		{
 			enum State
@@ -169,6 +181,9 @@ namespace houio
 				STATE_ARRAY_NEED_VALUE  = 8,
 				STATE_ARRAY_GOT_VALUE   = 9
 			};
+
+			Parser();
+			explicit Parser( const ParserLimits &limits );
 
 			bool parse( std::istream *in,  Handler *h );
 			bool                          parseStream();
@@ -199,6 +214,7 @@ namespace houio
 			bool                                 binary;
 
 			std::map<sint64, std::string>       strings; // common strings are references by ids
+			ParserLimits                         limits;
 		};
 
 
@@ -206,14 +222,31 @@ namespace houio
 		template<typename T>
 		T Parser::read()
 		{
-			T v;
-			stream->read( (char *)&v, sizeof(T) );
-			return v;
+			T value{};
+			read(&value, 1);
+			return value;
 		}
 		template<typename T>
 		void Parser::read( T *dst, sint64 numElements )
 		{
-			stream->read( (char *)dst, numElements*sizeof(T) );
+			if( !stream )
+				throw std::runtime_error( "Parser::read has no input stream" );
+			if( numElements < 0 )
+				throw std::length_error( "Parser::read received a negative element count" );
+			if( numElements == 0 )
+				return;
+			if( !dst )
+				throw std::invalid_argument( "Parser::read received a null destination" );
+
+			const uint64 elementCount = static_cast<uint64>(numElements);
+			const uint64 maximumBytes = static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
+			if( elementCount > maximumBytes / sizeof(T) )
+				throw std::length_error( "Parser::read byte count exceeds streamsize range" );
+
+			const std::streamsize byteCount = static_cast<std::streamsize>(elementCount * sizeof(T));
+			stream->read(reinterpret_cast<char*>(dst), byteCount);
+			if( stream->gcount() != byteCount )
+				throw std::runtime_error( "Parser::read encountered truncated input" );
 		}
 
 
@@ -282,14 +315,31 @@ namespace houio
 		template<typename T>
 		bool BinaryWriter::write( const T &v )
 		{
-			stream->write( (const char *)&v, sizeof(T) );
-			return true;
+			if( !stream )
+				return false;
+			stream->write(reinterpret_cast<const char*>(&v), static_cast<std::streamsize>(sizeof(T)));
+			return stream->good();
 		}
 		template<typename T>
 		bool BinaryWriter::write( const T *dst, sint64 numElements )
 		{
-			stream->write( (const char *)dst, numElements*sizeof(T) );
-			return true;
+			if( !stream )
+				return false;
+			if( numElements < 0 )
+				throw std::length_error( "BinaryWriter::write received a negative element count" );
+			if( numElements == 0 )
+				return stream->good();
+			if( !dst )
+				throw std::invalid_argument( "BinaryWriter::write received a null source" );
+
+			const uint64 elementCount = static_cast<uint64>(numElements);
+			const uint64 maximumBytes = static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
+			if( elementCount > maximumBytes / sizeof(T) )
+				throw std::length_error( "BinaryWriter::write byte count exceeds streamsize range" );
+
+			const std::streamsize byteCount = static_cast<std::streamsize>(elementCount * sizeof(T));
+			stream->write(reinterpret_cast<const char*>(dst), byteCount);
+			return stream->good();
 		}
 
 		template<typename T>
@@ -317,11 +367,14 @@ namespace houio
 			else
 				throw std::runtime_error("BinaryWriter::jsonUniformArray: unable to handle type");
 			
+			if( data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
+				throw std::length_error( "BinaryWriter::jsonUniformArray element count exceeds sint64 range" );
+			const sint64 elementCount = static_cast<sint64>(data.size());
 			writeId( Token::JID_UNIFORM_ARRAY );
-			write<sbyte>( (sbyte)type );
-			writeLength( data.size() );
+			write<sbyte>( static_cast<sbyte>(type) );
+			writeLength(elementCount);
 			if( !data.empty() )
-				write<T>( &data[0], data.size() );
+				write<T>(data.data(), elementCount);
 
 			return true;
 		}
@@ -350,10 +403,14 @@ namespace houio
 			else
 				throw std::runtime_error("BinaryWriter::jsonUniformArray: unable to handle type");
 			
+			if( numElements < 0 )
+				throw std::length_error( "BinaryWriter::jsonUniformArray received a negative element count" );
+			if( numElements > 0 && !data )
+				throw std::invalid_argument( "BinaryWriter::jsonUniformArray received null data" );
 			writeId( Token::JID_UNIFORM_ARRAY );
-			write<sbyte>( (sbyte)type );
-			writeLength( numElements );
-			write<T>( data, numElements );
+			write<sbyte>( static_cast<sbyte>(type) );
+			writeLength(numElements);
+			write<T>(data, numElements);
 
 			return true;
 		}
@@ -474,25 +531,18 @@ namespace houio
 			virtual void uaBool( sint64 numElements, Parser *parser )
 			{
 				indent();
-				//In binary JSON files, uniform bool arrays are stored as bit
-				//streams.  This method decodes the bit-stream, calling jsonBool()
-				//for each element of the bit array.
-				std::vector<bool> data(numElements);
-				if( numElements != 0 )
+				if( numElements < 0 )
+					throw std::length_error( "JSONLogger::uaBool received a negative element count" );
+				std::vector<bool> data(static_cast<size_t>(numElements));
+				sint64 elementsRemaining = numElements;
+				size_t destinationIndex = 0;
+				while( elementsRemaining > 0 )
 				{
-					int count = (int) numElements;
-					while( count > 0 )
-					{
-						uint32 bits;
-						parser->read<uint32>( &bits, 1 );
-						int nbits = std::min( count, 32 );
-						count -= nbits;
-						for( int i=0;i<nbits;++i )
-						{
-							bool b = (bits & (1 << i)) != 0;
-							data[i] = b;
-						}
-					}
+					const uint32 bits = parser->read<uint32>();
+					const int bitCount = static_cast<int>(std::min<sint64>(elementsRemaining, 32));
+					for( int bitIndex=0;bitIndex<bitCount;++bitIndex )
+						data[destinationIndex++] = (bits & (uint32(1) << bitIndex)) != 0;
+					elementsRemaining -= bitCount;
 				}
 				out << "jsonArray [";std::flush(out);
 				for( std::vector<bool>::iterator it = data.begin(); it != data.end();++it )
@@ -508,6 +558,11 @@ namespace houio
 			virtual void uaReal64( sint64 numElements, Parser *parser )
 			{
 				ua<real64>( numElements, parser, "<real64>" );
+			}
+
+			virtual void uaInt8( sint64 numElements, Parser *parser )
+			{
+				ua<sbyte>( numElements, parser, "<int8>" );
 			}
 
 			virtual void uaInt16( sint64 numElements, Parser *parser )
@@ -528,9 +583,11 @@ namespace houio
 			virtual void uaUInt8( sint64 numElements, Parser *parser )
 			{
 				indent();
-				std::vector<ubyte> data(numElements);
-				if( numElements != 0 )
-					parser->read<ubyte>( &data[0], numElements );
+				if( numElements < 0 )
+					throw std::length_error( "JSONLogger::uaUInt8 received a negative element count" );
+				std::vector<ubyte> data(static_cast<size_t>(numElements));
+				if( !data.empty() )
+					parser->read<ubyte>(data.data(), numElements);
 				out << "jsonArray<uint8> [";std::flush(out);
 				for( std::vector<ubyte>::iterator it = data.begin(); it != data.end();++it )
 					out << (int)(*it) << " ";std::flush(out);
@@ -540,8 +597,10 @@ namespace houio
 			virtual void uaString( sint64 numElements, Parser *parser )
 			{
 				indent();
+				if( numElements < 0 )
+					throw std::length_error( "JSONLogger::uaString received a negative element count" );
 				std::vector<std::string> data;
-				data.reserve(numElements);
+				data.reserve(static_cast<size_t>(numElements));
 				for(sint64 i=0;i<numElements;++i)
 					data.push_back( parser->readBinaryString() );
 				out << "jsonArray<string> [";std::flush(out);
@@ -554,9 +613,11 @@ namespace houio
 			void ua( sint64 numElements, Parser *parser, std::string type = "" )
 			{
 				indent();
-				std::vector<T> data(numElements);
-				if( numElements != 0 )
-					parser->read<T>( (T*)&data[0], numElements );
+				if( numElements < 0 )
+					throw std::length_error( "JSONLogger uniform array received a negative element count" );
+				std::vector<T> data(static_cast<size_t>(numElements));
+				if( !data.empty() )
+					parser->read<T>(data.data(), numElements);
 				out << "jsonArray"<<type<<" ("<< numElements << ") [";std::flush(out);
 				for( typename std::vector<T>::iterator it = data.begin(); it != data.end();++it )
 					out << *it << " ";std::flush(out);
@@ -691,6 +752,25 @@ namespace houio
 			void operator()( T d )
 			{
 				dest = (t_dest)d;
+			}
+		};
+
+		template<>
+		struct VariantConverter<double>
+		{
+			typedef double t_dest;
+			t_dest &dest;
+			VariantConverter( t_dest &_dest ) : dest(_dest){}
+
+			void operator()(std::string /*x*/)
+			{
+				// Keep the default destination value for incompatible string input.
+			}
+
+			template< typename T >
+			void operator()( T d )
+			{
+				dest = static_cast<t_dest>(d);
 			}
 		};
 
@@ -885,6 +965,7 @@ namespace houio
 			virtual void      uaBool( sint64 numElements, Parser *parser );
 			virtual void    uaReal32( sint64 numElements, Parser *parser );
 			virtual void    uaReal64( sint64 numElements, Parser *parser );
+			virtual void      uaInt8( sint64 numElements, Parser *parser );
 			virtual void     uaInt16( sint64 numElements, Parser *parser );
 			virtual void     uaInt32( sint64 numElements, Parser *parser );
 			virtual void     uaInt64( sint64 numElements, Parser *parser );
@@ -926,31 +1007,37 @@ namespace houio
 		template<typename T, typename S>
 		void JSONReader::jsonUA( sint64 numElements, Parser *parser )
 		{
+			if( numElements < 0 )
+				throw std::length_error( "JSONReader::jsonUA received a negative element count" );
+			const size_t elementCount = static_cast<size_t>(numElements);
+			if( elementCount > std::numeric_limits<size_t>::max() / sizeof(T)
+				|| elementCount > std::numeric_limits<size_t>::max() / sizeof(S) )
+				throw std::length_error( "JSONReader::jsonUA allocation size overflow" );
+
 			typedef ttl::meta::find_equivalent_type<const T&, Value::Variant::list> found;
-
-
 			Value v = Value::createArray();
 			ArrayPtr ua = v.asArray();
 			ua->m_isUniform = true;
-			ua->m_uniformdata = (unsigned char *)malloc( numElements*sizeof(T) );
 			ua->m_numUniformElements = numElements;
 			ua->m_uniformType = found::index;
 
-			S *data_src = (S *)malloc( numElements*sizeof(S) );
-			parser->read<S>( data_src, numElements );
+			const size_t destinationBytes = elementCount * sizeof(T);
+			ua->m_uniformdata = static_cast<unsigned char*>(std::malloc(destinationBytes));
+			if( destinationBytes > 0 && !ua->m_uniformdata )
+				throw std::bad_alloc();
 
-			// convert types
-			T *data_dest = (T *)ua->m_uniformdata;
-			for( sint64 i=0;i<numElements;++i, ++data_dest )
-				*data_dest = (T)data_src[i];
+			std::vector<S> sourceData(elementCount);
+			if( !sourceData.empty() )
+				parser->read<S>(sourceData.data(), numElements);
+
+			T *destinationData = reinterpret_cast<T*>(ua->m_uniformdata);
+			for( size_t elementIndex=0;elementIndex<elementCount;++elementIndex )
+				destinationData[elementIndex] = static_cast<T>(sourceData[elementIndex]);
 
 			if( m_root.isArray() )
 				m_root.asArray()->append(v);
-			else
-			if( m_root.isObject() )
+			else if( m_root.isObject() )
 				m_root.asObject()->append(nextKey, v);
-
-			free(data_src);
 		}
 
 

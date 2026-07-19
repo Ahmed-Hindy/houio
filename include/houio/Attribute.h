@@ -1,5 +1,8 @@
 #pragma once
+#include <cstring>
+#include <limits>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 #include <houio/math/Math.h>
 
@@ -21,7 +24,7 @@ namespace houio
 			FLOAT
 		};
 
-		Attribute( char numComponents=3, ComponentType componentType = FLOAT );
+		Attribute( int numComponents=3, ComponentType componentType = FLOAT );
 		~Attribute();
 
 		Attribute::Ptr copy();
@@ -63,19 +66,21 @@ namespace houio
 		}
 
 
-		int numElements()
+		int numElements()const
 		{
-			return m_numElements;
+			if( m_numElements > static_cast<size_t>(std::numeric_limits<int>::max()) )
+				throw std::overflow_error( "Attribute element count exceeds int range" );
+			return static_cast<int>(m_numElements);
 		}
 
-		int numComponents()
+		int numComponents()const
 		{
 			return m_numComponents;
 		}
 
 		ComponentType elementComponentType();
 
-		int elementComponentSize()
+		int elementComponentSize()const
 		{
 			return m_componentSize;
 		}
@@ -88,8 +93,13 @@ namespace houio
 		}
 		void *getRawPointer( int index )
 		{
-			// should change on e per type basis
-			return (void *)&m_data[index*numComponents()*elementComponentSize()];
+			if( index < 0 )
+				throw std::out_of_range( "Attribute index cannot be negative" );
+			const size_t byteOffset = static_cast<size_t>(index) * static_cast<size_t>(numComponents())
+				* static_cast<size_t>(elementComponentSize());
+			if( byteOffset >= m_data.size() )
+				throw std::out_of_range( "Attribute index exceeds stored data" );
+			return static_cast<void*>(m_data.data() + byteOffset);
 		}
 
 
@@ -97,15 +107,15 @@ namespace houio
 
 
 		std::vector<unsigned char> m_data;
-		char              m_componentSize; // size in memory of a component of an element in byte
+		int               m_componentSize; // size in memory of a component of an element in byte
 		ComponentType     m_componentType;
-		char              m_numComponents; // number of components per element
+		int               m_numComponents; // number of components per element
 		size_t              m_numElements;
 
 		//
 		// static creators
 		//
-		static Attribute::Ptr create(char numComponents, ComponentType componentType, unsigned char *raw, int numElements );
+		static Attribute::Ptr create(int numComponents, ComponentType componentType, const unsigned char *raw, int numElements );
 		static Attribute::Ptr createM33f();
 		static Attribute::Ptr createM44f();
 		static Attribute::Ptr createV4f( int numElements = 0 );
@@ -127,50 +137,60 @@ namespace houio
 	template<typename T>
 	unsigned int Attribute::appendElement( const T &value )
 	{
-		unsigned int pos = (unsigned int) m_data.size();
-		m_data.resize( pos + sizeof(T) );
-		*((T *)&m_data[pos]) = value;
+		if( m_numElements > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) )
+			throw std::overflow_error( "Attribute element index exceeds unsigned int range" );
+		const unsigned int elementIndex = static_cast<unsigned int>(m_numElements);
+		const size_t byteOffset = m_data.size();
+		m_data.resize(byteOffset + sizeof(T));
+		std::memcpy(m_data.data() + byteOffset, &value, sizeof(T));
+		++m_numElements;
 		m_isDirty = true;
-		return m_numElements++;
+		return elementIndex;
 	}
 
 	template<typename T>
 	unsigned int Attribute::appendElement( const T &v0, const T &v1 )
 	{
-		unsigned int pos = (unsigned int) m_data.size();
-		m_data.resize( pos + sizeof(T)*2 );
-		T *data = (T*)&m_data[pos];
-		*data = v0;++data;
-		*data = v1;++data;
+		const T values[] = {v0, v1};
+		if( m_numElements > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) )
+			throw std::overflow_error( "Attribute element index exceeds unsigned int range" );
+		const unsigned int elementIndex = static_cast<unsigned int>(m_numElements);
+		const size_t byteOffset = m_data.size();
+		m_data.resize(byteOffset + sizeof(values));
+		std::memcpy(m_data.data() + byteOffset, values, sizeof(values));
+		++m_numElements;
 		m_isDirty = true;
-		return m_numElements++;
+		return elementIndex;
 	}
 
 	template<typename T>
 	unsigned int Attribute::appendElement( const T &v0, const T &v1, const T &v2 )
 	{
-		unsigned int pos = (unsigned int) m_data.size();
-		m_data.resize( pos + sizeof(T)*3 );
-		T *data = (T*)&m_data[pos];
-		*data = v0;++data;
-		*data = v1;++data;
-		*data = v2;++data;
+		const T values[] = {v0, v1, v2};
+		if( m_numElements > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) )
+			throw std::overflow_error( "Attribute element index exceeds unsigned int range" );
+		const unsigned int elementIndex = static_cast<unsigned int>(m_numElements);
+		const size_t byteOffset = m_data.size();
+		m_data.resize(byteOffset + sizeof(values));
+		std::memcpy(m_data.data() + byteOffset, values, sizeof(values));
+		++m_numElements;
 		m_isDirty = true;
-		return m_numElements++;
+		return elementIndex;
 	}
 
 	template<typename T>
 	unsigned int Attribute::appendElement( const T &v0, const T &v1, const T &v2, const T &v3 )
 	{
-		unsigned int pos = (unsigned int) m_data.size();
-		m_data.resize( pos + sizeof(T)*4 );
-		T *data = (T*)&m_data[pos];
-		*data = v0;++data;
-		*data = v1;++data;
-		*data = v2;++data;
-		*data = v3;++data;
+		const T values[] = {v0, v1, v2, v3};
+		if( m_numElements > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) )
+			throw std::overflow_error( "Attribute element index exceeds unsigned int range" );
+		const unsigned int elementIndex = static_cast<unsigned int>(m_numElements);
+		const size_t byteOffset = m_data.size();
+		m_data.resize(byteOffset + sizeof(values));
+		std::memcpy(m_data.data() + byteOffset, values, sizeof(values));
+		++m_numElements;
 		m_isDirty = true;
-		return m_numElements++;
+		return elementIndex;
 	}
 
 	template<typename T>

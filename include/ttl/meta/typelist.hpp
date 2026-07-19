@@ -129,11 +129,7 @@ namespace impl
 		{
 			if( i == N ) 
 			{
-#ifdef __clang__
-                            f.template operator()<typename impl::get<L,N>::type>();
-#else  // __clang__
-                            f.operator()<typename impl::get<L,N>::type>();
-#endif // __clang__
+				f.template operator()<typename impl::get<L,N>::type>();
 			}
 			else
 			{
@@ -147,7 +143,7 @@ namespace impl
 	struct type_switch<L, N, true>
 	{
 		template< typename F >
-		void operator()( size_t i, F& f )
+		void operator()( size_t, F& )
 		{
 			throw meta::exception();
 		}

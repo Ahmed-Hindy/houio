@@ -82,11 +82,11 @@ namespace houio
 			virtual int                                       numVertices( int poly )const override;
 			virtual int const*                                vertices(int poly=0)const override;
 			virtual bool                                      closed()const override;
-			int                                               m_numPolys;
+			int                                               m_numPolys = 0;
 			std::vector<int>                                  m_perPolyVertexCount; // holds number of vertices for each polygon
 			std::vector<int>                                  m_perPolyVertexListOffset; // holds offset into m_vertices per poly
 			std::vector<int>                                  m_vertices; // vertex indicess for each vertex
-			bool                                              m_closed;
+			bool                                              m_closed = true;
 		};
 
 
@@ -98,6 +98,9 @@ namespace houio
 
 		void                                                 setPointAttribute( HouAttribute::Ptr attr );
 		void                                                 setPrimitiveAttribute( const std::string &name, HouAttribute::Ptr attr );
+		void                                                 setPointGroup( const std::string &name, const std::vector<bool> &membership );
+		void                                                 setVertexGroup( const std::string &name, const std::vector<bool> &membership );
+		void                                                 setPrimitiveGroup( const std::string &name, const std::vector<bool> &membership );
 		void                                                 addPrimitive( ScalarField::Ptr field );
 		void                                                 addPrimitive( PolyPrimitive::Ptr poly );
 		void                                                 setTopology( HouTopology::Ptr topo );
@@ -117,6 +120,12 @@ namespace houio
 		virtual void                                         getPrimitives( std::vector<HouGeoAdapter::Primitive::Ptr>& primitives )override;
 		virtual void                                         getGlobalAttributeNames( std::vector<std::string> &names )const override;
 		virtual AttributeAdapter::Ptr                        getGlobalAttribute( const std::string &name ) override;
+		virtual void                                         getPointGroupNames( std::vector<std::string> &names )const override;
+		virtual bool                                         getPointGroupMembership( const std::string &name, std::vector<bool> &membership )const override;
+		virtual void                                         getVertexGroupNames( std::vector<std::string> &names )const override;
+		virtual bool                                         getVertexGroupMembership( const std::string &name, std::vector<bool> &membership )const override;
+		virtual void                                         getPrimitiveGroupNames( std::vector<std::string> &names )const override;
+		virtual bool                                         getPrimitiveGroupMembership( const std::string &name, std::vector<bool> &membership )const override;
 		virtual Topology::Ptr                                getTopology() override;
 
 
@@ -130,11 +139,13 @@ namespace houio
 
 		void                                                 load( json::ObjectPtr o ); // a has to be the root of the array from hou geo
 		HouAttribute::Ptr                                    loadAttribute( json::ArrayPtr attribute, sint64 elementCount );
-		void                                                 loadTopology( json::ObjectPtr o );
+		void                                                 loadTopology( json::ObjectPtr o, sint64 pointCount );
 		void                                                 loadPrimitive( json::ArrayPtr primitive, SharedPrimitiveData& sharedPrimitiveData );
 		void                                                 loadVolumePrimitive( json::ObjectPtr volume, SharedPrimitiveData& sharedPrimitiveData );
 		void                                                 loadPolyPrimitive( json::ObjectPtr poly );
 		void                                                 loadPolyPrimitiveRun( json::ObjectPtr def, json::ArrayPtr run );
+		void                                                 loadPolygonRun( json::ObjectPtr polygonRun, bool closed=true );
+		void                                                 loadGroups( json::ArrayPtr groups, sint64 elementCount, std::map<std::string, std::vector<bool>> &destination );
 
 		void                                                 loadVoxelData( json::ObjectPtr voxels, const math::V3i& res, float* volData );
 
@@ -147,6 +158,9 @@ namespace houio
 		std::map<std::string, HouAttribute::Ptr>                           m_vertexAttributes;
 		std::map<std::string, HouAttribute::Ptr>                        m_primitiveAttributes;
 		std::map<std::string, HouAttribute::Ptr>                           m_globalAttributes;
+		std::map<std::string, std::vector<bool>>                                  m_pointGroups;
+		std::map<std::string, std::vector<bool>>                                  m_vertexGroups;
+		std::map<std::string, std::vector<bool>>                                  m_primitiveGroups;
 		HouTopology::Ptr                                                           m_topology;
 	};
 
