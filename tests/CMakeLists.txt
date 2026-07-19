@@ -1,14 +1,12 @@
-cmake_minimum_required(VERSION 2.8)
-add_definitions(-DTESTS_FILE_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}\")
-add_executable( test_logger main.cpp )
-include_directories (${CMAKE_CURRENT_SOURCE_DIR}/../include) 
-#include_directories (${CMAKE_CURRENT_SOURCE_DIR}/../include/hougeo) 
-target_link_libraries(test_logger houio)
+add_executable(houio_test_logger main.cpp)
+target_link_libraries(houio_test_logger PRIVATE houio::houio)
+target_compile_features(houio_test_logger PRIVATE cxx_std_20)
+target_compile_definitions(houio_test_logger PRIVATE TESTS_FILE_PATH="${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME houio.logger COMMAND houio_test_logger)
 
-
-
-
-add_executable( example_readwrite example_readwrite.cpp )
-include_directories (${CMAKE_CURRENT_SOURCE_DIR}/../include) 
-#include_directories (${CMAKE_CURRENT_SOURCE_DIR}/../hougeo) 
-target_link_libraries(example_readwrite houio)
+if(HOUIO_BUILD_EXAMPLES)
+    add_executable(houio_example_readwrite example_readwrite.cpp)
+    target_link_libraries(houio_example_readwrite PRIVATE houio::houio)
+    target_compile_features(houio_example_readwrite PRIVATE cxx_std_20)
+    target_compile_definitions(houio_example_readwrite PRIVATE TESTS_FILE_PATH="${CMAKE_CURRENT_SOURCE_DIR}")
+endif()

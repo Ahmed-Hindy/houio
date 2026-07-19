@@ -18,13 +18,13 @@ Focus on the first two areas initially. Ignore `HouScene`, `ImportHoudini`, and 
 
 At the time of this fork:
 
-- The project targets C++11.
+- The modernization branch targets C++20.
 - The supplied fixtures were produced by Houdini `13.0.288`.
-- The upstream repository has no README or license.
+- The upstream repository has no license.
 - The latest upstream commit is from 2020.
-- The CMake build adds the `tests` directory twice.
-- Existing tests are smoke executables with no assertions.
-- Houdini 21 compatibility is unverified.
+- The CMake build is target-based and uses presets.
+- Existing tests still provide limited semantic coverage.
+- Houdini 21 and 22 compatibility is under active validation.
 
 Do not infer modern format support from a successful parse of the supplied fixtures.
 
@@ -35,9 +35,9 @@ Use a native MSVC toolchain:
 - Windows 10
 - Visual Studio 2022 Build Tools or Visual Studio 2022
 - Desktop development with C++ workload
-- CMake
-- Ninja optionally
-- Houdini 21 for producing compatibility fixtures
+- CMake 3.24 or newer
+- Ninja
+- Houdini 21 and 22 for producing compatibility fixtures
 
 MSVC is preferable to MinGW when HouIO may later be used alongside HDK code or other Houdini-adjacent native libraries.
 
@@ -61,31 +61,30 @@ upstream  dkoerner/houio
 
 ## First build
 
-The root `CMakeLists.txt` currently calls `add_subdirectory(tests)` twice. Remove the duplicate call on a maintenance branch before expecting a clean configure.
-
-Then configure and build:
+Open an MSVC Developer PowerShell or Developer Command Prompt, then configure, build, and test through the checked-in presets:
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Debug
+cmake --preset windows-msvc-debug
+cmake --build --preset windows-msvc-debug
+ctest --preset windows-msvc-debug
 ```
 
 The main targets are:
 
 ```text
-houio              Static library
-test_logger        Parses and logs fixture files
-example_readwrite  Demonstrates low-level parsing and writing
+houio                     Static library
+houio_test_logger         Parses and logs fixture files
+houio_example_readwrite   Demonstrates low-level parsing and writing
 ```
 
-The current build does not register tests with CTest.
+The logger is registered with CTest.
 
 ## Run the smoke executable
 
-After a Visual Studio multi-configuration build:
+After the Debug preset build:
 
 ```powershell
-.\build\tests\Debug\test_logger.exe
+.\build\windows-msvc-debug\tests\houio_test_logger.exe
 ```
 
 It should print the contents of:
@@ -349,9 +348,9 @@ This establishes a baseline before format work.
 Run or document:
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Debug
-ctest --test-dir build -C Debug --output-on-failure
+cmake --preset windows-msvc-debug
+cmake --build --preset windows-msvc-debug
+ctest --preset windows-msvc-debug
 ```
 
 Also verify:

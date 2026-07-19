@@ -20,19 +20,19 @@ The priority labels indicate dependency order rather than estimated effort.
 
 ### Build system
 
-- [ ] Remove the duplicate `add_subdirectory(tests)` call from the root `CMakeLists.txt`.
-- [ ] Raise the minimum CMake version to a supported baseline.
-- [ ] Replace global `INCLUDE_DIRECTORIES` use with target-scoped includes.
-- [ ] Add proper `BUILD_INTERFACE` and `INSTALL_INTERFACE` include paths.
-- [ ] Define a namespaced CMake target such as `houio::houio`.
-- [ ] Verify static builds with Visual Studio 2022.
+- [x] Remove the duplicate `add_subdirectory(tests)` call from the root `CMakeLists.txt`.
+- [x] Raise the minimum CMake version to a supported baseline.
+- [x] Replace global `INCLUDE_DIRECTORIES` use with target-scoped includes.
+- [x] Add proper `BUILD_INTERFACE` and `INSTALL_INTERFACE` include paths.
+- [x] Define the namespaced CMake target `houio::houio`.
+- [x] Verify a C++20 static build with Visual Studio 2022 and Ninja.
 - [ ] Verify builds with Clang or GCC on Linux.
 - [ ] Decide whether `houio.pro` remains supported or should be removed.
 - [ ] Ensure install and package-config rules work from a clean consumer project.
 
 ### Test baseline
 
-- [ ] Call `enable_testing()` and register tests with CTest.
+- [x] Call `enable_testing()` and register the historical logger with CTest.
 - [ ] Replace print-only smoke behavior with assertion-based tests.
 - [ ] Add tests for the supplied Houdini 13 ASCII fixtures.
 - [ ] Add tests for the supplied Houdini 13 binary fixtures.
@@ -44,16 +44,16 @@ The priority labels indicate dependency order rather than estimated effort.
 
 ### Continuous integration
 
-- [ ] Add Windows MSVC CI.
+- [x] Add Windows MSVC CI.
 - [ ] Add Linux Clang or GCC CI.
-- [ ] Build Debug and Release configurations.
-- [ ] Run CTest with failure output enabled.
-- [ ] Enable warnings without immediately treating legacy warnings as errors.
+- [x] Add Debug and Release CMake presets.
+- [x] Run CTest with failure output enabled.
+- [x] Enable warnings without immediately treating legacy warnings as errors.
 - [ ] Add a separate strict-warning job once the warning baseline is clean.
 
 ## P1 — Make current behavior safe and maintainable
 
-### Houdini 21 compatibility baseline
+### Houdini 21 and 22 compatibility baseline
 
 - [ ] Generate minimal Houdini 21 `.geo` fixtures.
 - [ ] Generate matching uncompressed Houdini 21 `.bgeo` fixtures.

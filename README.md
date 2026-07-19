@@ -1,6 +1,6 @@
 # HouIO
 
-HouIO is a small C++11 library for reading and writing Houdini geometry files without linking against Houdini or the Houdini Development Kit.
+HouIO is a small C++20 library for reading and writing Houdini geometry files without linking against Houdini or the Houdini Development Kit.
 
 It implements SideFX's JSON-based geometry encoding used by:
 
@@ -18,7 +18,7 @@ HouIO should currently be treated as an experimental legacy library rather than 
 
 - The included geometry fixtures identify themselves as Houdini `13.0.288` files.
 - The latest upstream commit is from 2020.
-- Houdini 21 compatibility has not yet been established.
+- Houdini 21 and 22 compatibility is being established on the modernization branch.
 - Polygon and legacy dense-volume paths are the best-developed areas.
 - Packed geometry, VDBs, curves, agents, height fields, and most modern primitive types are not supported.
 - `.bgeo.sc` compression is not handled.
@@ -106,20 +106,17 @@ The logger is useful because Houdini geometry uses flattened key/value arrays an
 
 ## Building
 
-HouIO is intended to build as a static C++11 library. CMake and qmake project files are included.
+HouIO builds as a static C++20 library using target-based CMake.
 
-For Windows integration, MSVC is recommended, particularly when HouIO will be used next to Houdini or HDK-built components.
+For Windows integration, use an MSVC Developer PowerShell or Developer Command Prompt:
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
+cmake --preset windows-msvc-release
+cmake --build --preset windows-msvc-release
+ctest --preset windows-msvc-release
 ```
 
-### Current CMake caveat
-
-The root `CMakeLists.txt` currently adds the `tests` directory twice. A clean configure may fail because the same test targets are declared twice. This is tracked as a priority item in [todo.md](todo.md).
-
-The existing `tests` directory contains smoke executables, not assertion-based unit tests or registered CTest tests.
+The release preset uses Ninja, builds the examples, and registers the historical logger executable with CTest. The test currently proves that the Houdini 13 fixtures still parse; assertion-based semantic and Houdini 21/22 compatibility tests remain to be added.
 
 ## Supported data model
 

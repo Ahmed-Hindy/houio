@@ -1,57 +1,99 @@
-CMAKE_MINIMUM_REQUIRED ( VERSION 2.8 )
+cmake_minimum_required(VERSION 3.24)
 
-PROJECT ( houio )
-set( HOUIO_VERSION 0.1 )
+project(
+    houio
+    VERSION 0.2.0
+    DESCRIPTION "Standalone reader and writer for Houdini GEO and BGEO geometry files"
+    LANGUAGES CXX
+)
 
-set(CMAKE_DEBUG_POSTFIX "d")
-INCLUDE_DIRECTORIES ( include )
-
-ADD_LIBRARY ( houio STATIC
-  src/Attribute.cpp
-  src/Field.cpp
-  src/math/Color.cpp
-  src/math/Math.cpp
-  src/json.cpp
-  src/HouGeoAdapter.cpp
-  src/HouGeo.cpp
-  src/HouGeoIO.cpp
-  src/Geometry.cpp
-  )
-
-# trigger cxx standard (c++11)
-set_property(TARGET houio PROPERTY CXX_STANDARD 11)
-
-add_subdirectory ( tests )
-
-# install target (the lib file) and register the target in export set ---
-install( TARGETS houio DESTINATION lib EXPORT houio-targets )
-# copy header files
-install( DIRECTORY include DESTINATION . )
-
-
-# location of cmake config files in binary tree
-set(ConfigPackageLocation lib/cmake/houio)
-
+include(CTest)
+include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-# create version config file ---
-write_basic_package_version_file( "${CMAKE_CURRENT_BINARY_DIR}/houio/houio-config-version.cmake" VERSION ${HOUIO_VERSION} COMPATIBILITY AnyNewerVersion )
+option(HOUIO_BUILD_TESTS "Build HouIO tests" ${PROJECT_IS_TOP_LEVEL})
+option(HOUIO_BUILD_EXAMPLES "Build HouIO examples" ${PROJECT_IS_TOP_LEVEL})
+option(HOUIO_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 
-# export targets (which have been defined during previous calls to install)
-export(EXPORT houio-targets FILE "${CMAKE_CURRENT_BINARY_DIR}/houio/houio-targets.cmake" NAMESPACE Upstream:: )
+add_library(
+    houio
+    STATIC
+    src/Attribute.cpp
+    src/Field.cpp
+    src/Geometry.cpp
+    src/HouGeo.cpp
+    src/HouGeoAdapter.cpp
+    src/HouGeoIO.cpp
+    src/json.cpp
+    src/math/Color.cpp
+    src/math/Math.cpp
+)
+add_library(houio::houio ALIAS houio)
 
+target_compile_features(houio PUBLIC cxx_std_20)
+target_include_directories(
+    houio
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 
-# install houio-targets cmake file ---
-install( EXPORT houio-targets DESTINATION ${ConfigPackageLocation} )
+set_target_properties(
+    houio
+    PROPERTIES
+        CXX_EXTENSIONS OFF
+        DEBUG_POSTFIX d
+        EXPORT_NAME houio
+)
 
+if(MSVC)
+    target_compile_options(houio PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
+    target_compile_definitions(houio PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    if(HOUIO_WARNINGS_AS_ERRORS)
+        target_compile_options(houio PRIVATE /WX)
+    endif()
+else()
+    target_compile_options(houio PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion)
+    if(HOUIO_WARNINGS_AS_ERRORS)
+        target_compile_options(houio PRIVATE -Werror)
+    endif()
+endif()
 
-# install version and config package file ---
-install( FILES cmake/houio-config.cmake "${CMAKE_CURRENT_BINARY_DIR}/houio/houio-config-version.cmake" DESTINATION ${ConfigPackageLocation} COMPONENT Devel )
+if(HOUIO_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
-# for the final config file you can also use configure_file to replace some variables and move it into place
-# create final package config file (by copying from source-tree)
-#configure_file(cmake/houio-config.cmake "${CMAKE_CURRENT_BINARY_DIR}/houio/houio-config.cmake" COPYONLY )
+install(
+    TARGETS houio
+    EXPORT HouIOTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-# tests -----------
-add_subdirectory( tests )
+configure_package_config_file(
+    cmake/houio-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/houio-config.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/houio
+)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/houio-config-version.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
 
+install(
+    EXPORT HouIOTargets
+    FILE houio-targets.cmake
+    NAMESPACE houio::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/houio
+)
+install(
+    FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/houio-config.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/houio-config-version.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/houio
+)
