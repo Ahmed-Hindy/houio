@@ -218,7 +218,7 @@ The loader uses the root geometry counts to size each domain:
 - Flattened point-index data
 - Closed state
 
-The loader recognizes direct `Poly` records, legacy `run` records whose `runtype` is `Poly`, and Houdini 21/22 `Polygon_run` records. Binary Houdini files may compact these names to `p_r`, `s_v`, `n_p`, and `r_v`; the semantic loader accepts both spellings. `Polygon_run` expands run-length encoded vertex counts while validating the topology range and final primitive count.
+The loader recognizes direct `Poly` records, legacy `run` records whose `runtype` is `Poly`, Houdini 21/22 `Polygon_run` records, and open `PolygonCurve_run` records. Binary Houdini files may compact these names to `p_r` and `c_r`, with fields such as `s_v`, `n_p`, `r_v`, and `n_v`; the semantic loader accepts both spellings. Polygon runs support either run-length encoded counts or direct per-primitive vertex counts while validating the topology range and final primitive count.
 
 ### Volume primitives
 
@@ -274,12 +274,18 @@ HouGeoIO::importVolume(path)
 HouGeoIO::xport(...)
     ├─ Optionally adapt Geometry or Field<T> into HouGeo
     ├─ Serialize counts and topology
-    ├─ Serialize point, vertex, and primitive attribute domains
-    ├─ Serialize polygon or volume primitives
+    ├─ Serialize point, vertex, primitive, and global attribute domains
+    ├─ Serialize polygon-run or volume primitives
     └─ Finish the binary JSON root array
 ```
 
-The writer serializes point, vertex, and primitive attributes through the same adapter contract. Numeric values are emitted as paged uniform arrays. Per-element strings are deduplicated into a string table plus integer indices. The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`, preserving compatibility with its legacy binary schema. Each export owns its `BinaryWriter` on the stack. A scoped thread-local binding lets the legacy helper functions reach the active writer while restoring the previous binding after normal completion or exceptions. Independent streams can therefore be exported concurrently.
+The writer serializes point, vertex, primitive, and global attributes through the same adapter contract. Numeric values are emitted as paged uniform arrays. Per-element strings are deduplicated into a string table plus integer indices. Closed polygons are emitted as `Polygon_run`; open polygons use `PolygonCurve_run`. Each record stores a topology vertex offset plus direct per-primitive vertex counts, avoiding the historical ambiguity between topology offsets and point numbers. The writer promotes a three-component floating-point `P` attribute to four components with `w = 1`. Each export owns its `BinaryWriter` on the stack. A scoped thread-local binding lets the legacy helper functions reach the active writer while restoring the previous binding after normal completion or exceptions. Independent streams can therefore be exported concurrently.
+
+### Fixture-backed compatibility tests
+
+The optional Houdini integration layer generates minimal fixtures rather than storing version-specific binary blobs in the repository. A manifest records counts, domains, primitive state, and known losses. HouIO round-trips each fixture, and Houdini 21.0.631 and 22.0.368 compare exact attribute metadata and values, primitive topology, and open/closed state. Primitive-group membership is currently the only intentional loss in this matrix.
+
+The Crag integration test remains the large-scale gate. It additionally compares all 89,942 polygon topologies and 359,794 vertices exactly, which protects the topology-offset writer path from shared-point corruption.
 
 ## 6. Simplified `Geometry`
 

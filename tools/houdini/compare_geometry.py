@@ -23,6 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vertex-attribute", action="append", default=[])
     parser.add_argument("--primitive-string-attribute", action="append", default=[])
     parser.add_argument("--primitive-int-attribute", action="append", default=[])
+    parser.add_argument("--topology", action="store_true", help="Compare polygon topology and closed state")
     parser.add_argument("--tolerance", type=float, default=0.0)
     return parser.parse_args()
 
@@ -143,6 +144,60 @@ def compare_exact_values(domain: str, attribute_name: str, source_values: Sequen
         "domain": domain,
         "attribute": attribute_name,
         "value_count": len(source_values),
+        "exact_match": True,
+    }
+
+
+def compare_topology(source_geometry: hou.Geometry, candidate_geometry: hou.Geometry) -> dict[str, object]:
+    """Compare primitive topology and closed state exactly.
+
+    Args:
+        source_geometry: Reference geometry.
+        candidate_geometry: Candidate geometry.
+
+    Returns:
+        Topology comparison summary.
+
+    Raises:
+        RuntimeError: If primitive types, closed state, or point indices differ.
+    """
+    source_primitives = source_geometry.prims()
+    candidate_primitives = candidate_geometry.prims()
+    if len(source_primitives) != len(candidate_primitives):
+        raise RuntimeError(
+            f"Primitive topology count mismatch: {len(source_primitives)} != "
+            f"{len(candidate_primitives)}"
+        )
+
+    vertex_count = 0
+    for primitive_index, (source_primitive, candidate_primitive) in enumerate(
+        zip(source_primitives, candidate_primitives)
+    ):
+        source_type = source_primitive.type().name()
+        candidate_type = candidate_primitive.type().name()
+        if source_type != candidate_type:
+            raise RuntimeError(
+                f"Primitive {primitive_index} type mismatch: {source_type} != {candidate_type}"
+            )
+        if source_primitive.isClosed() != candidate_primitive.isClosed():
+            raise RuntimeError(
+                f"Primitive {primitive_index} closed-state mismatch: "
+                f"{source_primitive.isClosed()} != {candidate_primitive.isClosed()}"
+            )
+
+        source_points = [vertex.point().number() for vertex in source_primitive.vertices()]
+        candidate_points = [vertex.point().number() for vertex in candidate_primitive.vertices()]
+        if source_points != candidate_points:
+            raise RuntimeError(
+                f"Primitive {primitive_index} point topology mismatch: "
+                f"{source_points!r} != {candidate_points!r}"
+            )
+        vertex_count += len(source_points)
+
+    return {
+        "domain": "topology",
+        "primitive_count": len(source_primitives),
+        "vertex_count": vertex_count,
         "exact_match": True,
     }
 
@@ -282,6 +337,9 @@ def main() -> int:
                 ),
             )
         )
+
+    if args.topology:
+        comparisons.append(compare_topology(source_geometry, candidate_geometry))
 
     summary = {
         "houdini_version": hou.applicationVersionString(),

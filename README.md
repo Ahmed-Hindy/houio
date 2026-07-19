@@ -18,7 +18,7 @@ HouIO should currently be treated as an experimental legacy library rather than 
 
 - The included geometry fixtures identify themselves as Houdini `13.0.288` files.
 - The latest upstream commit is from 2020.
-- A static Crag `P` and polygon-topology round-trip has been validated with Houdini `21.0.631` and `22.0.368`.
+- A static Crag round-trip and an 11-case minimal geometry matrix have been validated with Houdini `21.0.631` and `22.0.368`.
 - Polygon and legacy dense-volume paths are the best-developed areas.
 - Packed geometry, VDBs, curves, agents, height fields, and most modern primitive types are not supported.
 - `.bgeo.sc` compression is not handled.
@@ -30,7 +30,7 @@ See [todo.md](todo.md) for the modernization plan.
 - Parse Houdini ASCII and binary JSON.
 - Inspect unknown Houdini geometry structures using a JSON logger.
 - Read point, vertex, primitive, and global attribute domains.
-- Read legacy polygon runs and Houdini 21/22 `Polygon_run` records.
+- Read legacy polygon runs, Houdini 21/22 `Polygon_run` records, and open `PolygonCurve_run` records.
 - Read legacy dense Houdini volumes, including tiled and constant storage.
 - Write point, polygon, and dense-volume `.bgeo` files.
 - Convert supported Houdini geometry into a lightweight render-oriented mesh representation.
@@ -165,7 +165,7 @@ The Houdini-oriented layer currently recognizes:
 
 - `Poly`
 - Legacy polygon `run` records
-- Houdini 21/22 `Polygon_run` records
+- Houdini 21/22 `Polygon_run` and `PolygonCurve_run` records
 - Legacy `Volume`
 
 The simplified `Geometry` class supports one primitive type per object:
@@ -177,6 +177,30 @@ The simplified `Geometry` class supports one primitive type per object:
 - Polygons
 
 Conversion to `Geometry` is intentionally render-oriented. Face-varying vertex attributes are converted into point attributes by duplicating points at discontinuities such as UV seams.
+
+## Houdini 21/22 minimal fixture matrix
+
+The generated fixture matrix isolates modern schema behavior into 11 small binary files:
+
+- Empty and point-only geometry
+- Point `P`, `Cd`, float, integer, and string attributes
+- Triangle-only, quad-only, mixed-size, and n-gon polygon runs
+- Open polygon curves and multiple closed/open primitive records
+- Vertex-domain UV seams
+- Numeric and string global attributes
+- Primitive string and integer attributes
+- Primitive groups as an explicit known loss
+
+Run the complete matrix with both installed Houdini versions:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\tools\houdini\run_fixture_roundtrips.ps1
+```
+
+Houdini 22.0.368 generates the sources by default. HouIO round-trips each file, then Houdini 21.0.631 and 22.0.368 compare exact counts, attribute metadata and values, primitive type, open/closed state, and point topology. Generated files stay under the configured build directory rather than being committed as opaque binary assets.
+
+Primitive-group membership is not represented by the current HouIO data model and is intentionally asserted as a documented loss. The primitive attributes on the same fixture still round-trip exactly.
 
 ## Houdini 21/22 Crag experiment
 
@@ -200,7 +224,7 @@ The harness:
 
 The verified geometry contains 90,085 points, 359,794 vertices, and 89,942 polygons. The output is static and preserves polygon topology, point `P`, vertex `N` and `uv`, primitive string `name`, and primitive integer `piece`. Houdini reports a maximum absolute difference of `0.0` for the floating-point attributes and exact matches for all 89,942 primitive string and integer values.
 
-Houdini 21/22 encode this mesh with `Polygon_run` and run-length vertex counts. HouIO now reads that record and promotes three-component `P` data to the four-component representation used by its legacy writer.
+Houdini 21/22 encode this mesh with `Polygon_run` and run-length vertex counts. HouIO reads both run-length counts and direct per-primitive `nvertices`/`n_v` arrays. The writer emits modern polygon-run records with topology vertex offsets and promotes three-component `P` data to its four-component output representation.
 
 Modern Houdini binary `.bgeo` input is now covered for this geometry path. The missing compatibility feature was uniform signed-int8 arrays, used by compact binary `Polygon_run` run-length data. `.bgeo.sc` remains unsupported because HouIO does not implement its outer compression layer.
 

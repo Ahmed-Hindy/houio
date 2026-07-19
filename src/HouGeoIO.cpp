@@ -599,7 +599,6 @@ namespace houio
 					exportAttribute( geo->getPrimitiveAttribute(*it) );
 			g_writer->jsonEndArray(); // primitiveattributes
 
-/*
 			// -- global attributes
 			g_writer->jsonString( "globalattributes" );
 			g_writer->jsonBeginArray();
@@ -608,7 +607,6 @@ namespace houio
 				for( std::vector<std::string>::iterator it = globalAttrNames.begin(); it != globalAttrNames.end(); ++it )
 					exportAttribute( geo->getGlobalAttribute(*it) );
 			g_writer->jsonEndArray(); // globalattributes
-*/
 		g_writer->jsonEndArray(); // attributes
 
 
@@ -621,14 +619,20 @@ namespace houio
 			std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
 			geo->getPrimitives(primitives);
 
+			int topologyVertexOffset = 0;
 			for( auto prim : primitives )
 			{
-				if( std::dynamic_pointer_cast<HouGeoAdapter::VolumePrimitive>(prim) )
-					exportPrimitive(std::dynamic_pointer_cast<HouGeoAdapter::VolumePrimitive>(prim));
-				else
-				if( std::dynamic_pointer_cast<HouGeoAdapter::PolyPrimitive>(prim) )
-					exportPrimitive(std::dynamic_pointer_cast<HouGeoAdapter::PolyPrimitive>(prim));
-
+				if( auto volume = std::dynamic_pointer_cast<HouGeoAdapter::VolumePrimitive>(prim) )
+				{
+					exportPrimitive(volume);
+					++topologyVertexOffset;
+				}
+				else if( auto poly = std::dynamic_pointer_cast<HouGeoAdapter::PolyPrimitive>(prim) )
+				{
+					exportPrimitive(poly, topologyVertexOffset);
+					for( int polygonIndex=0;polygonIndex<poly->numPolys();++polygonIndex )
+						topologyVertexOffset += poly->numVertices(polygonIndex);
+				}
 			}
 			g_writer->jsonEndArray(); // primitives
 		}
@@ -990,56 +994,37 @@ namespace houio
 		return true;
 	}
 
-	bool HouGeoIO::exportPrimitive( HouGeoAdapter::PolyPrimitive::Ptr poly )
+	bool HouGeoIO::exportPrimitive( HouGeoAdapter::PolyPrimitive::Ptr poly, int startVertex )
 	{
-		// if we have a single polygon, then we just export it as is
+		if( !poly || startVertex < 0 || poly->numPolys() <= 0 )
+			return false;
+
+		std::vector<sint32> vertexCounts;
+		vertexCounts.reserve(static_cast<size_t>(poly->numPolys()));
+		for( int polygonIndex=0;polygonIndex<poly->numPolys();++polygonIndex )
+		{
+			const int vertexCount = poly->numVertices(polygonIndex);
+			if( vertexCount <= 0 )
+				throw std::runtime_error( "HouGeoIO::exportPrimitive: polygon has no vertices" );
+			vertexCounts.push_back(vertexCount);
+		}
 
 		g_writer->jsonBeginArray();
-			if( poly->numPolys() == 1 )
-			{
-				// single poly
-				g_writer->jsonBeginArray();
-					g_writer->jsonString("type");
-					g_writer->jsonString("Poly");
-				g_writer->jsonEndArray();
+			g_writer->jsonBeginArray();
+				g_writer->jsonString("type");
+				g_writer->jsonString(poly->closed() ? "Polygon_run" : "PolygonCurve_run");
+			g_writer->jsonEndArray();
 
-				g_writer->jsonBeginArray();
-					g_writer->jsonString("vertex");
-					g_writer->jsonUniformArray<sint32>( poly->vertices(0), poly->numVertices(0));
+			g_writer->jsonBeginArray();
+				g_writer->jsonString("startvertex");
+				g_writer->jsonInt32(startVertex);
 
-					g_writer->jsonString("closed");
-					g_writer->jsonBool(false);
-				g_writer->jsonEndArray();
-			}else
-			{
-				// polygon run
-				g_writer->jsonBeginArray();
-					g_writer->jsonString("type");
-					g_writer->jsonString("run");
-					g_writer->jsonString("runtype");
-					g_writer->jsonString("Poly");
-					g_writer->jsonString("varyingfields");
-					g_writer->jsonBeginArray();
-						g_writer->jsonString("vertex");
-					g_writer->jsonEndArray();
-					g_writer->jsonString("uniformfields");
-					g_writer->jsonBeginMap();
-						g_writer->jsonKey("closed");
-						g_writer->jsonBool(poly->closed());
-					g_writer->jsonEndMap();
-				g_writer->jsonEndArray();
+				g_writer->jsonString("nprimitives");
+				g_writer->jsonInt32(poly->numPolys());
 
-				g_writer->jsonBeginArray();
-					int numPolys = poly->numPolys();
-					for( int i=0;i<numPolys;++i )
-					{
-						g_writer->jsonBeginArray();
-							g_writer->jsonUniformArray<sint32>( poly->vertices(i), poly->numVertices(i) );
-						g_writer->jsonEndArray();
-					}
-				g_writer->jsonEndArray();
-			}
-
+				g_writer->jsonString("nvertices");
+				g_writer->jsonUniformArray(vertexCounts);
+			g_writer->jsonEndArray();
 		g_writer->jsonEndArray();
 		return true;
 	}

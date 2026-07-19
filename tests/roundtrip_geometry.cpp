@@ -1,5 +1,6 @@
 #include <houio/HouGeoIO.h>
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -26,7 +27,20 @@ int runRoundtrip(const std::string& inputPath, const std::string& outputPath)
         return fail("HouIO failed to parse input file: " + inputPath);
     }
 
-    std::ofstream output(outputPath, std::ios::binary | std::ios::trunc);
+    const std::filesystem::path outputFilePath(outputPath);
+    if (outputFilePath.has_parent_path())
+    {
+        std::error_code directoryError;
+        std::filesystem::create_directories(outputFilePath.parent_path(), directoryError);
+        if (directoryError)
+        {
+            return fail(
+                "unable to create output directory: " + outputFilePath.parent_path().string()
+                + ": " + directoryError.message());
+        }
+    }
+
+    std::ofstream output(outputFilePath, std::ios::binary | std::ios::trunc);
     if (!output)
     {
         return fail("unable to open output file: " + outputPath);

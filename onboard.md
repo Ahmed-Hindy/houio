@@ -118,6 +118,25 @@ tests/test_volume.geo
 
 A successful run only proves that the historical fixtures still parse. It does not verify semantic correctness or modern Houdini compatibility.
 
+## Run the minimal Houdini fixture matrix
+
+The fixture harness generates 11 small Houdini 22 binary files, round-trips them through HouIO, and compares them exactly in Houdini 21 and 22:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\tools\houdini\run_fixture_roundtrips.ps1
+```
+
+The matrix covers empty geometry; typed point attributes; triangle, quad, mixed-size, and n-gon polygon runs; open polygon curves; UV seams; multiple primitive records; global attributes; and primitive attributes. Validation checks counts, attribute metadata and values, primitive type, open/closed state, and point topology.
+
+Generated sources, outputs, and `manifest.json` live under:
+
+```text
+build/windows-msvc-release/tests/fixtures/
+```
+
+Primitive-group membership is an explicit known loss. The source fixture proves that the groups exist, and validation requires the output to omit them until HouIO gains a group representation.
+
 ## Run the Crag integration experiment
 
 The one-command harness builds HouIO, generates Crag in a static rest T-pose, round-trips it, and validates the binary output in Houdini 21 and 22:
@@ -145,10 +164,12 @@ The current experiment proves:
 
 - Rest-pose Crag can be made time-independent.
 - Houdini 21/22 `Polygon_run` records can be imported.
-- 90,085 points, 359,794 vertices, and 89,942 polygons survive the round-trip.
+- 90,085 points, 359,794 vertices, and 89,942 polygons survive the round-trip with exact point topology.
 - HouIO binary output loads in Houdini 21.0.631 and 22.0.368.
 - Point `P` and vertex `N` and `uv` match the source exactly, with a maximum absolute difference of `0.0`.
 - Primitive string `name` and primitive integer `piece` match all 89,942 source values exactly.
+- Both run-length and direct per-primitive vertex-count encodings are covered by focused tests.
+- Closed `Polygon_run` and open `PolygonCurve_run` state survives export.
 
 To expose the same workflow through CTest, configure with a hython executable:
 

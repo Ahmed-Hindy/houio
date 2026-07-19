@@ -36,8 +36,8 @@ The priority labels indicate dependency order rather than estimated effort.
 - [ ] Replace print-only smoke behavior with assertion-based tests.
 - [ ] Add tests for the supplied Houdini 13 ASCII fixtures.
 - [ ] Add tests for the supplied Houdini 13 binary fixtures.
-- [ ] Assert point, vertex, and primitive counts.
-- [ ] Assert topology and representative attribute values.
+- [x] Assert point, vertex, and primitive counts.
+- [x] Assert topology and representative attribute values.
 - [ ] Assert legacy volume resolution, transform, and sample values.
 - [ ] Add malformed and truncated input tests.
 - [ ] Make test failures return non-zero process exit codes.
@@ -59,15 +59,15 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Freeze Crag in its rest T-pose with no time dependency.
 - [x] Add optional CTest generation, round-trip, and Houdini validation stages.
 - [x] Validate binary HouIO output in both Houdini 21.0.631 and 22.0.368.
-- [ ] Generate minimal purpose-specific Houdini 21/22 `.geo` fixtures for individual schema features.
+- [x] Generate minimal purpose-specific Houdini 21/22 `.bgeo` fixtures for individual schema features.
 - [x] Generate and round-trip uncompressed Houdini 21/22 Crag `.bgeo` data.
 - [x] Record the exact Houdini builds used by the Crag experiment.
-- [ ] Test points with `P`, `Cd`, float, integer, and string attributes.
-- [ ] Test point, vertex, primitive, and global attribute domains comprehensively.
-- [ ] Test triangle-only polygon runs.
-- [ ] Test quad-only polygon runs.
-- [ ] Test vertex UV seams.
-- [ ] Test empty geometry.
+- [x] Test points with `P`, `Cd`, float, integer, and string attributes.
+- [x] Test representative point, vertex, primitive, and global attribute domains.
+- [x] Test triangle-only polygon runs.
+- [x] Test quad-only polygon runs.
+- [x] Test vertex UV seams.
+- [x] Test empty geometry.
 - [ ] Test dense scalar volumes if Houdini 21 still emits the legacy representation.
 - [ ] Document unsupported Houdini 21 records rather than silently ignoring them.
 
@@ -111,8 +111,8 @@ The priority labels indicate dependency order rather than estimated effort.
 ### Correctness fixes
 
 - [ ] Guard `importVolume()` against an empty primitive list.
-- [ ] Initialize all `HouPoly` members deterministically.
-- [ ] Load and preserve polygon closed state where present.
+- [x] Initialize all `HouPoly` members deterministically.
+- [x] Load and preserve polygon closed state where present.
 - [x] Verify `Polygon_run` vertex indexing against static Houdini 21/22 Crag geometry.
 - [ ] Verify point-count behavior when no point attributes exist.
 - [ ] Check every `dynamic_pointer_cast` result before dereferencing it.
@@ -135,9 +135,9 @@ The priority labels indicate dependency order rather than estimated effort.
 
 - [ ] Separate fixtures by Houdini version.
 - [ ] Separate ASCII, binary, malformed, and unsupported fixtures.
-- [ ] Add a manifest describing how each fixture was generated.
-- [ ] Keep fixtures minimal and purpose-specific.
-- [ ] Avoid large production assets in the repository.
+- [x] Add a manifest describing how each fixture was generated.
+- [x] Keep fixtures minimal and purpose-specific.
+- [x] Avoid large production assets in the repository.
 
 Suggested structure:
 
@@ -162,7 +162,7 @@ tests/fixtures/
 - [ ] Unit-test uniform arrays for every other supported storage type.
 - [ ] Unit-test flattened-array conversion.
 - [ ] Unit-test attribute packing and constant pages.
-- [ ] Unit-test topology loading.
+- [x] Unit-test topology loading.
 - [ ] Unit-test polygon and polygon-run loading.
 - [ ] Unit-test tiled and constant volume loading.
 - [x] Add a compact modern `Polygon_run` semantic round-trip test.
@@ -191,7 +191,7 @@ tests/fixtures/
 - [x] Decode indexed string tables, including constant-page-compressed indices.
 - [ ] Preserve attribute type information and semantic metadata.
 - [x] Support vertex attribute export.
-- [ ] Restore and test global attribute export.
+- [x] Restore and test global attribute export.
 - [x] Verify primitive string and integer attribute export for polygon runs.
 - [ ] Support attribute packing layouts comprehensively.
 - [ ] Support constant-page encodings comprehensively.
@@ -200,9 +200,9 @@ tests/fixtures/
 
 - [x] Import Houdini 21/22 `Polygon_run` records with run-length vertex counts.
 - [ ] Import all stored polygon primitive groups rather than only the first one.
-- [ ] Support mixed triangle and quad meshes without throwing.
+- [x] Support mixed triangle and quad meshes without throwing.
 - [ ] Support arbitrary n-gons in the simplified conversion or return multiple geometry objects.
-- [ ] Preserve open and closed polygon state.
+- [x] Preserve open and closed polygon state.
 - [ ] Preserve face-varying attributes in a lossless representation.
 - [ ] Define a conversion result that can report splits, losses, and unsupported data.
 

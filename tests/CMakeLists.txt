@@ -16,6 +16,11 @@ target_link_libraries(houio_test_modern_geometry PRIVATE houio::houio)
 target_compile_features(houio_test_modern_geometry PRIVATE cxx_std_20)
 add_test(NAME houio.modern_geometry COMMAND houio_test_modern_geometry)
 
+add_executable(houio_test_polygon_runs test_polygon_runs.cpp)
+target_link_libraries(houio_test_polygon_runs PRIVATE houio::houio)
+target_compile_features(houio_test_polygon_runs PRIVATE cxx_std_20)
+add_test(NAME houio.polygon_runs COMMAND houio_test_polygon_runs)
+
 add_executable(houio_test_export_safety test_export_safety.cpp)
 target_link_libraries(houio_test_export_safety PRIVATE houio::houio Threads::Threads)
 target_compile_features(houio_test_export_safety PRIVATE cxx_std_20)
@@ -58,6 +63,66 @@ if(HOUIO_HYTHON_EXECUTABLE)
         message(FATAL_ERROR "HOUIO_HYTHON_EXECUTABLE does not exist: ${HOUIO_HYTHON_EXECUTABLE}")
     endif()
 
+    set(HOUIO_FIXTURE_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/fixtures")
+    set(HOUIO_FIXTURE_SOURCE_DIR "${HOUIO_FIXTURE_TEST_DIR}/source")
+    set(HOUIO_FIXTURE_OUTPUT_DIR "${HOUIO_FIXTURE_TEST_DIR}/output")
+    set(HOUIO_FIXTURE_MANIFEST "${HOUIO_FIXTURE_SOURCE_DIR}/manifest.json")
+    set(
+        HOUIO_FIXTURE_NAMES
+        empty
+        point_attributes
+        triangles
+        quads
+        mixed_polygons
+        ngon
+        open_polygon
+        uv_seam
+        multiple_polygon_runs
+        global_attributes
+        primitive_groups
+    )
+
+    add_test(
+        NAME houio.fixtures.generate
+        COMMAND
+            "${HOUIO_HYTHON_EXECUTABLE}"
+            "${PROJECT_SOURCE_DIR}/tools/houdini/generate_fixture_suite.py"
+            "${HOUIO_FIXTURE_SOURCE_DIR}"
+    )
+    set_tests_properties(houio.fixtures.generate PROPERTIES FIXTURES_SETUP houio_fixture_sources)
+
+    set(HOUIO_FIXTURE_ROUNDTRIP_TESTS)
+    foreach(HOUIO_FIXTURE_NAME IN LISTS HOUIO_FIXTURE_NAMES)
+        set(HOUIO_FIXTURE_SOURCE "${HOUIO_FIXTURE_SOURCE_DIR}/${HOUIO_FIXTURE_NAME}.bgeo")
+        set(HOUIO_FIXTURE_OUTPUT "${HOUIO_FIXTURE_OUTPUT_DIR}/${HOUIO_FIXTURE_NAME}.bgeo")
+        set(HOUIO_FIXTURE_TEST_NAME "houio.fixtures.${HOUIO_FIXTURE_NAME}.roundtrip")
+        add_test(
+            NAME "${HOUIO_FIXTURE_TEST_NAME}"
+            COMMAND $<TARGET_FILE:houio_roundtrip_geometry> "${HOUIO_FIXTURE_SOURCE}" "${HOUIO_FIXTURE_OUTPUT}"
+        )
+        set_tests_properties(
+            "${HOUIO_FIXTURE_TEST_NAME}"
+            PROPERTIES FIXTURES_REQUIRED houio_fixture_sources
+        )
+        list(APPEND HOUIO_FIXTURE_ROUNDTRIP_TESTS "${HOUIO_FIXTURE_TEST_NAME}")
+    endforeach()
+
+    add_test(
+        NAME houio.fixtures.validate
+        COMMAND
+            "${HOUIO_HYTHON_EXECUTABLE}"
+            "${PROJECT_SOURCE_DIR}/tools/houdini/validate_fixture_suite.py"
+            "${HOUIO_FIXTURE_MANIFEST}"
+            "${HOUIO_FIXTURE_SOURCE_DIR}"
+            "${HOUIO_FIXTURE_OUTPUT_DIR}"
+    )
+    set_tests_properties(
+        houio.fixtures.validate
+        PROPERTIES
+            FIXTURES_REQUIRED houio_fixture_sources
+            DEPENDS "${HOUIO_FIXTURE_ROUNDTRIP_TESTS}"
+    )
+
     set(HOUIO_CRAG_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/crag")
     set(HOUIO_CRAG_SOURCE "${HOUIO_CRAG_TEST_DIR}/crag_tpose.bgeo")
     set(HOUIO_CRAG_OUTPUT "${HOUIO_CRAG_TEST_DIR}/crag_tpose_houio.bgeo")
@@ -94,6 +159,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
             --vertex-attribute uv
             --primitive-string-attribute name
             --primitive-int-attribute piece
+            --topology
     )
     set_tests_properties(houio.crag.compare PROPERTIES FIXTURES_REQUIRED houio_crag_output)
 

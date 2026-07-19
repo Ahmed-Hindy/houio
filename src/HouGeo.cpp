@@ -797,7 +797,10 @@ namespace houio
 			loadPolyPrimitive( toObject(primitive->getArray(1)) );
 		else
 		if( primitiveType=="Polygon_run" || primitiveType=="p_r" )
-			loadPolygonRun( toObject(primitive->getArray(1)) );
+			loadPolygonRun( toObject(primitive->getArray(1)), true );
+		else
+		if( primitiveType=="PolygonCurve_run" || primitiveType=="c_r" )
+			loadPolygonRun( toObject(primitive->getArray(1)), false );
 		else
 		if( (primitiveType=="run")&&(primdef->hasKey("runtype")) )
 		{
@@ -1065,6 +1068,7 @@ namespace houio
 	void HouGeo::loadPolyPrimitive( json::ObjectPtr poly )
 	{
 		HouPoly::Ptr pol = std::make_shared<HouPoly>();
+		pol->m_closed = poly->get<bool>("closed", true);
 
 		if( !m_topology )
 			throw std::runtime_error( "HouGeo::loadPolyPrimitive expects topology to be loaded already!" );
@@ -1102,7 +1106,7 @@ namespace houio
 		m_primitives.push_back( pol );
 	}
 
-	void HouGeo::loadPolygonRun( json::ObjectPtr polygonRun )
+	void HouGeo::loadPolygonRun( json::ObjectPtr polygonRun, bool closed )
 	{
 		if( !m_topology )
 			throw std::runtime_error( "HouGeo::loadPolygonRun expects topology to be loaded already" );
@@ -1110,26 +1114,32 @@ namespace houio
 		const std::string startVertexKey = polygonRun->hasKey("startvertex") ? "startvertex" : "s_v";
 		const std::string primitiveCountKey = polygonRun->hasKey("nprimitives") ? "nprimitives" : "n_p";
 		const std::string runLengthKey = polygonRun->hasKey("nvertices_rle") ? "nvertices_rle" : "r_v";
-		if( !polygonRun->hasKey(startVertexKey) || !polygonRun->hasKey(primitiveCountKey) || !polygonRun->hasKey(runLengthKey) )
+		const std::string vertexCountsKey = polygonRun->hasKey("nvertices") ? "nvertices" : "n_v";
+		const bool hasRunLengthData = polygonRun->hasKey(runLengthKey);
+		const bool hasVertexCounts = polygonRun->hasKey(vertexCountsKey);
+		if( !polygonRun->hasKey(startVertexKey) || !polygonRun->hasKey(primitiveCountKey)
+			|| (!hasRunLengthData && !hasVertexCounts) )
 			throw std::runtime_error( "HouGeo::loadPolygonRun missing required fields" );
 
 		const int startVertex = polygonRun->get<int>(startVertexKey, -1);
 		const int expectedPrimitiveCount = polygonRun->get<int>(primitiveCountKey, -1);
-		json::ArrayPtr runLengthData = polygonRun->getArray(runLengthKey);
-		if( startVertex < 0 || expectedPrimitiveCount < 0 || !runLengthData || (runLengthData->size() % 2) != 0 )
+		json::ArrayPtr vertexCountData = polygonRun->getArray(hasRunLengthData ? runLengthKey : vertexCountsKey);
+		if( startVertex < 0 || expectedPrimitiveCount < 0 || !vertexCountData )
 			throw std::runtime_error( "HouGeo::loadPolygonRun invalid run metadata" );
+		if( hasRunLengthData && (vertexCountData->size() % 2) != 0 )
+			throw std::runtime_error( "HouGeo::loadPolygonRun invalid run-length data" );
+		if( !hasRunLengthData && hasVertexCounts && vertexCountData->size() != expectedPrimitiveCount )
+			throw std::runtime_error( "HouGeo::loadPolygonRun vertex-count array length mismatch" );
 
 		HouPoly::Ptr pol = std::make_shared<HouPoly>();
-		pol->m_closed = true;
+		pol->m_closed = polygonRun->get<bool>("closed", closed);
 
 		size_t topologyIndex = static_cast<size_t>(startVertex);
 		int primitiveCount = 0;
-		for( sint64 i=0;i<runLengthData->size();i+=2 )
+		auto appendPolygons = [&]( int verticesPerPrimitive, int repetitionCount )
 		{
-			const int verticesPerPrimitive = runLengthData->get<int>((int)i);
-			const int repetitionCount = runLengthData->get<int>((int)i+1);
 			if( verticesPerPrimitive <= 0 || repetitionCount <= 0 )
-				throw std::runtime_error( "HouGeo::loadPolygonRun invalid run-length pair" );
+				throw std::runtime_error( "HouGeo::loadPolygonRun invalid vertex-count data" );
 
 			for( int repetition=0;repetition<repetitionCount;++repetition )
 			{
@@ -1143,6 +1153,17 @@ namespace houio
 					pol->m_vertices.push_back(m_topology->indexBuffer[topologyIndex]);
 				++primitiveCount;
 			}
+		};
+
+		if( hasRunLengthData )
+		{
+			for( sint64 i=0;i<vertexCountData->size();i+=2 )
+				appendPolygons(vertexCountData->get<int>((int)i), vertexCountData->get<int>((int)i+1));
+		}
+		else
+		{
+			for( sint64 i=0;i<vertexCountData->size();++i )
+				appendPolygons(vertexCountData->get<int>((int)i), 1);
 		}
 
 		if( primitiveCount != expectedPrimitiveCount )

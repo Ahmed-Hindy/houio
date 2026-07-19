@@ -82,11 +82,11 @@ namespace houio
 			virtual int                                       numVertices( int poly )const override;
 			virtual int const*                                vertices(int poly=0)const override;
 			virtual bool                                      closed()const override;
-			int                                               m_numPolys;
+			int                                               m_numPolys = 0;
 			std::vector<int>                                  m_perPolyVertexCount; // holds number of vertices for each polygon
 			std::vector<int>                                  m_perPolyVertexListOffset; // holds offset into m_vertices per poly
 			std::vector<int>                                  m_vertices; // vertex indicess for each vertex
-			bool                                              m_closed;
+			bool                                              m_closed = true;
 		};
 
 
@@ -135,7 +135,7 @@ namespace houio
 		void                                                 loadVolumePrimitive( json::ObjectPtr volume, SharedPrimitiveData& sharedPrimitiveData );
 		void                                                 loadPolyPrimitive( json::ObjectPtr poly );
 		void                                                 loadPolyPrimitiveRun( json::ObjectPtr def, json::ArrayPtr run );
-		void                                                 loadPolygonRun( json::ObjectPtr polygonRun );
+		void                                                 loadPolygonRun( json::ObjectPtr polygonRun, bool closed=true );
 
 		void                                                 loadVoxelData( json::ObjectPtr voxels, const math::V3i& res, float* volData );
 

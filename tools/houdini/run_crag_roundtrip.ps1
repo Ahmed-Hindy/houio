@@ -106,7 +106,8 @@ foreach ($validationVersion in $ValidationVersions) {
         "--primitive-string-attribute",
         "name",
         "--primitive-int-attribute",
-        "piece"
+        "piece",
+        "--topology"
     )
 }
 
