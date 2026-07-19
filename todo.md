@@ -122,9 +122,9 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Initialize all `HouPoly` members deterministically.
 - [x] Load and preserve polygon closed state where present.
 - [x] Verify `Polygon_run` vertex indexing against static Houdini 21/22 Crag geometry.
-- [ ] Verify point-count behavior when no point attributes exist.
-- [ ] Check every `dynamic_pointer_cast` result before dereferencing it.
-- [ ] Avoid inserting null attributes into `Geometry`.
+- [x] Verify point-count behavior when no point attributes exist.
+- [x] Check every active `dynamic_pointer_cast` result before dereferencing it.
+- [x] Avoid inserting null attributes into `Geometry`.
 - [x] Verify 16-bit topology export rejects negative indices and promotes large indices to 32-bit storage.
 - [x] Verify dense-volume matrix conventions, multiplication order, and transforms through Houdini 21/22 round-trips.
 
@@ -132,7 +132,7 @@ The priority labels indicate dependency order rather than estimated effort.
 
 - [ ] Document ownership for every stream, pointer, and returned object.
 - [ ] Document supported primitive and attribute types.
-- [ ] Document lossy behavior in `convertToGeometry()`.
+- [x] Document lossy behavior in `convertToGeometry()`.
 - [x] Document exception and null-return behavior.
 - [ ] Add small compilable examples for import, export, logging, and custom adapters.
 - [ ] Decide whether to preserve the historical `xport` spelling or add a compatible `exportGeometry` API.
@@ -251,13 +251,13 @@ Add each type only with representative Houdini 21 fixtures and tests.
 
 ### `Geometry`
 
-- [ ] Mark `Geometry` explicitly as a lossy convenience representation in API docs.
+- [x] Mark `Geometry` explicitly as a lossy convenience representation in API docs.
 - [ ] Separate point and vertex attribute domains or introduce a second lossless mesh type.
 - [ ] Support mixed primitive groups.
 - [ ] Remove OpenGL-specific buffer identifiers from the file-format library or isolate them behind an optional module.
 - [ ] Add const-correct accessors.
 - [ ] Hide mutable implementation members where possible.
-- [ ] Validate attribute element counts against geometry counts.
+- [x] Validate converted point and vertex attribute element counts against geometry domains.
 
 ### `Attribute`
 

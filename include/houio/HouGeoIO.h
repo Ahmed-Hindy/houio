@@ -18,7 +18,9 @@ namespace houio
 		static ScalarField::Ptr                 importVolume(const std::string &path, DiagnosticList *diagnostics);
 		static void                             makeLog( const std::string &path, std::ostream *out );
 
-		static Geometry::Ptr                    convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim ); // converts primitive with the given index to geometry
+		// Lossy convenience conversion. Requires P, one fixed polygon size, and domain-consistent attributes.
+		// Vertex attributes are flattened to points by duplicating points where values differ.
+		static Geometry::Ptr                    convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim );
 		static Geometry::Ptr                    convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim, DiagnosticList *diagnostics );
 
 		static bool                             xport( const std::string& filename, ScalarField::Ptr volume ); // convinience funcion for quickly saving volume to bgeo

@@ -2,6 +2,8 @@
 #include <houio/math/Math.h>
 #include <iostream>
 #include <cstring>
+#include <limits>
+#include <stdexcept>
 
 
 //#include <util/tuple.h>
@@ -37,6 +39,10 @@ namespace houio
 
 	void Geometry::setAttr( const std::string &name, Attribute::Ptr attr )
 	{
+		if( name.empty() )
+			throw std::invalid_argument( "Geometry::setAttr requires a non-empty name" );
+		if( !attr )
+			throw std::invalid_argument( "Geometry::setAttr received a null attribute" );
 		m_attributes[name] = attr;
 	}
 
@@ -147,14 +153,30 @@ namespace houio
 	// duplicates point and returns index of duplicate (all attributes are copied etc.)
 	unsigned int Geometry::duplicatePoint( unsigned int index )
 	{
-		int newIndex = getAttr("P")->numElements();
-		for( std::map< std::string, Attribute::Ptr >::iterator it = m_attributes.begin(); it != m_attributes.end(); ++it )
+		Attribute::Ptr positions = getAttr("P");
+		if( !positions )
+			throw std::runtime_error( "Geometry::duplicatePoint requires a P attribute" );
+		const int pointCount = positions->numElements();
+		if( index >= static_cast<unsigned int>(pointCount) )
+			throw std::out_of_range( "Geometry::duplicatePoint index is out of range" );
+		if( pointCount == std::numeric_limits<int>::max() )
+			throw std::overflow_error( "Geometry::duplicatePoint exceeds the supported point range" );
+		const int newIndex = pointCount;
+		for( auto &entry : m_attributes )
 		{
-			Attribute::Ptr attr = it->second;
-			attr->resize( newIndex+1 );
-			memcpy( attr->getRawPointer(newIndex), attr->getRawPointer(index), attr->numComponents()*attr->elementComponentSize() );
+			Attribute::Ptr attr = entry.second;
+			if( !attr )
+				throw std::runtime_error( "Geometry::duplicatePoint encountered a null attribute" );
+			if( attr->numElements() != pointCount )
+				throw std::runtime_error( "Geometry::duplicatePoint attribute counts are inconsistent" );
+			const size_t elementBytes = static_cast<size_t>(attr->numComponents())
+				* static_cast<size_t>(attr->elementComponentSize());
+			std::vector<unsigned char> sourceValue(elementBytes);
+			std::memcpy(sourceValue.data(), attr->getRawPointer(static_cast<int>(index)), elementBytes);
+			attr->resize(static_cast<size_t>(newIndex) + 1);
+			std::memcpy(attr->getRawPointer(newIndex), sourceValue.data(), elementBytes);
 		}
-		return newIndex;
+		return static_cast<unsigned int>(newIndex);
 	}
 
 	void Geometry::transform( const math::M44f& tm )

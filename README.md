@@ -69,7 +69,7 @@ if (!geometry)
 }
 ```
 
-`importGeometry()` converts the first supported polygon primitive representation into HouIO's simplified `Geometry` class. Use the lower-level API when you need to preserve Houdini attribute domains or inspect multiple primitives.
+`importGeometry()` performs a deliberately lossy conversion of the first supported polygon primitive representation into HouIO's simplified `Geometry` class. It requires a point `P` value for every declared point, one fixed polygon size, valid point references, and attribute element counts that match their owner domains. Use the lower-level API when you need to preserve Houdini attribute domains, mixed polygon sizes, unsupported attributes, groups, or multiple primitive records.
 
 ### Read the Houdini-oriented representation
 
@@ -221,7 +221,7 @@ The simplified `Geometry` class supports one primitive type per object:
 - Quads
 - Polygons
 
-Conversion to `Geometry` is intentionally render-oriented. Face-varying vertex attributes are converted into point attributes by duplicating points at discontinuities such as UV seams.
+Conversion to `Geometry` is intentionally render-oriented and lossy. Face-varying vertex attributes are converted into point attributes by duplicating points at discontinuities such as UV seams. Primitive and global attributes, groups, mixed polygon sizes, arbitrary n-gons, and unsupported numeric storage types are not represented by this convenience model. Diagnostics-aware conversion rejects missing `P`, inconsistent domain counts, malformed polygon tables, and out-of-range point references rather than returning partially valid geometry.
 
 ## Houdini 21/22 minimal fixture matrix
 
