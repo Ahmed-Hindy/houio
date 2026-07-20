@@ -196,7 +196,7 @@ namespace houio
 			void                 validateTrailingInput();
 			void validateUniformArrayPayload( Token::Type type, sint64 elementCount );
 			bool                  readToken( Token &t );
-			bool            readBinaryToken( Token &t, ubyte test = 0xff );
+			bool            readBinaryToken( Token &t, ubyte test );
 			bool     readASCIIToken( Token &t, char c );
 			bool           readBinaryStringDefinition();
 			bool                       undefineString();

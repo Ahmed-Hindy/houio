@@ -15,6 +15,44 @@ namespace houio
 {
 	namespace json
 	{
+		namespace
+		{
+			bool isDefinedTokenType( ubyte value )
+			{
+				switch( value )
+				{
+				case Token::JID_NULL:
+				case Token::JID_MAP_BEGIN:
+				case Token::JID_MAP_END:
+				case Token::JID_ARRAY_BEGIN:
+				case Token::JID_ARRAY_END:
+				case Token::JID_BOOL:
+				case Token::JID_INT8:
+				case Token::JID_INT16:
+				case Token::JID_INT32:
+				case Token::JID_INT64:
+				case Token::JID_REAL16:
+				case Token::JID_REAL32:
+				case Token::JID_REAL64:
+				case Token::JID_UINT8:
+				case Token::JID_UINT16:
+				case Token::JID_STRING:
+				case Token::JID_FALSE:
+				case Token::JID_TRUE:
+				case Token::JID_TOKENDEF:
+				case Token::JID_TOKENREF:
+				case Token::JID_TOKENUNDEF:
+				case Token::JID_UNIFORM_ARRAY:
+				case Token::JID_KEY_SEPARATOR:
+				case Token::JID_VALUE_SEPARATOR:
+				case Token::JID_MAGIC:
+					return true;
+				default:
+					return false;
+				}
+			}
+		}
+
 		// Token ==================================================
 		Token::Token() : type(JID_NULL), value(0), uaType(JID_NULL)
 		{
@@ -476,7 +514,6 @@ namespace houio
 			}else
 				if( binary )
 				{
-					t.type = (Token::Type)c;
 					return readBinaryToken( t, c );
 				}
 				else
@@ -485,15 +522,28 @@ namespace houio
 			return true;
 		}
 
-		bool Parser::readBinaryToken( Token &t, ubyte )
+		bool Parser::readBinaryToken( Token &t, ubyte test )
 		{
+			auto assignTokenType = [&]( ubyte value, sint64 offset )
+			{
+				if( !isDefinedTokenType(value) )
+				{
+					std::ostringstream message;
+					message << "Parser encountered unknown binary token id " << static_cast<int>(value);
+					fail(DiagnosticCategory::malformed_input, message.str(), offset);
+				}
+				t.type = static_cast<Token::Type>(value);
+			};
+
+			assignTokenType(test, tokenOffset);
 			while( (t.type == Token::JID_TOKENDEF) || (t.type == Token::JID_TOKENUNDEF) )
 			{
 				if(t.type == Token::JID_TOKENDEF)
 					readBinaryStringDefinition();
 				else
 					undefineString();
-				t.type = (Token::Type)read<ubyte>();
+				const ubyte nextToken = read<ubyte>();
+				assignTokenType(nextToken, byteOffset - 1);
 			};
 
 			switch( t.type )
