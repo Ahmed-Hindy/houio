@@ -61,6 +61,11 @@ target_link_libraries(houio_test_export_safety PRIVATE houio::houio Threads::Thr
 target_compile_features(houio_test_export_safety PRIVATE cxx_std_20)
 add_test(NAME houio.export_safety COMMAND houio_test_export_safety)
 
+add_executable(houio_test_geometry_io test_geometry_io.cpp)
+target_link_libraries(houio_test_geometry_io PRIVATE houio::houio)
+target_compile_features(houio_test_geometry_io PRIVATE cxx_std_20)
+add_test(NAME houio.geometry_io COMMAND houio_test_geometry_io)
+
 add_test(
     NAME houio.package_consumer
     COMMAND
@@ -71,6 +76,7 @@ add_test(
         "-DHOUIO_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
         "-DHOUIO_BUILD_CONFIG=$<CONFIG>"
         "-DHOUIO_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+        "-DHOUIO_EXPECT_TOOLS=${HOUIO_BUILD_TOOLS}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package_consumer.cmake"
 )
 
@@ -90,12 +96,41 @@ if(HOUIO_BUILD_EXAMPLES)
     add_executable(houio_example_readwrite example_readwrite.cpp)
     target_link_libraries(houio_example_readwrite PRIVATE houio::houio)
     target_compile_features(houio_example_readwrite PRIVATE cxx_std_20)
-    target_compile_definitions(houio_example_readwrite PRIVATE TESTS_FILE_PATH="${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 if(HOUIO_HYTHON_EXECUTABLE)
     if(NOT EXISTS "${HOUIO_HYTHON_EXECUTABLE}")
         message(FATAL_ERROR "HOUIO_HYTHON_EXECUTABLE does not exist: ${HOUIO_HYTHON_EXECUTABLE}")
+    endif()
+
+    get_filename_component(HOUIO_HYTHON_BIN_DIR "${HOUIO_HYTHON_EXECUTABLE}" DIRECTORY)
+    if(WIN32)
+        set(HOUIO_HYTHON_BLOSC_LIBRARY "${HOUIO_HYTHON_BIN_DIR}/blosc.dll")
+    elseif(APPLE)
+        set(HOUIO_HYTHON_BLOSC_LIBRARY "${HOUIO_HYTHON_BIN_DIR}/../Frameworks/libblosc.dylib")
+    else()
+        set(HOUIO_HYTHON_BLOSC_LIBRARY "libblosc.so.1")
+    endif()
+
+    set_tests_properties(
+        houio.geometry_io
+        PROPERTIES ENVIRONMENT "HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
+    )
+
+    if(TARGET houio_convert)
+        add_test(
+            NAME houio.hom_bridge
+            COMMAND
+                "${HOUIO_HYTHON_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tools/houdini/test_hom_bridge.py"
+                "${CMAKE_CURRENT_BINARY_DIR}/hom_bridge"
+        )
+        set_tests_properties(
+            houio.hom_bridge
+            PROPERTIES
+                ENVIRONMENT "HOUIO_CONVERT_EXECUTABLE=$<TARGET_FILE:houio_convert>;HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
+                ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
+        )
     endif()
 
     set(HOUIO_FIXTURE_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/fixtures")
@@ -144,6 +179,86 @@ if(HOUIO_HYTHON_EXECUTABLE)
         )
         list(APPEND HOUIO_FIXTURE_ROUNDTRIP_TESTS "${HOUIO_FIXTURE_TEST_NAME}")
     endforeach()
+
+    add_test(
+        NAME houio.fixtures.triangles.scf_roundtrip
+        COMMAND
+            $<TARGET_FILE:houio_roundtrip_geometry>
+            "${HOUIO_FIXTURE_SOURCE_DIR}/triangles.bgeo"
+            "${HOUIO_FIXTURE_OUTPUT_DIR}/triangles.bgeo.sc"
+    )
+    set_tests_properties(
+        houio.fixtures.triangles.scf_roundtrip
+        PROPERTIES
+            FIXTURES_REQUIRED houio_fixture_sources
+            FIXTURES_SETUP houio_triangle_scf_output
+            ENVIRONMENT "HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
+    )
+
+    add_test(
+        NAME houio.fixtures.triangles.scf_validate
+        COMMAND
+            "${HOUIO_HYTHON_EXECUTABLE}"
+            "${PROJECT_SOURCE_DIR}/tools/houdini/compare_geometry.py"
+            "${HOUIO_FIXTURE_SOURCE_DIR}/triangles.bgeo"
+            "${HOUIO_FIXTURE_OUTPUT_DIR}/triangles.bgeo.sc"
+            --point-attribute P
+            --topology
+    )
+    set_tests_properties(
+        houio.fixtures.triangles.scf_validate
+        PROPERTIES
+            FIXTURES_REQUIRED "houio_fixture_sources;houio_triangle_scf_output"
+    )
+
+    if(TARGET houio_convert)
+        add_test(
+            NAME houio.fixtures.triangles.houdini_scf_generate
+            COMMAND
+                "${HOUIO_HYTHON_EXECUTABLE}"
+                -m houio_hom encode
+                "${HOUIO_FIXTURE_SOURCE_DIR}/triangles.bgeo"
+                "${HOUIO_FIXTURE_SOURCE_DIR}/triangles_houdini.bgeo.sc"
+        )
+        set_tests_properties(
+            houio.fixtures.triangles.houdini_scf_generate
+            PROPERTIES
+                FIXTURES_REQUIRED houio_fixture_sources
+                FIXTURES_SETUP houio_houdini_scf_source
+                ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
+        )
+
+        add_test(
+            NAME houio.fixtures.triangles.houdini_scf_read
+            COMMAND
+                $<TARGET_FILE:houio_convert>
+                "${HOUIO_FIXTURE_SOURCE_DIR}/triangles_houdini.bgeo.sc"
+                "${HOUIO_FIXTURE_OUTPUT_DIR}/triangles_houdini_scf.bgeo"
+        )
+        set_tests_properties(
+            houio.fixtures.triangles.houdini_scf_read
+            PROPERTIES
+                FIXTURES_REQUIRED houio_houdini_scf_source
+                FIXTURES_SETUP houio_houdini_scf_output
+                ENVIRONMENT "HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
+        )
+
+        add_test(
+            NAME houio.fixtures.triangles.houdini_scf_validate
+            COMMAND
+                "${HOUIO_HYTHON_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tools/houdini/compare_geometry.py"
+                "${HOUIO_FIXTURE_SOURCE_DIR}/triangles.bgeo"
+                "${HOUIO_FIXTURE_OUTPUT_DIR}/triangles_houdini_scf.bgeo"
+                --point-attribute P
+                --topology
+        )
+        set_tests_properties(
+            houio.fixtures.triangles.houdini_scf_validate
+            PROPERTIES
+                FIXTURES_REQUIRED "houio_fixture_sources;houio_houdini_scf_output"
+        )
+    endif()
 
     add_test(
         NAME houio.fixtures.validate

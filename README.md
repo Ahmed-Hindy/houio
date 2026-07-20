@@ -2,10 +2,11 @@
 
 HouIO is a small C++20 library for reading and writing Houdini geometry files without linking against Houdini or the Houdini Development Kit.
 
-It implements SideFX's JSON-based geometry encoding used by:
+It implements SideFX's JSON-based geometry encoding and the Seekable Compressed Format wrapper used by:
 
 - `.geo` ASCII geometry files
 - `.bgeo` binary geometry files
+- `.bgeo.sc` Blosc-compressed geometry files
 
 HouIO is a standalone file-format library. It is **not** a Houdini plug-in, does not load `.hip` or `.hipnc` scene files, and does not require a Houdini installation at runtime.
 
@@ -18,10 +19,10 @@ HouIO should currently be treated as an experimental legacy library rather than 
 
 - The included geometry fixtures identify themselves as Houdini `13.0.288` files.
 - The latest upstream commit is from 2020.
-- A static Crag round-trip and an 11-case minimal geometry matrix have been validated with Houdini `21.0.631` and `22.0.368`.
-- Polygon and legacy dense-volume paths are the best-developed areas.
-- Packed geometry, VDBs, curves, agents, height fields, and most modern primitive types are not supported.
-- `.bgeo.sc` compression is not handled.
+- A static Crag round-trip and a 14-case minimal geometry matrix have been validated with Houdini `21.0.631` and `22.0.368`.
+- Polygon, `.bgeo.sc`, and legacy dense-volume paths are the best-developed areas.
+- Packed geometry, native OpenVDB primitives, curves, agents, height fields, and most modern primitive types are not supported by the standalone C++ model.
+- The optional HOM bridge converts scalar `.vdb` files to and from HouIO's dense-volume representation inside Houdini.
 
 See [todo.md](todo.md) for the modernization plan.
 
@@ -33,9 +34,13 @@ See [todo.md](todo.md) for the modernization plan.
 - Preserve unordered point, vertex, and primitive groups.
 - Read legacy polygon runs, Houdini 21/22 `Polygon_run` records, and open `PolygonCurve_run` records.
 - Read legacy dense Houdini volumes, including tiled and constant storage.
-- Write point, polygon, and dense-volume `.bgeo` files.
+- Read and write point, polygon, and dense-volume `.bgeo` and `.bgeo.sc` files.
+- Detect formats from both file extensions and stream signatures.
+- Return owned result objects with structured diagnostics and explicit success state.
 - Convert supported Houdini geometry into a lightweight render-oriented mesh representation.
+- Read all dense scalar volumes or use a first-volume convenience API with loss warnings.
 - Export custom geometry implementations through the `HouGeoAdapter` interface.
+- Use a Houdini 21/22 HOM package for `.vdb`, `.bgeo.sc`, Python SOP, shelf-tool, and headless hython workflows.
 
 ## Repository layout
 
@@ -45,6 +50,8 @@ include/ttl/         Vendored variant and template utilities
 src/                 Library implementation
 src/math/            Math implementation
 tests/               Unit, packaging, and Houdini integration tests
+tools/               Installed converter and Houdini validation utilities
+python/houio_hom/    Houdini Object Model bridge package
 scene_exporter/      Separate legacy Houdini Python 2 scene exporter
 cmake/               CMake package configuration
 ```
@@ -55,44 +62,57 @@ For a practical introduction to the codebase, see [onboard.md](onboard.md).
 
 ## Quick API examples
 
-### Read geometry
+### Read geometry with owned diagnostics
 
 ```cpp
-#include <houio/HouGeoIO.h>
+#include <houio/GeometryIO.h>
 
-houio::Geometry::Ptr geometry =
-    houio::HouGeoIO::importGeometry("mesh.bgeo");
+const houio::GeometryReadResult<houio::HouGeo::Ptr> result =
+    houio::GeometryIO::readHouGeo("mesh.bgeo.sc");
 
-if (!geometry)
+if (!result)
 {
-    // Handle the import failure.
+    for (const houio::Diagnostic& diagnostic : result.diagnostics)
+    {
+        // Log category, message, byteOffset, and semantic path.
+    }
 }
 ```
 
-`importGeometry()` performs a deliberately lossy conversion of the first supported polygon primitive representation into HouIO's simplified `Geometry` class. It requires a point `P` value for every declared point, one fixed polygon size, valid point references, and attribute element counts that match their owner domains. Use the lower-level API when you need to preserve Houdini attribute domains, mixed polygon sizes, unsupported attributes, groups, or multiple primitive records.
+`GeometryIO` is the preferred path-based API. Result objects own their diagnostics, expose explicit success state, and do not require output pointers. The returned `std::shared_ptr` owns the parsed geometry independently of the input file and temporary decompression buffers. `GeometryReadOptions::maxFileBytes` defaults to 512 MiB for the on-disk container, while `parserLimits.maxInputBytes` independently bounds the raw or decompressed document.
 
-### Read the Houdini-oriented representation
+Use `readGeometry()` for the deliberately lossy render-oriented model. It requires point `P`, one fixed polygon size, valid point references, and domain-consistent attributes. Use `readHouGeo()` when mixed polygon sizes, primitive/global attributes, groups, multiple primitive records, or exact supported Houdini storage must survive.
+
+### Read dense volumes
 
 ```cpp
-#include <fstream>
-#include <houio/HouGeoIO.h>
-
-std::ifstream input("mesh.bgeo", std::ios::binary);
-houio::HouGeo::Ptr houdiniGeometry = houio::HouGeoIO::import(&input);
+const auto volumes = houio::GeometryIO::readVolumes("fields.bgeo.sc");
+if (volumes)
+{
+    for (const houio::ScalarField::Ptr& field : volumes.value)
+    {
+        // Every returned field is independently owned by the parsed HouGeo.
+    }
+}
 ```
+
+`readVolume()` is a convenience wrapper that returns the first dense scalar volume. It emits a conversion warning when the file contains additional volumes.
 
 ### Write geometry
 
 ```cpp
-#include <houio/HouGeoIO.h>
+#include <houio/GeometryIO.h>
 
 houio::Geometry::Ptr geometry = houio::Geometry::createTriangleGeometry();
 // Populate P, other attributes, and indices.
 
-bool exported = houio::HouGeoIO::exportGeometry("output.bgeo", geometry);
+const houio::GeometryWriteResult result =
+    houio::GeometryIO::writeGeometry("output.bgeo.sc", geometry);
 ```
 
-`exportGeometry()` and `exportVolume()` are the preferred public APIs. The historical `xport()` overloads remain as byte-identical compatibility wrappers. Every export owns its writer and explicit export context on the stack, so independent streams can be serialized concurrently without global or thread-local state. The `binary=false` path is explicitly unsupported and returns `false` without writing partial output.
+The output extension selects raw `.bgeo` or compressed `.bgeo.sc`. `GeometryWriteOptions` controls SCF block size, compression level, shuffling, compressor name, and an optional explicit C-Blosc library path.
+
+`HouGeoIO::importGeometry()`, `importVolume()`, `exportGeometry()`, `exportVolume()`, and the historical `xport()` overloads remain source-compatible wrappers. The no-diagnostics import overloads throw `DiagnosticException` on failure; overloads receiving a `DiagnosticList` append errors and return null. Stream-based serialization still uses an explicit stack-owned export context and supports independent concurrent streams. ASCII geometry export remains unsupported.
 
 ### Inspect a file's structure
 
@@ -143,7 +163,82 @@ for (const houio::Diagnostic& diagnostic : diagnostics)
 
 `DiagnosticCategory::malformed_input` identifies invalid stream encoding, while `unsupported_input` identifies valid records HouIO does not implement. Semantic failures use `schema`, file access uses `io`, and lossy convenience conversion warnings use `conversion`.
 
-The original overloads remain available. Parser failures continue to throw when no diagnostic list is supplied, while the diagnostics-aware overloads capture those failures and return null. `importGeometry()`, `importVolume()`, and `convertToGeometry()` also accept diagnostic lists. `importVolume()` now reports an empty primitive list instead of indexing it.
+The original overloads remain available. Parser and path-import failures throw `DiagnosticException` when no diagnostic list is supplied, while diagnostics-aware overloads capture those failures and return null. `importGeometry()`, `importVolume()`, and `convertToGeometry()` also accept diagnostic lists. `importVolume()` now reports an empty primitive list instead of indexing it.
+
+## `.bgeo.sc` support
+
+HouIO reads and writes SideFX's Seekable Compressed Format wrapper directly. The implementation validates the `scf1` header, metadata length, Blosc block headers, seek index, nominal and final block sizes, decompressed-size limit, and `1fcs` footer before passing the uncompressed bgeo payload to the existing parser.
+
+HouIO dynamically loads C-Blosc so the core library has no required compression link dependency. Resolution order is:
+
+1. `GeometryReadOptions::bloscLibraryPath` or `GeometryWriteOptions::bloscLibraryPath`.
+2. `HOUIO_BLOSC_LIBRARY`.
+3. `$HFS/bin/blosc.dll` on Windows.
+4. Standard platform library names such as `blosc.dll` or `libblosc.so.1`.
+
+Inside Houdini, the supplied package sets `HOUIO_BLOSC_LIBRARY` to the Blosc runtime shipped with the active Houdini version. Outside Houdini, install C-Blosc or pass its shared-library path explicitly.
+
+The installed converter can transcode directly:
+
+```powershell
+houio_convert input.bgeo.sc output.bgeo
+houio_convert input.bgeo output.bgeo.sc
+```
+
+Both directions are tested against Houdini-generated files, and Houdini 21 and 22 load HouIO-generated SCF output with exact tested topology and attributes.
+
+## Houdini HOM and `.vdb` workflows
+
+For an end-to-end Windows setup using Houdini 22, including build, package installation, Python Shell, shelf, Python SOP, `hython`, VDB, and troubleshooting examples, see [Using HouIO in Houdini 22 on Windows](docs/houdini-22-windows.md).
+
+The standalone C++ library does not link to Houdini's private OpenVDB build and does not yet model sparse OpenVDB trees natively. The `python/houio_hom` package provides the supported Houdini-side path:
+
+- Houdini reads and writes `.bgeo`, `.bgeo.sc`, `.geo`, and `.vdb` through HOM.
+- 32-bit float VDB grids can be converted to dense Houdini volumes with the `convertvdb` SOP verb before HouIO processing.
+- Dense HouIO volumes can be converted back to VDB grids before `.vdb` output.
+- `hou.Geometry.data()` and `hou.Geometry.load()` bridge uncompressed bgeo bytes without temporary Houdini nodes.
+- `houio_convert` can be launched from HOM without loading a Python extension into Houdini's process.
+
+Install the package for the current checkout:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\tools\houdini\install_hom_bridge.ps1
+```
+
+This writes `houio.json` under the user package directories for Houdini 21.0 and 22.0. It supports either a source checkout or an installed HouIO prefix, sets `HOUIO_ROOT` and `HOUIO_PYTHON_ROOT`, prepends the HOM package to `PYTHONPATH`, points `HOUIO_BLOSC_LIBRARY` at `$HFS/bin/blosc.dll`, and records `HOUIO_CONVERT_EXECUTABLE` when the converter is available. Use `-Uninstall` to remove those package files.
+
+### Python shell or shelf tool
+
+```python
+from houio_hom import convert_with_houio, load_for_houio
+
+# VDB is converted to a dense volume, processed by HouIO, then written as SCF.
+convert_with_houio("density.vdb", "density_houio.bgeo.sc")
+
+geometry = load_for_houio("density_houio.bgeo.sc", convert_vdb=False)
+print(len(geometry.prims()))
+```
+
+### Python SOP
+
+```python
+from houio_hom import roundtrip_current_sop
+
+# Replaces the writable Python SOP geometry with HouIO's round-trip output.
+# Float VDB primitives are explicitly densified before the subprocess call.
+roundtrip_current_sop(timeout_seconds=300.0)
+```
+
+### Headless hython
+
+```powershell
+hython -m houio_hom decode density.vdb density.bgeo
+hython -m houio_hom encode density.bgeo density.bgeo.sc
+hython -m houio_hom encode density.bgeo density.vdb
+```
+
+VDB conversion is deliberately bounded. VDB-to-volume conversion accepts 32-bit float grids and preserves unrelated primitives in mixed Houdini geometry. Volume-to-VDB conversion requires a pure dense-volume set because Houdini's `.vdb` writer silently omits mesh primitives. Sparse grids become dense in memory, so this path is intended for bounded fields, not large production VDBs. Converter subprocess calls default to a 300-second timeout, which can be changed or disabled per call.
 
 ## Building
 
@@ -157,7 +252,7 @@ cmake --build --preset windows-msvc-release
 ctest --preset windows-msvc-release
 ```
 
-The release preset uses Ninja, builds the tools and examples, and runs unit, package-consumer, and optional Houdini integration tests. Houdini integration tests are registered when `HOUIO_HYTHON_EXECUTABLE` points to an installed `hython.exe`.
+The release preset uses Ninja, builds the library, `houio_convert`, examples, and tests. Unit and package-consumer tests always run; HOM, SCF cross-compatibility, fixture, and Crag tests are registered when `HOUIO_HYTHON_EXECUTABLE` points to an installed `hython.exe`. Set `HOUIO_BUILD_TOOLS=OFF` when only the library is required.
 
 Linux and other GCC-based environments can use the matching C++20 preset:
 
@@ -185,7 +280,7 @@ find_package(houio 0.2 CONFIG REQUIRED)
 target_link_libraries(my_target PRIVATE houio::houio)
 ```
 
-`houio.package_consumer` validates this contract by installing to a clean temporary prefix, configuring an external project, building it through `find_package`, and running a geometry export/import round-trip. The same test runs in CI.
+The install includes the `houio::houio` CMake target, all public headers, and `bin/houio_convert` when tools are enabled. `houio.package_consumer` validates this contract by installing to a clean temporary prefix, configuring an external project, compiling against `GeometryIO.h`, and running a geometry export/import round-trip. The same test runs in CI.
 
 ## Supported data model
 
@@ -198,7 +293,7 @@ HouIO models these Houdini attribute domains:
 - Primitive
 - Global
 
-Numeric support is primarily focused on 32-bit float, 64-bit float, and 32-bit integer storage. String support is partial.
+Tested numeric storage includes signed Int32, signed Int64, Float16, Float32, and Float64. Numeric loading supports modern tuple/component arrays and validated legacy paged layouts, including constant-page compression and partial final pages. Indexed string tables are expanded and exported for the tested point, primitive, and global cases. Unsigned attribute storage and full semantic metadata are not yet modeled.
 
 ### Groups
 
@@ -271,7 +366,7 @@ The verified geometry contains 90,085 points, 359,794 vertices, and 89,942 polyg
 
 Houdini 21/22 encode this mesh with `Polygon_run` and run-length vertex counts. HouIO reads both run-length counts and direct per-primitive `nvertices`/`n_v` arrays. The writer emits modern polygon-run records with topology vertex offsets and promotes three-component `P` data to its four-component output representation.
 
-Modern Houdini binary `.bgeo` input is now covered for this geometry path. The missing compatibility feature was uniform signed-int8 arrays, used by compact binary `Polygon_run` run-length data. `.bgeo.sc` remains unsupported because HouIO does not implement its outer compression layer.
+Modern Houdini binary `.bgeo` input is covered for this geometry path. The missing geometry compatibility feature was uniform signed-int8 arrays, used by compact binary `Polygon_run` run-length data. The same parser and writer now operate transparently through the validated `.bgeo.sc` wrapper when C-Blosc is available.
 
 To register the same chain with CTest:
 
@@ -307,4 +402,5 @@ Recommended workflow:
 
 - [architecture.md](architecture.md) — modules, data flow, abstractions, and architectural risks
 - [onboard.md](onboard.md) — environment setup and code-reading path
+- [docs/houdini-22-windows.md](docs/houdini-22-windows.md) — complete Houdini 22 setup and usage on Windows
 - [todo.md](todo.md) — prioritized maintenance and compatibility work

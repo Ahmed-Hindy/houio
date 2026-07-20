@@ -13,6 +13,7 @@ include(CMakePackageConfigHelpers)
 
 option(HOUIO_BUILD_TESTS "Build HouIO tests" ${PROJECT_IS_TOP_LEVEL})
 option(HOUIO_BUILD_EXAMPLES "Build HouIO examples" ${PROJECT_IS_TOP_LEVEL})
+option(HOUIO_BUILD_TOOLS "Build HouIO command-line tools" ${PROJECT_IS_TOP_LEVEL})
 option(HOUIO_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(HOUIO_ENABLE_ADDRESS_SANITIZER "Enable AddressSanitizer instrumentation" OFF)
 set(HOUIO_HYTHON_EXECUTABLE "" CACHE FILEPATH "Optional hython executable for Houdini integration tests")
@@ -23,12 +24,14 @@ add_library(
     src/Attribute.cpp
     src/Field.cpp
     src/Geometry.cpp
+    src/GeometryIO.cpp
     src/HouGeo.cpp
     src/HouGeoAdapter.cpp
     src/HouGeoIO.cpp
     src/json.cpp
     src/math/Color.cpp
     src/math/Math.cpp
+    src/Scf.cpp
 )
 add_library(houio::houio ALIAS houio)
 
@@ -60,9 +63,18 @@ if(MSVC)
     endif()
 else()
     target_compile_options(houio PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion)
+    if(CMAKE_DL_LIBS)
+        target_link_libraries(houio PRIVATE ${CMAKE_DL_LIBS})
+    endif()
     if(HOUIO_WARNINGS_AS_ERRORS)
         target_compile_options(houio PRIVATE -Werror)
     endif()
+endif()
+
+if(HOUIO_BUILD_TOOLS)
+    add_executable(houio_convert tools/houio_convert.cpp)
+    target_link_libraries(houio_convert PRIVATE houio::houio)
+    target_compile_features(houio_convert PRIVATE cxx_std_20)
 endif()
 
 if(HOUIO_BUILD_TESTS)
@@ -79,6 +91,19 @@ install(
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(
+    DIRECTORY python/houio_hom
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/houio/python
+    PATTERN "__pycache__" EXCLUDE
+    PATTERN "*.pyc" EXCLUDE
+)
+install(
+    FILES tools/houdini/install_hom_bridge.ps1
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/houio/houdini
+)
+if(TARGET houio_convert)
+    install(TARGETS houio_convert RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 configure_package_config_file(
     cmake/houio-config.cmake.in

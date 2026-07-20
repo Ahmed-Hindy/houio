@@ -260,27 +260,32 @@ loadVolumePrimitive
 loadVoxelData
 ```
 
-### 5. `src/HouGeoIO.cpp`
+### 5. `include/houio/GeometryIO.h` and `src/GeometryIO.cpp`
 
-Trace the public workflows:
+Start with the preferred path-based workflows:
 
 ```text
-import
-importGeometry
-importVolume
-convertToGeometry
-exportGeometry / exportVolume
-xport compatibility wrappers
-makeLog
+detectFormat
+readHouGeo / readGeometry
+readVolume / readVolumes
+writeHouGeo / writeGeometry / writeVolume
 ```
+
+`GeometryIO` owns result diagnostics, detects raw versus SCF containers, and keeps file/decompression lifetime out of the semantic model.
+
+Then read `src/Scf.cpp` for the validated `scf1`/Blosc/index/`1fcs` wrapper and `src/HouGeoIO.cpp` for stream parsing, convenience adaptation, serializer helpers, and compatibility wrappers.
 
 Pay particular attention to assumptions in `convertToGeometry()`. It is a lossy convenience path: it requires `P`, one fixed polygon size, valid point references, and attribute counts matching their owner domains.
 
-### 6. `include/houio/HouGeoAdapter.h`
+### 6. `python/houio_hom/`
+
+Read this when integrating from Houdini rather than a standalone C++ process. The bridge uses HOM for file formats, strict VDB/dense-volume conversion, Python SOP geometry replacement, and a `houio_convert` subprocess so it remains compatible with both Houdini 21 and 22 Python ABIs.
+
+### 7. `include/houio/HouGeoAdapter.h`
 
 Read this before designing an integration. It is the intended abstraction for exporting a client-owned geometry representation.
 
-### 7. `Geometry`, `Attribute`, and `Field`
+### 8. `Geometry`, `Attribute`, and `Field`
 
 Treat these as convenience implementations:
 
@@ -295,12 +300,14 @@ They are not a complete model of Houdini geometry.
 When a file fails, capture structured diagnostics first, then use the generic logger when you need to inspect the decoded record stream.
 
 ```cpp
-houio::DiagnosticList diagnostics;
-std::ifstream input("problem.bgeo", std::ios::binary);
-houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input, &diagnostics);
-
-houio::HouGeoIO::makeLog("problem.bgeo", &std::cout);
+const auto result = houio::GeometryIO::readHouGeo("problem.bgeo.sc");
+for (const houio::Diagnostic& diagnostic : result.diagnostics)
+{
+    // Inspect category, byteOffset, path, and message.
+}
 ```
+
+For raw `.geo` or `.bgeo` parser inspection, `HouGeoIO::makeLog()` still prints the decoded token stream. Decode SCF first when logging a `.bgeo.sc` file.
 
 Parser diagnostics include byte offsets. Semantic diagnostics include paths such as `topology`, `attributes.pointattributes[0]`, or `primitives[2].definition.type`. Categories distinguish malformed input, unsupported input, schema errors, I/O failures, and convenience-conversion warnings.
 
@@ -316,7 +323,7 @@ Investigate:
 - Token identifiers
 - Length encodings
 - Uniform-array storage types
-- Truncation or outer compression
+- Truncation, invalid SCF framing, or unavailable C-Blosc runtime
 - Configured `ParserLimits` versus the observed total input, string, array, and nesting sizes
 - Undefined shared string-token references
 
@@ -345,7 +352,7 @@ case_name.geo
 case_name.bgeo
 ```
 
-Avoid `.bgeo.sc` initially because HouIO does not handle the outer compression wrapper.
+Add `.bgeo.sc` after the readable `.geo` and raw `.bgeo` pair. Wrapper tests should cover both directions: Houdini-written SCF read by HouIO and HouIO-written SCF validated by Houdini.
 
 Recommended fixture sequence:
 
@@ -359,10 +366,11 @@ Recommended fixture sequence:
 8. Point and primitive string attributes.
 9. Mixed triangles and quads.
 10. A dense scalar volume.
-11. Packed geometry.
-12. VDB geometry.
+11. The same triangle in `.bgeo.sc`.
+12. Packed geometry.
+13. VDB geometry through `houio_hom` conversion.
 
-The final cases are expected to expose unsupported paths. Tests should verify clean diagnostics rather than crashes.
+Packed geometry is expected to expose an unsupported core path. VDB tests should explicitly distinguish the unsupported native C++ sparse-grid path from the HOM-assisted dense-volume bridge.
 
 Keep fixtures minimal. Small ASCII files are easier to compare when a Houdini version changes the schema.
 
@@ -410,13 +418,21 @@ A JSON `Array` may store values in a packed uniform buffer rather than individua
 
 ## Known traps
 
-### `importGeometry()` is not a general importer
+### `readGeometry()` is not a general importer
 
-It selects the first stored primitive representation and only creates line, triangle, or quad geometry when the polygon vertex count is constant.
+It selects the first stored primitive representation and only creates line, triangle, or quad geometry when the polygon vertex count is constant. Use `readHouGeo()` for the lossless-as-supported model.
 
-### `importVolume()` requires a valid dense volume primitive
+### `readVolume()` may drop additional fields
 
-The diagnostics-aware overload reports empty primitive lists and non-volume first primitives through schema or unsupported-input diagnostics. Dense-volume loading also validates resolution, topology and `P` references, the transform tuple, tile count, tile payload sizes, and compression modes. The historical overload returns null for convenience-import failures.
+`readVolumes()` requires every primitive to be a supported dense scalar volume and returns all of them. `readVolume()` returns the first field and includes a conversion warning when more are present. Dense-volume loading validates resolution, topology and `P` references, transform tuples, tile counts, payload sizes, and compression modes.
+
+### SCF requires C-Blosc at runtime
+
+Raw `.geo` and `.bgeo` remain dependency-free. `.bgeo.sc` dynamically resolves C-Blosc from an explicit option, `HOUIO_BLOSC_LIBRARY`, `$HFS/bin/blosc.dll`, or a platform library name. Missing Blosc produces an `unsupported_input` diagnostic rather than a link or load crash.
+
+### Native VDB is intentionally unsupported
+
+`GeometryIO` detects `.vdb` and reports the HOM bridge requirement. `houio_hom` can explicitly densify 32-bit Float VDB grids while preserving unrelated Houdini primitives. Conversion back to `.vdb` requires a pure dense-volume set because Houdini's writer drops mesh primitives. Sparse grids may expand dramatically in memory, so do not use this bridge as a general OpenVDB replacement.
 
 ### Export uses an explicit context
 
@@ -426,9 +442,13 @@ Each export owns its writer and `ExportContext` on the stack. Topology, attribut
 
 The high-level stream export returns `false` for `binary=false` and writes no partial output. Use binary `.bgeo` output until the geometry serializer is generalized for `ASCIIWriter`.
 
-### Prefer diagnostics-aware import overloads
+### Prefer `GeometryIO` result objects
 
-The historical low-level parser path still throws when no diagnostic list is supplied. Diagnostics-aware `import()`, `importGeometry()`, `importVolume()`, and `convertToGeometry()` overloads capture failures and return null. New import-facing failure paths should preserve categories, parser offsets, and semantic paths instead of printing to standard output.
+The historical low-level parser path and no-diagnostics path import wrappers throw `DiagnosticException` on failure. Diagnostics-aware overloads return null and append records. `GeometryIO` owns its diagnostics and explicit success state, avoiding caller-managed output lists; invalid parser options are also captured rather than escaping as `std::invalid_argument`.
+
+### Adapter pointer lifetime is synchronous
+
+`writeHouGeo()` reads adapter raw pointers only during the call and never retains them. The adapter object, strings, topology arrays, and numeric memory must remain valid until the write returns. Returned read objects do not refer back to input files, compressed buffers, or parser trees.
 
 ### Raw attribute memory requires care
 
