@@ -101,9 +101,9 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Validate direct polygon and polygon-run topology references.
 - [x] Validate unordered group masks and reject unsupported ordered selections.
 - [ ] Add bounds checks before all remaining array and topology indexing.
-- [ ] Add fuzz testing for the JSON parser.
+- [x] Add deterministic mutation testing and an optional Clang/libFuzzer target for the JSON parser.
 - [x] Add and run an MSVC AddressSanitizer preset.
-- [ ] Add UndefinedBehaviorSanitizer coverage on a supported compiler.
+- [x] Add GCC UndefinedBehaviorSanitizer coverage in Linux CI.
 
 ### Export safety
 
@@ -330,7 +330,7 @@ Add each type only with representative Houdini 21 fixtures and tests.
 - [ ] Add a compatibility matrix by Houdini version and feature.
 - [ ] Add generated API documentation if the public surface remains stable.
 - [ ] Add contributor guidelines.
-- [ ] Add a security policy for malformed file reports.
+- [x] Add a security policy for malformed file reports.
 - [ ] Add release notes once versioned releases begin.
 - [ ] Document fixture regeneration steps inside Houdini.
 

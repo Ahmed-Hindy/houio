@@ -50,6 +50,32 @@
         "HOUIO_BUILD_TESTS": "ON",
         "HOUIO_BUILD_EXAMPLES": "ON"
       }
+    },
+    {
+      "name": "linux-gcc-ubsan",
+      "displayName": "Linux GCC UndefinedBehaviorSanitizer",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-gcc-ubsan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "HOUIO_BUILD_TESTS": "ON",
+        "HOUIO_BUILD_EXAMPLES": "ON",
+        "HOUIO_ENABLE_UNDEFINED_SANITIZER": "ON"
+      }
+    },
+    {
+      "name": "linux-clang-fuzzer",
+      "displayName": "Linux Clang Parser Fuzzer",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-clang-fuzzer",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "HOUIO_BUILD_TESTS": "OFF",
+        "HOUIO_BUILD_EXAMPLES": "OFF",
+        "HOUIO_BUILD_TOOLS": "OFF",
+        "HOUIO_BUILD_FUZZ_TARGETS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -68,6 +94,17 @@
     {
       "name": "linux-gcc-release",
       "configurePreset": "linux-gcc-release"
+    },
+    {
+      "name": "linux-gcc-ubsan",
+      "configurePreset": "linux-gcc-ubsan"
+    },
+    {
+      "name": "linux-clang-fuzzer",
+      "configurePreset": "linux-clang-fuzzer",
+      "targets": [
+        "houio_fuzz_parser"
+      ]
     }
   ],
   "testPresets": [
@@ -95,6 +132,13 @@
     {
       "name": "linux-gcc-release",
       "configurePreset": "linux-gcc-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-gcc-ubsan",
+      "configurePreset": "linux-gcc-ubsan",
       "output": {
         "outputOnFailure": true
       }
