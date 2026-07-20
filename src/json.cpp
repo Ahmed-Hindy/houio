@@ -419,6 +419,8 @@ namespace houio
 							fail(DiagnosticCategory::malformed_input, "Parser encountered an unmatched closing token", tokenOffset);
 						if( state == STATE_MAP_NEED_VALUE )
 							fail(DiagnosticCategory::malformed_input, "Parser encountered a map end before its value", tokenOffset);
+						if( !binary && state == STATE_ARRAY_NEED_VALUE )
+							fail(DiagnosticCategory::malformed_input, "Parser encountered an array end after a trailing separator", tokenOffset);
 						const bool arrayState = state == STATE_ARRAY_START || state == STATE_ARRAY_NEED_VALUE;
 						if( (arrayState && t.type != Token::JID_ARRAY_END)
 							|| (!arrayState && t.type != Token::JID_MAP_END) )
@@ -462,6 +464,8 @@ namespace houio
 					}else
 					if( t.type == Token::JID_MAP_END )
 					{
+						if( !binary && state == STATE_MAP_NEED_KEY )
+							fail(DiagnosticCategory::malformed_input, "Parser encountered a map end after a trailing separator", tokenOffset);
 						popState();
 						t.event( this );
 						if( stateStack.empty() )

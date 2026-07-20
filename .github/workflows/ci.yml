@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Configure MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -46,6 +48,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
@@ -62,6 +66,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Configure
         run: cmake --preset linux-clang-fuzzer
