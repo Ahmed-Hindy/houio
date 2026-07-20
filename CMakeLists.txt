@@ -93,13 +93,13 @@ if(HOUIO_BUILD_FUZZ_TARGETS)
         message(FATAL_ERROR "HOUIO_BUILD_FUZZ_TARGETS requires Clang with libFuzzer")
     endif()
 
-    target_compile_options(houio PRIVATE -fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer)
+    target_compile_options(houio PRIVATE -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
 
     add_executable(houio_fuzz_parser tests/parser_corpus.cpp)
     target_link_libraries(houio_fuzz_parser PRIVATE houio::houio)
     target_compile_features(houio_fuzz_parser PRIVATE cxx_std_20)
-    target_compile_options(houio_fuzz_parser PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
-    target_link_options(houio_fuzz_parser PRIVATE -fsanitize=fuzzer,address,undefined)
+    target_compile_options(houio_fuzz_parser PRIVATE -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(houio_fuzz_parser PRIVATE -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined)
 endif()
 
 install(

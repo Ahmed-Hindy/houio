@@ -51,6 +51,26 @@ namespace houio
 					return false;
 				}
 			}
+
+			bool isSupportedUniformArrayType( ubyte value )
+			{
+				switch( value )
+				{
+				case Token::JID_BOOL:
+				case Token::JID_INT8:
+				case Token::JID_INT16:
+				case Token::JID_INT32:
+				case Token::JID_INT64:
+				case Token::JID_REAL16:
+				case Token::JID_REAL32:
+				case Token::JID_REAL64:
+				case Token::JID_UINT8:
+				case Token::JID_STRING:
+					return true;
+				default:
+					return false;
+				}
+			}
 		}
 
 		// Token ==================================================
@@ -578,23 +598,10 @@ namespace houio
 			case Token::JID_STRING: t.value = readBinaryString();return true;
 			case Token::JID_UNIFORM_ARRAY:
 				{
-					t.uaType = static_cast<Token::Type>(read<sbyte>());
-					switch( t.uaType )
-					{
-					case Token::JID_BOOL:
-					case Token::JID_INT8:
-					case Token::JID_INT16:
-					case Token::JID_INT32:
-					case Token::JID_INT64:
-					case Token::JID_REAL16:
-					case Token::JID_REAL32:
-					case Token::JID_REAL64:
-					case Token::JID_UINT8:
-					case Token::JID_STRING:
-						break;
-					default:
+					const ubyte uniformType = read<ubyte>();
+					if( !isSupportedUniformArrayType(uniformType) )
 						fail(DiagnosticCategory::unsupported_input, "Parser::readBinaryToken encountered an unsupported uniform-array type", byteOffset - 1);
-					}
+					t.uaType = static_cast<Token::Type>(uniformType);
 
 					const sint64 elementCount = readLength();
 					if( elementCount > limits.maxUniformArrayElements )
