@@ -251,6 +251,75 @@ int verifyWideScalarFidelity()
     return 0;
 }
 
+int verifyRootAndClosingStateSafety()
+{
+    const std::vector<std::string> scalarDocuments = {
+        "1",
+        "-2",
+        "1.5",
+        "true",
+        "false",
+        "null",
+        "\"text\"",
+    };
+    for (const std::string& document : scalarDocuments)
+    {
+        std::istringstream input(document);
+        houio::json::JSONReader reader;
+        houio::json::Parser parser;
+        if (!parser.parse(&input, &reader))
+        {
+            return fail("valid scalar root at exact EOF was rejected");
+        }
+    }
+
+    const std::string binaryScalar = binaryDocument({0x11, 0x05});
+    std::istringstream binaryScalarInput(binaryScalar, std::ios::in | std::ios::binary);
+    houio::json::JSONReader binaryScalarReader;
+    houio::json::Parser binaryScalarParser;
+    if (!binaryScalarParser.parse(&binaryScalarInput, &binaryScalarReader)
+        || binaryScalarReader.getRoot().as<houio::sint32>() != 5)
+    {
+        return fail("valid binary scalar root was rejected");
+    }
+
+    NonSeekableBuffer scalarBuffer("1");
+    std::istream nonSeekableScalarInput(&scalarBuffer);
+    houio::json::JSONReader scalarReader;
+    houio::json::Parser scalarParser;
+    if (!scalarParser.parse(&nonSeekableScalarInput, &scalarReader)
+        || scalarReader.getRoot().as<houio::sint64>() != 1)
+    {
+        return fail("non-seekable scalar root at exact EOF was rejected");
+    }
+
+    const std::vector<std::string> malformed = {
+        "]",
+        "}",
+        "[}",
+        "{]",
+        "[1}",
+        "{\"a\":1]",
+        "{\"a\":}",
+        "[,]",
+        ",",
+        ":",
+    };
+    for (const std::string& document : malformed)
+    {
+        std::istringstream input(document);
+        houio::json::JSONReader reader;
+        houio::json::Parser parser;
+        houio::DiagnosticList diagnostics;
+        if (parser.parse(&input, &reader, &diagnostics) || diagnostics.empty()
+            || diagnostics.front().category != houio::DiagnosticCategory::malformed_input)
+        {
+            return fail("invalid root, separator, or closing token was not rejected safely");
+        }
+    }
+    return 0;
+}
+
 int verifyInputBudgetAndTrailingData()
 {
     const std::string binaryData = binaryDocument({0x5b, 0x11, 0x05, 0x5d});
@@ -492,6 +561,10 @@ int main()
         return result;
     }
     if (const int result = verifyWideScalarFidelity(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyRootAndClosingStateSafety(); result != 0)
     {
         return result;
     }

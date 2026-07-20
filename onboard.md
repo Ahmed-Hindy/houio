@@ -188,6 +188,22 @@ cmake --build --preset windows-msvc-asan
 ctest --preset windows-msvc-asan
 ```
 
+On Linux, run the UndefinedBehaviorSanitizer preset:
+
+```bash
+cmake --preset linux-gcc-ubsan
+cmake --build --preset linux-gcc-ubsan
+ctest --preset linux-gcc-ubsan
+```
+
+The normal test suite includes `houio.parser_corpus`, which applies deterministic truncation, replacement, insertion, deletion, and randomized mutations to valid ASCII and binary seeds. Clang users can also build the libFuzzer target:
+
+```bash
+cmake --preset linux-clang-fuzzer
+cmake --build --preset linux-clang-fuzzer
+./build/linux-clang-fuzzer/houio_fuzz_parser -runs=2000 -max_len=512 -timeout=5
+```
+
 ## Read the code in this order
 
 ### 1. `tests/example_readwrite.cpp`
@@ -232,7 +248,7 @@ Parser::readBinaryToken
 Parser::readASCIIToken
 ```
 
-Then follow uniform-array callbacks into `JSONReader`. `ParserLimits` bounds total input bytes, string bytes, uniform-array elements, and nesting depth. Seekable streams are checked up front, streaming inputs are bounded while reading, payload sizes are validated before handler allocation, and complete-document checks reject trailing data.
+Then follow uniform-array callbacks into `JSONReader`. `ParserLimits` bounds total input bytes, string bytes, uniform-array elements, and nesting depth. Seekable streams are checked up front, streaming inputs are bounded while reading, payload sizes are validated before handler allocation, and complete-document checks reject trailing data. The state machine also validates root scalars, container closure, key/value separators, and exact-EOF ASCII scalar tokens.
 
 ### 4. `HouGeo::load()` in `src/HouGeo.cpp`
 

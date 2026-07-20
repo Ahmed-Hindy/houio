@@ -336,6 +336,20 @@ namespace houio
 					(state == STATE_MAP_NEED_VALUE))
 				{
 					State newState = STATE_INVALID;
+					const bool scalarToken =
+						t.type == Token::JID_NULL
+						|| t.type == Token::JID_BOOL
+						|| t.type == Token::JID_INT8
+						|| t.type == Token::JID_INT16
+						|| t.type == Token::JID_INT32
+						|| t.type == Token::JID_INT64
+						|| t.type == Token::JID_REAL16
+						|| t.type == Token::JID_REAL32
+						|| t.type == Token::JID_REAL64
+						|| t.type == Token::JID_UINT8
+						|| t.type == Token::JID_UINT16
+						|| t.type == Token::JID_STRING
+						|| t.type == Token::JID_UNIFORM_ARRAY;
 
 					if( t.type == Token::JID_ARRAY_BEGIN )
 						newState = STATE_ARRAY_START;
@@ -343,13 +357,25 @@ namespace houio
 						newState = STATE_MAP_START;
 					else if( (t.type == Token::JID_ARRAY_END)||(t.type == Token::JID_MAP_END) )
 					{
+						if( stateStack.empty() )
+							fail(DiagnosticCategory::malformed_input, "Parser encountered an unmatched closing token", tokenOffset);
+						if( state == STATE_MAP_NEED_VALUE )
+							fail(DiagnosticCategory::malformed_input, "Parser encountered a map end before its value", tokenOffset);
+						const bool arrayState = state == STATE_ARRAY_START || state == STATE_ARRAY_NEED_VALUE;
+						if( (arrayState && t.type != Token::JID_ARRAY_END)
+							|| (!arrayState && t.type != Token::JID_MAP_END) )
+							fail(DiagnosticCategory::malformed_input, "Parser encountered a mismatched closing token", tokenOffset);
 						popState();
 						popped = true;
+					}else if( !scalarToken )
+					{
+						fail(DiagnosticCategory::malformed_input, "Parser expected a value", tokenOffset);
 					}
 
+					const bool topLevelScalar = state == STATE_START && scalarToken;
 					if( newState != STATE_INVALID )
 						pushState( newState );
-					else if( !popped )
+					else if( !popped && !topLevelScalar )
 					{
 						if( state == STATE_MAP_NEED_VALUE )
 							setState( STATE_MAP_GOT_VALUE );
@@ -359,6 +385,11 @@ namespace houio
 
 					// call event handler for current token
 					t.event( this );
+					if( topLevelScalar )
+					{
+						state = STATE_COMPLETE;
+						return true;
+					}
 				}else
 				// expecting keys ---------------------
 				if( (state == STATE_MAP_START)||
@@ -377,12 +408,17 @@ namespace houio
 						t.event( this );
 						if( stateStack.empty() )
 							return true;
+					}else
+					{
+						fail(DiagnosticCategory::malformed_input, "Parser expected a map key or map end", tokenOffset);
 					}
 				}else
 				if( state == STATE_MAP_SEPERATOR )
 				{
 					if( t.type == Token::JID_KEY_SEPARATOR )
 						setState( STATE_MAP_NEED_VALUE );
+					else
+						fail(DiagnosticCategory::malformed_input, "Parser expected a map key separator", tokenOffset);
 				}else
 				if( state == STATE_MAP_GOT_VALUE )
 				{
@@ -395,6 +431,8 @@ namespace houio
 					}else
 					if( t.type == Token::JID_VALUE_SEPARATOR )
 						setState( STATE_MAP_NEED_KEY );
+					else
+						fail(DiagnosticCategory::malformed_input, "Parser expected a map separator or map end", tokenOffset);
 				}else
 				if( state == STATE_ARRAY_GOT_VALUE )
 				{
@@ -407,6 +445,8 @@ namespace houio
 					}else
 					if( t.type == Token::JID_VALUE_SEPARATOR )
 						setState( STATE_ARRAY_NEED_VALUE );
+					else
+						fail(DiagnosticCategory::malformed_input, "Parser expected an array separator or array end", tokenOffset);
 				}
 
 			}
@@ -582,7 +622,8 @@ namespace houio
 				while(true)
 				{
 					string.append( &c, 1 );
-					c = read<char>();
+					if( !tryReadASCIIChar(c) )
+						break;
 					if( (c == ' ')||(c == '\r')||(c == '\n')||(c == '\t')||(c == '/')||(c == '{')||(c == '}')||(c == '[')||(c == ']')||(c == ',')||(c == ':')||(c == '"') )
 					{
 						stream->unget();
@@ -626,17 +667,14 @@ namespace houio
 		{
 			if( stateStack.size() >= limits.maxNestingDepth )
 				fail(DiagnosticCategory::malformed_input, "Parser nesting depth limit exceeded");
-			stateStack.push( s );
-
-			// set new state
-			setState( s );
+			stateStack.push(s);
+			state = s;
 		}
 
 		void Parser::popState()
 		{
 			if( stateStack.empty() )
-				// error
-				return;
+				fail(DiagnosticCategory::malformed_input, "Parser state stack underflow", tokenOffset);
 
 			int n = (int)stateStack.size();
 			stateStack.pop();
@@ -671,11 +709,10 @@ namespace houio
 				if( newState == STATE_MAP_GOT_VALUE )
 					newState = STATE_MAP_NEED_KEY;
 			}
-			// set new state
+			if( stateStack.empty() )
+				fail(DiagnosticCategory::malformed_input, "Parser state update requires an active container", tokenOffset);
 			state = newState;
-			// update stack
-			stateStack.pop();
-			stateStack.push(newState);
+			stateStack.top() = newState;
 		}
 
 
@@ -739,6 +776,22 @@ namespace houio
 			if( length > 0 )
 				read(value.data(), length);
 			return value;
+		}
+
+		bool Parser::tryReadASCIIChar( char &value )
+		{
+			if( byteOffset < 0 || byteOffset >= limits.maxInputBytes )
+				fail(DiagnosticCategory::malformed_input, "Parser input byte limit exceeded", byteOffset);
+			if( knownInputBytes >= 0 && byteOffset >= knownInputBytes )
+				return false;
+			if( stream->get(value) )
+			{
+				++byteOffset;
+				return true;
+			}
+			if( stream->eof() )
+				return false;
+			fail(DiagnosticCategory::io, "Parser failed while reading ASCII input", byteOffset);
 		}
 
 		// Read a quoted string one character at a time

@@ -16,6 +16,8 @@ option(HOUIO_BUILD_EXAMPLES "Build HouIO examples" ${PROJECT_IS_TOP_LEVEL})
 option(HOUIO_BUILD_TOOLS "Build HouIO command-line tools" ${PROJECT_IS_TOP_LEVEL})
 option(HOUIO_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(HOUIO_ENABLE_ADDRESS_SANITIZER "Enable AddressSanitizer instrumentation" OFF)
+option(HOUIO_ENABLE_UNDEFINED_SANITIZER "Enable UndefinedBehaviorSanitizer instrumentation" OFF)
+option(HOUIO_BUILD_FUZZ_TARGETS "Build optional Clang libFuzzer targets" OFF)
 set(HOUIO_HYTHON_EXECUTABLE "" CACHE FILEPATH "Optional hython executable for Houdini integration tests")
 
 add_library(
@@ -69,6 +71,10 @@ else()
     if(HOUIO_WARNINGS_AS_ERRORS)
         target_compile_options(houio PRIVATE -Werror)
     endif()
+    if(HOUIO_ENABLE_UNDEFINED_SANITIZER)
+        target_compile_options(houio PUBLIC -fsanitize=undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+        target_link_options(houio PUBLIC -fsanitize=undefined -fno-sanitize-recover=undefined)
+    endif()
 endif()
 
 if(HOUIO_BUILD_TOOLS)
@@ -80,6 +86,20 @@ endif()
 if(HOUIO_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+if(HOUIO_BUILD_FUZZ_TARGETS)
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        message(FATAL_ERROR "HOUIO_BUILD_FUZZ_TARGETS requires Clang with libFuzzer")
+    endif()
+
+    target_compile_options(houio PRIVATE -fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer)
+
+    add_executable(houio_fuzz_parser tests/parser_corpus.cpp)
+    target_link_libraries(houio_fuzz_parser PRIVATE houio::houio)
+    target_compile_features(houio_fuzz_parser PRIVATE cxx_std_20)
+    target_compile_options(houio_fuzz_parser PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
+    target_link_options(houio_fuzz_parser PRIVATE -fsanitize=fuzzer,address,undefined)
 endif()
 
 install(

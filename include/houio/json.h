@@ -213,6 +213,7 @@ namespace houio
 			sint64                         readLength();
 			std::string              readBinaryString();
 			std::string               readASCIIString();
+			bool                  tryReadASCIIChar( char &value );
 
 
 			// 
@@ -1054,6 +1055,9 @@ namespace houio
 			{
 				m_root.asObject()->append(nextKey, Value::create<T>(value));
 				nextKey = "JSONReader::jsonValue:invalid key";
+			}else if( m_root.isNull() && m_stack.empty() )
+			{
+				m_root = Value::create<T>(value);
 			}else
 			{
 				throw std::runtime_error("JSONReader::jsonValue: unknown container");

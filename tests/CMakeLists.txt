@@ -11,6 +11,12 @@ target_link_libraries(houio_test_binary_json PRIVATE houio::houio)
 target_compile_features(houio_test_binary_json PRIVATE cxx_std_20)
 add_test(NAME houio.binary_json COMMAND houio_test_binary_json)
 
+add_executable(houio_test_parser_corpus parser_corpus.cpp)
+target_link_libraries(houio_test_parser_corpus PRIVATE houio::houio)
+target_compile_features(houio_test_parser_corpus PRIVATE cxx_std_20)
+target_compile_definitions(houio_test_parser_corpus PRIVATE HOUIO_STANDALONE_CORPUS=1)
+add_test(NAME houio.parser_corpus COMMAND houio_test_parser_corpus)
+
 add_executable(houio_test_attribute test_attribute.cpp)
 target_link_libraries(houio_test_attribute PRIVATE houio::houio)
 target_compile_features(houio_test_attribute PRIVATE cxx_std_20)

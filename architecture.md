@@ -106,7 +106,7 @@ The parser handles:
 - Uniform numeric arrays, including modern signed-int8 polygon run-length data
 - Arrays and maps
 
-The parser determines whether the input is binary by inspecting the stream's opening data. Every fixed-size read validates the exact byte count. Binary lengths reject negative values before conversion to container sizes, and string-token references must resolve to an existing definition.
+The parser determines whether the input is binary by inspecting the stream's opening data. Every fixed-size read validates the exact byte count. Binary lengths reject negative values before conversion to container sizes, and string-token references must resolve to an existing definition. State transitions reject unmatched or mismatched closing tokens, missing map values, misplaced separators, and invalid top-level tokens. ASCII scalar roots are supported even when their final byte is the end of a seekable or streaming input.
 
 `ParserLimits` provides per-parser bounds for total input bytes, string bytes, uniform-array elements, and nesting depth. The defaults are 1 GiB per document, 64 MiB per string, 64 million uniform-array elements, and 1,024 nested containers. Seekable streams are checked before parsing, while non-seekable streams enforce the same budget as bytes are consumed. Uniform-array payload sizes are validated before handler allocation, trailing data is rejected, and duplicate native map keys fail explicitly. `HouGeoIO::import()` uses these defaults, while its limits overload exposes the same controls to applications.
 
@@ -115,6 +115,8 @@ The parser determines whether the input is binary by inspecting the stream's ope
 `include/houio/Diagnostic.h` defines the shared diagnostic boundary for parsing, semantic loading, and convenience conversion. Each record contains severity, category, message, optional byte position represented by `-1` when unavailable, and an optional schema path.
 
 Parser reads maintain a monotonic byte offset. Truncated fixed-size values report the first missing byte, token failures report the token or storage-type byte, and parser-generated diagnostics distinguish malformed encodings from recognized-but-unsupported encodings. The diagnostics-aware parser overload catches these failures and returns `false`; the historical overload continues to throw.
+
+`tests/parser_corpus.cpp` is shared by a deterministic CTest executable and an optional Clang/libFuzzer target. The deterministic pass exercises valid ASCII and binary seeds plus truncation, byte replacement, insertion, deletion, and reproducible randomized mutation through both `JSONReader` and `HouGeoIO::import()`. CI runs the corpus under normal compilers, GCC UndefinedBehaviorSanitizer, MSVC AddressSanitizer, and a bounded libFuzzer smoke session.
 
 `HouGeo::load()` wraps attribute, topology, primitive, and group boundaries with schema paths. Unknown primitive types and unsupported group encodings preserve the `unsupported_input` category while gaining paths such as `primitives[0].definition.type`. Other semantic exceptions are promoted to `schema` diagnostics.
 

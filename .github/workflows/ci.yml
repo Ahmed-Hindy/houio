@@ -13,6 +13,11 @@ permissions:
 jobs:
   windows-msvc:
     runs-on: windows-2022
+    strategy:
+      matrix:
+        preset:
+          - windows-msvc-release
+          - windows-msvc-asan
 
     steps:
       - name: Check out repository
@@ -22,15 +27,36 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure
-        run: cmake --preset windows-msvc-release
+        run: cmake --preset ${{ matrix.preset }}
 
       - name: Build
-        run: cmake --build --preset windows-msvc-release
+        run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Test
-        run: ctest --preset windows-msvc-release
+        run: ctest --preset ${{ matrix.preset }}
 
   linux-gcc:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        preset:
+          - linux-gcc-release
+          - linux-gcc-ubsan
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}
+
+  linux-clang-fuzzer:
     runs-on: ubuntu-24.04
 
     steps:
@@ -38,10 +64,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake --preset linux-gcc-release
+        run: cmake --preset linux-clang-fuzzer
 
       - name: Build
-        run: cmake --build --preset linux-gcc-release
+        run: cmake --build --preset linux-clang-fuzzer
 
-      - name: Test
-        run: ctest --preset linux-gcc-release
+      - name: Fuzz parser smoke test
+        run: ./build/linux-clang-fuzzer/houio_fuzz_parser -runs=2000 -max_len=512 -timeout=5

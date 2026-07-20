@@ -262,7 +262,7 @@ cmake --build --preset linux-gcc-release
 ctest --preset linux-gcc-release
 ```
 
-CI verifies both Visual Studio 2022 on Windows and GCC on Ubuntu.
+CI verifies Visual Studio 2022 Release and AddressSanitizer builds on Windows, GCC Release and UndefinedBehaviorSanitizer builds on Ubuntu, and a Clang/libFuzzer parser smoke test.
 
 ## Installing and consuming
 
@@ -385,6 +385,24 @@ cmake --build --preset windows-msvc-asan
 ctest --preset windows-msvc-asan
 ```
 
+GCC UndefinedBehaviorSanitizer coverage is available on Linux:
+
+```bash
+cmake --preset linux-gcc-ubsan
+cmake --build --preset linux-gcc-ubsan
+ctest --preset linux-gcc-ubsan
+```
+
+`houio.parser_corpus` deterministically exercises valid ASCII and binary seeds plus truncation, replacement, insertion, deletion, and randomized mutations through both the generic JSON reader and semantic `HouGeoIO` importer. An optional Clang/libFuzzer target uses the same entry point:
+
+```bash
+cmake --preset linux-clang-fuzzer
+cmake --build --preset linux-clang-fuzzer
+./build/linux-clang-fuzzer/houio_fuzz_parser -runs=2000 -max_len=512 -timeout=5
+```
+
+The deterministic corpus is part of normal CTest runs. The libFuzzer target is opt-in and is also compiled and smoke-tested in CI.
+
 ## Contributing
 
 Before changing schema parsing, add or preserve a fixture that demonstrates the relevant encoding. Format handling is reverse-engineered and small assumptions can affect unrelated files. Semantic loading rejects malformed flattened objects, negative counts, invalid group masks, topology-count mismatches, out-of-range point or polygon topology references, invalid volume dimensions and transforms, mismatched tile counts, malformed tile payloads, and unsupported volume compression modes.
@@ -403,4 +421,5 @@ Recommended workflow:
 - [architecture.md](architecture.md) — modules, data flow, abstractions, and architectural risks
 - [onboard.md](onboard.md) — environment setup and code-reading path
 - [docs/houdini-22-windows.md](docs/houdini-22-windows.md) — complete Houdini 22 setup and usage on Windows
+- [SECURITY.md](SECURITY.md) — private malformed-input and vulnerability reporting guidance
 - [todo.md](todo.md) — prioritized maintenance and compatibility work
