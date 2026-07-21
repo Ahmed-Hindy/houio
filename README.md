@@ -194,8 +194,9 @@ For an end-to-end Windows setup using Houdini 22, including build, package insta
 The standalone C++ library does not link to Houdini's private OpenVDB build and does not yet model sparse OpenVDB trees natively. The `python/houio_hom` package provides the supported Houdini-side path:
 
 - Houdini reads and writes `.bgeo`, `.bgeo.sc`, `.geo`, and `.vdb` through HOM.
-- 32-bit float VDB grids can be converted to dense Houdini volumes with the `convertvdb` SOP verb before HouIO processing.
-- Dense HouIO volumes can be converted back to VDB grids before `.vdb` output.
+- 32-bit Float SDF and Fog VDB grids can be converted to dense Houdini volumes before HouIO processing.
+- Level-set grids become iso dense volumes and Fog grids become smoke dense volumes; `houio_vdb_class` preserves the authoritative class through the dense representation.
+- Dense HouIO volumes can be converted back to VDB grids with `level set` or `fog volume` class restored before `.vdb` output.
 - `hou.Geometry.data()` and `hou.Geometry.load()` bridge uncompressed bgeo bytes without temporary Houdini nodes.
 - `houio_convert` can be launched from HOM without loading a Python extension into Houdini's process.
 
@@ -213,7 +214,8 @@ This writes `houio.json` under the user package directories for Houdini 21.0 and
 ```python
 from houio_hom import convert_with_houio, load_for_houio
 
-# VDB is converted to a dense volume, processed by HouIO, then written as SCF.
+# SDF or Fog VDB is converted to an iso or smoke dense volume, processed by
+# HouIO, then written as SCF with its semantic class metadata preserved.
 convert_with_houio("density.vdb", "density_houio.bgeo.sc")
 
 geometry = load_for_houio("density_houio.bgeo.sc", convert_vdb=False)
@@ -226,7 +228,7 @@ print(len(geometry.prims()))
 from houio_hom import roundtrip_current_sop
 
 # Replaces the writable Python SOP geometry with HouIO's round-trip output.
-# Float VDB primitives are explicitly densified before the subprocess call.
+# Float SDF and Fog VDB primitives are explicitly densified before the subprocess call.
 roundtrip_current_sop(timeout_seconds=300.0)
 ```
 
@@ -238,7 +240,7 @@ hython -m houio_hom encode density.bgeo density.bgeo.sc
 hython -m houio_hom encode density.bgeo density.vdb
 ```
 
-VDB conversion is deliberately bounded. VDB-to-volume conversion accepts 32-bit float grids and preserves unrelated primitives in mixed Houdini geometry. Volume-to-VDB conversion requires a pure dense-volume set because Houdini's `.vdb` writer silently omits mesh primitives. Sparse grids become dense in memory, so this path is intended for bounded fields, not large production VDBs. Converter subprocess calls default to a 300-second timeout, which can be changed or disabled per call.
+VDB conversion is deliberately bounded. VDB-to-volume conversion accepts 32-bit Float `level set` and `fog volume` grids, preserves their SDF/Fog semantics, and preserves unrelated primitives in mixed Houdini geometry. Iso dense volumes convert back to level sets, smoke dense volumes convert back to Fog grids, and explicit `houio_vdb_class` metadata takes precedence. Volume-to-VDB conversion requires a pure dense-volume set because Houdini's `.vdb` writer silently omits mesh primitives. Sparse grids become dense in memory, so this path is intended for bounded fields, not large production VDBs. Converter subprocess calls default to a 300-second timeout, which can be changed or disabled per call.
 
 ## Building
 

@@ -97,7 +97,7 @@ convert_with_houio(
 
 HouIO reads the SCF wrapper natively, processes the uncompressed Houdini geometry, and writes a new `.bgeo.sc` file.
 
-### Float VDB to `.bgeo.sc`
+### Float SDF or Fog VDB to `.bgeo.sc`
 
 ```python
 from houio_hom import convert_with_houio
@@ -108,7 +108,7 @@ convert_with_houio(
 )
 ```
 
-Houdini converts 32-bit Float VDB grids to dense Houdini volumes before the C++ converter runs. Polygon primitives in the same geometry are preserved during this VDB-to-volume conversion.
+Houdini converts 32-bit Float VDB grids to dense Houdini volumes before the C++ converter runs. Level sets become iso volumes and Fog grids become smoke volumes. The `houio_vdb_class` primitive attribute preserves the authoritative `level set` or `fog volume` class through the dense representation. Polygon primitives in the same geometry are preserved during this conversion.
 
 ### Dense volume back to VDB
 
@@ -121,7 +121,7 @@ convert_with_houio(
 )
 ```
 
-VDB output requires geometry containing only dense volumes or VDB grids. The bridge rejects mixed mesh/volume output because Houdini's `.vdb` writer would otherwise omit mesh primitives.
+VDB output requires geometry containing only dense volumes or VDB grids. Iso dense volumes become level-set VDBs and smoke dense volumes become Fog VDBs; explicit `houio_vdb_class` metadata overrides visualization-based inference. The bridge rejects mixed mesh/volume output because Houdini's `.vdb` writer would otherwise omit mesh primitives.
 
 ## 5. Process SOP geometry
 
@@ -140,7 +140,7 @@ print(len(processed_geometry.prims()))
 
 `roundtrip_node_geometry()` returns a new `hou.Geometry`. It does not modify the source node.
 
-Float VDB primitives are explicitly converted to dense volumes before HouIO processes the geometry.
+Float SDF and Fog VDB primitives are explicitly converted to iso or smoke dense volumes before HouIO processes the geometry. Their semantic class is preserved for later VDB reconstruction.
 
 ### Use inside a Python SOP
 

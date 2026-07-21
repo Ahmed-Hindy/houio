@@ -1314,11 +1314,11 @@ namespace houio
 			g_writer->jsonString("visualization");
 			g_writer->jsonBeginMap();
 				g_writer->jsonKey("mode");
-				g_writer->jsonString("smoke");
+				g_writer->jsonString(volume->getVisualizationMode());
 				g_writer->jsonKey("iso");
-				g_writer->jsonReal32(0.0f);
+				g_writer->jsonReal32(volume->getVisualizationIso());
 				g_writer->jsonKey("density");
-				g_writer->jsonReal32(1.0f);
+				g_writer->jsonReal32(volume->getVisualizationDensity());
 			g_writer->jsonEndMap();
 
 			g_writer->jsonString("taperx");

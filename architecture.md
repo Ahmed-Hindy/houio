@@ -71,7 +71,7 @@ houio_hom (hou.Geometry + Convert VDB SOP verb)
 | Vendored templates | `include/ttl/` | Provide the variant implementation used by the JSON layer. |
 | Build and package | `CMakeLists.txt`, `CMakePresets.json`, `cmake/` | Define the C++20 target, presets, install tree, package version, and exported `houio::houio` target. |
 | Converter tool | `tools/houio_convert.cpp` | Provide an installed path-to-path `.geo`/`.bgeo`/`.bgeo.sc` converter using the public API. |
-| HOM bridge | `python/houio_hom/`, `tools/houdini/install_hom_bridge.ps1` | Integrate with Houdini 21/22, convert Float VDB/dense volumes, and invoke `houio_convert` with a bounded timeout. |
+| HOM bridge | `python/houio_hom/`, `tools/houdini/install_hom_bridge.ps1` | Integrate with Houdini 21/22, preserve Float SDF/Fog semantics across VDB/dense-volume conversion, and invoke `houio_convert` with a bounded timeout. |
 | Tests and examples | `tests/`, `tools/houdini/` | Provide historical fixtures, modern-schema, SCF, HOM, package-consumer, and dual-Houdini regression coverage. |
 | Legacy scene exporter | `scene_exporter/` | Export custom scene JSON from old Python 2 Houdini sessions. |
 
@@ -354,7 +354,7 @@ C-Blosc is resolved at runtime rather than linked into `houio::houio`. This keep
 
 The standalone C++ library deliberately does not load Houdini's private `openvdb_sesi` binary or duplicate OpenVDB's sparse tree model. `GeometryFileFormat::openvdb` exists for detection and actionable diagnostics, not native sparse-grid parsing.
 
-`python/houio_hom` is the supported Houdini-side adapter. It uses `hou.Geometry.loadFromFile()` and `saveToFile()` for Houdini-supported containers, `hou.Geometry.data()` and `load()` for in-memory bgeo bytes, and the `convertvdb` SOP verb for 32-bit Float VDB/dense-volume conversion. Float VDBs can be densified while preserving unrelated Houdini primitives; `.vdb` output remains restricted to pure dense-volume or VDB sets because Houdini's writer omits unrelated mesh primitives. `houio_convert` runs as a subprocess with a configurable 300-second default timeout, avoiding a CPython extension ABI tied to one Houdini Python version. Sparse VDBs are densified only by explicit caller choice and are therefore subject to potentially large memory amplification.
+`python/houio_hom` is the supported Houdini-side adapter. It uses `hou.Geometry.loadFromFile()` and `saveToFile()` for Houdini-supported containers, `hou.Geometry.data()` and `load()` for in-memory bgeo bytes, and the `convertvdb` SOP verb for 32-bit Float VDB/dense-volume conversion. The bridge accepts `level set` and `fog volume` VDB classes, maps them to iso and smoke dense volumes, carries the authoritative class in the `houio_vdb_class` primitive attribute, and restores the VDB intrinsic on output. The C++ volume model also preserves Houdini visualization mode, iso value, and density instead of hardcoding smoke metadata. Float VDBs can be densified while preserving unrelated Houdini primitives; `.vdb` output remains restricted to pure dense-volume or VDB sets because Houdini's writer omits unrelated mesh primitives. `houio_convert` runs as a subprocess with a configurable 300-second default timeout, avoiding a CPython extension ABI tied to one Houdini Python version. Sparse VDBs are densified only by explicit caller choice and are therefore subject to potentially large memory amplification.
 
 ### Fixture-backed compatibility tests
 
@@ -507,7 +507,7 @@ The parser and schema model are based on reverse-engineered Houdini 13-era data.
 
 ### Data model mismatch
 
-`Geometry` cannot faithfully represent all Houdini domains and primitive mixtures. It should remain an explicit convenience conversion rather than become the canonical model. `ScalarField` also cannot represent sparse OpenVDB topology, grid classes, inactive values, or arbitrary metadata.
+`Geometry` cannot faithfully represent all Houdini domains and primitive mixtures. It should remain an explicit convenience conversion rather than become the canonical model. `ScalarField` still cannot represent sparse OpenVDB topology, inactive values, or arbitrary grid metadata; SDF/Fog class is preserved only by the Houdini bridge's primitive metadata and visualization mapping.
 
 ### Optional runtime dependencies
 

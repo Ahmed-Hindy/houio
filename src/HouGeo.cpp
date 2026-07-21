@@ -1287,6 +1287,21 @@ namespace houio
 			});
 		}
 
+		if( volume->hasKey("visualization") )
+		{
+			withSchemaPath("visualization", [&]()
+			{
+				json::ObjectPtr visualization = volume->getObject("visualization");
+				if( !visualization )
+					throw std::runtime_error( "HouGeo::loadVolumePrimitive visualization must be an object" );
+				vol->visualizationMode = visualization->get<std::string>("mode", "smoke");
+				if( vol->visualizationMode.empty() )
+					vol->visualizationMode = "smoke";
+				vol->visualizationIso = visualization->get<real32>("iso", 0.0f);
+				vol->visualizationDensity = visualization->get<real32>("density", 1.0f);
+			});
+		}
+
 		m_primitives.push_back(vol);
 	}
 
@@ -1407,6 +1422,21 @@ namespace houio
 	real32 HouGeo::HouVolume::getVoxel( int i, int j, int k )const
 	{
 		return field->sample(i, j, k);
+	}
+
+	std::string HouGeo::HouVolume::getVisualizationMode()const
+	{
+		return visualizationMode;
+	}
+
+	real32 HouGeo::HouVolume::getVisualizationIso()const
+	{
+		return visualizationIso;
+	}
+
+	real32 HouGeo::HouVolume::getVisualizationDensity()const
+	{
+		return visualizationDensity;
 	}
 	
 	math::Vec3i HouGeo::HouVolume::getResolution()const

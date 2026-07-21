@@ -1,6 +1,9 @@
 """Houdini Object Model helpers for HouIO file interoperability."""
 
 from .bridge import (
+    VDB_CLASS_ATTRIBUTE,
+    VDB_FOG_VOLUME_CLASS,
+    VDB_LEVEL_SET_CLASS,
     convert_vdb_to_volume,
     convert_volume_to_vdb,
     convert_with_houio,
@@ -15,6 +18,9 @@ from .bridge import (
 )
 
 __all__ = [
+    "VDB_CLASS_ATTRIBUTE",
+    "VDB_FOG_VOLUME_CLASS",
+    "VDB_LEVEL_SET_CLASS",
     "convert_vdb_to_volume",
     "convert_volume_to_vdb",
     "convert_with_houio",

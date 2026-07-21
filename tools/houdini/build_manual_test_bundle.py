@@ -104,6 +104,21 @@ ROUNDTRIP_CODE = (
 )
 
 
+DENSE_TO_VDB_CODE = (
+    BOOTSTRAP_CODE
+    + r"""
+
+from houio_hom import convert_volume_to_vdb
+
+node = hou.pwd()
+result = convert_volume_to_vdb(node.inputs()[0].geometry())
+target = node.geometry()
+target.clear()
+target.merge(result)
+"""
+)
+
+
 VALIDATE_POLYGON_CODE = r"""
 import hou
 
@@ -239,6 +254,11 @@ point/vertex/primitive/detail attributes, and groups. Inspect its detail
 attributes for `houio_test_status=PASS`. `VIEW_SOURCE_AND_RESULT` displays the
 source and a translated result side by side so both are visible at once.
 
+The VDB network contains separate SDF and Fog branches. Level-set VDBs become
+iso dense volumes and rebuild as level sets; fog VDBs become smoke dense volumes
+and rebuild as fog grids. Inspect the `houio_vdb_class` primitive attribute and
+the `vdb_class` intrinsic to verify the semantic class.
+
 The HIP file bootstraps the bundled Python package and converter relative to its
 own location. Installing the Houdini package is optional for this HIP file.
 
@@ -269,7 +289,8 @@ Windows Documents known folder in `houdini22.0/packages`.
 
 ## Important limitations
 
-- Float VDB grids are densified before HouIO processes them.
+- Float SDF and Fog VDB grids are both supported and retain their semantic class.
+- VDB grids are densified before HouIO processes them.
 - Sparse OpenVDB topology is not preserved.
 - VDB output must contain volumes only; mixed polygon/VDB output is rejected.
 - Best-supported standalone geometry is polygons and dense scalar volumes.
@@ -353,20 +374,32 @@ for attribute_name in ("name", "piece"):
     assert polygon_result.findPrimAttrib(attribute_name) is not None
 assert polygon_result.findVertexAttrib("uv") is not None
 
-vdb_source = hou.node("/obj/HOUiO_VDB_ROUNDTRIP/SOURCE_VDB").geometry()
-dense_result = hou.node("/obj/HOUiO_VDB_ROUNDTRIP/RESULT_DENSE_VOLUME").geometry()
-rebuilt_vdb = hou.node("/obj/HOUiO_VDB_ROUNDTRIP/RESULT_REBUILT_VDB").geometry()
-assert any(isinstance(primitive, hou.VDB) for primitive in vdb_source.prims())
-assert any(isinstance(primitive, hou.Volume) for primitive in dense_result.prims())
-assert any(isinstance(primitive, hou.VDB) for primitive in rebuilt_vdb.prims())
+sdf_source = hou.node("/obj/HOUiO_VDB_ROUNDTRIP/SOURCE_SDF_VDB").geometry()
+sdf_dense = hou.node("/obj/HOUiO_VDB_ROUNDTRIP/RESULT_SDF_DENSE").geometry()
+sdf_rebuilt = hou.node("/obj/HOUiO_VDB_ROUNDTRIP/RESULT_SDF_VDB").geometry()
+fog_source = hou.node("/obj/HOUiO_VDB_ROUNDTRIP/SOURCE_FOG_VDB").geometry()
+fog_dense = hou.node("/obj/HOUiO_VDB_ROUNDTRIP/RESULT_FOG_DENSE").geometry()
+fog_rebuilt = hou.node("/obj/HOUiO_VDB_ROUNDTRIP/RESULT_FOG_VDB").geometry()
+
+assert sdf_source.prims()[0].intrinsicValue("vdb_class") == "level set"
+assert sdf_dense.prims()[0].intrinsicValue("volumevisualmode") == "iso"
+assert sdf_dense.prims()[0].attribValue("houio_vdb_class") == "level set"
+assert sdf_rebuilt.prims()[0].intrinsicValue("vdb_class") == "level set"
+assert fog_source.prims()[0].intrinsicValue("vdb_class") == "fog volume"
+assert fog_dense.prims()[0].intrinsicValue("volumevisualmode") == "smoke"
+assert fog_dense.prims()[0].attribValue("houio_vdb_class") == "fog volume"
+assert fog_rebuilt.prims()[0].intrinsicValue("vdb_class") == "fog volume"
 
 cache_root = bundle_root / "manual-tests" / "cache"
 required_files = (
     "polygon_source.bgeo.sc",
     "polygon_houio.bgeo.sc",
-    "density_source.vdb",
-    "density_houio.bgeo.sc",
-    "density_rebuilt.vdb",
+    "sdf_source.vdb",
+    "sdf_houio.bgeo.sc",
+    "sdf_rebuilt.vdb",
+    "fog_source.vdb",
+    "fog_houio.bgeo.sc",
+    "fog_rebuilt.vdb",
 )
 for file_name in required_files:
     assert (cache_root / file_name).is_file(), file_name
@@ -374,9 +407,12 @@ for file_name in required_files:
 for node_name in (
     "POLYGON_SOURCE_FILE",
     "POLYGON_HOUiO_FILE",
-    "VDB_SOURCE_FILE",
-    "DENSE_HOUiO_FILE",
-    "VDB_REBUILT_FILE",
+    "SDF_SOURCE_FILE",
+    "SDF_DENSE_HOUiO_FILE",
+    "SDF_REBUILT_FILE",
+    "FOG_SOURCE_FILE",
+    "FOG_DENSE_HOUiO_FILE",
+    "FOG_REBUILT_FILE",
 ):
     file_node = hou.node(f"/obj/HOUiO_DISK_FIXTURES/{node_name}")
     file_node.cook(force=True)
@@ -386,7 +422,8 @@ for node_name in (
 print("HouIO Houdini 22 smoke tests: PASS")
 print(f"HIP: {hip_path}")
 print(f"Polygon points/primitives: {len(polygon_result.points())}/{len(polygon_result.prims())}")
-print(f"Dense volume primitives: {len(dense_result.prims())}")
+print("SDF class: level set -> iso -> level set")
+print("Fog class: fog volume -> smoke -> fog volume")
 '''
 
 
@@ -474,37 +511,74 @@ def create_polygon_network(obj: hou.Node) -> hou.Node:
 
 
 def create_vdb_network(obj: hou.Node) -> hou.Node:
-    """Create the Float VDB to dense-volume round-trip test network."""
+    """Create separate Float SDF and fog VDB round-trip test branches."""
     network = obj.createNode("geo", "HOUiO_VDB_ROUNDTRIP", run_init_scripts=False)
     sphere = network.createNode("sphere", "POLYGON_SPHERE")
     sphere.parm("type").set(1)
     sphere.parm("rows").set(24)
     sphere.parm("cols").set(48)
-    vdb = network.createNode("vdbfrompolygons", "CREATE_FLOAT_VDB")
-    vdb.setInput(0, sphere)
-    vdb.parm("voxelsize").set(0.1)
-    source = network.createNode("null", "SOURCE_VDB")
-    source.setInput(0, vdb)
-    roundtrip = create_python_node(
-        network, "HOUiO_VDB_TO_DENSE", ROUNDTRIP_CODE, source
+
+    sdf_vdb = network.createNode("vdbfrompolygons", "CREATE_SDF_VDB")
+    sdf_vdb.setInput(0, sphere)
+    sdf_vdb.parm("voxelsize").set(0.1)
+    sdf_vdb.parm("builddistance").set(1)
+    sdf_vdb.parm("buildfog").set(0)
+    sdf_source = network.createNode("null", "SOURCE_SDF_VDB")
+    sdf_source.setInput(0, sdf_vdb)
+    sdf_roundtrip = create_python_node(
+        network, "HOUiO_SDF_TO_DENSE", ROUNDTRIP_CODE, sdf_source
     )
-    dense_result = network.createNode("null", "RESULT_DENSE_VOLUME")
-    dense_result.setInput(0, roundtrip)
-    rebuild = network.createNode("convertvdb", "DENSE_TO_VDB")
-    rebuild.setInput(0, dense_result)
-    rebuild.parm("conversion").set(1)
-    vdb_result = network.createNode("null", "RESULT_REBUILT_VDB")
-    vdb_result.setInput(0, rebuild)
-    vdb_result.setDisplayFlag(True)
-    vdb_result.setRenderFlag(True)
+    sdf_dense = network.createNode("null", "RESULT_SDF_DENSE")
+    sdf_dense.setInput(0, sdf_roundtrip)
+    sdf_rebuild = create_python_node(
+        network, "HOUiO_DENSE_SDF_TO_VDB", DENSE_TO_VDB_CODE, sdf_dense
+    )
+    sdf_result = network.createNode("null", "RESULT_SDF_VDB")
+    sdf_result.setInput(0, sdf_rebuild)
+
+    fog_vdb = network.createNode("vdbfrompolygons", "CREATE_FOG_VDB")
+    fog_vdb.setInput(0, sphere)
+    fog_vdb.parm("voxelsize").set(0.1)
+    fog_vdb.parm("builddistance").set(0)
+    fog_vdb.parm("buildfog").set(1)
+    fog_source = network.createNode("null", "SOURCE_FOG_VDB")
+    fog_source.setInput(0, fog_vdb)
+    fog_roundtrip = create_python_node(
+        network, "HOUiO_FOG_TO_DENSE", ROUNDTRIP_CODE, fog_source
+    )
+    fog_dense = network.createNode("null", "RESULT_FOG_DENSE")
+    fog_dense.setInput(0, fog_roundtrip)
+    fog_rebuild = create_python_node(
+        network, "HOUiO_DENSE_FOG_TO_VDB", DENSE_TO_VDB_CODE, fog_dense
+    )
+    fog_result = network.createNode("null", "RESULT_FOG_VDB")
+    fog_result.setInput(0, fog_rebuild)
+
+    fog_offset = network.createNode("xform", "FOG_RESULT_OFFSET")
+    fog_offset.setInput(0, fog_result)
+    fog_offset.parm("tx").set(3.5)
+    view = network.createNode("merge", "VIEW_SDF_AND_FOG_VDB")
+    view.setInput(0, sdf_result)
+    view.setInput(1, fog_offset)
+    view.setDisplayFlag(True)
+    view.setRenderFlag(True)
+
+    sphere.setPosition(hou.Vector2(-8.0, 1.5))
     for index, node in enumerate(
-        (sphere, vdb, source, roundtrip, dense_result, rebuild, vdb_result)
+        (sdf_vdb, sdf_source, sdf_roundtrip, sdf_dense, sdf_rebuild, sdf_result)
     ):
-        node.setPosition(hou.Vector2(-6.0 + index * 2.0, 0.0))
+        node.setPosition(hou.Vector2(-6.0 + index * 2.0, 1.5))
+    for index, node in enumerate(
+        (fog_vdb, fog_source, fog_roundtrip, fog_dense, fog_rebuild, fog_result)
+    ):
+        node.setPosition(hou.Vector2(-6.0 + index * 2.0, -1.5))
+    fog_offset.setPosition(hou.Vector2(6.0, -1.5))
+    view.setPosition(hou.Vector2(8.0, 0.0))
+
     add_note(
         network,
-        "VDB TEST\n\nSOURCE_VDB is a sparse Float SDF.\nHOUiO_VDB_TO_DENSE explicitly densifies it and round-trips through HouIO.\nDENSE_TO_VDB converts the result back to VDB for visual comparison.\nExpect sparse topology to change.",
-        (-6.5, 1.0, 8.5, 4.5),
+        "VDB SEMANTICS TEST\n\nTop branch: level-set VDB -> iso dense volume -> level-set VDB.\nBottom branch: fog VDB -> smoke dense volume -> fog VDB.\nThe houio_vdb_class primitive attribute carries the authoritative class through the dense representation.\nVIEW_SDF_AND_FOG_VDB offsets the fog result for visual comparison.\nSparse topology is still rebuilt rather than preserved.",
+        (-8.5, 3.0, 17.5, 6.5),
     )
     return network
 
@@ -515,9 +589,12 @@ def create_disk_network(obj: hou.Node) -> hou.Node:
     file_specs = (
         ("POLYGON_SOURCE_FILE", "$HIP/cache/polygon_source.bgeo.sc"),
         ("POLYGON_HOUiO_FILE", "$HIP/cache/polygon_houio.bgeo.sc"),
-        ("VDB_SOURCE_FILE", "$HIP/cache/density_source.vdb"),
-        ("DENSE_HOUiO_FILE", "$HIP/cache/density_houio.bgeo.sc"),
-        ("VDB_REBUILT_FILE", "$HIP/cache/density_rebuilt.vdb"),
+        ("SDF_SOURCE_FILE", "$HIP/cache/sdf_source.vdb"),
+        ("SDF_DENSE_HOUiO_FILE", "$HIP/cache/sdf_houio.bgeo.sc"),
+        ("SDF_REBUILT_FILE", "$HIP/cache/sdf_rebuilt.vdb"),
+        ("FOG_SOURCE_FILE", "$HIP/cache/fog_source.vdb"),
+        ("FOG_DENSE_HOUiO_FILE", "$HIP/cache/fog_houio.bgeo.sc"),
+        ("FOG_REBUILT_FILE", "$HIP/cache/fog_rebuilt.vdb"),
     )
     for index, (name, file_path) in enumerate(file_specs):
         node = network.createNode("file", name)
@@ -583,19 +660,29 @@ def create_bundle(install_root: Path, output_root: Path, commit: str) -> None:
 
     polygon_source_path = cache_root / "polygon_source.bgeo.sc"
     polygon_result_path = cache_root / "polygon_houio.bgeo.sc"
-    vdb_source_path = cache_root / "density_source.vdb"
-    dense_result_path = cache_root / "density_houio.bgeo.sc"
-    rebuilt_vdb_path = cache_root / "density_rebuilt.vdb"
+    sdf_source_path = cache_root / "sdf_source.vdb"
+    sdf_dense_path = cache_root / "sdf_houio.bgeo.sc"
+    sdf_rebuilt_path = cache_root / "sdf_rebuilt.vdb"
+    fog_source_path = cache_root / "fog_source.vdb"
+    fog_dense_path = cache_root / "fog_houio.bgeo.sc"
+    fog_rebuilt_path = cache_root / "fog_rebuilt.vdb"
 
     hou.node("/obj/HOUiO_POLYGON_ROUNDTRIP/SOURCE_POLYGON").geometry().saveToFile(
         str(polygon_source_path)
     )
     convert_with_houio(polygon_source_path, polygon_result_path)
-    hou.node("/obj/HOUiO_VDB_ROUNDTRIP/SOURCE_VDB").geometry().saveToFile(
-        str(vdb_source_path)
+
+    hou.node("/obj/HOUiO_VDB_ROUNDTRIP/SOURCE_SDF_VDB").geometry().saveToFile(
+        str(sdf_source_path)
     )
-    convert_with_houio(vdb_source_path, dense_result_path)
-    convert_with_houio(dense_result_path, rebuilt_vdb_path)
+    convert_with_houio(sdf_source_path, sdf_dense_path)
+    convert_with_houio(sdf_dense_path, sdf_rebuilt_path)
+
+    hou.node("/obj/HOUiO_VDB_ROUNDTRIP/SOURCE_FOG_VDB").geometry().saveToFile(
+        str(fog_source_path)
+    )
+    convert_with_houio(fog_source_path, fog_dense_path)
+    convert_with_houio(fog_dense_path, fog_rebuilt_path)
 
     hou.hipFile.save(str(hip_path))
     archive_base = output_root.parent / output_root.name

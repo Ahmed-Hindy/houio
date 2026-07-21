@@ -233,7 +233,7 @@ Add each type only with representative Houdini 21 fixtures and tests.
 - [ ] Agents and crowds
 - [ ] Instancing records
 - [ ] Native OpenVDB primitives in the standalone C++ model
-- [x] Add a strict Houdini HOM bridge for scalar VDB-to-dense-volume conversion and VDB output.
+- [x] Add a strict Houdini HOM bridge for Float SDF/Fog VDB-to-dense-volume conversion and class-preserving VDB output.
 
 ### Compression and wrappers
 
