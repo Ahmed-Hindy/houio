@@ -196,6 +196,10 @@ int verifyBinaryRoundTrip()
     {
         return fail("volume binary export failed");
     }
+    if (output.str().find("compressiontypes") == std::string::npos)
+    {
+        return fail("volume binary export used an invalid tiled-array compression key");
+    }
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
     houio::DiagnosticList diagnostics;

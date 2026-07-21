@@ -159,6 +159,20 @@ def validate(output_directory: Path) -> None:
             raise AssertionError(
                 "Cooked VDB SOP round-trip changed values or transform"
             )
+
+        dense_file_node = geometry_container.createNode("file")
+        dense_file_node.parm("file").set(str(converter_scf_path))
+        dense_file_node.cook(force=True)
+        if dense_file_node.errors():
+            raise AssertionError(
+                "HouIO dense-volume SCF produced File SOP errors: "
+                + "; ".join(dense_file_node.errors())
+            )
+        if dense_file_node.warnings():
+            raise AssertionError(
+                "HouIO dense-volume SCF produced File SOP warnings: "
+                + "; ".join(dense_file_node.warnings())
+            )
     finally:
         geometry_container.destroy()
 

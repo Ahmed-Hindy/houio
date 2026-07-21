@@ -1235,7 +1235,7 @@ namespace houio
 					g_writer->jsonString("version");
 					g_writer->jsonInt32( 1 );
 
-					g_writer->jsonString("compressiontype");
+					g_writer->jsonString("compressiontypes");
 					// !!! uniform string array?
 					g_writer->jsonBeginArray();
 						g_writer->jsonString("raw");
