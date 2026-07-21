@@ -98,6 +98,33 @@ int verifyStructuredDiagnostics()
     }
 
     if (const int result = expectImportDiagnostic(
+            R"JSON(["pointcount", 0, "vertexcount", 0, "primitivecount", 0, "sharedprimitivedata", "invalid"])JSON",
+            houio::DiagnosticCategory::schema, "sharedprimitivedata",
+            "shared primitive container diagnostic");
+        result != 0)
+    {
+        return result;
+    }
+
+    if (const int result = expectImportDiagnostic(
+            R"JSON(["pointcount", 0, "vertexcount", 0, "primitivecount", 0, "sharedprimitivedata", ["volume", "invalid"]])JSON",
+            houio::DiagnosticCategory::schema, "sharedprimitivedata[0]",
+            "shared primitive entry diagnostic");
+        result != 0)
+    {
+        return result;
+    }
+
+    if (const int result = expectImportDiagnostic(
+            R"JSON(["pointcount", 0, "vertexcount", 0, "primitivecount", 0, "sharedprimitivedata", ["volume", ["tiledarray", "density", "invalid"]]])JSON",
+            houio::DiagnosticCategory::schema, "sharedprimitivedata[0]",
+            "shared primitive voxel payload diagnostic");
+        result != 0)
+    {
+        return result;
+    }
+
+    if (const int result = expectImportDiagnostic(
             R"JSON(["pointcount", 1, "vertexcount", 0, "primitivecount", 0, "attributes", ["pointattributes", [[["type", "numeric", "name", "P"], ["size", 3, "storage", "fpreal32", "values", ["size", 3, "storage", "fpreal32", "tuples", []]]]]]])JSON",
             houio::DiagnosticCategory::schema, "attributes.pointattributes[0]",
             "point attribute diagnostic");

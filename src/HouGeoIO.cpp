@@ -174,7 +174,6 @@ namespace houio
 		return result.value;
 	}
 
-	// prim -1 means we will get a simple pointsgeometry
 	Geometry::Ptr HouGeoIO::convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim )
 	{
 		return convertToGeometry(houGeo, houPrim, nullptr);
@@ -583,12 +582,12 @@ namespace houio
 		}
 	}
 
-	void HouGeoIO::makeLog( const std::string &path, std::ostream *out )
+	void HouGeoIO::makeLog( const std::string &path, std::ostream *output )
 	{
-		std::ifstream in( path.c_str(), std::ios_base::in | std::ios_base::binary );
-		json::JSONLogger logger(*out);
-		json::Parser p;
-		p.parse( &in, &logger );
+		std::ifstream input( path.c_str(), std::ios_base::in | std::ios_base::binary );
+		json::JSONLogger logger(*output);
+		json::Parser parser;
+		parser.parse( &input, &logger );
 	}
 
 
@@ -612,303 +611,269 @@ namespace houio
 		return exportVolume(filename, volume);
 	}
 
-	HouGeo::Ptr HouGeoIO::adaptGeometry( Geometry::Ptr geo )
+	HouGeo::Ptr HouGeoIO::adaptGeometry( Geometry::Ptr geometry )
 	{
-		if( !geo )
+		if( !geometry )
 			return HouGeo::Ptr();
-		HouGeo::Ptr houGeo = std::make_shared<HouGeo>();
+		HouGeo::Ptr houdiniGeometry = std::make_shared<HouGeo>();
 
-
-		// contruct point attributes  ---
 		std::vector<std::string> pointAttributeNames;
-		geo->getAttrNames(pointAttributeNames);
-		for( auto name : pointAttributeNames )
+		geometry->getAttrNames(pointAttributeNames);
+		for( const std::string &name : pointAttributeNames )
 		{
-			Attribute::Ptr attr = geo->getAttr(name);
+			Attribute::Ptr sourceAttribute = geometry->getAttr(name);
 
-			// some attributes need special treatment
-			if( name == "P" && attr->numComponents() == 3 )
+			// Houdini stores P as a four-component point position in this representation.
+			if( name == "P" && sourceAttribute->numComponents() == 3 )
 			{
-				// promote P attribute from v3f to v4f
-				Attribute::Ptr attr_new = std::make_shared<Attribute>( 4, Attribute::FLOAT);
-				int numElements = attr->numElements();
-				for( int i=0;i<numElements;++i )
+				Attribute::Ptr promotedAttribute = std::make_shared<Attribute>(4, Attribute::FLOAT);
+				const int elementCount = sourceAttribute->numElements();
+				for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
 				{
-					math::V3f p = attr->get<math::V3f>(i);
-					attr_new->appendElement<math::V4f>( math::V4f(p.x, p.y, p.z, 1.0) );
+					const math::V3f position = sourceAttribute->get<math::V3f>(elementIndex);
+					promotedAttribute->appendElement<math::V4f>(
+						math::V4f(position.x, position.y, position.z, 1.0f));
 				}
-				attr = attr_new;
+				sourceAttribute = promotedAttribute;
 			}
 
-			HouGeo::HouAttribute::Ptr hattr = std::make_shared<HouGeo::HouAttribute>( name, attr );
-			houGeo->setPointAttribute( hattr );
+			HouGeo::HouAttribute::Ptr houdiniAttribute =
+				std::make_shared<HouGeo::HouAttribute>(name, sourceAttribute);
+			houdiniGeometry->setPointAttribute(houdiniAttribute);
 		}
 
-		if(geo->numPrimitives()>0)
+		if( geometry->numPrimitives() > 0 )
 		{
-			// topology ---
-			HouGeo::HouTopology::Ptr top = std::make_shared<HouGeo::HouTopology>();
-
-			size_t numIndices = geo->m_indexBuffer.size();
-			top->indexBuffer.resize(numIndices);
-			for( size_t i=0;i<numIndices;++i )
-				top->indexBuffer[i] = geo->m_indexBuffer[i];
-
-			houGeo->setTopology(top);
-
-			// primitives ---
-
-			// each poly is a seperate primitive...
-			/*
-			for( int i=0;i<geo->numPrimitives();++i )
+			HouGeo::HouTopology::Ptr topology = std::make_shared<HouGeo::HouTopology>();
+			topology->indexBuffer.reserve(geometry->m_indexBuffer.size());
+			for( const unsigned int pointIndex : geometry->m_indexBuffer )
 			{
-				HouGeo::HouPoly::Ptr poly = std::make_shared<HouGeo::HouPoly>();
-				poly->m_numPolys = 1;
-				poly->m_perPolyVertexCount = std::vector<int>(1, geo->numPrimitiveVertices());
-				poly->m_vertices.resize(geo->numPrimitiveVertices());
-				for( int j=0;j<geo->numPrimitiveVertices();++j )
-					poly->m_vertices[j] = i*geo->numPrimitiveVertices() + j;
-				houGeo->addPrimitive(poly);
+				if( pointIndex > static_cast<unsigned int>(std::numeric_limits<int>::max()) )
+					throw std::overflow_error( "HouGeoIO::adaptGeometry point index exceeds int range" );
+				topology->indexBuffer.push_back(static_cast<int>(pointIndex));
 			}
-			*/
+			houdiniGeometry->setTopology(topology);
 
-			// all polys are combined making a run
+			// The simplified Geometry model uses a fixed vertex count, so all polygons form one run.
+			HouGeo::HouPoly::Ptr polygonRun = std::make_shared<HouGeo::HouPoly>();
+			const int primitiveCount = geometry->numPrimitives();
+			const int verticesPerPrimitive = geometry->numPrimitiveVertices();
+			polygonRun->m_numPolys = primitiveCount;
+			polygonRun->m_perPolyVertexListOffset.assign(static_cast<size_t>(primitiveCount), 0);
+			for( int primitiveIndex=1;primitiveIndex<primitiveCount;++primitiveIndex )
 			{
-				HouGeo::HouPoly::Ptr poly = std::make_shared<HouGeo::HouPoly>();
-				poly->m_numPolys = geo->numPrimitives();
-				poly->m_perPolyVertexListOffset = std::vector<int>(geo->numPrimitives(), 0);
-				int numPrims = geo->numPrimitives();
-				int numPrimVertices = geo->numPrimitiveVertices();
-				for( int i=1;i<numPrims;++i )
-				{
-					poly->m_perPolyVertexListOffset[i] = poly->m_perPolyVertexListOffset[i-1] + numPrimVertices;
-				}
-				poly->m_perPolyVertexCount = std::vector<int>(numPrims, numPrimVertices);
-
-				if( geo->m_indexBuffer.size() > static_cast<size_t>(std::numeric_limits<int>::max()) )
-					throw std::overflow_error( "HouGeoIO::xport index buffer exceeds int range" );
-				poly->m_vertices.resize(geo->m_indexBuffer.size());
-				for( size_t i=0;i<geo->m_indexBuffer.size();++i )
-					poly->m_vertices[i] = static_cast<int>(i);
-
-				poly->m_closed = false;
-				if(geo->primitiveType() != Geometry::LINE)
-					poly->m_closed = true;
-
-				houGeo->addPrimitive(poly);
+				polygonRun->m_perPolyVertexListOffset[static_cast<size_t>(primitiveIndex)] =
+					polygonRun->m_perPolyVertexListOffset[static_cast<size_t>(primitiveIndex - 1)]
+					+ verticesPerPrimitive;
 			}
+			polygonRun->m_perPolyVertexCount.assign(static_cast<size_t>(primitiveCount), verticesPerPrimitive);
+
+			if( geometry->m_indexBuffer.size() > static_cast<size_t>(std::numeric_limits<int>::max()) )
+				throw std::overflow_error( "HouGeoIO::adaptGeometry index buffer exceeds int range" );
+			polygonRun->m_vertices.resize(geometry->m_indexBuffer.size());
+			for( size_t vertexIndex=0;vertexIndex<geometry->m_indexBuffer.size();++vertexIndex )
+				polygonRun->m_vertices[vertexIndex] = static_cast<int>(vertexIndex);
+
+			polygonRun->m_closed = geometry->primitiveType() != Geometry::LINE;
+			houdiniGeometry->addPrimitive(polygonRun);
 		}
 
-
-		return houGeo;
+		return houdiniGeometry;
 	}
 
-	bool HouGeoIO::exportGeometry( const std::string &filename, Geometry::Ptr geo )
+	bool HouGeoIO::exportGeometry( const std::string &filename, Geometry::Ptr geometry )
 	{
-		return static_cast<bool>(GeometryIO::writeGeometry(filename, geo));
+		return static_cast<bool>(GeometryIO::writeGeometry(filename, geometry));
 	}
 
-	bool HouGeoIO::xport( const std::string &filename, Geometry::Ptr geo )
+	bool HouGeoIO::xport( const std::string &filename, Geometry::Ptr geometry )
 	{
-		return exportGeometry(filename, geo);
+		return exportGeometry(filename, geometry);
 	}
 
 	bool HouGeoIO::xport( const std::string& filename, const std::vector<math::V3f>& points )
 	{
-		std::map<std::string, std::vector<math::V3f>> pattr_v3f;
-		pattr_v3f["P"] = points;
-		return xport(filename, pattr_v3f);
+		std::map<std::string, std::vector<math::V3f>> pointAttributes;
+		pointAttributes["P"] = points;
+		return xport(filename, pointAttributes);
 	}
 
-	bool HouGeoIO::xport( const std::string& filename, const std::map<std::string, std::vector<math::V3f>>& pattr_v3f )
+	bool HouGeoIO::xport( const std::string& filename,
+		const std::map<std::string, std::vector<math::V3f>>& pointAttributes )
 	{
-		Geometry::Ptr geo = Geometry::createPointGeometry();
+		Geometry::Ptr geometry = Geometry::createPointGeometry();
 
-		for( auto&it:pattr_v3f )
+		for( const auto &entry : pointAttributes )
 		{
-			std::string name = it.first;
-			const std::vector<math::V3f>& data = it.second;
+			const std::string &name = entry.first;
+			const std::vector<math::V3f> &values = entry.second;
+			const int elementCount = static_cast<int>(values.size());
+			if( elementCount == 0 )
+				continue;
 
-			int numElements = int(data.size());
-			if (numElements > 0)
-			{
-				Attribute::Ptr attr = Attribute::createV3f(numElements);
-				memcpy(attr->getRawPointer(), &data[0], sizeof(math::V3f)*numElements);
-				geo->setAttr(name, attr);
-			}
+			Attribute::Ptr attribute = Attribute::createV3f(elementCount);
+			memcpy(attribute->getRawPointer(), values.data(), sizeof(math::V3f) * static_cast<size_t>(elementCount));
+			geometry->setAttr(name, attribute);
 		}
 
-		return xport( filename, geo );
+		return xport(filename, geometry);
 	}
 
 
 
 
-	bool HouGeoIO::xport( std::ostream *out, HouGeoAdapter::Ptr geo, bool binary )
+	bool HouGeoIO::xport( std::ostream *output, HouGeoAdapter::Ptr geometry, bool binary )
 	{
-		return exportGeometry(out, geo, binary);
+		return exportGeometry(output, geometry, binary);
 	}
 
-	bool HouGeoIO::exportGeometry( std::ostream *out, HouGeoAdapter::Ptr geo, bool binary )
+	bool HouGeoIO::exportGeometry( std::ostream *output, HouGeoAdapter::Ptr geometry, bool binary )
 	{
-		if( !out || !geo || !out->good() )
-			return false;
-		if( !binary )
+		if( !output || !geometry || !output->good() || !binary )
 			return false;
 
-		json::BinaryWriter writer(out);
+		json::BinaryWriter writer(output);
 		ExportContext context(writer);
-		json::BinaryWriter* const g_writer = &context.writer;
 
-		const sint64 pointCount = geo->pointcount();
-		const sint64 vertexCount = geo->vertexcount();
-		const sint64 primitiveCount = geo->primitivecount();
+		const sint64 pointCount = geometry->pointcount();
+		const sint64 vertexCount = geometry->vertexcount();
+		const sint64 primitiveCount = geometry->primitivecount();
 		if( pointCount < 0 || vertexCount < 0 || primitiveCount < 0 )
 			throw std::runtime_error( "HouGeoIO::exportGeometry received negative geometry counts" );
 
-		g_writer->jsonBeginArray();
+		writer.jsonBeginArray();
 
-		g_writer->jsonString( "pointcount" );
-		g_writer->jsonInt( pointCount );
+		writer.jsonString( "pointcount" );
+		writer.jsonInt( pointCount );
 
-		g_writer->jsonString( "vertexcount" );
-		g_writer->jsonInt( vertexCount );
+		writer.jsonString( "vertexcount" );
+		writer.jsonInt( vertexCount );
 
-		g_writer->jsonString( "primitivecount" );
-		g_writer->jsonInt( primitiveCount );
+		writer.jsonString( "primitivecount" );
+		writer.jsonInt( primitiveCount );
 
-		// -- topology (required)
-		g_writer->jsonString( "topology" );
-		g_writer->jsonBeginArray();
-			if( geo->getTopology() )
-				exportTopology(context, geo->getTopology());
-		g_writer->jsonEndArray();
+		writer.jsonString( "topology" );
+		writer.jsonBeginArray();
+		if( geometry->getTopology() )
+			exportTopology(context, geometry->getTopology());
+		writer.jsonEndArray();
 
+		writer.jsonString( "attributes" );
+		writer.jsonBeginArray();
 
-		// -- attributes
-		g_writer->jsonString( "attributes" );
-		g_writer->jsonBeginArray();
+		writer.jsonString( "pointattributes" );
+		writer.jsonBeginArray();
+		std::vector<std::string> pointAttributeNames;
+		geometry->getPointAttributeNames(pointAttributeNames);
+		for( const std::string &name : pointAttributeNames )
+			exportAttribute(context, geometry->getPointAttribute(name));
+		writer.jsonEndArray();
 
-			// -- point attributes
-			g_writer->jsonString( "pointattributes" );
-			g_writer->jsonBeginArray();
-				std::vector<std::string> pointAttrNames;
-				geo->getPointAttributeNames(pointAttrNames);
-				for( std::vector<std::string>::iterator it = pointAttrNames.begin(); it != pointAttrNames.end(); ++it )
-					exportAttribute(context, geo->getPointAttribute(*it));
-			g_writer->jsonEndArray(); // pointattributes
+		writer.jsonString( "vertexattributes" );
+		writer.jsonBeginArray();
+		std::vector<std::string> vertexAttributeNames;
+		geometry->getVertexAttributeNames(vertexAttributeNames);
+		for( const std::string &name : vertexAttributeNames )
+			exportAttribute(context, geometry->getVertexAttribute(name));
+		writer.jsonEndArray();
 
-			// -- vertex attributes
-			g_writer->jsonString( "vertexattributes" );
-			g_writer->jsonBeginArray();
-				std::vector<std::string> vertexAttrNames;
-				geo->getVertexAttributeNames(vertexAttrNames);
-				for( std::vector<std::string>::iterator it = vertexAttrNames.begin(); it != vertexAttrNames.end(); ++it )
-					exportAttribute(context, geo->getVertexAttribute(*it));
-			g_writer->jsonEndArray(); // vertexattributes
+		writer.jsonString( "primitiveattributes" );
+		writer.jsonBeginArray();
+		std::vector<std::string> primitiveAttributeNames;
+		geometry->getPrimitiveAttributeNames(primitiveAttributeNames);
+		for( const std::string &name : primitiveAttributeNames )
+			exportAttribute(context, geometry->getPrimitiveAttribute(name));
+		writer.jsonEndArray();
 
+		writer.jsonString( "globalattributes" );
+		writer.jsonBeginArray();
+		std::vector<std::string> globalAttributeNames;
+		geometry->getGlobalAttributeNames(globalAttributeNames);
+		for( const std::string &name : globalAttributeNames )
+			exportAttribute(context, geometry->getGlobalAttribute(name));
+		writer.jsonEndArray();
 
-			// -- primitive attributes
-			g_writer->jsonString( "primitiveattributes" );
-			g_writer->jsonBeginArray();
-				std::vector<std::string> primitiveAttrNames;
-				geo->getPrimitiveAttributeNames(primitiveAttrNames);
-				for( std::vector<std::string>::iterator it = primitiveAttrNames.begin(); it != primitiveAttrNames.end(); ++it )
-					exportAttribute(context, geo->getPrimitiveAttribute(*it));
-			g_writer->jsonEndArray(); // primitiveattributes
+		writer.jsonEndArray();
 
-			// -- global attributes
-			g_writer->jsonString( "globalattributes" );
-			g_writer->jsonBeginArray();
-				std::vector<std::string> globalAttrNames;
-				geo->getGlobalAttributeNames(globalAttrNames);
-				for( std::vector<std::string>::iterator it = globalAttrNames.begin(); it != globalAttrNames.end(); ++it )
-					exportAttribute(context, geo->getGlobalAttribute(*it));
-			g_writer->jsonEndArray(); // globalattributes
-		g_writer->jsonEndArray(); // attributes
-
-
-		// -- primitives
 		if( primitiveCount > 0 )
 		{
-			g_writer->jsonString( "primitives" );
-			g_writer->jsonBeginArray();
+			writer.jsonString( "primitives" );
+			writer.jsonBeginArray();
 
 			std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
-			geo->getPrimitives(primitives);
+			geometry->getPrimitives(primitives);
 
 			int topologyVertexOffset = 0;
-			for( auto prim : primitives )
+			for( const HouGeoAdapter::Primitive::Ptr &primitive : primitives )
 			{
-				if( auto volume = std::dynamic_pointer_cast<HouGeoAdapter::VolumePrimitive>(prim) )
+				if( auto volume = std::dynamic_pointer_cast<HouGeoAdapter::VolumePrimitive>(primitive) )
 				{
 					exportPrimitive(context, volume);
 					++topologyVertexOffset;
 				}
-				else if( auto poly = std::dynamic_pointer_cast<HouGeoAdapter::PolyPrimitive>(prim) )
+				else if( auto polygonRun = std::dynamic_pointer_cast<HouGeoAdapter::PolyPrimitive>(primitive) )
 				{
-					exportPrimitive(context, poly, topologyVertexOffset);
-					for( int polygonIndex=0;polygonIndex<poly->numPolys();++polygonIndex )
-						topologyVertexOffset += poly->numVertices(polygonIndex);
+					exportPrimitive(context, polygonRun, topologyVertexOffset);
+					for( int polygonIndex=0;polygonIndex<polygonRun->numPolys();++polygonIndex )
+						topologyVertexOffset += polygonRun->numVertices(polygonIndex);
 				}
 			}
-			g_writer->jsonEndArray(); // primitives
+			writer.jsonEndArray();
 		}
 
 		std::vector<std::string> pointGroupNames;
-		geo->getPointGroupNames(pointGroupNames);
+		geometry->getPointGroupNames(pointGroupNames);
 		if( !pointGroupNames.empty() )
 		{
-			g_writer->jsonString("pointgroups");
-			g_writer->jsonBeginArray();
+			writer.jsonString("pointgroups");
+			writer.jsonBeginArray();
 			for( const std::string &name : pointGroupNames )
 			{
 				std::vector<bool> membership;
-				if( !geo->getPointGroupMembership(name, membership)
+				if( !geometry->getPointGroupMembership(name, membership)
 					|| membership.size() != static_cast<size_t>(pointCount) )
 					throw std::runtime_error( "HouGeoIO::exportGeometry invalid point group " + name );
 				exportGroup(context, name, membership);
 			}
-			g_writer->jsonEndArray();
+			writer.jsonEndArray();
 		}
 
 		std::vector<std::string> vertexGroupNames;
-		geo->getVertexGroupNames(vertexGroupNames);
+		geometry->getVertexGroupNames(vertexGroupNames);
 		if( !vertexGroupNames.empty() )
 		{
-			g_writer->jsonString("vertexgroups");
-			g_writer->jsonBeginArray();
+			writer.jsonString("vertexgroups");
+			writer.jsonBeginArray();
 			for( const std::string &name : vertexGroupNames )
 			{
 				std::vector<bool> membership;
-				if( !geo->getVertexGroupMembership(name, membership)
+				if( !geometry->getVertexGroupMembership(name, membership)
 					|| membership.size() != static_cast<size_t>(vertexCount) )
 					throw std::runtime_error( "HouGeoIO::exportGeometry invalid vertex group " + name );
 				exportGroup(context, name, membership);
 			}
-			g_writer->jsonEndArray();
+			writer.jsonEndArray();
 		}
 
 		std::vector<std::string> primitiveGroupNames;
-		geo->getPrimitiveGroupNames(primitiveGroupNames);
+		geometry->getPrimitiveGroupNames(primitiveGroupNames);
 		if( !primitiveGroupNames.empty() )
 		{
-			g_writer->jsonString("primitivegroups");
-			g_writer->jsonBeginArray();
+			writer.jsonString("primitivegroups");
+			writer.jsonBeginArray();
 			for( const std::string &name : primitiveGroupNames )
 			{
 				std::vector<bool> membership;
-				if( !geo->getPrimitiveGroupMembership(name, membership)
+				if( !geometry->getPrimitiveGroupMembership(name, membership)
 					|| membership.size() != static_cast<size_t>(primitiveCount) )
 					throw std::runtime_error( "HouGeoIO::exportGeometry invalid primitive group " + name );
 				exportGroup(context, name, membership);
 			}
-			g_writer->jsonEndArray();
+			writer.jsonEndArray();
 		}
 
-		g_writer->jsonEndArray(); // /root
-
-		return out->good();
+		writer.jsonEndArray();
+		return output->good();
 	}
 
 
@@ -916,238 +881,200 @@ namespace houio
 
 
 
-	bool HouGeoIO::exportAttribute( ExportContext &context, HouGeoAdapter::AttributeAdapter::Ptr attr )
+	bool HouGeoIO::exportAttribute( ExportContext &context, HouGeoAdapter::AttributeAdapter::Ptr attribute )
 	{
-		json::BinaryWriter* const g_writer = &context.writer;
-		if( !attr )
+		if( !attribute )
 			return false;
+		json::BinaryWriter &writer = context.writer;
 
-		std::string type;
-		std::string storage;
-		const int sourceSize = attr->getTupleSize();
-		const std::string name = attr->getName();
-		const bool promotePosition = name == "P" && sourceSize == 3;
-		const int size = promotePosition ? 4 : sourceSize;
+		std::string attributeType;
+		std::string storageName;
+		const int sourceTupleSize = attribute->getTupleSize();
+		const std::string name = attribute->getName();
+		const bool promotePosition = name == "P" && sourceTupleSize == 3;
+		const int exportTupleSize = promotePosition ? 4 : sourceTupleSize;
+		const int elementCount = attribute->getNumElements();
 
-		if( attr->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
-			type = "numeric";
-		else if( attr->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING )
-			type = "string";
+		if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
+			attributeType = "numeric";
+		else if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING )
+			attributeType = "string";
 
-		if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
-				storage = "fpreal16";
-		else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
-				storage = "fpreal32";
-		else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
-				storage = "fpreal64";
-		else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
-				storage = "int32";
-		else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
-				storage = "int64";
+		if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+			storageName = "fpreal16";
+		else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+			storageName = "fpreal32";
+		else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+			storageName = "fpreal64";
+		else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
+			storageName = "int32";
+		else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
+			storageName = "int64";
 
-		if( attr->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC && storage.empty() )
+		if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC && storageName.empty() )
 			throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported storage for attribute " + name );
 
-		if( name == "P" && size != 4 )
+		if( name == "P" && exportTupleSize != 4 )
 			throw std::runtime_error( "HouGeoIO::exportAttribute: P must contain either three or four components" );
 
-		g_writer->jsonBeginArray();
+		writer.jsonBeginArray();
 
+		writer.jsonBeginArray();
+		writer.jsonString( "name" );
+		writer.jsonString( name );
+		writer.jsonString( "type" );
+		writer.jsonString(attributeType);
+		writer.jsonEndArray();
 
-		// attribute definition ------------
-		g_writer->jsonBeginArray();
-
-		g_writer->jsonString( "name" );
-		g_writer->jsonString( name );
-
-		g_writer->jsonString( "type" );
-		g_writer->jsonString(type);
-
-		g_writer->jsonEndArray(); // definition
-
-		// attribute content ------------
-		g_writer->jsonBeginArray();
-
-		if( attr->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
+		writer.jsonBeginArray();
+		if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
 		{
-			g_writer->jsonString( "size" );
-			g_writer->jsonInt( size );
+			writer.jsonString( "size" );
+			writer.jsonInt( exportTupleSize );
+			writer.jsonString( "storage" );
+			writer.jsonString( storageName );
 
-			g_writer->jsonString( "storage" );
-			g_writer->jsonString( storage );
+			writer.jsonString( "values" );
+			writer.jsonBeginArray();
+			writer.jsonString( "size" );
+			writer.jsonInt( exportTupleSize );
+			writer.jsonString( "storage" );
+			writer.jsonString( storageName );
+			writer.jsonString( "pagesize" );
+			writer.jsonInt( 1024 );
+			writer.jsonString( "rawpagedata" );
 
+			HouGeoAdapter::RawPointer::Ptr rawPointer = attribute->getRawPointer();
+			if( !rawPointer || (!rawPointer->ptr && elementCount > 0) )
+				throw std::runtime_error( "HouGeoIO::exportAttribute: missing data for attribute " + name );
 
-			g_writer->jsonString( "values" );
-			g_writer->jsonBeginArray();
-
-				g_writer->jsonString( "size" );
-				g_writer->jsonInt( size );
-
-				g_writer->jsonString( "storage" );
-				g_writer->jsonString( storage );
-
-				g_writer->jsonString( "pagesize" );
-				g_writer->jsonInt( 1024 );
-
-
-				//g_writer->jsonString( "packing" );
-				//std::vector<int> packing;
-				//attr->getPacking( packing );
-				//g_writer->jsonUniformArray( packing );
-
-				//std::cout << "CHECK " << name << std::endl;
-				//std::cout << "CHECK " << attr->getNumElements() << std::endl;
-				//std::cout << "CHECK " << attr->getTupleSize() << std::endl;
-				//attr->getRawPointer();
-
-				g_writer->jsonString( "rawpagedata" );
-				HouGeoAdapter::RawPointer::Ptr rawPointer = attr->getRawPointer();
-				if( !rawPointer || (!rawPointer->ptr && attr->getNumElements() > 0) )
-					throw std::runtime_error( "HouGeoIO::exportAttribute: missing data for attribute " + name );
-
-				if( promotePosition )
+			if( promotePosition )
+			{
+				if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
 				{
-					if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+					const uword* source = static_cast<const uword*>(rawPointer->ptr);
+					std::vector<uword> promotedData(static_cast<size_t>(elementCount) * 4u);
+					for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
 					{
-						const uword* source = static_cast<const uword*>(rawPointer->ptr);
-						std::vector<uword> promotedData(static_cast<size_t>(attr->getNumElements())*4u);
-						for( int elementIndex=0;elementIndex<attr->getNumElements();++elementIndex )
-						{
-							const size_t sourceOffset = static_cast<size_t>(elementIndex)*3u;
-							const size_t destinationOffset = static_cast<size_t>(elementIndex)*4u;
-							promotedData[destinationOffset] = source[sourceOffset];
-							promotedData[destinationOffset+1u] = source[sourceOffset+1u];
-							promotedData[destinationOffset+2u] = source[sourceOffset+2u];
-							promotedData[destinationOffset+3u] = floatToHalfBits(1.0f);
-						}
-						g_writer->jsonUniformArrayReal16(promotedData.data(), static_cast<sint64>(promotedData.size()));
+						const size_t sourceOffset = static_cast<size_t>(elementIndex) * 3u;
+						const size_t destinationOffset = static_cast<size_t>(elementIndex) * 4u;
+						promotedData[destinationOffset] = source[sourceOffset];
+						promotedData[destinationOffset + 1u] = source[sourceOffset + 1u];
+						promotedData[destinationOffset + 2u] = source[sourceOffset + 2u];
+						promotedData[destinationOffset + 3u] = floatToHalfBits(1.0f);
 					}
-					else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
-					{
-						const real32* source = static_cast<const real32*>(rawPointer->ptr);
-						std::vector<real32> promotedData(static_cast<size_t>(attr->getNumElements())*4u);
-						for( int elementIndex=0;elementIndex<attr->getNumElements();++elementIndex )
-						{
-							const size_t sourceOffset = static_cast<size_t>(elementIndex)*3u;
-							const size_t destinationOffset = static_cast<size_t>(elementIndex)*4u;
-							promotedData[destinationOffset] = source[sourceOffset];
-							promotedData[destinationOffset+1u] = source[sourceOffset+1u];
-							promotedData[destinationOffset+2u] = source[sourceOffset+2u];
-							promotedData[destinationOffset+3u] = 1.0f;
-						}
-						g_writer->jsonUniformArray(promotedData);
-					}
-					else
-						throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported three-component P storage" );
+					writer.jsonUniformArrayReal16(promotedData.data(), static_cast<sint64>(promotedData.size()));
 				}
-				else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
-					g_writer->jsonUniformArrayReal16(static_cast<const uword*>(rawPointer->ptr), attr->getNumElements()*sourceSize);
-				else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
-					g_writer->jsonUniformArray<real32>( static_cast<const real32*>(rawPointer->ptr), attr->getNumElements()*sourceSize );
-				else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
-					g_writer->jsonUniformArray<real64>( static_cast<const real64*>(rawPointer->ptr), attr->getNumElements()*sourceSize );
-				else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
-					g_writer->jsonUniformArray<sint32>( static_cast<const sint32*>(rawPointer->ptr), attr->getNumElements()*sourceSize );
-				else if( attr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
-					g_writer->jsonUniformArray<sint64>( static_cast<const sint64*>(rawPointer->ptr), attr->getNumElements()*sourceSize );
+				else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+				{
+					const real32* source = static_cast<const real32*>(rawPointer->ptr);
+					std::vector<real32> promotedData(static_cast<size_t>(elementCount) * 4u);
+					for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
+					{
+						const size_t sourceOffset = static_cast<size_t>(elementIndex) * 3u;
+						const size_t destinationOffset = static_cast<size_t>(elementIndex) * 4u;
+						promotedData[destinationOffset] = source[sourceOffset];
+						promotedData[destinationOffset + 1u] = source[sourceOffset + 1u];
+						promotedData[destinationOffset + 2u] = source[sourceOffset + 2u];
+						promotedData[destinationOffset + 3u] = 1.0f;
+					}
+					writer.jsonUniformArray(promotedData);
+				}
+				else
+					throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported three-component P storage" );
+			}
+			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+				writer.jsonUniformArrayReal16(static_cast<const uword*>(rawPointer->ptr), elementCount * sourceTupleSize);
+			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+				writer.jsonUniformArray<real32>( static_cast<const real32*>(rawPointer->ptr), elementCount * sourceTupleSize );
+			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+				writer.jsonUniformArray<real64>( static_cast<const real64*>(rawPointer->ptr), elementCount * sourceTupleSize );
+			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
+				writer.jsonUniformArray<sint32>( static_cast<const sint32*>(rawPointer->ptr), elementCount * sourceTupleSize );
+			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
+				writer.jsonUniformArray<sint64>( static_cast<const sint64*>(rawPointer->ptr), elementCount * sourceTupleSize );
 
-			g_writer->jsonEndArray(); // values
-		}else
-		if(attr->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING )
+			writer.jsonEndArray();
+		}
+		else if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING )
 		{
-			g_writer->jsonString( "size" );
-			g_writer->jsonInt( size );
-
-			g_writer->jsonString( "storage" );
-			g_writer->jsonString( "int32" );
+			writer.jsonString( "size" );
+			writer.jsonInt( exportTupleSize );
+			writer.jsonString( "storage" );
+			writer.jsonString( "int32" );
 
 			std::map<std::string, sint32> stringLookup;
 			std::vector<std::string> stringTable;
-			std::vector<sint32> indices;
-			stringTable.reserve(static_cast<size_t>(attr->getNumElements()));
-			indices.reserve(static_cast<size_t>(attr->getNumElements()));
-			for( int i=0;i<attr->getNumElements();++i )
+			std::vector<sint32> stringIndices;
+			stringTable.reserve(static_cast<size_t>(elementCount));
+			stringIndices.reserve(static_cast<size_t>(elementCount));
+			for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
 			{
-				const std::string value = attr->getString(i);
+				const std::string value = attribute->getString(elementIndex);
 				auto insertion = stringLookup.emplace(value, static_cast<sint32>(stringTable.size()));
 				if( insertion.second )
 					stringTable.push_back(value);
-				indices.push_back(insertion.first->second);
+				stringIndices.push_back(insertion.first->second);
 			}
 
-			g_writer->jsonString( "strings" );
-			g_writer->jsonBeginArray();
-				for( const std::string& value : stringTable )
-					g_writer->jsonString(value);
-			g_writer->jsonEndArray();
+			writer.jsonString( "strings" );
+			writer.jsonBeginArray();
+			for( const std::string &value : stringTable )
+				writer.jsonString(value);
+			writer.jsonEndArray();
 
-			g_writer->jsonString( "indices" );
-			g_writer->jsonBeginArray();
-				g_writer->jsonString( "size" );
-				g_writer->jsonInt32( 1 );
-
-				g_writer->jsonString( "storage" );
-				g_writer->jsonString( "int32" );
-
-				g_writer->jsonString( "pagesize" );
-				g_writer->jsonInt32( 1024 );
-
-				g_writer->jsonString( "rawpagedata" );
-				g_writer->jsonUniformArray(indices);
-
-			g_writer->jsonEndArray();
-
-
+			writer.jsonString( "indices" );
+			writer.jsonBeginArray();
+			writer.jsonString( "size" );
+			writer.jsonInt32( 1 );
+			writer.jsonString( "storage" );
+			writer.jsonString( "int32" );
+			writer.jsonString( "pagesize" );
+			writer.jsonInt32( 1024 );
+			writer.jsonString( "rawpagedata" );
+			writer.jsonUniformArray(stringIndices);
+			writer.jsonEndArray();
 		}
 
-
-
-		g_writer->jsonEndArray(); // attribute content
-
-
-
-		g_writer->jsonEndArray(); // attribute
-
+		writer.jsonEndArray();
+		writer.jsonEndArray();
 		return true;
 	}
 
-	// export topo
-	// TODO: datatype is int ~~~~
-	bool HouGeoIO::exportTopology( ExportContext &context, HouGeoAdapter::Topology::Ptr topo )
+	bool HouGeoIO::exportTopology( ExportContext &context, HouGeoAdapter::Topology::Ptr topology )
 	{
-		json::BinaryWriter* const g_writer = &context.writer;
-		if( !topo )
+		if( !topology )
 			return false;
+		json::BinaryWriter &writer = context.writer;
+
 		std::vector<sint32> indices;
-		topo->getIndices(indices);
-		
-		// Determine the type used for the index array, either 16- or 32-bit integers.
-		bool indexExceeds16Bit = false;
+		topology->getIndices(indices);
+
+		bool requires32BitIndices = false;
 		for( const sint32 index : indices )
 		{
 			if( index < 0 )
 				throw std::runtime_error( "HouGeoIO::exportTopology cannot export negative point indices" );
 			if( index > std::numeric_limits<sint16>::max() )
-				indexExceeds16Bit = true;
+				requires32BitIndices = true;
 		}
 
-		g_writer->jsonString( "pointref" );
-		g_writer->jsonBeginArray();
-			g_writer->jsonString( "indices" );
-			if( indexExceeds16Bit )
-			{
-				g_writer->jsonUniformArray<sint32>(indices);
-			}
-			else
-			{
-				std::vector<sint16> compactIndices;
-				compactIndices.reserve(indices.size());
-				for( const sint32 index : indices )
-					compactIndices.push_back(static_cast<sint16>(index));
-				g_writer->jsonUniformArray<sint16>(compactIndices);
-			}
-			
-		g_writer->jsonEndArray();
+		writer.jsonString( "pointref" );
+		writer.jsonBeginArray();
+		writer.jsonString( "indices" );
+		if( requires32BitIndices )
+		{
+			writer.jsonUniformArray<sint32>(indices);
+		}
+		else
+		{
+			std::vector<sint16> compactIndices;
+			compactIndices.reserve(indices.size());
+			for( const sint32 index : indices )
+				compactIndices.push_back(static_cast<sint16>(index));
+			writer.jsonUniformArray<sint16>(compactIndices);
+		}
+		writer.jsonEndArray();
 
 		return true;
 	}
@@ -1155,219 +1082,194 @@ namespace houio
 
 	bool HouGeoIO::exportGroup( ExportContext &context, const std::string &name, const std::vector<bool> &membership )
 	{
-		json::BinaryWriter* const g_writer = &context.writer;
 		if( name.empty() )
 			throw std::runtime_error( "HouGeoIO::exportGroup requires a non-empty name" );
+		json::BinaryWriter &writer = context.writer;
 
 		std::vector<sbyte> encodedMembership;
 		encodedMembership.reserve(membership.size());
-		for( bool selected : membership )
+		for( const bool selected : membership )
 			encodedMembership.push_back(static_cast<sbyte>(selected ? 1 : 0));
 
-		g_writer->jsonBeginArray();
-			g_writer->jsonBeginArray();
-				g_writer->jsonString("name");
-				g_writer->jsonString(name);
-			g_writer->jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonBeginArray();
+		writer.jsonString("name");
+		writer.jsonString(name);
+		writer.jsonEndArray();
 
-			g_writer->jsonBeginArray();
-				g_writer->jsonString("selection");
-				g_writer->jsonBeginArray();
-					g_writer->jsonString("unordered");
-					g_writer->jsonBeginArray();
-						g_writer->jsonString("i8");
-						g_writer->jsonUniformArray(encodedMembership);
-					g_writer->jsonEndArray();
-				g_writer->jsonEndArray();
-			g_writer->jsonEndArray();
-		g_writer->jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonString("selection");
+		writer.jsonBeginArray();
+		writer.jsonString("unordered");
+		writer.jsonBeginArray();
+		writer.jsonString("i8");
+		writer.jsonUniformArray(encodedMembership);
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		writer.jsonEndArray();
 		return true;
 	}
 
 	bool HouGeoIO::exportPrimitive( ExportContext &context, HouGeoAdapter::VolumePrimitive::Ptr volume )
 	{
-		json::BinaryWriter* const g_writer = &context.writer;
 		if( !volume )
 			return false;
-		math::V3i res = volume->getResolution();
+		json::BinaryWriter &writer = context.writer;
+		const math::V3i resolution = volume->getResolution();
 
-		g_writer->jsonBeginArray();
+		writer.jsonBeginArray();
 
-		// primitive type
-		g_writer->jsonBeginArray();
-			g_writer->jsonString("type");
-			g_writer->jsonString("Volume");
-		g_writer->jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString("Volume");
+		writer.jsonEndArray();
 
-		g_writer->jsonBeginArray();
-			g_writer->jsonString("vertex");
-			g_writer->jsonInt32(volume->getVertex());
+		writer.jsonBeginArray();
+		writer.jsonString("vertex");
+		writer.jsonInt32(volume->getVertex());
 
-			g_writer->jsonString("transform");
-			math::M44f houLocalToWorldTranslation = math::M44f::TranslationMatrix(volume->getTransform().getTranslation());
-			math::M44f houLocalToWorldRotationScale = math::M44f::ScaleMatrix(0.5f)*math::M44f::TranslationMatrix(1.0,1.0,1.0)*volume->getTransform()*houLocalToWorldTranslation.inverted();
-			math::M33f transform( houLocalToWorldRotationScale.ma[0], houLocalToWorldRotationScale.ma[1], houLocalToWorldRotationScale.ma[2],
-						houLocalToWorldRotationScale.ma[4], houLocalToWorldRotationScale.ma[5], houLocalToWorldRotationScale.ma[6],
-						houLocalToWorldRotationScale.ma[8], houLocalToWorldRotationScale.ma[9], houLocalToWorldRotationScale.ma[10]);
-			g_writer->jsonUniformArray<real32>( transform.ma, 9 );
+		writer.jsonString("transform");
+		const math::M44f translation = math::M44f::TranslationMatrix(volume->getTransform().getTranslation());
+		const math::M44f rotationScale = math::M44f::ScaleMatrix(0.5f)
+			* math::M44f::TranslationMatrix(1.0, 1.0, 1.0)
+			* volume->getTransform() * translation.inverted();
+		const math::M33f transform( rotationScale.ma[0], rotationScale.ma[1], rotationScale.ma[2],
+			rotationScale.ma[4], rotationScale.ma[5], rotationScale.ma[6],
+			rotationScale.ma[8], rotationScale.ma[9], rotationScale.ma[10]);
+		writer.jsonUniformArray<real32>( transform.ma, 9 );
 
-			g_writer->jsonString("res");
-			g_writer->jsonUniformArray<sint32>( &res.x, 3 );
+		writer.jsonString("res");
+		writer.jsonUniformArray<sint32>( &resolution.x, 3 );
 
-			g_writer->jsonString("border");
-			g_writer->jsonBeginMap();
-				g_writer->jsonKey("type");
-				g_writer->jsonString("constant");
-				g_writer->jsonKey("value");
-				g_writer->jsonReal32(0.0f);
-			g_writer->jsonEndMap();
+		writer.jsonString("border");
+		writer.jsonBeginMap();
+		writer.jsonKey("type");
+		writer.jsonString("constant");
+		writer.jsonKey("value");
+		writer.jsonReal32(0.0f);
+		writer.jsonEndMap();
 
-			g_writer->jsonString("compression");
-			g_writer->jsonBeginMap();
-				g_writer->jsonKey("tolerance");
-				g_writer->jsonReal32(0.0f);
-			g_writer->jsonEndMap();
+		writer.jsonString("compression");
+		writer.jsonBeginMap();
+		writer.jsonKey("tolerance");
+		writer.jsonReal32(0.0f);
+		writer.jsonEndMap();
 
-			g_writer->jsonString("voxels");
-			g_writer->jsonBeginArray();
-				g_writer->jsonString("tiledarray");
-				g_writer->jsonBeginArray();
-					g_writer->jsonString("version");
-					g_writer->jsonInt32( 1 );
+		writer.jsonString("voxels");
+		writer.jsonBeginArray();
+		writer.jsonString("tiledarray");
+		writer.jsonBeginArray();
+		writer.jsonString("version");
+		writer.jsonInt32( 1 );
 
-					g_writer->jsonString("compressiontypes");
-					// !!! uniform string array?
-					g_writer->jsonBeginArray();
-						g_writer->jsonString("raw");
-						g_writer->jsonString("rawfull");
-						g_writer->jsonString("constant");
-						g_writer->jsonString("fpreal16");
-						g_writer->jsonString("FP32Range");
-					g_writer->jsonEndArray();
+		writer.jsonString("compressiontypes");
+		writer.jsonBeginArray();
+		writer.jsonString("raw");
+		writer.jsonString("rawfull");
+		writer.jsonString("constant");
+		writer.jsonString("fpreal16");
+		writer.jsonString("FP32Range");
+		writer.jsonEndArray();
 
-					g_writer->jsonString("tiles");
-					g_writer->jsonBeginArray();
+		writer.jsonString("tiles");
+		writer.jsonBeginArray();
 
-						// get first invalid tileindex in each dimension
-						math::Vec3i tileEnd;
-						tileEnd.x = res.x / 16;
-						tileEnd.y = res.y / 16;
-						tileEnd.z = res.z / 16;
+		const math::V3i tileCount(
+			resolution.x / 16 + (resolution.x % 16 != 0 ? 1 : 0),
+			resolution.y / 16 + (resolution.y % 16 != 0 ? 1 : 0),
+			resolution.z / 16 + (resolution.z % 16 != 0 ? 1 : 0));
+		math::Vec3i voxelOffset;
+		math::Vec3i tileResolution;
+		std::vector<real32> tileValues;
+		for( int tileZ=0;tileZ<tileCount.z;++tileZ )
+		{
+			voxelOffset.z = tileZ * 16;
+			tileResolution.z = std::min(16, resolution.z - voxelOffset.z);
+			for( int tileY=0;tileY<tileCount.y;++tileY )
+			{
+				voxelOffset.y = tileY * 16;
+				tileResolution.y = std::min(16, resolution.y - voxelOffset.y);
+				for( int tileX=0;tileX<tileCount.x;++tileX )
+				{
+					voxelOffset.x = tileX * 16;
+					tileResolution.x = std::min(16, resolution.x - voxelOffset.x);
 
-						// if there are some voxels remaining, add another tile
-						if( res.x%16 )
-							++tileEnd.x;
-						if( res.y%16 )
-							++tileEnd.y;
-						if( res.z%16 )
-							++tileEnd.z;
+					writer.jsonBeginArray();
+					writer.jsonString("compression");
+					writer.jsonInt32(0);
+					writer.jsonString("data");
+					tileValues.clear();
+					const math::V3i voxelEnd(
+						voxelOffset.x + tileResolution.x,
+						voxelOffset.y + tileResolution.y,
+						voxelOffset.z + tileResolution.z);
+					for( int voxelZ=voxelOffset.z;voxelZ<voxelEnd.z;++voxelZ )
+						for( int voxelY=voxelOffset.y;voxelY<voxelEnd.y;++voxelY )
+							for( int voxelX=voxelOffset.x;voxelX<voxelEnd.x;++voxelX )
+								tileValues.push_back(volume->getVoxel(voxelX, voxelY, voxelZ));
+					writer.jsonUniformArray(tileValues);
+					writer.jsonEndArray();
+				}
+			}
+		}
 
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		writer.jsonEndArray();
 
-						math::Vec3i voxelOffset; // start offset (in voxels) for current tile
-						math::Vec3i numVoxels;   // number of voxels for current tile (may differ in each dimension)
-						std::vector<real32> data;
-						int remainK = res.z;
-						for( int tk=0; tk<tileEnd.z;++tk )
-						{
-							voxelOffset.z = tk*16;
-							numVoxels.z = std::min( 16,  remainK );
+		writer.jsonString("visualization");
+		writer.jsonBeginMap();
+		writer.jsonKey("mode");
+		writer.jsonString(volume->getVisualizationMode());
+		writer.jsonKey("iso");
+		writer.jsonReal32(volume->getVisualizationIso());
+		writer.jsonKey("density");
+		writer.jsonReal32(volume->getVisualizationDensity());
+		writer.jsonEndMap();
 
-							int remainJ = res.y;
-							for( int tj=0; tj<tileEnd.y;++tj )
-							{
-								voxelOffset.y = tj*16;
-								numVoxels.y = std::min( 16,  remainJ );
+		writer.jsonString("taperx");
+		writer.jsonReal32(1.0f);
+		writer.jsonString("tapery");
+		writer.jsonReal32(1.0f);
 
-								int remainI = res.x;
-								for( int ti=0; ti<tileEnd.x;++ti )
-								{
-									voxelOffset.x = ti*16;
-									numVoxels.x = std::min( 16,  remainI );
-
-									// write tile ---
-									g_writer->jsonBeginArray();
-										g_writer->jsonString("compression");
-										g_writer->jsonInt32(0);
-										g_writer->jsonString("data");
-										data.clear();
-										math::V3i voxelEnd( voxelOffset.x + numVoxels.x, voxelOffset.y + numVoxels.y, voxelOffset.z + numVoxels.z );
-										for( int k=voxelOffset.z;k<voxelEnd.z;++k )
-											for( int j=voxelOffset.y;j<voxelEnd.y;++j )
-												for( int i=voxelOffset.x;i<voxelEnd.x;++i )
-													data.push_back(volume->getVoxel( i, j, k ));
-										g_writer->jsonUniformArray(data);
-									g_writer->jsonEndArray();
-
-									remainI -=16;
-								}
-								remainJ -=16;
-							}
-							remainK -=16;
-						}
-
-					g_writer->jsonEndArray();
-
-				g_writer->jsonEndArray();
-
-			g_writer->jsonEndArray();
-
-			g_writer->jsonString("visualization");
-			g_writer->jsonBeginMap();
-				g_writer->jsonKey("mode");
-				g_writer->jsonString(volume->getVisualizationMode());
-				g_writer->jsonKey("iso");
-				g_writer->jsonReal32(volume->getVisualizationIso());
-				g_writer->jsonKey("density");
-				g_writer->jsonReal32(volume->getVisualizationDensity());
-			g_writer->jsonEndMap();
-
-			g_writer->jsonString("taperx");
-			g_writer->jsonReal32(1.0f);
-
-			g_writer->jsonString("tapery");
-			g_writer->jsonReal32(1.0f);
-
-
-
-		g_writer->jsonEndArray();
-
-		g_writer->jsonEndArray();
+		writer.jsonEndArray();
+		writer.jsonEndArray();
 		return true;
 	}
 
-	bool HouGeoIO::exportPrimitive( ExportContext &context, HouGeoAdapter::PolyPrimitive::Ptr poly, int startVertex )
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::PolyPrimitive::Ptr polygonRun, int startVertex )
 	{
-		json::BinaryWriter* const g_writer = &context.writer;
-		if( !poly || startVertex < 0 || poly->numPolys() <= 0 )
+		if( !polygonRun || startVertex < 0 || polygonRun->numPolys() <= 0 )
 			return false;
+		json::BinaryWriter &writer = context.writer;
 
 		std::vector<sint32> vertexCounts;
-		vertexCounts.reserve(static_cast<size_t>(poly->numPolys()));
-		for( int polygonIndex=0;polygonIndex<poly->numPolys();++polygonIndex )
+		vertexCounts.reserve(static_cast<size_t>(polygonRun->numPolys()));
+		for( int polygonIndex=0;polygonIndex<polygonRun->numPolys();++polygonIndex )
 		{
-			const int vertexCount = poly->numVertices(polygonIndex);
+			const int vertexCount = polygonRun->numVertices(polygonIndex);
 			if( vertexCount <= 0 )
 				throw std::runtime_error( "HouGeoIO::exportPrimitive: polygon has no vertices" );
 			vertexCounts.push_back(vertexCount);
 		}
 
-		g_writer->jsonBeginArray();
-			g_writer->jsonBeginArray();
-				g_writer->jsonString("type");
-				g_writer->jsonString(poly->closed() ? "Polygon_run" : "PolygonCurve_run");
-			g_writer->jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString(polygonRun->closed() ? "Polygon_run" : "PolygonCurve_run");
+		writer.jsonEndArray();
 
-			g_writer->jsonBeginArray();
-				g_writer->jsonString("startvertex");
-				g_writer->jsonInt32(startVertex);
-
-				g_writer->jsonString("nprimitives");
-				g_writer->jsonInt32(poly->numPolys());
-
-				g_writer->jsonString("nvertices");
-				g_writer->jsonUniformArray(vertexCounts);
-			g_writer->jsonEndArray();
-		g_writer->jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonString("startvertex");
+		writer.jsonInt32(startVertex);
+		writer.jsonString("nprimitives");
+		writer.jsonInt32(polygonRun->numPolys());
+		writer.jsonString("nvertices");
+		writer.jsonUniformArray(vertexCounts);
+		writer.jsonEndArray();
+		writer.jsonEndArray();
 		return true;
 	}
 

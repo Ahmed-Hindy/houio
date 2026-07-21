@@ -91,7 +91,7 @@ namespace houio
 			int                                               m_numPolys = 0;
 			std::vector<int>                                  m_perPolyVertexCount; // holds number of vertices for each polygon
 			std::vector<int>                                  m_perPolyVertexListOffset; // holds offset into m_vertices per poly
-			std::vector<int>                                  m_vertices; // vertex indicess for each vertex
+			std::vector<int>                                  m_vertices; // Point indices for each polygon vertex.
 			bool                                              m_closed = true;
 		};
 
@@ -137,26 +137,26 @@ namespace houio
 
 
 
-		// this structure carries some global json data which I dont want to have as members of hougeo
+		// Temporary document-level data shared while primitive records are loaded.
 		struct SharedPrimitiveData
 		{
 			std::map<std::string, json::ObjectPtr> sharedVoxelData;
 		};
 
-		void                                                 load( json::ObjectPtr o ); // a has to be the root of the array from hou geo
+		void                                                 load( json::ObjectPtr rootObject );
 		HouAttribute::Ptr                                    loadAttribute( json::ArrayPtr attribute, sint64 elementCount );
-		void                                                 loadTopology( json::ObjectPtr o, sint64 pointCount );
+		void                                                 loadTopology( json::ObjectPtr topologyObject, sint64 pointCount );
 		void                                                 loadPrimitive( json::ArrayPtr primitive, SharedPrimitiveData& sharedPrimitiveData );
 		void                                                 loadVolumePrimitive( json::ObjectPtr volume, SharedPrimitiveData& sharedPrimitiveData );
-		void                                                 loadPolyPrimitive( json::ObjectPtr poly );
-		void                                                 loadPolyPrimitiveRun( json::ObjectPtr def, json::ArrayPtr run );
+		void                                                 loadPolyPrimitive( json::ObjectPtr polygonObject );
+		void                                                 loadPolyPrimitiveRun( json::ObjectPtr definition, json::ArrayPtr runEntries );
 		void                                                 loadPolygonRun( json::ObjectPtr polygonRun, bool closed=true );
 		void                                                 loadGroups( json::ArrayPtr groups, sint64 elementCount, std::map<std::string, std::vector<bool>> &destination );
 
-		void                                                 loadVoxelData( json::ObjectPtr voxels, const math::V3i& res, float* volData );
+		void                                                 loadVoxelData( json::ObjectPtr voxelObject, const math::V3i& resolution, float* voxelData );
 
 
-		static json::ObjectPtr                               toObject( json::ArrayPtr a ); // turns json array into jsonObject (every first entry is key, every second is value)
+		static json::ObjectPtr                               toObject( json::ArrayPtr flattenedArray );
 
 	private:
 		std::vector<Primitive::Ptr>                                              m_primitives;
