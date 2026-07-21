@@ -683,18 +683,35 @@ namespace houio
 		if( rootObject->hasKey("sharedprimitivedata") )
 		{
 			json::ArrayPtr entries = rootObject->getArray("sharedprimitivedata");
-			const int entryCount = static_cast<int>(entries->size() / 2);
-			for( int entryIndex=0;entryIndex<entryCount;++entryIndex )
+			if( !entries )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeo::load sharedprimitivedata must be an array", -1, "sharedprimitivedata"});
+			if( (entries->size() % 2) != 0 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeo::load sharedprimitivedata requires type/value pairs", -1, "sharedprimitivedata"});
+			if( entries->size() > static_cast<sint64>(std::numeric_limits<int>::max()) )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+					"HouGeo::load sharedprimitivedata exceeds supported indexing", -1, "sharedprimitivedata"});
+
+			const sint64 entryCount = entries->size() / 2;
+			for( sint64 entryIndex=0;entryIndex<entryCount;++entryIndex )
 			{
-				const int recordOffset = entryIndex * 2;
-				[[maybe_unused]] const std::string entryType = entries->get<std::string>(recordOffset);
-				json::ArrayPtr entry = entries->getArray(recordOffset + 1);
+				withSchemaPath("sharedprimitivedata[" + std::to_string(entryIndex) + "]", [&]()
+				{
+					const int recordOffset = static_cast<int>(entryIndex * 2);
+					[[maybe_unused]] const std::string entryType = entries->get<std::string>(recordOffset);
+					json::ArrayPtr entry = entries->getArray(recordOffset + 1);
+					if( !entry || entry->size() < 3 )
+						throw std::runtime_error( "HouGeo::load shared primitive entry requires type, id, and voxel data" );
 
-				[[maybe_unused]] const std::string dataType = entry->get<std::string>(0);
-				const std::string dataId = entry->get<std::string>(1);
-				json::ArrayPtr voxelData = entry->getArray(2);
+					[[maybe_unused]] const std::string dataType = entry->get<std::string>(0);
+					const std::string dataId = entry->get<std::string>(1);
+					json::ArrayPtr voxelData = entry->getArray(2);
+					if( !voxelData )
+						throw std::runtime_error( "HouGeo::load shared primitive voxel data must be an array" );
 
-				sharedPrimitiveData.sharedVoxelData[dataId] = toObject(voxelData);
+					sharedPrimitiveData.sharedVoxelData[dataId] = toObject(voxelData);
+				});
 			}
 		}
 		if( rootObject->hasKey("primitives") )
