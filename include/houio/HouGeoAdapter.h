@@ -97,6 +97,9 @@ namespace houio
 			virtual int                        getVertex()const=0;
 			virtual math::Vec3i                getResolution()const;
 			virtual real32                     getVoxel( int i, int j, int k )const=0;
+			virtual std::string                getVisualizationMode()const;
+			virtual real32                     getVisualizationIso()const;
+			virtual real32                     getVisualizationDensity()const;
 			virtual RawPointer::Ptr            getRawPointer(); // returns raw pointer to the data
 		};
 

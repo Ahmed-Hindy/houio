@@ -448,7 +448,7 @@ Raw `.geo` and `.bgeo` remain dependency-free. `.bgeo.sc` dynamically resolves C
 
 ### Native VDB is intentionally unsupported
 
-`GeometryIO` detects `.vdb` and reports the HOM bridge requirement. `houio_hom` can explicitly densify 32-bit Float VDB grids while preserving unrelated Houdini primitives. Conversion back to `.vdb` requires a pure dense-volume set because Houdini's writer drops mesh primitives. Sparse grids may expand dramatically in memory, so do not use this bridge as a general OpenVDB replacement.
+`GeometryIO` detects `.vdb` and reports the HOM bridge requirement. `houio_hom` explicitly densifies 32-bit Float SDF and Fog VDB grids while preserving unrelated Houdini primitives. Level sets become iso dense volumes, Fog grids become smoke dense volumes, and `houio_vdb_class` carries the authoritative class through C++ processing before it is restored on rebuilt VDBs. Conversion back to `.vdb` requires a pure dense-volume set because Houdini's writer drops mesh primitives. Sparse grids may expand dramatically in memory, so do not use this bridge as a general OpenVDB replacement.
 
 ### Export uses an explicit context
 

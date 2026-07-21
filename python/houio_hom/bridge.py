@@ -13,6 +13,10 @@ import hou
 
 PathLike = Union[str, Path]
 DEFAULT_CONVERTER_TIMEOUT_SECONDS = 300.0
+VDB_CLASS_ATTRIBUTE = "houio_vdb_class"
+VDB_LEVEL_SET_CLASS = "level set"
+VDB_FOG_VOLUME_CLASS = "fog volume"
+_SUPPORTED_VDB_CLASSES = frozenset((VDB_LEVEL_SET_CLASS, VDB_FOG_VOLUME_CLASS))
 
 
 def _resolve_converter(executable: Optional[PathLike]) -> Path:
@@ -77,6 +81,132 @@ def _primitive_counts(geometry: hou.Geometry) -> tuple[int, int, int]:
     return polygon_count, volume_count, vdb_count
 
 
+def _ensure_vdb_class_attribute(geometry: hou.Geometry) -> hou.Attrib:
+    """Return the primitive attribute used to preserve VDB grid classes."""
+    attribute = geometry.findPrimAttrib(VDB_CLASS_ATTRIBUTE)
+    if attribute is None:
+        attribute = geometry.addAttrib(hou.attribType.Prim, VDB_CLASS_ATTRIBUTE, "")
+    return attribute
+
+
+def _validated_vdb_class(value: object, context: str) -> str:
+    """Validate and normalize a supported VDB grid class.
+
+    Args:
+        value: Candidate Houdini VDB class value.
+        context: Human-readable primitive description for diagnostics.
+
+    Returns:
+        Canonical Houdini VDB class string.
+
+    Raises:
+        ValueError: If the class is neither level set nor fog volume.
+    """
+    grid_class = str(value)
+    if grid_class not in _SUPPORTED_VDB_CLASSES:
+        raise ValueError(
+            f"{context} has unsupported VDB class {grid_class!r}; "
+            "HouIO supports level set and fog volume grids"
+        )
+    return grid_class
+
+
+def _tag_vdb_classes(geometry: hou.Geometry) -> int:
+    """Store each VDB primitive's authoritative class as a string attribute."""
+    class_attribute = _ensure_vdb_class_attribute(geometry)
+    tagged_count = 0
+    for primitive in geometry.prims():
+        if not isinstance(primitive, hou.VDB):
+            continue
+        grid_class = _validated_vdb_class(
+            primitive.intrinsicValue("vdb_class"),
+            f"VDB primitive {primitive.number()}",
+        )
+        primitive.setAttribValue(class_attribute, grid_class)
+        tagged_count += 1
+    return tagged_count
+
+
+def _dense_volume_class(
+    primitive: hou.Volume, class_attribute: Optional[hou.Attrib]
+) -> str:
+    """Resolve a dense volume's SDF or fog semantic class."""
+    if class_attribute is not None:
+        tagged_class = primitive.attribValue(class_attribute)
+        if tagged_class:
+            return _validated_vdb_class(
+                tagged_class,
+                f"Dense volume primitive {primitive.number()}",
+            )
+
+    visualization_mode = str(primitive.intrinsicValue("volumevisualmode"))
+    if visualization_mode == "iso":
+        return VDB_LEVEL_SET_CLASS
+    if visualization_mode == "smoke":
+        return VDB_FOG_VOLUME_CLASS
+    raise ValueError(
+        f"Dense volume primitive {primitive.number()} has visualization mode "
+        f"{visualization_mode!r}; use iso for SDF or smoke for fog semantics"
+    )
+
+
+def _tag_dense_volume_classes(geometry: hou.Geometry) -> int:
+    """Tag dense volumes using explicit metadata or their visualization mode."""
+    class_attribute = _ensure_vdb_class_attribute(geometry)
+    tagged_count = 0
+    for primitive in geometry.prims():
+        if not isinstance(primitive, hou.Volume) or isinstance(primitive, hou.VDB):
+            continue
+        grid_class = _dense_volume_class(primitive, class_attribute)
+        primitive.setAttribValue(class_attribute, grid_class)
+        tagged_count += 1
+    return tagged_count
+
+
+def _apply_dense_volume_semantics(geometry: hou.Geometry, expected_count: int) -> None:
+    """Restore dense-volume visualization from preserved VDB class metadata."""
+    class_attribute = geometry.findPrimAttrib(VDB_CLASS_ATTRIBUTE)
+    restored_count = 0
+    if class_attribute is not None:
+        for primitive in geometry.prims():
+            if not isinstance(primitive, hou.Volume) or isinstance(primitive, hou.VDB):
+                continue
+            tagged_class = primitive.attribValue(class_attribute)
+            if not tagged_class:
+                continue
+            grid_class = _validated_vdb_class(
+                tagged_class,
+                f"Dense volume primitive {primitive.number()}",
+            )
+            visualization_mode = "iso" if grid_class == VDB_LEVEL_SET_CLASS else "smoke"
+            primitive.setIntrinsicValue("volumevisualmode", visualization_mode)
+            restored_count += 1
+    if restored_count != expected_count:
+        raise ValueError(
+            "Convert VDB did not preserve class metadata for every converted grid"
+        )
+
+
+def _restore_vdb_classes(geometry: hou.Geometry, expected_count: int) -> None:
+    """Restore VDB class intrinsics after converting tagged dense volumes."""
+    class_attribute = geometry.findPrimAttrib(VDB_CLASS_ATTRIBUTE)
+    restored_count = 0
+    if class_attribute is not None:
+        for primitive in geometry.prims():
+            if not isinstance(primitive, hou.VDB):
+                continue
+            grid_class = _validated_vdb_class(
+                primitive.attribValue(class_attribute),
+                f"VDB primitive {primitive.number()}",
+            )
+            primitive.setIntrinsicValue("vdb_class", grid_class)
+            restored_count += 1
+    if restored_count != expected_count:
+        raise ValueError(
+            "Convert VDB did not preserve class metadata for every dense volume"
+        )
+
+
 def convert_vdb_to_volume(geometry: hou.Geometry) -> hou.Geometry:
     """Convert every VDB primitive to a dense Houdini volume.
 
@@ -86,6 +216,8 @@ def convert_vdb_to_volume(geometry: hou.Geometry) -> hou.Geometry:
 
     Returns:
         Independent geometry with Float VDB primitives converted to dense volumes.
+        Level-set grids become iso volumes and fog grids become smoke volumes.
+        The original class is retained in ``houio_vdb_class`` metadata.
 
     Raises:
         ValueError: If the source contains no VDB primitive, contains another VDB
@@ -109,13 +241,19 @@ def convert_vdb_to_volume(geometry: hou.Geometry) -> hou.Geometry:
             + ", ".join(unsupported_types)
         )
 
+    tagged_geometry = _copy_geometry(geometry)
+    if _tag_dense_volume_classes(tagged_geometry) != volume_count:
+        raise ValueError("Could not classify every existing dense volume")
+    if _tag_vdb_classes(tagged_geometry) != vdb_count:
+        raise ValueError("Could not preserve every VDB grid class before conversion")
+
     verb = hou.sopNodeTypeCategory().nodeVerb("convertvdb")
     if verb is None:
         raise hou.OperationFailed("The Convert VDB SOP verb is unavailable")
     verb.setParms({"conversion": 0})
 
     result = hou.Geometry()
-    verb.execute(result, [geometry])
+    verb.execute(result, [tagged_geometry])
     result_polygon_count, result_volume_count, remaining_vdb_count = _primitive_counts(
         result
     )
@@ -128,6 +266,7 @@ def convert_vdb_to_volume(geometry: hou.Geometry) -> hou.Geometry:
         raise ValueError(
             "Convert VDB did not preserve non-VDB primitives or produce the expected dense volumes"
         )
+    _apply_dense_volume_semantics(result, volume_count + vdb_count)
     return result
 
 
@@ -138,8 +277,9 @@ def convert_volume_to_vdb(geometry: hou.Geometry) -> hou.Geometry:
         geometry: Source geometry containing one or more dense volumes.
 
     Returns:
-        Independent geometry containing VDB primitives suitable for `.vdb`
-        output.
+        Independent geometry containing Float VDB primitives suitable for `.vdb`
+        output. Iso dense volumes become level sets and smoke volumes become fog
+        grids unless explicit ``houio_vdb_class`` metadata overrides the mode.
 
     Raises:
         ValueError: If the source contains no dense volume or conversion leaves
@@ -149,10 +289,26 @@ def convert_volume_to_vdb(geometry: hou.Geometry) -> hou.Geometry:
     polygon_count, volume_count, vdb_count = _primitive_counts(geometry)
     if volume_count == 0:
         if vdb_count > 0 and polygon_count == 0 and vdb_count == len(geometry.prims()):
-            return _copy_geometry(geometry)
+            result = _copy_geometry(geometry)
+            for primitive in result.prims():
+                if not isinstance(primitive, hou.VDB):
+                    continue
+                if primitive.vdbType() != hou.vdbType.Float:
+                    raise ValueError(
+                        "HouIO VDB output supports only 32-bit float grids"
+                    )
+                _validated_vdb_class(
+                    primitive.intrinsicValue("vdb_class"),
+                    f"VDB primitive {primitive.number()}",
+                )
+            return result
         raise ValueError("Geometry contains no dense volume primitives")
     if polygon_count != 0 or vdb_count != 0 or volume_count != len(geometry.prims()):
         raise ValueError("VDB output requires geometry containing only dense volumes")
+
+    tagged_geometry = _copy_geometry(geometry)
+    if _tag_dense_volume_classes(tagged_geometry) != volume_count:
+        raise ValueError("Could not classify every dense volume before VDB conversion")
 
     verb = hou.sopNodeTypeCategory().nodeVerb("convertvdb")
     if verb is None:
@@ -160,10 +316,11 @@ def convert_volume_to_vdb(geometry: hou.Geometry) -> hou.Geometry:
     verb.setParms({"conversion": 1})
 
     result = hou.Geometry()
-    verb.execute(result, [geometry])
+    verb.execute(result, [tagged_geometry])
     _, remaining_volume_count, result_vdb_count = _primitive_counts(result)
     if remaining_volume_count != 0 or result_vdb_count != len(result.prims()):
         raise ValueError(".vdb output requires all primitives to be VDB grids")
+    _restore_vdb_classes(result, volume_count)
     return result
 
 
@@ -211,9 +368,12 @@ def load_for_houio(path: PathLike, *, convert_vdb: bool = True) -> hou.Geometry:
     """
     geometry = hou.Geometry()
     geometry.loadFromFile(str(Path(path)))
-    _, _, vdb_count = _primitive_counts(geometry)
+    _, volume_count, vdb_count = _primitive_counts(geometry)
     if vdb_count > 0 and convert_vdb:
-        return convert_vdb_to_volume(geometry)
+        geometry = convert_vdb_to_volume(geometry)
+        _, volume_count, _ = _primitive_counts(geometry)
+    if volume_count > 0:
+        _tag_dense_volume_classes(geometry)
     return geometry
 
 
@@ -351,13 +511,17 @@ def roundtrip_node_geometry(
 
     Returns:
         Newly allocated geometry loaded from HouIO's output. Float VDB grids are
-        returned as dense volumes because HouIO has no sparse VDB model.
+        returned as dense volumes because HouIO has no sparse VDB model. Level
+        sets retain iso/SDF semantics and fog grids retain smoke/fog semantics.
     """
     converter = _resolve_converter(executable)
     source_geometry = _copy_geometry(node.geometry())
-    _, _, vdb_count = _primitive_counts(source_geometry)
+    _, volume_count, vdb_count = _primitive_counts(source_geometry)
     if vdb_count > 0:
         source_geometry = convert_vdb_to_volume(source_geometry)
+        _, volume_count, _ = _primitive_counts(source_geometry)
+    if volume_count > 0:
+        _tag_dense_volume_classes(source_geometry)
 
     with tempfile.TemporaryDirectory(prefix="houio_node_") as temporary_directory:
         temporary_root = Path(temporary_directory)
@@ -386,7 +550,7 @@ def roundtrip_current_sop(
 
     Returns:
         The current Python SOP's modifiable geometry. Float VDB primitives are
-        replaced with dense volumes.
+        replaced with dense volumes while preserving SDF or fog semantics.
 
     Raises:
         hou.GeometryPermissionError: If called outside a writable Python SOP

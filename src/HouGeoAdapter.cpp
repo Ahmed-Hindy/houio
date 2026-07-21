@@ -117,6 +117,21 @@ namespace houio
 		return math::Vec3i(0,0,0);
 	}
 
+	std::string HouGeoAdapter::VolumePrimitive::getVisualizationMode()const
+	{
+		return "smoke";
+	}
+
+	real32 HouGeoAdapter::VolumePrimitive::getVisualizationIso()const
+	{
+		return 0.0f;
+	}
+
+	real32 HouGeoAdapter::VolumePrimitive::getVisualizationDensity()const
+	{
+		return 1.0f;
+	}
+
 	// returns raw pointer to the data
 	HouGeoAdapter::RawPointer::Ptr HouGeoAdapter::VolumePrimitive::getRawPointer()
 	{

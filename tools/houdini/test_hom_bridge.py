@@ -19,19 +19,25 @@ from houio_hom import (
 )
 
 
-def build_dense_volume() -> hou.Geometry:
-    """Create a deterministic scalar volume for bridge validation."""
+def build_dense_volume(visualization_mode: str = "smoke") -> hou.Geometry:
+    """Create a deterministic scalar volume for bridge validation.
+
+    Args:
+        visualization_mode: ``smoke`` for fog semantics or ``iso`` for SDF
+            semantics.
+    """
     geometry = hou.Geometry()
     bounding_box = hou.BoundingBox(-2.0, -1.0, 3.0, 6.0, 5.0, 7.0)
     volume = geometry.createVolume(17, 2, 1, bounding_box)
     volume.setAllVoxels(tuple(float(x + y * 100) for y in range(2) for x in range(17)))
+    volume.setIntrinsicValue("volumevisualmode", visualization_mode)
     return geometry
 
 
 def volume_summary(
     geometry: hou.Geometry,
-) -> tuple[tuple[int, int, int], tuple[float, ...], tuple[float, ...]]:
-    """Return comparable resolution, voxel, and transform data."""
+) -> tuple[tuple[int, int, int], tuple[float, ...], tuple[float, ...], str]:
+    """Return comparable resolution, voxel, transform, and semantic data."""
     volumes = [
         primitive for primitive in geometry.prims() if isinstance(primitive, hou.Volume)
     ]
@@ -43,12 +49,90 @@ def volume_summary(
     transform = tuple(
         float(value) for row in volume.transform().asTupleOfTuples() for value in row
     )
-    return resolution, values, transform
+    visualization_mode = str(volume.intrinsicValue("volumevisualmode"))
+    return resolution, values, transform, visualization_mode
+
+
+def vdb_grid_class(geometry: hou.Geometry) -> str:
+    """Return the class of a geometry containing exactly one VDB grid."""
+    grids = [
+        primitive for primitive in geometry.prims() if isinstance(primitive, hou.VDB)
+    ]
+    if len(grids) != 1:
+        raise AssertionError("Expected exactly one VDB grid")
+    return str(grids[0].intrinsicValue("vdb_class"))
+
+
+def validate_volume_semantics(output_directory: Path) -> None:
+    """Validate both fog and SDF classes through HOM and the C++ converter."""
+    for label, visualization_mode, expected_class in (
+        ("fog", "smoke", "fog volume"),
+        ("sdf", "iso", "level set"),
+    ):
+        source = build_dense_volume(visualization_mode)
+        source_summary = volume_summary(source)
+
+        vdb_geometry = convert_volume_to_vdb(source)
+        if vdb_grid_class(vdb_geometry) != expected_class:
+            raise AssertionError(f"{label} dense volume produced the wrong VDB class")
+
+        dense_geometry = convert_vdb_to_volume(vdb_geometry)
+        if volume_summary(dense_geometry) != source_summary:
+            raise AssertionError(f"{label} VDB densification changed its semantics")
+
+        rebuilt_vdb = convert_volume_to_vdb(dense_geometry)
+        if vdb_grid_class(rebuilt_vdb) != expected_class:
+            raise AssertionError(
+                f"{label} VDB class was not restored after densification"
+            )
+
+        source_path = output_directory / f"{label}_source.bgeo"
+        result_path = output_directory / f"{label}_converter.bgeo.sc"
+        rebuilt_path = output_directory / f"{label}_converter.vdb"
+        source.saveToFile(str(source_path))
+        convert_with_houio(source_path, result_path)
+        converter_result = load_for_houio(result_path, convert_vdb=False)
+        if volume_summary(converter_result) != source_summary:
+            raise AssertionError(
+                f"{label} C++ round-trip changed dense-volume visualization semantics"
+            )
+        convert_with_houio(result_path, rebuilt_path)
+        rebuilt_from_converter = load_for_houio(rebuilt_path, convert_vdb=False)
+        if vdb_grid_class(rebuilt_from_converter) != expected_class:
+            raise AssertionError(f"{label} C++ round-trip produced the wrong VDB class")
+
+    combined_vdb = hou.Geometry()
+    combined_vdb.merge(convert_volume_to_vdb(build_dense_volume("iso")))
+    combined_vdb.merge(convert_volume_to_vdb(build_dense_volume("smoke")))
+    combined_dense = convert_vdb_to_volume(combined_vdb)
+    combined_modes = sorted(
+        str(primitive.intrinsicValue("volumevisualmode"))
+        for primitive in combined_dense.prims()
+        if isinstance(primitive, hou.Volume) and not isinstance(primitive, hou.VDB)
+    )
+    combined_classes = sorted(
+        str(primitive.attribValue("houio_vdb_class"))
+        for primitive in combined_dense.prims()
+        if isinstance(primitive, hou.Volume) and not isinstance(primitive, hou.VDB)
+    )
+    if combined_modes != ["iso", "smoke"]:
+        raise AssertionError("Mixed SDF/Fog VDB densification lost visualization modes")
+    if combined_classes != ["fog volume", "level set"]:
+        raise AssertionError("Mixed SDF/Fog VDB densification lost class metadata")
+    combined_rebuilt = convert_volume_to_vdb(combined_dense)
+    rebuilt_classes = sorted(
+        str(primitive.intrinsicValue("vdb_class"))
+        for primitive in combined_rebuilt.prims()
+        if isinstance(primitive, hou.VDB)
+    )
+    if rebuilt_classes != ["fog volume", "level set"]:
+        raise AssertionError("Mixed SDF/Fog dense volumes rebuilt with wrong classes")
 
 
 def validate(output_directory: Path) -> None:
     """Run all HOM bridge round-trips."""
     output_directory.mkdir(parents=True, exist_ok=True)
+    validate_volume_semantics(output_directory)
     source = build_dense_volume()
     source_summary = volume_summary(source)
 
@@ -158,6 +242,20 @@ def validate(output_directory: Path) -> None:
         if volume_summary(processed_vdb_node) != source_summary:
             raise AssertionError(
                 "Cooked VDB SOP round-trip changed values or transform"
+            )
+
+        dense_file_node = geometry_container.createNode("file")
+        dense_file_node.parm("file").set(str(converter_scf_path))
+        dense_file_node.cook(force=True)
+        if dense_file_node.errors():
+            raise AssertionError(
+                "HouIO dense-volume SCF produced File SOP errors: "
+                + "; ".join(dense_file_node.errors())
+            )
+        if dense_file_node.warnings():
+            raise AssertionError(
+                "HouIO dense-volume SCF produced File SOP warnings: "
+                + "; ".join(dense_file_node.warnings())
             )
     finally:
         geometry_container.destroy()

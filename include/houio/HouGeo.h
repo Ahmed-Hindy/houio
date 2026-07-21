@@ -70,9 +70,15 @@ namespace houio
 			virtual math::Vec3i                               getResolution()const;
 			virtual RawPointer::Ptr                           getRawPointer(); // returns raw pointer to the data
 			virtual real32                                    getVoxel( int i, int j, int k )const;
+			virtual std::string                               getVisualizationMode()const;
+			virtual real32                                    getVisualizationIso()const;
+			virtual real32                                    getVisualizationDensity()const;
 
 			ScalarField::Ptr                                  field;
 			int                                               vertex = -1; // hougeo uses topology vertex indices to encode translation
+			std::string                                       visualizationMode = "smoke";
+			real32                                           visualizationIso = 0.0f;
+			real32                                           visualizationDensity = 1.0f;
 		};
 
 		struct HouPoly : public PolyPrimitive

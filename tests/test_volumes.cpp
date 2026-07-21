@@ -191,10 +191,31 @@ int verifyBinaryRoundTrip()
 
     houio::HouGeo::Ptr sourceGeometry = houio::HouGeo::create();
     sourceGeometry->addPrimitive(sourceField);
+    std::vector<houio::HouGeoAdapter::Primitive::Ptr> sourcePrimitives;
+    sourceGeometry->getPrimitives(sourcePrimitives);
+    houio::HouGeo::HouVolume::Ptr sourceVolume = sourcePrimitives.size() == 1
+        ? std::dynamic_pointer_cast<houio::HouGeo::HouVolume>(sourcePrimitives.front())
+        : houio::HouGeo::HouVolume::Ptr();
+    if (!sourceVolume)
+    {
+        return fail("volume source primitive was not created");
+    }
+    sourceVolume->visualizationMode = "iso";
+    sourceVolume->visualizationIso = 0.125f;
+    sourceVolume->visualizationDensity = 0.75f;
+
     std::ostringstream output(std::ios::out | std::ios::binary);
     if (!houio::HouGeoIO::xport(&output, sourceGeometry))
     {
         return fail("volume binary export failed");
+    }
+    if (output.str().find("compressiontypes") == std::string::npos)
+    {
+        return fail("volume binary export used an invalid tiled-array compression key");
+    }
+    if (output.str().find("iso") == std::string::npos)
+    {
+        return fail("volume binary export lost the visualization mode");
     }
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
@@ -213,6 +234,12 @@ int verifyBinaryRoundTrip()
     if (!importedVolume || importedVolume->getVertex() != 0)
     {
         return fail("volume binary round-trip lost primitive metadata");
+    }
+    if (importedVolume->getVisualizationMode() != "iso"
+        || std::abs(importedVolume->getVisualizationIso() - 0.125f) > 1.0e-6f
+        || std::abs(importedVolume->getVisualizationDensity() - 0.75f) > 1.0e-6f)
+    {
+        return fail("volume binary round-trip lost visualization metadata");
     }
 
     const houio::math::V3i importedResolution = importedVolume->getResolution();
