@@ -41,8 +41,14 @@ Extract the archive:
 $Zip = "G:\Projects\Dev\Github\houio\build\windows-msvc-release\houio-houdini-package-0.2.0-windows-x86_64.zip"
 $Extract = "G:\Projects\Dev\Github\houio\build\manual-package-test"
 
-Remove-Item $Extract -Recurse -Force -ErrorAction SilentlyContinue
-Expand-Archive -LiteralPath $Zip -DestinationPath $Extract
+# Leave the extraction directory before attempting to delete it.
+Set-Location (Split-Path -Parent $Extract)
+
+if (Test-Path -LiteralPath $Extract) {
+    Remove-Item -LiteralPath $Extract -Recurse -Force -ErrorAction Stop
+}
+
+Expand-Archive -LiteralPath $Zip -DestinationPath $Extract -Force
 Set-Location $Extract
 ```
 
