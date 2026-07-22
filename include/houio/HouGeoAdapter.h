@@ -12,6 +12,11 @@
 
 namespace houio
 {
+	namespace json
+	{
+		struct Object;
+	}
+
 	struct HouGeoAdapter
 	{
 		typedef std::shared_ptr<HouGeoAdapter> Ptr;
@@ -55,6 +60,7 @@ namespace houio
 			virtual int                      getNumElements()const;
 			virtual RawPointer::Ptr          getRawPointer();
 			virtual std::string              getString( int index )const=0;
+			virtual std::shared_ptr<json::Object> getDictionary( int index )const;
 			static Type                      type( const std::string &typeName );
 			static Storage                   storage( const std::string &storageName );
 			static int                       storageSize( Storage storage );

@@ -556,6 +556,13 @@ namespace houio
 		return strings[static_cast<size_t>(index)];
 	}
 
+	std::shared_ptr<json::Object> HouGeo::HouAttribute::getDictionary( int index )const
+	{
+		if( index < 0 || static_cast<size_t>(index) >= dictionaries.size() )
+			throw std::out_of_range( "HouAttribute dictionary index is out of range" );
+		return dictionaries[static_cast<size_t>(index)];
+	}
+
 
 
 

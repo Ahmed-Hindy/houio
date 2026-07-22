@@ -365,6 +365,13 @@ namespace houio
 			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->getPointAttribute(attrName);
 			const std::string attributePath = "attributes.pointattributes." + attrName;
 			validateDomainAttribute(houAttr, numPoints, attributePath);
+			if( houAttr->getType() != HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
+			{
+				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
+					"HouGeoIO::convertToGeometry skips non-numeric point attribute " + attrName,
+					-1, attributePath});
+				continue;
+			}
 			const int numComponents = houAttr->getTupleSize();
 
 			Attribute::Ptr attr;
@@ -484,6 +491,13 @@ namespace houio
 			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->getVertexAttribute(attrName);
 			const std::string attributePath = "attributes.vertexattributes." + attrName;
 			validateDomainAttribute(houAttr, numVertices, attributePath);
+			if( houAttr->getType() != HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
+			{
+				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
+					"HouGeoIO::convertToGeometry skips non-numeric vertex attribute " + attrName,
+					-1, attributePath});
+				continue;
+			}
 			const int numComponents = houAttr->getTupleSize();
 
 			Attribute::Ptr attr;
@@ -1138,9 +1152,15 @@ namespace houio
 			writer.jsonEndArray();
 		}else if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_DICT )
 		{
-			const auto houAttribute = std::dynamic_pointer_cast<HouGeo::HouAttribute>(attribute);
-			if( !houAttribute || houAttribute->dictionaries.size() != static_cast<size_t>(elementCount) )
-				throw std::runtime_error( "HouGeoIO::exportAttribute: invalid dictionary data for attribute " + name );
+			std::vector<std::shared_ptr<json::Object>> dictionaries;
+			dictionaries.reserve(static_cast<size_t>(elementCount));
+			for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
+			{
+				std::shared_ptr<json::Object> dictionary = attribute->getDictionary(elementIndex);
+				if( !dictionary )
+					throw std::runtime_error( "HouGeoIO::exportAttribute: invalid dictionary data for attribute " + name );
+				dictionaries.push_back(std::move(dictionary));
+			}
 
 			writer.jsonString( "size" );
 			writer.jsonInt( exportTupleSize );
@@ -1148,7 +1168,7 @@ namespace houio
 			writer.jsonString( "int32" );
 			writer.jsonString( "dicts" );
 			writer.jsonBeginArray();
-			for( const json::ObjectPtr &dictionary : houAttribute->dictionaries )
+			for( const std::shared_ptr<json::Object> &dictionary : dictionaries )
 				writeJsonObject(writer, dictionary);
 			writer.jsonEndArray();
 

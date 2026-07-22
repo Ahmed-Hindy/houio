@@ -73,6 +73,38 @@ function Get-PackageDirectories {
     return $directories
 }
 
+function Get-LegacyPackageDirectories {
+    param([Parameter(Mandatory)][string]$HoudiniVersion)
+
+    $directories = [System.Collections.Generic.List[string]]::new()
+    if ([string]::IsNullOrWhiteSpace($HOME)) {
+        return $directories
+    }
+
+    $legacyDirectory = Resolve-AbsolutePath `
+        -Path (Join-Path $HOME "houdini$HoudiniVersion\packages") `
+        -Description "legacy package directory"
+    $canonicalDirectories = @(Get-PackageDirectories -HoudiniVersion $HoudiniVersion)
+    $matchesCanonical = $false
+    foreach ($canonicalDirectory in $canonicalDirectories) {
+        $canonicalPath = Resolve-AbsolutePath `
+            -Path $canonicalDirectory `
+            -Description "canonical package directory"
+        if ([string]::Equals(
+            $legacyDirectory,
+            $canonicalPath,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+            $matchesCanonical = $true
+            break
+        }
+    }
+    if (-not $matchesCanonical) {
+        $directories.Add($legacyDirectory)
+    }
+    return $directories
+}
+
 if ([string]::IsNullOrWhiteSpace($InstallDirectory)) {
     if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
         throw "LOCALAPPDATA is unavailable. Pass -InstallDirectory explicitly."
@@ -85,7 +117,11 @@ $loaderFileName = "houio_loader.json"
 
 if ($Uninstall) {
     foreach ($houdiniVersion in $HoudiniVersions) {
-        foreach ($packageDirectory in Get-PackageDirectories -HoudiniVersion $houdiniVersion) {
+        $packageDirectories = @(
+            @(Get-PackageDirectories -HoudiniVersion $houdiniVersion)
+            @(Get-LegacyPackageDirectories -HoudiniVersion $houdiniVersion)
+        ) | Sort-Object -Unique
+        foreach ($packageDirectory in $packageDirectories) {
             $loaderPath = Join-Path $packageDirectory $loaderFileName
             if (Test-Path -LiteralPath $loaderPath) {
                 if ($PSCmdlet.ShouldProcess($loaderPath, "Remove HouIO package loader")) {
@@ -141,6 +177,16 @@ $loaderJson = $loader | ConvertTo-Json -Depth 4
 $utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
 
 foreach ($houdiniVersion in $HoudiniVersions) {
+    foreach ($legacyPackageDirectory in Get-LegacyPackageDirectories -HoudiniVersion $houdiniVersion) {
+        $legacyLoaderPath = Join-Path $legacyPackageDirectory $loaderFileName
+        if (Test-Path -LiteralPath $legacyLoaderPath) {
+            if ($PSCmdlet.ShouldProcess($legacyLoaderPath, "Remove legacy HouIO package loader")) {
+                Remove-Item -LiteralPath $legacyLoaderPath -Force
+                Write-Host "Removed legacy loader $legacyLoaderPath"
+            }
+        }
+    }
+
     foreach ($packageDirectory in Get-PackageDirectories -HoudiniVersion $houdiniVersion) {
         $loaderPath = Join-Path $packageDirectory $loaderFileName
         if ($PSCmdlet.ShouldProcess($loaderPath, "Install HouIO package loader")) {

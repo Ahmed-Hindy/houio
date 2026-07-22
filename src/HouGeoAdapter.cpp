@@ -62,6 +62,11 @@ namespace houio
 		return HouGeoAdapter::RawPointer::Ptr();
 	}
 
+	std::shared_ptr<json::Object> HouGeoAdapter::AttributeAdapter::getDictionary( int )const
+	{
+		return std::shared_ptr<json::Object>();
+	}
+
 	HouGeoAdapter::AttributeAdapter::Type HouGeoAdapter::AttributeAdapter::type( const std::string &typeName )
 	{
 		if( typeName == "numeric" )

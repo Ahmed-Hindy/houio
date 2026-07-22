@@ -3,7 +3,6 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <vector>
 
 namespace
 {
@@ -34,19 +33,18 @@ int main()
     }
 
     const std::string log = output.str();
-    const std::vector<std::string> expectedEntries = {
-        "jsonBeginArray",
-        "jsonString pointcount",
-        "jsonString vertexcount",
-        "jsonString primitivecount",
-        "jsonEndArray",
-    };
-    for (const std::string& expectedEntry : expectedEntries)
+    const std::string expectedLog =
+        "jsonBeginArray\n"
+        "\tjsonString pointcount\n"
+        "\tjsonInt64 0\n"
+        "\tjsonString vertexcount\n"
+        "\tjsonInt64 0\n"
+        "\tjsonString primitivecount\n"
+        "\tjsonInt64 0\n"
+        "jsonEndArray\n";
+    if (log != expectedLog)
     {
-        if (log.find(expectedEntry) == std::string::npos)
-        {
-            return fail("JSON logger output is missing: " + expectedEntry);
-        }
+        return fail("JSON logger output does not match the expected sequence:\n" + log);
     }
 
     return 0;

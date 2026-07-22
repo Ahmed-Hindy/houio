@@ -181,7 +181,8 @@ Extract and install it:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
-  .\install_houdini_package.ps1
+  .\install_houdini_package.ps1 `
+  -Install
 ```
 
 The default installer targets Houdini 20.0, 20.5, 21.0, and 22.0.

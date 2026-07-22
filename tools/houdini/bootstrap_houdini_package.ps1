@@ -148,6 +148,11 @@ if ([string]::IsNullOrWhiteSpace($BootstrapDirectory)) {
     $BootstrapDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("houio-bootstrap-" + [guid]::NewGuid().ToString("N"))
 }
 $resolvedBootstrapDirectory = Resolve-AbsolutePath -Path $BootstrapDirectory -Description "bootstrap directory"
+if (Test-Path -LiteralPath $resolvedBootstrapDirectory) {
+    throw "Bootstrap directory must not already exist: $resolvedBootstrapDirectory"
+}
+New-Item -ItemType Directory -Path $resolvedBootstrapDirectory | Out-Null
+$bootstrapDirectoryCreatedByScript = $true
 $packageDirectory = Join-Path $resolvedBootstrapDirectory "packages"
 $userPreferencesDirectory = Join-Path $resolvedBootstrapDirectory "user\houdini__HVER__"
 $loaderPath = Join-Path $packageDirectory "houio_loader.json"
@@ -171,7 +176,7 @@ Write-Host "Isolated user preferences: $userPreferencesDirectory"
 Write-Host "No package files were installed."
 
 if ($ValidateOnly) {
-    if (-not $KeepBootstrap) {
+    if (-not $KeepBootstrap -and $bootstrapDirectoryCreatedByScript) {
         Remove-Item -LiteralPath $resolvedBootstrapDirectory -Recurse -Force
     }
     return
@@ -228,7 +233,11 @@ finally {
         }
     }
 
-    if (-not $KeepBootstrap -and (Test-Path -LiteralPath $resolvedBootstrapDirectory)) {
+    if (
+        (-not $KeepBootstrap) -and
+        $bootstrapDirectoryCreatedByScript -and
+        (Test-Path -LiteralPath $resolvedBootstrapDirectory)
+    ) {
         Remove-Item -LiteralPath $resolvedBootstrapDirectory -Recurse -Force
     }
 }

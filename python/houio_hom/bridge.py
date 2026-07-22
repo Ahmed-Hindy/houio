@@ -16,6 +16,7 @@ DEFAULT_CONVERTER_TIMEOUT_SECONDS = 300.0
 VDB_CLASS_ATTRIBUTE = "houio_vdb_class"
 VDB_LEVEL_SET_CLASS = "level set"
 VDB_FOG_VOLUME_CLASS = "fog volume"
+VDB_ROUNDTRIP_GROUP_BASE = "__houio_original_vdb"
 _SUPPORTED_VDB_CLASSES = frozenset((VDB_LEVEL_SET_CLASS, VDB_FOG_VOLUME_CLASS))
 
 
@@ -24,7 +25,11 @@ class HouIOConverterError(subprocess.CalledProcessError):
 
     def __str__(self) -> str:
         message = super().__str__()
-        details = (self.stderr or self.output or "").strip()
+        details = "\n".join(
+            stream.strip()
+            for stream in (self.stderr or "", self.output or "")
+            if stream.strip()
+        )
         return f"{message}\n{details}" if details else message
 
 
@@ -90,12 +95,93 @@ def _primitive_counts(geometry: hou.Geometry) -> tuple[int, int, int]:
     return polygon_count, volume_count, vdb_count
 
 
+def _unique_primitive_group_name(geometry: hou.Geometry, base_name: str) -> str:
+    """Return a primitive-group name that does not collide with user geometry."""
+    candidate = base_name
+    suffix = 1
+    while geometry.findPrimGroup(candidate) is not None:
+        candidate = f"{base_name}_{suffix}"
+        suffix += 1
+    return candidate
+
+
+def _mark_original_vdbs(geometry: hou.Geometry) -> tuple[str, int]:
+    """Mark source VDB primitives with a temporary round-trip group."""
+    group_name = _unique_primitive_group_name(geometry, VDB_ROUNDTRIP_GROUP_BASE)
+    group = geometry.createPrimGroup(group_name)
+    marked_count = 0
+    for primitive in geometry.prims():
+        if isinstance(primitive, hou.VDB):
+            group.add(primitive)
+            marked_count += 1
+    if marked_count == 0:
+        group.destroy()
+        raise ValueError("Geometry contains no VDB primitives to mark")
+    return group_name, marked_count
+
+
+def _restore_original_vdbs(
+    geometry: hou.Geometry, group_name: str, expected_count: int
+) -> hou.Geometry:
+    """Restore only dense volumes marked as VDBs before the HouIO round trip."""
+    group = geometry.findPrimGroup(group_name)
+    if group is None:
+        raise ValueError("HouIO round-trip did not preserve the original VDB group")
+    selected_primitives = tuple(group.prims())
+    if len(selected_primitives) != expected_count or any(
+        not isinstance(primitive, hou.Volume) or isinstance(primitive, hou.VDB)
+        for primitive in selected_primitives
+    ):
+        raise ValueError(
+            "HouIO round-trip did not preserve every original VDB as a tagged dense volume"
+        )
+
+    polygon_count, volume_count, vdb_count = _primitive_counts(geometry)
+    if vdb_count != 0:
+        raise ValueError("HouIO round-trip unexpectedly returned VDB primitives")
+
+    verb = hou.sopNodeTypeCategory().nodeVerb("convertvdb")
+    if verb is None:
+        raise hou.OperationFailed("The Convert VDB SOP verb is unavailable")
+    verb.setParms({"conversion": 1, "group": group_name})
+
+    result = hou.Geometry()
+    verb.execute(result, [geometry])
+    result_polygon_count, result_volume_count, result_vdb_count = _primitive_counts(
+        result
+    )
+    if (
+        result_polygon_count != polygon_count
+        or result_volume_count != volume_count - expected_count
+        or result_vdb_count != expected_count
+        or len(result.prims()) != len(geometry.prims())
+    ):
+        raise ValueError(
+            "Convert VDB did not restore the original VDB primitives without changing other geometry"
+        )
+    _restore_vdb_classes(result, expected_count)
+    restored_group = result.findPrimGroup(group_name)
+    if restored_group is not None:
+        restored_group.destroy()
+    return result
+
+
 def _ensure_vdb_class_attribute(geometry: hou.Geometry) -> hou.Attrib:
     """Return the primitive attribute used to preserve VDB grid classes."""
     attribute = geometry.findPrimAttrib(VDB_CLASS_ATTRIBUTE)
     if attribute is None:
         attribute = geometry.addAttrib(hou.attribType.Prim, VDB_CLASS_ATTRIBUTE, "")
     return attribute
+
+
+def _vdb_value_type(primitive: hou.VDB) -> str:
+    """Return Houdini's precision-aware VDB value type across supported versions."""
+    return str(primitive.intrinsicValue("vdb_value_type"))
+
+
+def _is_float32_vdb(primitive: hou.VDB) -> bool:
+    """Return whether a VDB is a scalar 32-bit float grid."""
+    return _vdb_value_type(primitive) == "float"
 
 
 def _validated_vdb_class(value: object, context: str) -> str:
@@ -238,10 +324,9 @@ def convert_vdb_to_volume(geometry: hou.Geometry) -> hou.Geometry:
         raise ValueError("Geometry contains no VDB primitives")
     unsupported_types = sorted(
         {
-            str(primitive.intrinsicValue("vdb_value_type"))
+            _vdb_value_type(primitive)
             for primitive in geometry.prims()
-            if isinstance(primitive, hou.VDB)
-            and primitive.dataType() != hou.vdbData.Float
+            if isinstance(primitive, hou.VDB) and not _is_float32_vdb(primitive)
         }
     )
     if unsupported_types:
@@ -302,7 +387,7 @@ def convert_volume_to_vdb(geometry: hou.Geometry) -> hou.Geometry:
             for primitive in result.prims():
                 if not isinstance(primitive, hou.VDB):
                     continue
-                if primitive.dataType() != hou.vdbData.Float:
+                if not _is_float32_vdb(primitive):
                     raise ValueError(
                         "HouIO VDB output supports only 32-bit float grids"
                     )
@@ -519,14 +604,19 @@ def roundtrip_node_geometry(
         timeout_seconds: Maximum converter runtime, or `None` to disable the timeout.
 
     Returns:
-        Newly allocated geometry loaded from HouIO's output. Float VDB grids are
-        returned as dense volumes because HouIO has no sparse VDB model. Level
-        sets retain iso/SDF semantics and fog grids retain smoke/fog semantics.
+        Newly allocated geometry loaded from HouIO's output. Supported Float VDB
+        grids are densified only for the external conversion, then restored to
+        VDB primitives with their level-set or fog class. Native dense volumes
+        remain dense volumes.
     """
     converter = _resolve_converter(executable)
     source_geometry = _copy_geometry(node.geometry())
     _, volume_count, vdb_count = _primitive_counts(source_geometry)
+    vdb_group_name: Optional[str] = None
     if vdb_count > 0:
+        vdb_group_name, marked_vdb_count = _mark_original_vdbs(source_geometry)
+        if marked_vdb_count != vdb_count:
+            raise ValueError("Could not mark every source VDB primitive")
         source_geometry = convert_vdb_to_volume(source_geometry)
         _, volume_count, _ = _primitive_counts(source_geometry)
     if volume_count > 0:
@@ -543,7 +633,12 @@ def roundtrip_node_geometry(
             executable=converter,
             timeout_seconds=timeout_seconds,
         )
-        return geometry_from_bgeo_bytes(output_path.read_bytes())
+        processed_geometry = geometry_from_bgeo_bytes(output_path.read_bytes())
+        if vdb_group_name is not None:
+            processed_geometry = _restore_original_vdbs(
+                processed_geometry, vdb_group_name, vdb_count
+            )
+        return processed_geometry
 
 
 def roundtrip_current_sop(
@@ -558,8 +653,9 @@ def roundtrip_current_sop(
         timeout_seconds: Maximum converter runtime, or `None` to disable the timeout.
 
     Returns:
-        The current Python SOP's modifiable geometry. Float VDB primitives are
-        replaced with dense volumes while preserving SDF or fog semantics.
+        The current Python SOP's modifiable geometry. Supported Float VDB
+        primitives are restored as VDBs after the HouIO conversion, while native
+        dense volumes remain dense volumes.
 
     Raises:
         hou.GeometryPermissionError: If called outside a writable Python SOP

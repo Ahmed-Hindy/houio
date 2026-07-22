@@ -5,6 +5,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -154,6 +155,83 @@ int verifyNullAndCountGuards()
     return 0;
 }
 
+int verifyNonNumericAttributesAreSkipped()
+{
+    const std::string document = R"JSON([
+        "pointcount", 3,
+        "vertexcount", 3,
+        "primitivecount", 1,
+        "topology", ["pointref", ["indices", [0, 1, 2]]],
+        "attributes", [
+            "pointattributes", [
+                [
+                    ["type", "numeric", "name", "P"],
+                    ["size", 3, "storage", "fpreal32", "values", [
+                        "size", 3,
+                        "storage", "fpreal32",
+                        "tuples", [[0, 0, 0], [1, 0, 0], [0, 1, 0]]
+                    ]]
+                ],
+                [
+                    ["type", "dict", "name", "point_meta"],
+                    [
+                        "size", 1,
+                        "storage", "int32",
+                        "dicts", [{"label": {"type": "string", "value": "point"}}],
+                        "indices", ["size", 1, "storage", "int32", "arrays", [[0, 0, 0]]]
+                    ]
+                ]
+            ],
+            "vertexattributes", [
+                [
+                    ["type", "dict", "name", "vertex_meta"],
+                    [
+                        "size", 1,
+                        "storage", "int32",
+                        "dicts", [{"label": {"type": "string", "value": "vertex"}}],
+                        "indices", ["size", 1, "storage", "int32", "arrays", [[0, 0, 0]]]
+                    ]
+                ]
+            ]
+        ],
+        "primitives", [[["type", "Poly"], ["vertex", [0, 1, 2], "closed", true]]]
+    ])JSON";
+
+    std::istringstream input(document);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input);
+    if (!geometry)
+        return fail("dictionary-attribute conversion fixture did not import");
+
+    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
+    geometry->getPrimitives(primitives);
+    if (primitives.size() != 1)
+        return fail("dictionary-attribute conversion fixture lost its polygon");
+
+    houio::DiagnosticList diagnostics;
+    houio::Geometry::Ptr converted = houio::HouGeoIO::convertToGeometry(
+        geometry, primitives.front(), &diagnostics);
+    if (!converted)
+        return fail("non-numeric attributes prevented geometry conversion");
+
+    bool pointWarning = false;
+    bool vertexWarning = false;
+    for (const houio::Diagnostic& diagnostic : diagnostics)
+    {
+        if (diagnostic.severity != houio::DiagnosticSeverity::warning
+            || diagnostic.category != houio::DiagnosticCategory::conversion)
+        {
+            continue;
+        }
+        pointWarning = pointWarning
+            || diagnostic.path == "attributes.pointattributes.point_meta";
+        vertexWarning = vertexWarning
+            || diagnostic.path == "attributes.vertexattributes.vertex_meta";
+    }
+    if (!pointWarning || !vertexWarning)
+        return fail("non-numeric attributes were not reported as skipped");
+    return 0;
+}
+
 int verifyAttributeAndStringBounds()
 {
     houio::Attribute oversized(4, houio::Attribute::FLOAT);
@@ -195,6 +273,10 @@ int main()
         return result;
     }
     if (const int result = verifyNullAndCountGuards(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyNonNumericAttributesAreSkipped(); result != 0)
     {
         return result;
     }

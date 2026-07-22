@@ -34,6 +34,7 @@ namespace houio
 			virtual void                          getPacking( std::vector<int> &packing )const;
 			virtual int                           getNumElements()const;
 			virtual std::string                   getString( int index )const;
+			virtual std::shared_ptr<json::Object>  getDictionary( int index )const override;
 			virtual RawPointer::Ptr               getRawPointer();
 
 			//int                                   addV4f(math::V4f value);

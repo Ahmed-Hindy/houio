@@ -163,6 +163,8 @@ Parameters:
 - **Enabled** bypasses HouIO when disabled.
 - **Timeout (seconds)** limits converter execution; default `300`.
 
+Supported VDB inputs are densified only for the external HouIO process and are restored as VDB primitives when the node finishes cooking. Native dense volumes remain dense volumes.
+
 ### Convert Geometry File
 
 Converts `.geo`, `.bgeo`, or `.bgeo.sc` through the bundled executable.

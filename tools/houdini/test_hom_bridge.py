@@ -146,8 +146,8 @@ def validate(output_directory: Path) -> None:
         vdb_geometry.prims()[0], hou.VDB
     ):
         raise AssertionError("Dense volume conversion did not produce a VDB")
-    if vdb_geometry.prims()[0].dataType() != hou.vdbData.Float:
-        raise AssertionError("Dense volume conversion did not produce a Float VDB")
+    if str(vdb_geometry.prims()[0].intrinsicValue("vdb_value_type")) != "float":
+        raise AssertionError("Dense volume conversion did not produce a 32-bit Float VDB")
 
     mixed_geometry = hou.Geometry()
     polygon_points = mixed_geometry.createPoints(
@@ -186,6 +186,22 @@ def validate(output_directory: Path) -> None:
             raise
     else:
         raise AssertionError("Non-Float VDB densification was not rejected")
+
+    double_verb = hou.sopNodeTypeCategory().nodeVerb("convertvdb")
+    if double_verb is None:
+        raise AssertionError("The Convert VDB SOP verb is unavailable")
+    double_verb.setParms(
+        {"conversion": 1, "vdbtype": "float", "vdbprecision": "64"}
+    )
+    double_vdb = hou.Geometry()
+    double_verb.execute(double_vdb, [source])
+    try:
+        convert_vdb_to_volume(double_vdb)
+    except ValueError as error:
+        if "32-bit float" not in str(error):
+            raise
+    else:
+        raise AssertionError("64-bit Float VDB densification was not rejected")
 
     vdb_path = output_directory / "density.vdb"
     vdb_geometry.saveToFile(str(vdb_path))
@@ -251,10 +267,18 @@ def validate(output_directory: Path) -> None:
             attribute.name(): processed_visualization.attribValue(attribute)
             for attribute in processed_visualization.globalAttribs()
         }
+        # Houdini generates varmap from the preserved primitive-class attribute;
+        # it is bookkeeping rather than Volume Visualization metadata.
+        ignored_visualization_attributes = {"varmap"}
+        all_visualization_attribute_names = (
+            set(expected_visualization_attributes)
+            | set(actual_visualization_attributes)
+        ) - ignored_visualization_attributes
         changed_visualization_attributes = {
             name
-            for name, expected_value in expected_visualization_attributes.items()
-            if actual_visualization_attributes.get(name) != expected_value
+            for name in all_visualization_attribute_names
+            if expected_visualization_attributes.get(name)
+            != actual_visualization_attributes.get(name)
         }
         if changed_visualization_attributes:
             raise AssertionError(
@@ -265,10 +289,56 @@ def validate(output_directory: Path) -> None:
         file_node = geometry_container.createNode("file")
         file_node.parm("file").set(str(vdb_path))
         processed_vdb_node = roundtrip_node_geometry(file_node, timeout_seconds=60.0)
-        if volume_summary(processed_vdb_node) != source_summary:
+        if vdb_grid_class(processed_vdb_node) != "fog volume":
+            raise AssertionError("Cooked VDB SOP round-trip did not restore a fog VDB")
+        if processed_vdb_node.findPrimGroup("__houio_original_vdb") is not None:
+            raise AssertionError("Cooked VDB SOP round-trip leaked its internal group")
+        processed_vdb_dense = convert_vdb_to_volume(processed_vdb_node)
+        if volume_summary(processed_vdb_dense) != source_summary:
             raise AssertionError(
                 "Cooked VDB SOP round-trip changed values or transform"
             )
+
+        mixed_roundtrip_source = build_dense_volume("smoke")
+        mixed_roundtrip_source.merge(
+            convert_volume_to_vdb(build_dense_volume("iso"))
+        )
+        mixed_stash_node = geometry_container.createNode("stash")
+        mixed_stash_parameter = mixed_stash_node.parm("stash")
+        if mixed_stash_parameter is None:
+            raise AssertionError("The Stash SOP has no geometry parameter")
+        mixed_stash_parameter.set(mixed_roundtrip_source)
+        processed_mixed_roundtrip = roundtrip_node_geometry(
+            mixed_stash_node, timeout_seconds=60.0
+        )
+        processed_native_volumes = [
+            primitive
+            for primitive in processed_mixed_roundtrip.prims()
+            if isinstance(primitive, hou.Volume)
+            and not isinstance(primitive, hou.VDB)
+        ]
+        processed_vdbs = [
+            primitive
+            for primitive in processed_mixed_roundtrip.prims()
+            if isinstance(primitive, hou.VDB)
+        ]
+        if len(processed_native_volumes) != 1 or len(processed_vdbs) != 1:
+            raise AssertionError(
+                "Mixed SOP round-trip did not preserve one native volume and one VDB"
+            )
+        if (
+            str(processed_native_volumes[0].intrinsicValue("volumevisualmode"))
+            != "smoke"
+            or str(processed_vdbs[0].intrinsicValue("vdb_class")) != "level set"
+        ):
+            raise AssertionError(
+                "Mixed SOP round-trip changed native-volume or VDB semantics"
+            )
+        if any(
+            group.name().startswith("__houio_original_vdb")
+            for group in processed_mixed_roundtrip.primGroups()
+        ):
+            raise AssertionError("Mixed SOP round-trip leaked its internal VDB group")
 
         dense_file_node = geometry_container.createNode("file")
         dense_file_node.parm("file").set(str(converter_scf_path))

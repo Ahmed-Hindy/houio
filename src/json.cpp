@@ -859,6 +859,12 @@ namespace houio
 		std::string Parser::readASCIIString()
 		{
 			std::string result;
+			auto appendCharacter = [&]( char value )
+			{
+				if( static_cast<sint64>(result.size()) >= limits.maxStringBytes )
+					fail(DiagnosticCategory::malformed_input, "Parser ASCII-string byte limit exceeded", byteOffset);
+				result.push_back(value);
+			};
 			while( true )
 			{
 				char c = read<char>();
@@ -869,17 +875,17 @@ namespace houio
 					{
 					case '"':
 					case '\\':
-					case '/': result.push_back(c); break;
-					case 'b': result.push_back('\b'); break;
-					case 'f': result.push_back('\f'); break;
-					case 'n': result.push_back('\n'); break;
-					case 'r': result.push_back('\r'); break;
-					case 't': result.push_back('\t'); break;
+					case '/': appendCharacter(c); break;
+					case 'b': appendCharacter('\b'); break;
+					case 'f': appendCharacter('\f'); break;
+					case 'n': appendCharacter('\n'); break;
+					case 'r': appendCharacter('\r'); break;
+					case 't': appendCharacter('\t'); break;
 					case 'u':
 						fail(DiagnosticCategory::unsupported_input, "Parser does not support Unicode escape sequences");
 					default:
-						result.push_back('\\');
-						result.push_back(c);
+						appendCharacter('\\');
+						appendCharacter(c);
 						break;
 					}
 				}
@@ -889,7 +895,7 @@ namespace houio
 				}
 				else
 				{
-					result.push_back(c);
+					appendCharacter(c);
 				}
 			}
 		}

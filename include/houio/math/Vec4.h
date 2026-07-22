@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cmath>
+#include <type_traits>
+
 namespace houio::math
 {
     template<typename T>
@@ -21,6 +24,24 @@ namespace houio::math
               z(static_cast<T>(value.z)),
               w(static_cast<T>(value.w))
         {
+        }
+
+        bool operator==(const Vec4<T>& rhs) const
+        {
+            if constexpr (std::is_floating_point_v<T>)
+            {
+                constexpr T tolerance = static_cast<T>(0.00001);
+                return std::abs(x - rhs.x) < tolerance
+                    && std::abs(y - rhs.y) < tolerance
+                    && std::abs(z - rhs.z) < tolerance
+                    && std::abs(w - rhs.w) < tolerance;
+            }
+            return x == rhs.x && y == rhs.y && z == rhs.z && w == rhs.w;
+        }
+
+        bool operator!=(const Vec4<T>& rhs) const
+        {
+            return !(*this == rhs);
         }
 
         union

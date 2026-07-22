@@ -41,5 +41,20 @@ int main()
     if (!(nearValue == houio::math::Vec3f(1.000001f, 2.0f, 3.0f)))
         return fail("Vec3 floating-point comparison lost its tolerance");
 
+    const houio::math::Vec4i integer4(2, 4, 6, 8);
+    if (!(integer4 == houio::math::Vec4i(2, 4, 6, 8))
+        || integer4 != houio::math::Vec4i(2, 4, 6, 8)
+        || integer4 == houio::math::Vec4i(2, 4, 6, 9))
+    {
+        return fail("Vec4 integer comparison is not exact");
+    }
+
+    const houio::math::Vec4f nearValue4(1.0f, 2.0f, 3.0f, 4.0f);
+    if (!(nearValue4 == houio::math::Vec4f(1.000001f, 2.0f, 3.0f, 4.0f))
+        || nearValue4 != houio::math::Vec4f(1.000001f, 2.0f, 3.0f, 4.0f))
+    {
+        return fail("Vec4 floating-point comparison lost its tolerance");
+    }
+
     return 0;
 }
