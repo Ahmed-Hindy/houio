@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shelfDocument>
+  <toolshelf name="houio" label="HouIO">
+    <memberTool name="houio_roundtrip_sop"/>
+    <memberTool name="houio_convert_file"/>
+  </toolshelf>
+  <tool name="houio_roundtrip_sop" label="HouIO Round Trip SOP" icon="MISC_python">
+    <helpText><![CDATA[Create a Python SOP after the selected SOP and round-trip its geometry through HouIO.]]></helpText>
+    <script scriptType="python"><![CDATA[from houio_houdini_tools import create_roundtrip_sop
+
+create_roundtrip_sop()
+]]></script>
+  </tool>
+  <tool name="houio_convert_file" label="HouIO Convert File" icon="MISC_python">
+    <helpText><![CDATA[Convert a geometry or VDB file through HouIO from inside Houdini.]]></helpText>
+    <script scriptType="python"><![CDATA[from houio_houdini_tools import convert_file
+
+convert_file()
+]]></script>
+  </tool>
+</shelfDocument>

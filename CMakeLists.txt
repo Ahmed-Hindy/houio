@@ -121,6 +121,12 @@ install(
     FILES tools/houdini/install_hom_bridge.ps1
     DESTINATION ${CMAKE_INSTALL_DATADIR}/houio/houdini
 )
+install(
+    DIRECTORY houdini/
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/houio/houdini
+    PATTERN "__pycache__" EXCLUDE
+    PATTERN "*.pyc" EXCLUDE
+)
 if(TARGET houio_convert)
     install(TARGETS houio_convert RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()

@@ -43,6 +43,15 @@ if (-not (Test-Path (Join-Path $pythonRoot "houio_hom"))) {
 }
 $resolvedPythonRoot = Convert-ToPackagePath -Path $pythonRoot
 
+$houdiniRoot = Join-Path $RepositoryRoot "houdini"
+if (-not (Test-Path (Join-Path $houdiniRoot "toolbar\houio.shelf"))) {
+    $houdiniRoot = Join-Path $RepositoryRoot "share\houio\houdini"
+}
+if (-not (Test-Path (Join-Path $houdiniRoot "toolbar\houio.shelf"))) {
+    throw "Could not find the HouIO Houdini package files under $RepositoryRoot"
+}
+$resolvedHoudiniRoot = Convert-ToPackagePath -Path $houdiniRoot
+
 if ([string]::IsNullOrWhiteSpace($ConverterExecutable)) {
     $converterCandidates = @(
         (Join-Path $RepositoryRoot "build\windows-msvc-release\houio_convert.exe")
@@ -92,6 +101,7 @@ foreach ($houdiniVersion in $HoudiniVersions) {
         [ordered]@{ HOUIO_ROOT = $resolvedRoot }
         [ordered]@{ HOUIO_PYTHON_ROOT = $resolvedPythonRoot }
         [ordered]@{ PYTHONPATH = '$HOUIO_PYTHON_ROOT;$PYTHONPATH' }
+        [ordered]@{ HOUDINI_PATH = "$resolvedHoudiniRoot;&" }
         [ordered]@{ HOUIO_BLOSC_LIBRARY = '$HFS/bin/blosc.dll' }
     )
     if (-not [string]::IsNullOrWhiteSpace($resolvedConverter)) {

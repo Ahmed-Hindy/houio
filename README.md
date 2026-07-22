@@ -207,9 +207,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\install_hom_bridge.ps1
 ```
 
-This writes `houio.json` under the user package directories for Houdini 21.0 and 22.0. It supports either a source checkout or an installed HouIO prefix, sets `HOUIO_ROOT` and `HOUIO_PYTHON_ROOT`, prepends the HOM package to `PYTHONPATH`, points `HOUIO_BLOSC_LIBRARY` at `$HFS/bin/blosc.dll`, and records `HOUIO_CONVERT_EXECUTABLE` when the converter is available. Use `-Uninstall` to remove those package files.
+This writes `houio.json` under the user package directories for Houdini 21.0 and 22.0. It supports either a source checkout or an installed HouIO prefix, loads the HouIO shelf through `HOUDINI_PATH`, prepends the HOM package to `PYTHONPATH`, points `HOUIO_BLOSC_LIBRARY` at `$HFS/bin/blosc.dll`, and records `HOUIO_CONVERT_EXECUTABLE`. Use `-Uninstall` to remove those package files.
 
-### Python shell or shelf tool
+After restarting Houdini, add the **HouIO** shelf set. It contains:
+
+- **HouIO Round Trip SOP**: select one SOP and click the tool to insert a connected Python SOP that processes the cooked geometry through HouIO.
+- **HouIO Convert File**: choose an input and output geometry file through Houdini's file dialogs.
+
+The tools run through HOM and the bundled converter, so they work in Houdini FX, Core, Indie, and Apprentice without loading a custom C++ plugin into Houdini.
+
+### Python shell
 
 ```python
 from houio_hom import convert_with_houio, load_for_houio

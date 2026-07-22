@@ -29,6 +29,8 @@ set(installed_files
     "${package_root}/share/houio/python/houio_hom/__init__.py"
     "${package_root}/share/houio/python/houio_hom/bridge.py"
     "${package_root}/share/houio/houdini/install_hom_bridge.ps1"
+    "${package_root}/share/houio/houdini/scripts/python/houio_houdini_tools.py"
+    "${package_root}/share/houio/houdini/toolbar/houio.shelf"
 )
 if(HOUIO_EXPECT_TOOLS)
     set(installed_converter "${package_root}/bin/houio_convert")
