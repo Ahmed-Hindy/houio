@@ -1,48 +1,49 @@
-# Security Policy
+# Security policy
 
-HouIO is an experimental file-format library. It parses complex binary and ASCII geometry supplied by callers, so malformed-input reports are treated as security-relevant even when they only reproduce in development builds.
+HouIO parses caller-supplied ASCII, binary, and compressed geometry. Malformed-input failures are treated as security-relevant when they can cause memory corruption, uncontrolled resource use, parser state corruption, or unsafe process/library resolution.
 
-## Supported versions
+## Supported code
 
-There are no supported binary releases yet. Security fixes are developed against the current `master` branch. Older commits and downstream forks may not receive fixes.
+Security fixes target the current `master` branch. No binary release channel is currently maintained.
 
 ## Reporting a vulnerability
 
-Do not publish a crashing file, exploit details, or sensitive production geometry in a public issue.
+Do not publish crashing files, exploit details, or sensitive production geometry in a public issue.
 
-Use GitHub's private vulnerability-reporting flow from the repository **Security** tab when it is available. If private reporting is unavailable, open a public issue containing only a request for a private contact channel and no reproduction data.
+Use the private vulnerability-reporting flow in the GitHub **Security** tab. When private reporting is unavailable, open a public issue requesting a private contact channel without including reproduction data.
 
-Include as much of the following as possible in the private report:
+Include:
 
-- The affected commit SHA.
-- Operating system and compiler.
-- Build preset and sanitizer configuration.
-- File type, such as `.geo`, `.bgeo`, `.bgeo.sc`, or HOM-assisted `.vdb`.
-- The smallest non-sensitive reproducer you can provide.
-- Exact command line or API call.
-- Stack trace and sanitizer output.
-- Whether configured parser or decompression limits were changed.
+- Affected commit SHA
+- Operating system and compiler
+- Build preset and sanitizer configuration
+- File type: `.geo`, `.bgeo`, `.bgeo.sc`, or bridge-assisted `.vdb`
+- Smallest non-sensitive reproducer
+- Exact command or API call
+- Stack trace and sanitizer output
+- Any parser, file-size, decompression, or timeout limits that were changed
 
-A minimized synthetic file is preferable to production geometry. Remove proprietary names and attributes before sharing data.
+Prefer minimized synthetic geometry. Remove proprietary names, paths, and attributes before sharing data.
 
 ## Relevant issue classes
 
-Examples include:
+Examples:
 
-- Out-of-bounds reads or writes.
-- Use-after-free or invalid lifetime behavior.
-- Integer overflow that bypasses allocation or payload limits.
-- Stack exhaustion or uncontrolled recursion.
-- Unbounded allocation or decompression amplification.
-- Parser state corruption caused by malformed tokens.
-- Crashes or exceptions escaping diagnostics-aware APIs.
-- Unsafe dynamic-library or subprocess resolution in SCF or HOM workflows.
+- Out-of-bounds reads or writes
+- Use-after-free or invalid lifetime behavior
+- Integer overflow that bypasses limits
+- Stack exhaustion or uncontrolled recursion
+- Unbounded allocation or decompression amplification
+- Parser state corruption
+- Exceptions escaping diagnostics-aware APIs
+- Unsafe dynamic-library resolution
+- Unsafe subprocess resolution or argument handling
 
-Ordinary unsupported primitive diagnostics and documented lossy conversions are not security vulnerabilities unless they cause memory corruption, uncontrolled resource use, or unexpected code execution.
+A clean unsupported-data diagnostic is not a vulnerability unless it triggers memory corruption, uncontrolled resource use, or unexpected code execution.
 
 ## Reproducing safely
 
-Use the existing sanitizer configurations before reducing a report:
+Windows AddressSanitizer:
 
 ```powershell
 cmake --preset windows-msvc-asan
@@ -50,13 +51,15 @@ cmake --build --preset windows-msvc-asan
 ctest --preset windows-msvc-asan
 ```
 
+Linux UndefinedBehaviorSanitizer:
+
 ```bash
 cmake --preset linux-gcc-ubsan
 cmake --build --preset linux-gcc-ubsan
 ctest --preset linux-gcc-ubsan
 ```
 
-The deterministic parser mutation test is registered as `houio.parser_corpus`. Clang builds can also run the optional libFuzzer target:
+Clang libFuzzer:
 
 ```bash
 cmake --preset linux-clang-fuzzer
@@ -64,10 +67,19 @@ cmake --build --preset linux-clang-fuzzer
 ./build/linux-clang-fuzzer/houio_fuzz_parser -runs=2000 -max_len=512 -timeout=5
 ```
 
-## Current security boundary
+The deterministic mutation test is registered as `houio.parser_corpus`.
 
-HouIO has parser, string, array, nesting, file-size, SCF decompression, and topology limits, but it is not yet presented as a hardened sandbox for hostile files. Applications processing untrusted data should use conservative limits, isolation appropriate to their threat model, and current sanitizer-tested builds.
+## Security boundary
 
-The Houdini HOM bridge starts the configured `houio_convert` executable without a shell and applies a finite default timeout. VDB conversion may expand sparse grids into dense memory, so callers must bound grid size before using that workflow.
+HouIO enforces limits for file size, strings, arrays, nesting, SCF decompression, topology, and primitive ranges. It is not presented as a hardened sandbox for hostile files.
 
-Security reports are handled on a best-effort basis. No response-time or release-time service level is currently offered.
+Applications processing untrusted data should:
+
+- Use conservative limits
+- Run current sanitizer-tested builds
+- Isolate conversion according to their threat model
+- Set an explicit C-Blosc library path
+- Set finite subprocess timeouts
+- Bound VDB resolution before densification
+
+The Houdini bridge starts the configured converter directly without a shell. VDB conversion can expand sparse grids into dense memory and must be constrained by the caller.

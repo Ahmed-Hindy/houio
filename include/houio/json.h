@@ -1,24 +1,6 @@
-//
-// lightweight json parser and writer. special about this one is that it supports binary json as
-// specified by sideeffects' bgeo format (houdini12+).
-// 
-// todo: - transparent recasting of variants (e.g. value is int but queried as float...)
-//       - support for uniform arrays
-//       - support for ascii (read and write)
-//
-// bugs: Object::get with std::string is dodgy!
-//	the following code crashes:
-//		base::json::ObjectPtr o = base::json::Object::create();
-//		std::string testShape = "asdasd";
-//		o->append( "shape", base::json::Value::create( testShape ) );
-//		int test = 0;
-//		if( o->hasKey( "settings" ) )
-//		{
-//			test = o->get<int>("width");
-//		}
-//		std::string t = o->get<std::string>("shape");
-//
 #pragma once
+
+// Houdini ASCII and binary JSON parser, event handlers, value tree, and writers.
 
 #include <algorithm>
 #include <cstring>
@@ -111,12 +93,10 @@ namespace houio
 									  sword,          // int16
 									  sint32,         // int32
 									  sint64,         // int64
-									  // TODO: real16
-									  real32,         // real32
+									  real32,         // real16 values are widened to real32
 									  real64,         // real64
 									  ubyte,          // uint8
 									  uword,          // uint16
-									  // no uint32?
 									  std::string    // string
 									  > Value;
 			Token();

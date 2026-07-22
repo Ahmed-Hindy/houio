@@ -1,12 +1,7 @@
-// TODO:
-// packing
-// attribute varname mapping
-// ascii support
-
 #pragma once
 
-#include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <houio/Attribute.h>
@@ -83,9 +78,9 @@ namespace houio
 				PRIM_VOLUME,
 				PRIM_POLY
 			};
-			virtual ~Primitive(){}
+			virtual ~Primitive() = default;
 
-			// will be overloaded by primitive runs which represent multiple prims
+			// Primitive runs override this to report the number of represented records.
 			virtual int numPrimitives()const{return 1;}
 		};
 
@@ -136,10 +131,6 @@ namespace houio
 		virtual void                  getPrimitives( std::vector<HouGeoAdapter::Primitive::Ptr>& primitives );
 		virtual Topology::Ptr         getTopology();
 	};
-
-
-
-	//Geometry::Ptr convertHouGeoPrimitive( HouGeoPtr houGeo, int prim = -1 );
 }
 
 

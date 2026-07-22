@@ -46,25 +46,6 @@ namespace houio
 ///
 namespace math
 {
-/*
-	inline int isnan( float f )
-	{
-		#if defined(_WINDOWS)
-		return _isnan(f);
-		#else
-		return isnan(f);
-		#endif
-	}
-
-	inline int isinf( float f )
-	{
-		#if defined(_WINDOWS)
-		return !_finite((f));
-		#else
-		return isinf(f);
-		#endif
-	}
-*/
 	inline float radToDeg( float rad )
 	{
 		return (float) ( (rad * 180.0f) / MATH_PIf );
@@ -127,19 +108,6 @@ namespace math
 
 
 
-
-
-	/*
-	#define ALPHAMASK	0xff000000
-	#define REDMASK		0x00ff0000
-	#define GREENMASK	0x0000ff00
-	#define BLUEMASK	0x000000ff
-
-	#define ALPHASHIFT 24
-	#define REDSHIFT   16
-	#define GREENSHIFT 8
-	#define BLUESHIFT  0
-	*/
 	// RGBA
 	#define REDMASK		0x000000ff
 	#define GREENMASK	0x0000ff00

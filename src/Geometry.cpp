@@ -6,11 +6,6 @@
 #include <stdexcept>
 
 
-//#include <util/tuple.h>
-//#include "util/ObjIO.h"
-
-
-
 namespace houio
 {
 	Geometry::Geometry( PrimitiveType pt ) :
@@ -307,25 +302,6 @@ namespace houio
 		result->setAttr( "P", positions);
 		return result;
 	}
-/*
-	Geometry::Ptr Geometry::createReferenceMesh()
-	{
-		return importObj( path( "base" ) + "/data/meshref.obj" );
-	}
-*/
-/*
-	Geometry::Ptr geo_points( math::Vec3f p )
-	{
-		Geometry::Ptr result = Geometry::Ptr( new Geometry(Geometry::POINT) );
-		Attribute::Ptr positions = Attribute::createVec3f();
-		positions->appendElement( p );
-		result->setAttr( "P", positions);
-		result->addPoint( 0 );
-		return result;
-	}
-
-*/
-
 	Geometry::Ptr Geometry::createQuad(Geometry::PrimitiveType primType)
 	{
 		Geometry::Ptr result = std::make_shared<Geometry>(primType);
@@ -463,7 +439,7 @@ namespace houio
 		}else
 		if (primType == Geometry::TRIANGLE)
 		{
-			//TODO
+			// Grid triangle generation is not implemented by this convenience helper.
 		}
 
 
@@ -477,7 +453,6 @@ namespace houio
 		Attribute::Ptr positions = Attribute::createV3f();
 		result->setAttr( "P", positions);
 
-		//Attribute::Ptr uvs = Attribute::createV2f();
 		//result->setAttr( "UV", uvs );
 
 		float dPhi = MATH_2PIf/uSubdivisions;
@@ -680,233 +655,6 @@ namespace houio
 		return result;
 	}
 
-	/*
-	//TODO: add uv mapping
-	Geometry::Ptr geo_sphere( int uSubdivisions, int vSubdivisions, float radius, math::Vec3f center, Geometry::PrimitiveType primType )
-	{
-		Geometry::Ptr result = Geometry::Ptr(new Geometry(primType));
-
-		Attribute::Ptr positions = Attribute::createVec3f();
-		result->setAttr( "P", positions);
-
-		Attribute::Ptr uvs = Attribute::createVec2f();
-		result->setAttr( "UV", uvs );
-
-		float dPhi = MATH_2PIf/uSubdivisions;
-		float dTheta = MATH_PIf/vSubdivisions;
-		float theta, phi;
-
-		// y
-		for (theta=MATH_PIf/2.0f+dTheta;theta<=(3.0f*MATH_PIf)/2.0f-dTheta;theta+=dTheta)
-		{
-			math::Vec3f p;
-			float y = sin(theta);
-			// x-z
-			phi = 0.0f;
-			for( int j = 0; j<uSubdivisions; ++j  )
-			{
-				p.x = cos(theta) * cos(phi);
-				p.y = y;
-				p.z = cos(theta) * sin(phi);
-
-				p = p*radius + center;
-
-				positions->appendElement( p );
-				phi+=dPhi;
-			}
-		}
-
-		int pole1 = positions->appendElement( math::Vec3f(0.0f, 1.0f, 0.0f)*radius + center );
-		int pole2 = positions->appendElement( math::Vec3f(0.0f, -1.0f, 0.0f)*radius + center );
-
-		if( primType == Geometry::POINT )
-		{
-			int numVertices = positions->numElements();
-			for( int i=0; i< numVertices; ++i )
-				result->addPoint( i );
-		}else
-		if( primType == Geometry::LINE )
-		{
-			int numVertices = positions->numElements();
-			for( int j=0; j<vSubdivisions-3;++j )
-			{
-				int offset = j*(uSubdivisions);
-				int i = 0;
-				for( i=0; i<uSubdivisions-1; ++i )
-					result->addLine(offset+i, offset+i+1);
-				result->addLine(offset+0, offset+i);
-			}
-		}else
-		if( primType == Geometry::TRIANGLE )
-		{
-			// add faces
-			for( int j=0; j<vSubdivisions-3;++j )
-			{
-				int offset = j*(uSubdivisions);
-				int i = 0;
-				for( i=0; i<uSubdivisions-1; ++i )
-				{
-					result->addTriangle(offset+i+1, offset+i + uSubdivisions, offset+i);
-					result->addTriangle(offset+i+1, offset+i+uSubdivisions+1, offset+i + uSubdivisions);
-				}
-				result->addTriangle(offset+0,offset+i + uSubdivisions,offset+i);
-				result->addTriangle(offset,offset + uSubdivisions,offset+i + uSubdivisions);
-			}
-			for( int i=0; i<uSubdivisions-1; ++i )
-			{
-				result->addTriangle(i+1, i,pole1);
-				result->addTriangle(uSubdivisions*(vSubdivisions-3)+i, uSubdivisions*(vSubdivisions-3)+i+1, pole2);
-			}
-			result->addTriangle(0, uSubdivisions-1, pole1);
-			result->addTriangle(uSubdivisions*(vSubdivisions-2)-1, uSubdivisions*(vSubdivisions-3), pole2);
-		}
-		return result;
-	}
-
-	Geometry::Ptr geo_circle( int uSubdivisions, float radius, math::Vec3f center, Geometry::PrimitiveType primType )
-	{
-		Geometry::Ptr result = Geometry::Ptr(new Geometry(Geometry::LINE));
-
-		Attribute::Ptr positions = Attribute::createVec3f();
-		result->setAttr( "P", positions);
-
-		Attribute::Ptr uvs = Attribute::createVec2f();
-		result->setAttr( "UV", uvs );
-
-		float dPhi = MATH_2PIf/uSubdivisions;
-		float phi;
-
-		{
-			math::Vec3f p;
-			// x-z
-			phi = 0.0f;
-			for( int j = 0; j<uSubdivisions; ++j  )
-			{
-				p.x = cos(phi);
-				p.y = 0.0f;
-				p.z = sin(phi);
-
-				p = p*radius + center;
-
-				positions->appendElement( p );
-				phi+=dPhi;
-			}
-		}
-
-		int pole1 = positions->appendElement( math::Vec3f(0.0f, 1.0f, 0.0f)*radius + center );
-		int pole2 = positions->appendElement( math::Vec3f(0.0f, -1.0f, 0.0f)*radius + center );
-
-		if( primType == Geometry::POINT )
-		{
-			int numVertices = positions->numElements();
-			for( int i=0; i< numVertices; ++i )
-				result->addPoint( i );
-		}else
-		if( primType == Geometry::LINE )
-		{
-			for( int i=0; i<uSubdivisions-1; ++i )
-			{
-				result->addLine(i, i+1);
-			}
-			result->addLine(uSubdivisions-1, 0);
-
-//			// add faces
-//			for( int j=0; j<vSubdivisions-3;++j )
-//			{
-//				int offset = j*(uSubdivisions);
-//				int i = 0;
-//				for( i=0; i<uSubdivisions-1; ++i )
-//				{
-//					result->addTriangle(offset+i+1, offset+i + uSubdivisions, offset+i);
-//					result->addTriangle(offset+i+1, offset+i+uSubdivisions+1, offset+i + uSubdivisions);
-//				}
-//				result->addTriangle(offset+0,offset+i + uSubdivisions,offset+i);
-//				result->addTriangle(offset,offset + uSubdivisions,offset+i + uSubdivisions);
-//			}
-//			for( int i=0; i<uSubdivisions-1; ++i )
-//			{
-//				result->addTriangle(i+1, i,pole1);
-//				result->addTriangle(uSubdivisions*(vSubdivisions-3)+i, uSubdivisions*(vSubdivisions-3)+i+1, pole2);
-//			}
-//			result->addTriangle(0, uSubdivisions-1, pole1);
-//			result->addTriangle(uSubdivisions*(vSubdivisions-2)-1, uSubdivisions*(vSubdivisions-3), pole2);
-
-		}
-		return result;
-	}
-
-	Geometry::Ptr geo_cone( math::Vec3f axis, float halfAngle,  float height, int uSubdivisions )
-	{
-		Geometry::Ptr result = Geometry::Ptr(new Geometry(Geometry::TRIANGLE));
-
-		Attribute::Ptr positions = Attribute::createVec3f();
-		result->setAttr( "P", positions);
-
-
-		float r = height*tan(halfAngle);
-
-		math::Matrix33f rm = math::Matrix33f::RotationMatrix( axis, (2.0f*MATH_PIf)/uSubdivisions );
-
-		math::Vec3f p = height*axis+math::cross( math::baseVec3<float>( math::nondominantAxis(axis) ), axis )*r;
-
-		// add apex
-		positions->appendElement<math::Vec3f>(math::Vec3f(0.0f, 0.0f, 0.0f));
-
-		// add base and triangles
-		positions->appendElement<math::Vec3f>(p);
-		float d = (p-height*axis).getLength();
-		for( int i=1;i<uSubdivisions;++i )
-		{
-			p = math::transform( p, rm );
-
-			d = (p-height*axis).getLength();
-
-			positions->appendElement<math::Vec3f>(p);
-			result->addTriangle( 0, i, i+1 );
-		}
-
-
-		return result;
-	}
-
-
-
-
-
-
-
-
-
-
-	void apply_transform( Geometry::Ptr geo, math::Matrix44f tm )
-	{
-		Attribute::Ptr pAttr = geo->getAttr("P");
-		int numElements = pAttr->numElements();
-		for( int i=0; i<numElements; ++i )
-		{
-			math::Vec3f v = math::transform( pAttr->get<math::Vec3f>(i), tm);
-			pAttr->set<math::Vec3f>( (unsigned int)i, v );
-		}
-	}
-
-
-
-
-
-
-
-
-
-	math::BoundingBox3f compute_bound( Geometry::Ptr geo )
-	{
-		math::BoundingBox3f bbox;
-		Attribute::Ptr p = geo->getAttr( "P" );
-		int numElements = p->numElements();
-		for( int i=0;i<numElements;++i )
-			bbox.extend(p->get<math::Vec3f>(i));
-		return bbox;
-	}
-	*/
 }
 
 

@@ -21,6 +21,11 @@ target_link_libraries(houio_test_attribute PRIVATE houio::houio)
 target_compile_features(houio_test_attribute PRIVATE cxx_std_20)
 add_test(NAME houio.attribute COMMAND houio_test_attribute)
 
+add_executable(houio_test_math test_math.cpp)
+target_link_libraries(houio_test_math PRIVATE houio::houio)
+target_compile_features(houio_test_math PRIVATE cxx_std_20)
+add_test(NAME houio.math COMMAND houio_test_math)
+
 add_executable(houio_test_modern_geometry test_modern_geometry.cpp)
 target_link_libraries(houio_test_modern_geometry PRIVATE houio::houio)
 target_compile_features(houio_test_modern_geometry PRIVATE cxx_std_20)

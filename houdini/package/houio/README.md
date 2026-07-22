@@ -1,11 +1,13 @@
 # HouIO for Houdini
 
-After installation, open a SOP network and use the Tab menu.
+HouIO supports Houdini 20.0 or newer.
 
-- **HouIO > HouIO Round Trip** creates a configured Python SOP after the selected SOP.
-- **HouIO > Convert Geometry File** converts a geometry file through HouIO.
-- **HouIO > Package Diagnostics** reports the active package, converter, and Blosc paths.
+Open a SOP network and use **Tab > HouIO**:
 
-The C++ converter runs as a separate process. Houdini loads only the Python bridge, avoiding Python ABI coupling between Houdini versions.
+- **HouIO Round Trip** creates a configured Python SOP after the selected node.
+- **Convert Geometry File** runs the bundled converter for `.geo`, `.bgeo`, and `.bgeo.sc` files.
+- **Package Diagnostics** reports the active package, converter, and C-Blosc paths.
 
-The Houdini bridge supports `.geo`, `.bgeo`, `.bgeo.sc`, and bounded 32-bit Float `.vdb` grids. Sparse VDB grids become dense Houdini volumes while retaining level-set or Fog semantics.
+The converter runs as a separate process. Houdini loads only the Python bridge, avoiding Python ABI coupling between Houdini versions.
+
+The bridge also supports bounded 32-bit Float SDF and Fog VDB grids through explicit dense-volume conversion. Sparse VDB topology is not preserved.

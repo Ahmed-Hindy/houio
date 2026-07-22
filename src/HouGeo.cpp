@@ -529,9 +529,7 @@ namespace houio
 	{
 		if( m_attr )
 			return HouGeoAdapter::RawPointer::create( m_attr->getRawPointer() );
-		//if( !data.empty() )
-		//	return HouGeoAdapter::RawPointer::create( &data[0] );
-		return HouGeoAdapter::RawPointer::create( 0 );
+		return HouGeoAdapter::RawPointer::create( nullptr );
 	}
 
 	int HouGeo::HouAttribute::getNumElements()const
@@ -542,28 +540,8 @@ namespace houio
 	}
 
 
-	/*
-	int HouGeo::HouAttribute::addV4f( math::V4f value )
-	{
-		// TODO: check storage
-		// TODO: check type
-
-		if( tupleSize != 4 )
-			qCritical() << "tupleSize does not match!";
-
-		int elementSize = storageSize( m_storage )*tupleSize;
-		data.resize( data.size() + elementSize );
-
-		*((math::V4f *)(&data[ numElements * elementSize ])) = value;
-
-		return numElements++;
-	}
-	*/
-
 	int HouGeo::HouAttribute::addString(const std::string &value)
 	{
-		// TODO: check storage
-		// TODO: check type
 		strings.push_back(value);
 		m_type = ATTR_TYPE_STRING;
 		m_storage = ATTR_STORAGE_INT32;
@@ -1024,9 +1002,6 @@ namespace houio
 						throw std::overflow_error( "HouGeo::loadAttribute element count exceeds int range for attribute " + attrName );
 					attr->numElements = static_cast<int>(elementCount);
 					size_t elementsRemaining = static_cast<size_t>(attr->numElements);
-					//qDebug() << "numElements " << attr->numElements;
-					//qDebug() << "rawPageData->size() " << (int)rawPageData->size();
-					//qDebug() << "attrTupleSize " << attrTupleSize;
 
 					// process each page
 					size_t pageIndex = 0;
@@ -1050,7 +1025,6 @@ namespace houio
 
 							// is pack for current page constant?
 							bool isConstant = constantPageFlagsPerPack[packIndex].empty() ? false : constantPageFlagsPerPack[packIndex][pageIndex];
-							//qDebug() << "constant? " << isConstant;
 
 
 							// if pack is constant only the first element is given, this is the reference
@@ -1066,21 +1040,13 @@ namespace houio
 									// get page element index into rawpagedata for current pack
 									// we can do pageStartElement*attrTupleSize because packing doesnt matter for past pages
 									elementIndex = pageStartIndex + i*pack;
-									//qDebug() << "elementIndex " << elementIndex;
-									//qDebug() << "pageStartElement " << pageStartElement;
-									//qDebug() << "attrTupleSize " << attrTupleSize;
-									//qDebug() << "i " << i;
-									//qDebug() << "pack " << pack;
-
 								// get global element index for writing into our dense array
 								const size_t destElementIndex = (pageStartElement + i) * static_cast<size_t>(dstTupleSize);
 
 								// for each component of current pack
 								for( size_t component=0;component<maxPack;++component )
 								{
-									// get component value from current rawpagedata
-									// and copy that component to the location of that component in dense array
-									// TODO: uniform arrays!
+									// Copy the packed component into the dense destination tuple.
 									const size_t rawIndex = elementIndex + component;
 									if( rawIndex > static_cast<size_t>(std::numeric_limits<int>::max()) )
 										throw std::overflow_error( "HouGeo::loadAttribute raw page index exceeds int range for attribute " + attrName );

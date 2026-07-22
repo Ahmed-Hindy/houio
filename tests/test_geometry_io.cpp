@@ -204,13 +204,13 @@ int verifyLegacyFailureContract(const std::filesystem::path &directory)
         threwDiagnostic = exception.diagnostic().category == houio::DiagnosticCategory::io;
     }
     if( !threwDiagnostic )
-        return fail("legacy importGeometry did not throw without a diagnostic list");
+        return fail("compatibility importGeometry did not throw without a diagnostic list");
 
     houio::DiagnosticList diagnostics;
     const houio::Geometry::Ptr geometry =
         houio::HouGeoIO::importGeometry(missingPath.string(), &diagnostics);
     if( geometry || !containsCategory(diagnostics, houio::DiagnosticCategory::io) )
-        return fail("legacy diagnostics overload did not return an I/O diagnostic");
+        return fail("compatibility diagnostics overload did not return an I/O diagnostic");
     return 0;
 }
 

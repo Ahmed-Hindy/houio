@@ -107,30 +107,4 @@ namespace houio
 		static Ptr                                                  merge(const std::vector<Geometry::Ptr>& geo_list);
 	};
 
-
-
-
-
-	//
-	// geometry generation functions
-	//
-	/*
-	GeometryPtr                                     geo_points( math::Vec3f p );
-	GeometryPtr                                     geo_quad(Geometry::PrimitiveType primType = Geometry::QUAD);
-
-	GeometryPtr                                     geo_cube( const math::BoundingBox3f &bound = math::BoundingBox3f(math::Vec3f(-0.5f), math::Vec3f(0.5f)), Geometry::PrimitiveType primType = Geometry::QUAD );
-	GeometryPtr                                     geo_sphere( int uSubdivisions, int vSubdivisions, float radius, math::Vec3f center = math::Vec3f(0.0f,0.0f,0.0f), Geometry::PrimitiveType primType = Geometry::TRIANGLE );
-	GeometryPtr                                     geo_circle( int uSubdivisions, float radius, math::Vec3f center = math::Vec3f(0.0f,0.0f,0.0f), Geometry::PrimitiveType primType = Geometry::LINE );
-	GeometryPtr                                     geo_cone( math::Vec3f axis, float halfAngle,  float height, int uSubdivisions = 30 );
-
-
-	//
-	// geometry manipulation functions
-	//
-	void                                            apply_transform( GeometryPtr geo, math::Matrix44f tm );
-	void                                            apply_normals( GeometryPtr geo );
-
-	// geometry utility functions
-	math::BoundingBox3f                             compute_bound( GeometryPtr geo );
-	*/
 }
