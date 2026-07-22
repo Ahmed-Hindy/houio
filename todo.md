@@ -100,7 +100,7 @@ The priority labels indicate dependency order rather than estimated effort.
 - [x] Validate topology counts and point-reference ranges.
 - [x] Validate direct polygon and polygon-run topology references.
 - [x] Validate unordered group masks and reject unsupported ordered selections.
-- [ ] Add bounds checks before all remaining array and topology indexing.
+- [x] Add bounds checks before all remaining array and topology indexing.
 - [x] Add deterministic mutation testing and an optional Clang/libFuzzer target for the JSON parser.
 - [x] Add and run an MSVC AddressSanitizer preset.
 - [x] Add GCC UndefinedBehaviorSanitizer coverage in Linux CI.
