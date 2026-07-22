@@ -35,7 +35,8 @@ namespace houio
 			{
 				ATTR_TYPE_INVALID  = 0,
 				ATTR_TYPE_NUMERIC  = 1,
-				ATTR_TYPE_STRING   = 2
+				ATTR_TYPE_STRING   = 2,
+				ATTR_TYPE_DICT     = 3
 			};
 			enum Storage
 			{

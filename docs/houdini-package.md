@@ -173,7 +173,7 @@ Reports the active package root, Houdini version, converter path, C-Blosc path, 
 
 ## Supported data
 
-The package supports HouIO's polygon, attribute, group, and dense scalar-volume model.
+The package supports HouIO's polygon, numeric/string/dictionary attribute, group, and dense scalar-volume model. Houdini Volume Visualization detail metadata is preserved in both the scalar-attribute layout used by Houdini 20.x and the dictionary layout used by Houdini 21.x and newer.
 
 The Houdini bridge also accepts bounded 32-bit Float SDF and Fog VDB grids by converting them to dense volumes. VDB class is retained through the `houio_vdb_class` attribute and restored on output.
 

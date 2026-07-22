@@ -146,7 +146,7 @@ def validate(output_directory: Path) -> None:
         vdb_geometry.prims()[0], hou.VDB
     ):
         raise AssertionError("Dense volume conversion did not produce a VDB")
-    if vdb_geometry.prims()[0].vdbType() != hou.vdbType.Float:
+    if vdb_geometry.prims()[0].dataType() != hou.vdbData.Float:
         raise AssertionError("Dense volume conversion did not produce a Float VDB")
 
     mixed_geometry = hou.Geometry()
@@ -235,6 +235,32 @@ def validate(output_directory: Path) -> None:
             processed_box.prims()
         ) != len(source_box.prims()):
             raise AssertionError("Cooked SOP round-trip changed box counts")
+
+        volume_node = geometry_container.createNode("volume")
+        visualization_node = geometry_container.createNode("volumevisualization")
+        visualization_node.setInput(0, volume_node)
+        source_visualization = visualization_node.geometry()
+        expected_visualization_attributes = {
+            attribute.name(): source_visualization.attribValue(attribute)
+            for attribute in source_visualization.globalAttribs()
+        }
+        processed_visualization = roundtrip_node_geometry(
+            visualization_node, timeout_seconds=60.0
+        )
+        actual_visualization_attributes = {
+            attribute.name(): processed_visualization.attribValue(attribute)
+            for attribute in processed_visualization.globalAttribs()
+        }
+        changed_visualization_attributes = {
+            name
+            for name, expected_value in expected_visualization_attributes.items()
+            if actual_visualization_attributes.get(name) != expected_value
+        }
+        if changed_visualization_attributes:
+            raise AssertionError(
+                "Volume visualization detail attributes changed during round-trip: "
+                + ", ".join(sorted(changed_visualization_attributes))
+            )
 
         file_node = geometry_container.createNode("file")
         file_node.parm("file").set(str(vdb_path))

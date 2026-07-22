@@ -1101,6 +1101,11 @@ namespace houio
 				attr->strings.reserve(static_cast<size_t>(elementCount));
 				for( int stringIndex : indexValues )
 				{
+					if( stringIndex == -1 )
+					{
+						attr->strings.emplace_back();
+						continue;
+					}
 					if( stringIndex < 0 || static_cast<size_t>(stringIndex) >= stringTable.size() )
 						throw std::runtime_error( "HouGeo::loadAttribute string index out of range for attribute " + attrName );
 					attr->strings.push_back(stringTable[static_cast<size_t>(stringIndex)]);
@@ -1116,6 +1121,55 @@ namespace houio
 				throw std::runtime_error( "HouGeo::loadAttribute cannot map string table to elements for attribute " + attrName );
 
 			attr->numElements = static_cast<int>(attr->strings.size());
+		}else if( attrType == AttributeAdapter::ATTR_TYPE_DICT )
+		{
+			json::ArrayPtr dictionaries = attrData->getArray("dicts");
+			const int dictionaryCount = checkedArrayCount(dictionaries,
+				"HouGeo::loadAttribute dictionary table for attribute " + attrName);
+			std::vector<json::ObjectPtr> dictionaryTable;
+			dictionaryTable.reserve(static_cast<size_t>(dictionaryCount));
+			for( int dictionaryIndex=0;dictionaryIndex<dictionaryCount;++dictionaryIndex )
+			{
+				json::ObjectPtr dictionary = dictionaries->getObject(dictionaryIndex);
+				if( !dictionary )
+					throw std::runtime_error( "HouGeo::loadAttribute expected a dictionary value for attribute " + attrName );
+				dictionaryTable.push_back(dictionary);
+			}
+
+			attr->m_name = attrName;
+			attr->m_type = attrType;
+			attr->m_storage = AttributeAdapter::ATTR_STORAGE_INT32;
+			attr->tupleSize = 1;
+			attr->dictionaries.reserve(static_cast<size_t>(elementCount));
+
+			if( attrData->hasKey("indices") )
+			{
+				json::ObjectPtr indices = toObject(attrData->getArray("indices"));
+				const std::vector<int> indexValues = expandPagedIntValues(indices, elementCount, attrName);
+				for( int dictionaryIndex : indexValues )
+				{
+					if( dictionaryIndex == -1 )
+					{
+						attr->dictionaries.push_back(json::Object::create());
+						continue;
+					}
+					if( dictionaryIndex < 0 || static_cast<size_t>(dictionaryIndex) >= dictionaryTable.size() )
+						throw std::runtime_error( "HouGeo::loadAttribute dictionary index out of range for attribute " + attrName );
+					attr->dictionaries.push_back(dictionaryTable[static_cast<size_t>(dictionaryIndex)]);
+				}
+			}else if( dictionaryTable.size() == static_cast<size_t>(elementCount) )
+				attr->dictionaries = dictionaryTable;
+			else if( dictionaryTable.size() == 1 && elementCount > 0 )
+				attr->dictionaries.assign(static_cast<size_t>(elementCount), dictionaryTable.front());
+			else if( elementCount != 0 )
+				throw std::runtime_error( "HouGeo::loadAttribute cannot map dictionary table to elements for attribute " + attrName );
+
+			attr->numElements = static_cast<int>(attr->dictionaries.size());
+		}else if( attrType == AttributeAdapter::ATTR_TYPE_INVALID )
+		{
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+				"HouGeo::loadAttribute does not support attribute type " + attrDef->get<std::string>("type"),
+				-1, "type"});
 		}
 
 		return attr;

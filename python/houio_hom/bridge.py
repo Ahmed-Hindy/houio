@@ -19,6 +19,15 @@ VDB_FOG_VOLUME_CLASS = "fog volume"
 _SUPPORTED_VDB_CLASSES = frozenset((VDB_LEVEL_SET_CLASS, VDB_FOG_VOLUME_CLASS))
 
 
+class HouIOConverterError(subprocess.CalledProcessError):
+    """Converter failure that includes captured HouIO diagnostics in its message."""
+
+    def __str__(self) -> str:
+        message = super().__str__()
+        details = (self.stderr or self.output or "").strip()
+        return f"{message}\n{details}" if details else message
+
+
 def _resolve_converter(executable: Optional[PathLike]) -> Path:
     """Resolve the installed or locally built HouIO converter executable."""
     candidates: list[Path] = []
@@ -229,10 +238,10 @@ def convert_vdb_to_volume(geometry: hou.Geometry) -> hou.Geometry:
         raise ValueError("Geometry contains no VDB primitives")
     unsupported_types = sorted(
         {
-            str(primitive.vdbType())
+            str(primitive.intrinsicValue("vdb_value_type"))
             for primitive in geometry.prims()
             if isinstance(primitive, hou.VDB)
-            and primitive.vdbType() != hou.vdbType.Float
+            and primitive.dataType() != hou.vdbData.Float
         }
     )
     if unsupported_types:
@@ -293,7 +302,7 @@ def convert_volume_to_vdb(geometry: hou.Geometry) -> hou.Geometry:
             for primitive in result.prims():
                 if not isinstance(primitive, hou.VDB):
                     continue
-                if primitive.vdbType() != hou.vdbType.Float:
+                if primitive.dataType() != hou.vdbData.Float:
                     raise ValueError(
                         "HouIO VDB output supports only 32-bit float grids"
                     )
@@ -485,7 +494,7 @@ def convert_with_houio(
             timeout=timeout_seconds,
         )
         if completed.returncode != 0:
-            raise subprocess.CalledProcessError(
+            raise HouIOConverterError(
                 completed.returncode,
                 completed.args,
                 output=completed.stdout,

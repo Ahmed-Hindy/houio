@@ -31,7 +31,8 @@ HouIO currently supports:
 - Point, vertex, primitive, and global attribute domains
 - Signed Int32 and Int64 storage
 - Float16, Float32, and Float64 storage
-- Indexed string attributes
+- Indexed string attributes, including Houdini's empty-string sentinel
+- Indexed dictionary metadata in faithful `HouGeo` round trips
 - Unordered point, vertex, and primitive groups
 - `Poly`, `Polygon_run`, and `PolygonCurve_run`
 - Dense scalar volumes
@@ -49,7 +50,7 @@ Not currently supported by the standalone C++ model:
 - NURBS and Bezier primitives
 - Instancing records
 
-The Houdini bridge can explicitly convert supported Float SDF and Fog VDB grids to dense volumes, process them through HouIO, and restore their VDB class on output.
+The Houdini bridge can explicitly convert supported Float SDF and Fog VDB grids to dense volumes, process them through HouIO, and restore their VDB class on output. It also preserves Houdini Volume Visualization detail metadata across the supported Houdini versions.
 
 ## Build
 

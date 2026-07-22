@@ -61,6 +61,35 @@ const char* mixedPolygonGeometry()
                         "storage", "int32",
                         "values", ["size", 1, "storage", "int32", "arrays", [[22]]]
                     ]
+                ],
+                [
+                    ["scope", "public", "type", "string", "name", "empty_value"],
+                    [
+                        "size", 1,
+                        "storage", "int32",
+                        "strings", [],
+                        "indices", [
+                            "size", 1,
+                            "storage", "int32",
+                            "pagesize", 1024,
+                            "constantpageflags", [[true]],
+                            "rawpagedata", [-1]
+                        ]
+                    ]
+                ],
+                [
+                    ["scope", "public", "type", "dict", "name", "settings"],
+                    [
+                        "size", 1,
+                        "storage", "int32",
+                        "dicts", [
+                            {
+                                "empty": {"type": "string", "value": ""},
+                                "count": {"type": "int", "value": 3},
+                                "range": {"type": "vector2", "value": [0.0, 1.0]}
+                            }
+                        ]
+                    ]
                 ]
             ]
         ],
@@ -193,6 +222,32 @@ int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
     if (versionData[0] != 22)
     {
         return fail("global integer attribute value was not preserved");
+    }
+
+    const auto emptyValue = geometry->getGlobalAttribute("empty_value");
+    if (!emptyValue || emptyValue->getString(0) != "")
+    {
+        return fail("empty global string attribute was not preserved");
+    }
+
+    const auto settings = std::dynamic_pointer_cast<houio::HouGeo::HouAttribute>(
+        geometry->getGlobalAttribute("settings"));
+    if (!settings || settings->getType() != houio::HouGeoAdapter::AttributeAdapter::ATTR_TYPE_DICT
+        || settings->dictionaries.size() != 1)
+    {
+        return fail("global dictionary attribute metadata was not preserved");
+    }
+    const auto dictionary = settings->dictionaries.front();
+    const auto emptySetting = dictionary->getObject("empty");
+    const auto countSetting = dictionary->getObject("count");
+    const auto rangeSetting = dictionary->getObject("range");
+    const auto rangeValues = rangeSetting ? rangeSetting->getArray("value") : houio::json::ArrayPtr();
+    if (!emptySetting || emptySetting->get<std::string>("value") != ""
+        || !countSetting || countSetting->get<int>("value") != 3
+        || !rangeValues || rangeValues->size() != 2
+        || rangeValues->get<double>(0) != 0.0 || rangeValues->get<double>(1) != 1.0)
+    {
+        return fail("global dictionary attribute values were not preserved");
     }
     return 0;
 }

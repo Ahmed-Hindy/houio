@@ -69,6 +69,8 @@ namespace houio
 		else
 		if( typeName == "string" )
 			return ATTR_TYPE_STRING;
+		else if( typeName == "dict" )
+			return ATTR_TYPE_DICT;
 		return ATTR_TYPE_INVALID;
 	}
 

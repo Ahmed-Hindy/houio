@@ -45,6 +45,7 @@ namespace houio
 			Type                                  m_type;
 			//std::vector<char>                     data;
 			std::vector<std::string>              strings; // used in case of type==string
+			std::vector<json::ObjectPtr>          dictionaries; // used in case of type==dict
 			int                                   numElements;
 
 			Attribute::Ptr                        m_attr; // primitives::Attribute

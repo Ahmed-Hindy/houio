@@ -18,4 +18,4 @@ Open a SOP network and use **Tab > HouIO**:
 
 The converter runs as a separate process. Houdini loads only the Python bridge, avoiding Python ABI coupling between Houdini versions.
 
-The bridge also supports bounded 32-bit Float SDF and Fog VDB grids through explicit dense-volume conversion. Sparse VDB topology is not preserved.
+The bridge preserves Houdini Volume Visualization detail metadata across the Houdini 20.x scalar layout and the Houdini 21.x+ dictionary layout. It also supports bounded 32-bit Float SDF and Fog VDB grids through explicit dense-volume conversion. Sparse VDB topology is not preserved.
