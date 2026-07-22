@@ -134,6 +134,42 @@ int verifyStructuredDiagnostics()
     }
 
     if (const int result = expectImportDiagnostic(
+            R"JSON(["pointcount", 0, "vertexcount", 0, "primitivecount", 0, "attributes", ["pointattributes", "invalid"]])JSON",
+            houio::DiagnosticCategory::schema, "attributes.pointattributes",
+            "point attribute container diagnostic");
+        result != 0)
+    {
+        return result;
+    }
+
+    if (const int result = expectImportDiagnostic(
+            R"JSON(["pointcount", 0, "vertexcount", 0, "primitivecount", 0, "attributes", ["pointattributes", ["invalid"]]])JSON",
+            houio::DiagnosticCategory::schema, "attributes.pointattributes[0]",
+            "point attribute entry diagnostic");
+        result != 0)
+    {
+        return result;
+    }
+
+    if (const int result = expectImportDiagnostic(
+            R"JSON(["pointcount", 0, "vertexcount", 0, "primitivecount", 0, "primitives", "invalid"])JSON",
+            houio::DiagnosticCategory::schema, "primitives",
+            "primitive container diagnostic");
+        result != 0)
+    {
+        return result;
+    }
+
+    if (const int result = expectImportDiagnostic(
+            R"JSON(["pointcount", 0, "vertexcount", 0, "primitivecount", 1])JSON",
+            houio::DiagnosticCategory::schema, "primitives",
+            "primitive count diagnostic");
+        result != 0)
+    {
+        return result;
+    }
+
+    if (const int result = expectImportDiagnostic(
             R"JSON(["pointcount", 0, "vertexcount", 0, "primitivecount", 1, "primitives", [[["type", "AlembicRef"], []]]])JSON",
             houio::DiagnosticCategory::unsupported_input,
             "primitives[0].definition.type", "unsupported primitive diagnostic");
