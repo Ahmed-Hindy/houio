@@ -17,8 +17,9 @@ HouIO is a standalone file-format library. It is **not** a Houdini plug-in, does
 
 HouIO should currently be treated as an experimental legacy library rather than a production-ready dependency.
 
-- The included geometry fixtures identify themselves as Houdini `13.0.288` files.
+- The minimum supported Houdini version is `20.0`; Houdini 13 fixtures are historical and are not part of the active compatibility target.
 - The latest upstream commit is from 2020.
+- The distributable package has passed its shelf-tool, diagnostics, and box round-trip test in Houdini `20.0.653`, `20.5.410`, `21.0.631`, and `22.0.368`.
 - A static Crag round-trip and a 14-case minimal geometry matrix have been validated with Houdini `21.0.631` and `22.0.368`.
 - Polygon, `.bgeo.sc`, and legacy dense-volume paths are the best-developed areas.
 - Packed geometry, native OpenVDB primitives, curves, agents, height fields, and most modern primitive types are not supported by the standalone C++ model.
@@ -32,7 +33,7 @@ See [todo.md](todo.md) for the modernization plan.
 - Inspect unknown Houdini geometry structures using a JSON logger.
 - Read point, vertex, primitive, and global attribute domains.
 - Preserve unordered point, vertex, and primitive groups.
-- Read legacy polygon runs, Houdini 21/22 `Polygon_run` records, and open `PolygonCurve_run` records.
+- Read legacy polygon runs, modern `Polygon_run` records, and open `PolygonCurve_run` records.
 - Read legacy dense Houdini volumes, including tiled and constant storage.
 - Read and write point, polygon, and dense-volume `.bgeo` and `.bgeo.sc` files.
 - Detect formats from both file extensions and stream signatures.
@@ -40,7 +41,7 @@ See [todo.md](todo.md) for the modernization plan.
 - Convert supported Houdini geometry into a lightweight render-oriented mesh representation.
 - Read all dense scalar volumes or use a first-volume convenience API with loss warnings.
 - Export custom geometry implementations through the `HouGeoAdapter` interface.
-- Use a Houdini 21/22 HOM package for `.vdb`, `.bgeo.sc`, Python SOP, shelf-tool, and headless hython workflows.
+- Use a Houdini 20.0+ HOM package for `.vdb`, `.bgeo.sc`, Python SOP, shelf-tool, and headless hython workflows.
 
 ## Repository layout
 
@@ -200,7 +201,7 @@ The standalone C++ library does not link to Houdini's private OpenVDB build and 
 - `hou.Geometry.data()` and `hou.Geometry.load()` bridge uncompressed bgeo bytes without temporary Houdini nodes.
 - `houio_convert` can be launched from HOM without loading a Python extension into Houdini's process.
 
-The distributable Windows archive contains the converter, Python bridge, shelf tools, and package file. Houdini 22 users can install the ZIP through **Package Browser > Install Package Archive**. Houdini 21 and 22 users can also extract it and run:
+The distributable Windows archive contains the converter, Python bridge, shelf tools, and package file. Houdini 22 users can install the ZIP through **Package Browser > Install Package Archive**. Houdini 20.0 or newer users can also extract it and run:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
@@ -309,7 +310,7 @@ The Houdini-oriented layer currently recognizes:
 
 - `Poly`
 - Legacy polygon `run` records
-- Houdini 21/22 `Polygon_run` and `PolygonCurve_run` records
+- Modern `Polygon_run` and `PolygonCurve_run` records
 - Legacy `Volume`
 
 The simplified `Geometry` class supports one primitive type per object:
@@ -368,7 +369,7 @@ The harness:
 
 The verified geometry contains 90,085 points, 359,794 vertices, and 89,942 polygons. The output is static and preserves polygon topology, point `P`, vertex `N` and `uv`, primitive string `name`, and primitive integer `piece`. Houdini reports a maximum absolute difference of `0.0` for the floating-point attributes and exact matches for all 89,942 primitive string and integer values.
 
-Houdini 21/22 encode this mesh with `Polygon_run` and run-length vertex counts. HouIO reads both run-length counts and direct per-primitive `nvertices`/`n_v` arrays. The writer emits modern polygon-run records with topology vertex offsets and promotes three-component `P` data to its four-component output representation.
+Modern Houdini releases encode this mesh with `Polygon_run` and run-length vertex counts. HouIO reads both run-length counts and direct per-primitive `nvertices`/`n_v` arrays. The writer emits modern polygon-run records with topology vertex offsets and promotes three-component `P` data to its four-component output representation.
 
 Modern Houdini binary `.bgeo` input is covered for this geometry path. The missing geometry compatibility feature was uniform signed-int8 arrays, used by compact binary `Polygon_run` run-length data. The same parser and writer now operate transparently through the validated `.bgeo.sc` wrapper when C-Blosc is available.
 

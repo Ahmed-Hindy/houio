@@ -33,9 +33,9 @@ The priority labels indicate dependency order rather than estimated effort.
 ### Test baseline
 
 - [x] Call `enable_testing()` and register the historical logger with CTest.
-- [ ] Replace print-only smoke behavior with assertion-based tests.
-- [ ] Add tests for the supplied Houdini 13 ASCII fixtures.
-- [ ] Add tests for the supplied Houdini 13 binary fixtures.
+- [x] Replace print-only smoke behavior with an assertion-based JSON logger test.
+- [x] Retire Houdini 13 fixtures from the active test baseline; the minimum supported version is Houdini 20.0.
+- [x] Validate the distributable package in Houdini 20.0.653 and 20.5.410.
 - [x] Assert point, vertex, and primitive counts.
 - [x] Assert topology and representative attribute values.
 - [ ] Assert legacy volume resolution, transform, and sample values.
@@ -56,8 +56,10 @@ The priority labels indicate dependency order rather than estimated effort.
 
 ## P1 — Make current behavior safe and maintainable
 
-### Houdini 21 and 22 compatibility baseline
+### Houdini 20.0+ compatibility baseline
 
+- [x] Set Houdini 20.0 as the minimum supported version.
+- [x] Validate the package, shelf tools, diagnostics, and box round trip in Houdini 20.0.653 and 20.5.410.
 - [x] Add a reproducible Houdini 21.0.631 and 22.0.368 Crag generator.
 - [x] Freeze Crag in its rest T-pose with no time dependency.
 - [x] Add optional CTest generation, round-trip, and Houdini validation stages.
@@ -154,10 +156,16 @@ Suggested structure:
 
 ```text
 tests/fixtures/
-    houdini-13.0.288/
+    houdini-20.0.x/
+        ascii/
+        binary/
+    houdini-20.5.x/
         ascii/
         binary/
     houdini-21.0.x/
+        ascii/
+        binary/
+    houdini-22.0.x/
         ascii/
         binary/
     malformed/
@@ -347,8 +355,8 @@ A practical sequence is:
 
 1. Resolve licensing.
 2. Repair CMake and establish CI.
-3. Convert historical fixtures into real tests.
-4. Add minimal Houdini 21 fixtures.
+3. Establish assertion-based tests and retire unsupported legacy-version checks.
+4. Add minimal fixtures for supported Houdini 20.0+ versions.
 5. Improve diagnostics and parser bounds checking.
 6. Remove static export state.
 7. Fix confirmed correctness defects.

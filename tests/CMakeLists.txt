@@ -3,7 +3,6 @@ find_package(Threads REQUIRED)
 add_executable(houio_test_logger main.cpp)
 target_link_libraries(houio_test_logger PRIVATE houio::houio)
 target_compile_features(houio_test_logger PRIVATE cxx_std_20)
-target_compile_definitions(houio_test_logger PRIVATE TESTS_FILE_PATH="${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME houio.logger COMMAND houio_test_logger)
 
 add_executable(houio_test_binary_json test_binary_json.cpp)

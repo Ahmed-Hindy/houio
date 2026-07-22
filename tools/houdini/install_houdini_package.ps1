@@ -4,7 +4,7 @@ param(
     [string]$SourceRoot = $PSScriptRoot,
 
     [Parameter()]
-    [string[]]$HoudiniVersions = @("21.0", "22.0"),
+    [string[]]$HoudiniVersions = @("20.0", "20.5", "21.0", "22.0"),
 
     [Parameter()]
     [string]$InstallDirectory = "",
@@ -33,13 +33,11 @@ function Get-PackageDirectories {
     )
     if (-not [string]::IsNullOrWhiteSpace($documentsDirectory)) {
         $directories.Add((Join-Path $documentsDirectory "houdini$HoudiniVersion\packages"))
+        return $directories
     }
 
     if (-not [string]::IsNullOrWhiteSpace($HOME)) {
-        $homePackageDirectory = Join-Path $HOME "houdini$HoudiniVersion\packages"
-        if (-not $directories.Contains($homePackageDirectory)) {
-            $directories.Add($homePackageDirectory)
-        }
+        $directories.Add((Join-Path $HOME "houdini$HoudiniVersion\packages"))
     }
     return $directories
 }
@@ -123,4 +121,4 @@ foreach ($houdiniVersion in $HoudiniVersions) {
 }
 
 Write-Host "HouIO package files: $resolvedInstallDirectory"
-Write-Host "Restart Houdini 21/22, or reload the package from Houdini 22's Package Browser."
+Write-Host "Restart Houdini 20.0 or newer, or reload the package from Houdini 22's Package Browser."

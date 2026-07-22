@@ -1,6 +1,6 @@
 # Onboarding
 
-This guide is for developers approaching HouIO for the first time, especially those validating it against Houdini 21 or 22 on Windows.
+This guide is for developers approaching HouIO for the first time, especially those validating it against Houdini 20.0 or newer on Windows.
 
 ## What to understand first
 
@@ -19,15 +19,16 @@ Focus on the first two areas initially. Ignore `HouScene`, `ImportHoudini`, and 
 At the time of this fork:
 
 - The modernization branch targets C++20.
-- The supplied fixtures were produced by Houdini `13.0.288`.
+- The minimum supported Houdini version is `20.0`; older fixtures are historical only.
+- The distributable package is validated in Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368.
 - The upstream repository has no license.
 - The latest upstream commit is from 2020.
 - The CMake build is target-based and uses presets.
-- Existing historical tests still provide limited semantic coverage.
+- Generated modern fixtures and assertion-based tests provide the active compatibility baseline.
 - A static Crag `P` and polygon-topology round-trip is validated in Houdini 21.0.631 and 22.0.368.
 - Modern Houdini binary `.bgeo` input is validated for the static Crag path.
 
-Do not infer modern format support from a successful parse of the supplied fixtures.
+Treat generated Houdini 20.0+ fixtures and package validation as the compatibility evidence.
 
 ## Recommended Windows toolchain
 
@@ -99,7 +100,7 @@ ctest --test-dir build/windows-msvc-release --output-on-failure -R houio.package
 
 This catches broken install destinations, package version files, exported target names, include directories, and transitive link requirements.
 
-## Run the smoke executable
+## Run the JSON logger test
 
 After the Debug preset build:
 
@@ -107,16 +108,7 @@ After the Debug preset build:
 .\build\windows-msvc-debug\tests\houio_test_logger.exe
 ```
 
-It should print the contents of:
-
-```text
-tests/test_box.bgeo
-tests/test_volume.bgeo
-tests/test_box.geo
-tests/test_volume.geo
-```
-
-A successful run only proves that the historical fixtures still parse. It does not verify semantic correctness or modern Houdini compatibility.
+The executable parses a deterministic modern geometry header and asserts that the logger receives the expected array and field events. It returns a non-zero exit code if parsing, diagnostics, or logger output is incorrect. Houdini 13 fixtures are not part of the active test baseline.
 
 ## Run the minimal Houdini fixture matrix
 
@@ -478,13 +470,13 @@ MSVC and GCC builds still report intentional compatibility debt. Anonymous union
 
 A good first maintenance change is narrow and observable:
 
-1. Remove the duplicate `add_subdirectory(tests)` call.
-2. Enable CTest.
-3. Convert the historical fixture smoke run into assertions for counts and key attributes.
-4. Add CI for MSVC and one non-Windows compiler.
-5. Leave schema behavior unchanged.
+1. Add a minimal Houdini 20.0+ fixture or malformed-input case.
+2. Assert the expected schema, topology, or diagnostics.
+3. Run the existing Debug and sanitizer suites.
+4. Keep unrelated formatting and API changes out of the same pull request.
+5. Document the exact Houdini build used when a DCC fixture is involved.
 
-This establishes a baseline before format work.
+This extends the maintained baseline without reviving unsupported legacy-version work.
 
 ## Before opening a pull request
 
@@ -502,7 +494,7 @@ Also verify:
 - New schema behavior has a minimal fixture.
 - Binary and ASCII paths are both considered.
 - Unsupported files fail cleanly.
-- Existing historical fixtures still pass.
+- Generated Houdini 20.0+ fixtures and package checks still pass.
 - Documentation distinguishes confirmed behavior from assumptions.
 
 ## Where to go next

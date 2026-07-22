@@ -71,8 +71,8 @@ houio_hom (hou.Geometry + Convert VDB SOP verb)
 | Vendored templates | `include/ttl/` | Provide the variant implementation used by the JSON layer. |
 | Build and package | `CMakeLists.txt`, `CMakePresets.json`, `cmake/` | Define the C++20 target, presets, install tree, package version, and exported `houio::houio` target. |
 | Converter tool | `tools/houio_convert.cpp` | Provide an installed path-to-path `.geo`/`.bgeo`/`.bgeo.sc` converter using the public API. |
-| HOM bridge | `python/houio_hom/`, `tools/houdini/install_hom_bridge.ps1` | Integrate with Houdini 21/22, preserve Float SDF/Fog semantics across VDB/dense-volume conversion, and invoke `houio_convert` with a bounded timeout. |
-| Tests and examples | `tests/`, `tools/houdini/` | Provide historical fixtures, modern-schema, SCF, HOM, package-consumer, and dual-Houdini regression coverage. |
+| HOM bridge | `python/houio_hom/`, `tools/houdini/install_hom_bridge.ps1` | Integrate with Houdini 20.0+, preserve Float SDF/Fog semantics across VDB/dense-volume conversion, and invoke `houio_convert` with a bounded timeout. |
+| Tests and examples | `tests/`, `tools/houdini/` | Provide modern-schema, SCF, HOM, package-consumer, and supported-Houdini regression coverage. |
 | Legacy scene exporter | `scene_exporter/` | Export custom scene JSON from old Python 2 Houdini sessions. |
 
 ## 1. Binary JSON layer
@@ -491,7 +491,7 @@ These assumptions are reasonable for small legacy files but become problematic f
 
 ### Format evolution
 
-The parser and schema model are based on reverse-engineered Houdini 13-era data. New record types or encodings may fail, be ignored, or be interpreted incorrectly.
+The parser and schema model originated from reverse-engineered Houdini 13-era data, but the active compatibility floor is Houdini 20.0. Houdini 13 files are not supported. New record types or encodings outside the tested Houdini 20.0+ paths may fail, be ignored, or be interpreted incorrectly.
 
 ### Full-document memory use
 

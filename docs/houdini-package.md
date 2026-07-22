@@ -11,7 +11,7 @@ HouIO is distributed as a small Windows ZIP containing the converter, Python bri
 
 The tools become available immediately. A restart is not required.
 
-## PowerShell installation for Houdini 21 or 22
+## PowerShell installation for Houdini 20.0 or newer
 
 Extract the ZIP, open PowerShell in the extracted folder, and run:
 
@@ -20,14 +20,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\install_houdini_package.ps1
 ```
 
-The installer copies HouIO to `%LOCALAPPDATA%\HouIO` and writes small package-loader files for Houdini 21.0 and 22.0. Restart Houdini after using this installation method.
+The installer copies HouIO to `%LOCALAPPDATA%\HouIO` and writes small package-loader files for Houdini 20.0, 20.5, 21.0, and 22.0. Restart Houdini after using this installation method.
 
 Install only one Houdini version:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\install_houdini_package.ps1 `
-  -HoudiniVersions 22.0
+  -HoudiniVersions 20.0
 ```
 
 The installer is retained under `%LOCALAPPDATA%\HouIO`, so the extracted download can be deleted after installation.
@@ -57,8 +57,10 @@ The node runs the converter in a separate process. Houdini does not load a HouIO
 
 ## Supported Houdini versions and licenses
 
-The same archive has been tested with:
+The minimum supported Houdini version is 20.0. The same archive has passed the package, shelf-tool, diagnostics, and box round-trip test with:
 
+- Houdini 20.0.653
+- Houdini 20.5.410
 - Houdini 21.0.631
 - Houdini 22.0.368
 - Houdini FX
