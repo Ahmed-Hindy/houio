@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shelfDocument>
+  <toolshelf name="houio" label="HouIO">
+    <memberTool name="houio_roundtrip_sop"/>
+    <memberTool name="houio_convert_geometry_file"/>
+    <memberTool name="houio_package_diagnostics"/>
+    <readOnly/>
+  </toolshelf>
+
+  <tool name="houio_roundtrip_sop" label="HouIO Round Trip" icon="SOP_python">
+    <toolMenuContext name="network">
+      <contextNetType>SOP</contextNetType>
+    </toolMenuContext>
+    <toolMenuContext name="viewer">
+      <contextNetType>SOP</contextNetType>
+    </toolMenuContext>
+    <toolSubmenu>HouIO</toolSubmenu>
+    <script scriptType="python"><![CDATA[from houio_tools import create_roundtrip_from_tool
+
+create_roundtrip_from_tool(kwargs)
+]]></script>
+    <readOnly/>
+  </tool>
+
+  <tool name="houio_convert_geometry_file" label="Convert Geometry File" icon="SOP_file">
+    <toolMenuContext name="network">
+      <contextNetType>SOP</contextNetType>
+    </toolMenuContext>
+    <toolSubmenu>HouIO</toolSubmenu>
+    <script scriptType="python"><![CDATA[from houio_tools import convert_geometry_file
+
+convert_geometry_file()
+]]></script>
+    <readOnly/>
+  </tool>
+
+  <tool name="houio_package_diagnostics" label="Package Diagnostics" icon="SOP_null">
+    <toolMenuContext name="network">
+      <contextNetType>SOP</contextNetType>
+    </toolMenuContext>
+    <toolSubmenu>HouIO</toolSubmenu>
+    <script scriptType="python"><![CDATA[from houio_tools import show_package_diagnostics
+
+show_package_diagnostics()
+]]></script>
+    <readOnly/>
+  </tool>
+</shelfDocument>

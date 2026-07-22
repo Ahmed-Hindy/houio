@@ -189,7 +189,7 @@ Both directions are tested against Houdini-generated files, and Houdini 21 and 2
 
 ## Houdini HOM and `.vdb` workflows
 
-For an end-to-end Windows setup using Houdini 22, including build, package installation, Python Shell, shelf, Python SOP, `hython`, VDB, and troubleshooting examples, see [Using HouIO in Houdini 22 on Windows](docs/houdini-22-windows.md).
+For the end-user package workflow, see [Installing HouIO in Houdini](docs/houdini-package.md). For source builds and pipeline scripting, see [Using HouIO in Houdini 22 on Windows](docs/houdini-22-windows.md).
 
 The standalone C++ library does not link to Houdini's private OpenVDB build and does not yet model sparse OpenVDB trees natively. The `python/houio_hom` package provides the supported Houdini-side path:
 
@@ -200,14 +200,16 @@ The standalone C++ library does not link to Houdini's private OpenVDB build and 
 - `hou.Geometry.data()` and `hou.Geometry.load()` bridge uncompressed bgeo bytes without temporary Houdini nodes.
 - `houio_convert` can be launched from HOM without loading a Python extension into Houdini's process.
 
-Install the package for the current checkout:
+The distributable Windows archive contains the converter, Python bridge, shelf tools, and package file. Houdini 22 users can install the ZIP through **Package Browser > Install Package Archive**. Houdini 21 and 22 users can also extract it and run:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
-  .\tools\houdini\install_hom_bridge.ps1
+  .\install_houdini_package.ps1
 ```
 
-This writes `houio.json` under the user package directories for Houdini 21.0 and 22.0. It supports either a source checkout or an installed HouIO prefix, sets `HOUIO_ROOT` and `HOUIO_PYTHON_ROOT`, prepends the HOM package to `PYTHONPATH`, points `HOUIO_BLOSC_LIBRARY` at `$HFS/bin/blosc.dll`, and records `HOUIO_CONVERT_EXECUTABLE` when the converter is available. Use `-Uninstall` to remove those package files.
+After installation, open a SOP network and use **Tab > HouIO > HouIO Round Trip**. The tool inserts a configured Python SOP after the selected SOP. The same submenu also includes file conversion and package diagnostics tools.
+
+Developers working directly from a source checkout can keep using `tools/houdini/install_hom_bridge.ps1` to point Houdini at the checkout and local build.
 
 ### Python shell or shelf tool
 

@@ -2,6 +2,8 @@
 
 This guide covers Houdini 22 on Windows 10 using the tested HOM bridge and the standalone `houio_convert.exe` process. The bridge does not load a CPython extension into Houdini, so it is compatible with Houdini 22's Python 3.13 runtime.
 
+Users who only need the packaged Houdini tools should follow [Installing HouIO in Houdini](houdini-package.md). The build instructions below are for developers working from a source checkout.
+
 The commands below use Houdini `22.0.368`. Change the patch version if another Houdini 22 build is installed.
 
 ## 1. Build HouIO
@@ -28,7 +30,7 @@ G:\Projects\Dev\Github\houio\build\windows-msvc-release\houio_convert.exe
 
 The Houdini-specific tests are registered only when `HOUIO_HYTHON_EXECUTABLE` points to a valid `hython.exe`.
 
-## 2. Install the Houdini package
+## 2. Install the source-checkout package
 
 From the repository root, run:
 

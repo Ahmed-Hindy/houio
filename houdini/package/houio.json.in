@@ -1,0 +1,20 @@
+{
+  "enable": true,
+  "load_package_once": true,
+  "show": true,
+  "hpath": "$HOUDINI_PACKAGE_PATH/houio",
+  "env": [
+    {
+      "HOUIO_ROOT": "$HOUDINI_PACKAGE_PATH/houio"
+    },
+    {
+      "HOUIO_VERSION": "@HOUIO_VERSION@"
+    },
+    {
+      "HOUIO_CONVERT_EXECUTABLE": "$HOUDINI_PACKAGE_PATH/houio/bin/houio_convert.exe"
+    },
+    {
+      "HOUIO_BLOSC_LIBRARY": "$HFS/bin/blosc.dll"
+    }
+  ]
+}
