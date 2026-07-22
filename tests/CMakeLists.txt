@@ -139,6 +139,35 @@ if(HOUIO_HYTHON_EXECUTABLE)
         )
     endif()
 
+    if(TARGET houio_houdini_package)
+        add_test(
+            NAME houio.houdini_package.build
+            COMMAND
+                "${CMAKE_COMMAND}"
+                --build "${PROJECT_BINARY_DIR}"
+                --target houio_houdini_package
+        )
+        set_tests_properties(
+            houio.houdini_package.build
+            PROPERTIES FIXTURES_SETUP houio_houdini_package_archive
+        )
+
+        add_test(
+            NAME houio.houdini_package.validate
+            COMMAND
+                "${CMAKE_COMMAND}"
+                "-DHOUIO_HOUDINI_PACKAGE_ARCHIVE=${HOUIO_HOUDINI_PACKAGE_ARCHIVE}"
+                "-DHOUIO_HOUDINI_PACKAGE_EXTRACT_DIR=${CMAKE_CURRENT_BINARY_DIR}/houdini_package"
+                "-DHOUIO_HYTHON_EXECUTABLE=${HOUIO_HYTHON_EXECUTABLE}"
+                "-DHOUIO_HOUDINI_PACKAGE_TEST_SCRIPT=${PROJECT_SOURCE_DIR}/tools/houdini/test_houdini_package.py"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_houdini_package_test.cmake"
+        )
+        set_tests_properties(
+            houio.houdini_package.validate
+            PROPERTIES FIXTURES_REQUIRED houio_houdini_package_archive
+        )
+    endif()
+
     set(HOUIO_FIXTURE_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/fixtures")
     set(HOUIO_FIXTURE_SOURCE_DIR "${HOUIO_FIXTURE_TEST_DIR}/source")
     set(HOUIO_FIXTURE_OUTPUT_DIR "${HOUIO_FIXTURE_TEST_DIR}/output")
