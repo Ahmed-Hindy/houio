@@ -3,7 +3,6 @@ find_package(Threads REQUIRED)
 add_executable(houio_test_logger main.cpp)
 target_link_libraries(houio_test_logger PRIVATE houio::houio)
 target_compile_features(houio_test_logger PRIVATE cxx_std_20)
-target_compile_definitions(houio_test_logger PRIVATE TESTS_FILE_PATH="${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME houio.logger COMMAND houio_test_logger)
 
 add_executable(houio_test_binary_json test_binary_json.cpp)
@@ -21,6 +20,11 @@ add_executable(houio_test_attribute test_attribute.cpp)
 target_link_libraries(houio_test_attribute PRIVATE houio::houio)
 target_compile_features(houio_test_attribute PRIVATE cxx_std_20)
 add_test(NAME houio.attribute COMMAND houio_test_attribute)
+
+add_executable(houio_test_math test_math.cpp)
+target_link_libraries(houio_test_math PRIVATE houio::houio)
+target_compile_features(houio_test_math PRIVATE cxx_std_20)
+add_test(NAME houio.math COMMAND houio_test_math)
 
 add_executable(houio_test_modern_geometry test_modern_geometry.cpp)
 target_link_libraries(houio_test_modern_geometry PRIVATE houio::houio)
@@ -85,6 +89,19 @@ add_test(
         "-DHOUIO_EXPECT_TOOLS=${HOUIO_BUILD_TOOLS}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package_consumer.cmake"
 )
+
+if(WIN32 AND TARGET houio_houdini_package)
+    add_test(
+        NAME houio.houdini_package.bootstrap
+        COMMAND
+            "${CMAKE_COMMAND}"
+            "-DHOUIO_BINARY_DIR=${PROJECT_BINARY_DIR}"
+            "-DHOUIO_BUILD_CONFIG=$<CONFIG>"
+            "-DHOUIO_HOUDINI_PACKAGE_ARCHIVE=${HOUIO_HOUDINI_PACKAGE_ARCHIVE}"
+            "-DHOUIO_HOUDINI_BOOTSTRAP_EXTRACT_DIR=${CMAKE_CURRENT_BINARY_DIR}/houdini_package_bootstrap"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_houdini_bootstrap_test.cmake"
+    )
+endif()
 
 add_executable(houio_roundtrip_geometry roundtrip_geometry.cpp)
 target_link_libraries(houio_roundtrip_geometry PRIVATE houio::houio)

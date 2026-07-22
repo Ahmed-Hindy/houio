@@ -9,6 +9,89 @@
 
 namespace
 {
+class DictionaryAttributeAdapter : public houio::HouGeoAdapter::AttributeAdapter
+{
+public:
+    DictionaryAttributeAdapter()
+    {
+        auto label = houio::json::Object::create();
+        label->appendValue("type", std::string("string"));
+        label->appendValue("value", std::string("adapter"));
+        dictionary_ = houio::json::Object::create();
+        dictionary_->append("label", label);
+    }
+
+    std::string getName() const override
+    {
+        return "settings";
+    }
+
+    Type getType() const override
+    {
+        return ATTR_TYPE_DICT;
+    }
+
+    int getTupleSize() const override
+    {
+        return 1;
+    }
+
+    Storage getStorage() const override
+    {
+        return ATTR_STORAGE_INT32;
+    }
+
+    int getNumElements() const override
+    {
+        return 1;
+    }
+
+    std::string getString(int) const override
+    {
+        return "";
+    }
+
+    std::shared_ptr<houio::json::Object> getDictionary(int index) const override
+    {
+        return index == 0 ? dictionary_ : std::shared_ptr<houio::json::Object>();
+    }
+
+private:
+    std::shared_ptr<houio::json::Object> dictionary_;
+};
+
+class DictionaryGeometryAdapter : public houio::HouGeoAdapter
+{
+public:
+    DictionaryGeometryAdapter()
+        : attribute_(std::make_shared<DictionaryAttributeAdapter>())
+    {
+    }
+
+    void getPrimitiveAttributeNames(std::vector<std::string>& names) const override
+    {
+        names.clear();
+    }
+
+    AttributeAdapter::Ptr getPrimitiveAttribute(const std::string&) override
+    {
+        return AttributeAdapter::Ptr();
+    }
+
+    void getGlobalAttributeNames(std::vector<std::string>& names) const override
+    {
+        names = {"settings"};
+    }
+
+    AttributeAdapter::Ptr getGlobalAttribute(const std::string& name) override
+    {
+        return name == "settings" ? attribute_ : AttributeAdapter::Ptr();
+    }
+
+private:
+    AttributeAdapter::Ptr attribute_;
+};
+
 class RejectingStreamBuffer : public std::streambuf
 {
 protected:
@@ -66,6 +149,26 @@ bool roundtripOnce(const houio::HouGeoAdapter::Ptr& source)
     houio::HouGeo::Ptr imported = houio::HouGeoIO::import(&input);
     return imported && imported->pointcount() == 4 && imported->vertexcount() == 0
            && imported->primitivecount() == 0;
+}
+
+int verifyAdapterDictionaryExport()
+{
+    auto source = std::make_shared<DictionaryGeometryAdapter>();
+    std::ostringstream output(std::ios::out | std::ios::binary);
+    if (!houio::HouGeoIO::exportGeometry(&output, source, true))
+        return fail("abstract adapter dictionary export failed");
+
+    std::istringstream input(output.str(), std::ios::in | std::ios::binary);
+    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(&input);
+    auto attribute = imported ? imported->getGlobalAttribute("settings")
+                              : houio::HouGeoAdapter::AttributeAdapter::Ptr();
+    auto dictionary = attribute ? attribute->getDictionary(0)
+                                : std::shared_ptr<houio::json::Object>();
+    auto label = dictionary ? dictionary->getObject("label")
+                            : std::shared_ptr<houio::json::Object>();
+    if (!label || label->get<std::string>("value") != "adapter")
+        return fail("abstract adapter dictionary value changed during export");
+    return 0;
 }
 
 int verifyCompatibilityWrapper(const houio::HouGeoAdapter::Ptr& validGeometry)
@@ -206,6 +309,10 @@ int main()
 {
     const houio::HouGeoAdapter::Ptr validGeometry = createPointGeometry();
 
+    if (const int result = verifyAdapterDictionaryExport(); result != 0)
+    {
+        return result;
+    }
     if (const int result = verifyCompatibilityWrapper(validGeometry); result != 0)
     {
         return result;

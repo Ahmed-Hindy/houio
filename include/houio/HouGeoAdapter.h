@@ -1,12 +1,7 @@
-// TODO:
-// packing
-// attribute varname mapping
-// ascii support
-
 #pragma once
 
-#include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <houio/Attribute.h>
@@ -17,6 +12,11 @@
 
 namespace houio
 {
+	namespace json
+	{
+		struct Object;
+	}
+
 	struct HouGeoAdapter
 	{
 		typedef std::shared_ptr<HouGeoAdapter> Ptr;
@@ -40,7 +40,8 @@ namespace houio
 			{
 				ATTR_TYPE_INVALID  = 0,
 				ATTR_TYPE_NUMERIC  = 1,
-				ATTR_TYPE_STRING   = 2
+				ATTR_TYPE_STRING   = 2,
+				ATTR_TYPE_DICT     = 3
 			};
 			enum Storage
 			{
@@ -59,6 +60,7 @@ namespace houio
 			virtual int                      getNumElements()const;
 			virtual RawPointer::Ptr          getRawPointer();
 			virtual std::string              getString( int index )const=0;
+			virtual std::shared_ptr<json::Object> getDictionary( int index )const;
 			static Type                      type( const std::string &typeName );
 			static Storage                   storage( const std::string &storageName );
 			static int                       storageSize( Storage storage );
@@ -83,9 +85,9 @@ namespace houio
 				PRIM_VOLUME,
 				PRIM_POLY
 			};
-			virtual ~Primitive(){}
+			virtual ~Primitive() = default;
 
-			// will be overloaded by primitive runs which represent multiple prims
+			// Primitive runs override this to report the number of represented records.
 			virtual int numPrimitives()const{return 1;}
 		};
 
@@ -136,10 +138,6 @@ namespace houio
 		virtual void                  getPrimitives( std::vector<HouGeoAdapter::Primitive::Ptr>& primitives );
 		virtual Topology::Ptr         getTopology();
 	};
-
-
-
-	//Geometry::Ptr convertHouGeoPrimitive( HouGeoPtr houGeo, int prim = -1 );
 }
 
 

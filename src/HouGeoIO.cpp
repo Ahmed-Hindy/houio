@@ -83,6 +83,99 @@ namespace houio
 				throw std::length_error( "Converted attribute element size overflow" );
 			return componentCount * componentBytes;
 		}
+
+		struct JsonScalarWriter
+		{
+			json::BinaryWriter &writer;
+
+			void operator()( bool value )const { writer.jsonBool(value); }
+			void operator()( sint32 value )const { writer.jsonInt32(value); }
+			void operator()( real32 value )const { writer.jsonReal32(value); }
+			void operator()( real64 value )const { writer.jsonReal64(value); }
+			void operator()( const std::string &value )const { writer.jsonString(value); }
+			void operator()( ubyte value )const { writer.jsonUInt8(value); }
+			void operator()( sint64 value )const { writer.jsonInt64(value); }
+		};
+
+		template<typename T>
+		std::vector<T> copyUniformValues( const json::ArrayPtr &array )
+		{
+			if( array->m_numUniformElements < 0 )
+				throw std::runtime_error( "Cannot export a uniform array with a negative element count" );
+			const size_t elementCount = static_cast<size_t>(array->m_numUniformElements);
+			if( elementCount > std::numeric_limits<size_t>::max() / sizeof(T) )
+				throw std::length_error( "Uniform JSON array byte count overflow" );
+			if( elementCount > 0 && !array->m_uniformdata )
+				throw std::runtime_error( "Cannot export a uniform array with missing data" );
+			std::vector<T> values(elementCount);
+			if( elementCount > 0 )
+				std::memcpy(values.data(), array->m_uniformdata, elementCount * sizeof(T));
+			return values;
+		}
+
+		void writeJsonValue( json::BinaryWriter &writer, json::Value value );
+
+		void writeJsonArray( json::BinaryWriter &writer, const json::ArrayPtr &array )
+		{
+			if( !array )
+				throw std::runtime_error( "Cannot export a null JSON array" );
+			if( array->isUniform() )
+			{
+				switch( array->m_uniformType )
+				{
+				case 1:
+					writer.jsonUniformArray(copyUniformValues<sint32>(array));
+					return;
+				case 2:
+					writer.jsonUniformArray(copyUniformValues<real32>(array));
+					return;
+				case 3:
+					writer.jsonUniformArray(copyUniformValues<real64>(array));
+					return;
+				case 5:
+					writer.jsonUniformArray(copyUniformValues<ubyte>(array));
+					return;
+				case 6:
+					writer.jsonUniformArray(copyUniformValues<sint64>(array));
+					return;
+				default:
+					throw std::runtime_error( "Cannot export an unsupported uniform JSON array type" );
+				}
+			}
+
+			writer.jsonBeginArray();
+			for( const json::Value &item : array->m_values )
+				writeJsonValue(writer, item);
+			writer.jsonEndArray();
+		}
+
+		void writeJsonObject( json::BinaryWriter &writer, const json::ObjectPtr &object )
+		{
+			if( !object )
+				throw std::runtime_error( "Cannot export a null JSON object" );
+			writer.jsonBeginMap();
+			for( const auto &entry : object->m_values )
+			{
+				writer.jsonKey(entry.first);
+				writeJsonValue(writer, entry.second);
+			}
+			writer.jsonEndMap();
+		}
+
+		void writeJsonValue( json::BinaryWriter &writer, json::Value value )
+		{
+			if( value.isArray() )
+				writeJsonArray(writer, value.asArray());
+			else if( value.isObject() )
+				writeJsonObject(writer, value.asObject());
+			else if( value.isNull() )
+				throw std::runtime_error( "Cannot export a null JSON value" );
+			else
+			{
+				JsonScalarWriter scalarWriter{writer};
+				ttl::var::apply_visitor(scalarWriter, value.getVariant());
+			}
+		}
 	}
 
 	HouGeo::Ptr HouGeoIO::import( std::istream *in )
@@ -272,6 +365,13 @@ namespace houio
 			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->getPointAttribute(attrName);
 			const std::string attributePath = "attributes.pointattributes." + attrName;
 			validateDomainAttribute(houAttr, numPoints, attributePath);
+			if( houAttr->getType() != HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
+			{
+				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
+					"HouGeoIO::convertToGeometry skips non-numeric point attribute " + attrName,
+					-1, attributePath});
+				continue;
+			}
 			const int numComponents = houAttr->getTupleSize();
 
 			Attribute::Ptr attr;
@@ -391,6 +491,13 @@ namespace houio
 			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->getVertexAttribute(attrName);
 			const std::string attributePath = "attributes.vertexattributes." + attrName;
 			validateDomainAttribute(houAttr, numVertices, attributePath);
+			if( houAttr->getType() != HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
+			{
+				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
+					"HouGeoIO::convertToGeometry skips non-numeric vertex attribute " + attrName,
+					-1, attributePath});
+				continue;
+			}
 			const int numComponents = houAttr->getTupleSize();
 
 			Attribute::Ptr attr;
@@ -899,6 +1006,10 @@ namespace houio
 			attributeType = "numeric";
 		else if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING )
 			attributeType = "string";
+		else if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_DICT )
+			attributeType = "dict";
+		else
+			throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported type for attribute " + name );
 
 		if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
 			storageName = "fpreal16";
@@ -920,10 +1031,15 @@ namespace houio
 		writer.jsonBeginArray();
 
 		writer.jsonBeginArray();
-		writer.jsonString( "name" );
-		writer.jsonString( name );
+		writer.jsonString( "scope" );
+		writer.jsonString( "public" );
 		writer.jsonString( "type" );
 		writer.jsonString(attributeType);
+		writer.jsonString( "name" );
+		writer.jsonString( name );
+		writer.jsonString( "options" );
+		writer.jsonBeginMap();
+		writer.jsonEndMap();
 		writer.jsonEndArray();
 
 		writer.jsonBeginArray();
@@ -1033,6 +1149,42 @@ namespace houio
 			writer.jsonInt32( 1024 );
 			writer.jsonString( "rawpagedata" );
 			writer.jsonUniformArray(stringIndices);
+			writer.jsonEndArray();
+		}else if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_DICT )
+		{
+			std::vector<std::shared_ptr<json::Object>> dictionaries;
+			dictionaries.reserve(static_cast<size_t>(elementCount));
+			for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
+			{
+				std::shared_ptr<json::Object> dictionary = attribute->getDictionary(elementIndex);
+				if( !dictionary )
+					throw std::runtime_error( "HouGeoIO::exportAttribute: invalid dictionary data for attribute " + name );
+				dictionaries.push_back(std::move(dictionary));
+			}
+
+			writer.jsonString( "size" );
+			writer.jsonInt( exportTupleSize );
+			writer.jsonString( "storage" );
+			writer.jsonString( "int32" );
+			writer.jsonString( "dicts" );
+			writer.jsonBeginArray();
+			for( const std::shared_ptr<json::Object> &dictionary : dictionaries )
+				writeJsonObject(writer, dictionary);
+			writer.jsonEndArray();
+
+			std::vector<sint32> dictionaryIndices(static_cast<size_t>(elementCount));
+			for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
+				dictionaryIndices[static_cast<size_t>(elementIndex)] = static_cast<sint32>(elementIndex);
+			writer.jsonString( "indices" );
+			writer.jsonBeginArray();
+			writer.jsonString( "size" );
+			writer.jsonInt32( 1 );
+			writer.jsonString( "storage" );
+			writer.jsonString( "int32" );
+			writer.jsonString( "pagesize" );
+			writer.jsonInt32( 1024 );
+			writer.jsonString( "rawpagedata" );
+			writer.jsonUniformArray(dictionaryIndices);
 			writer.jsonEndArray();
 		}
 

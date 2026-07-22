@@ -4,7 +4,7 @@ param(
     [string]$RepositoryRoot = "",
 
     [Parameter()]
-    [string[]]$HoudiniVersions = @("21.0", "22.0"),
+    [string[]]$HoudiniVersions = @("20.0", "20.5", "21.0", "22.0"),
 
     [Parameter()]
     [string]$ConverterExecutable = "",

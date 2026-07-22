@@ -443,7 +443,7 @@ namespace math
 
 		switch( axis )
 		{
-		case 0:break; // TODO!:
+		case 0: break; // X-up conversion is not implemented; return the identity fallback.
 		case 1:
 			{
 				if(!orientationOnly)

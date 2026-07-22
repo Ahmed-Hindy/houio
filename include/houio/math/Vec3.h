@@ -4,7 +4,10 @@ simple vector class
 
 ----------------------------------------------------------------------*/
 #pragma once
+
+#include <cmath>
 #include <iostream>
+#include <type_traits>
 
 namespace houio
 {
@@ -40,8 +43,8 @@ namespace math
 
 
 
-		bool                       operator==( const Vec3<T> &rhs );
-		bool                       operator!=( const Vec3<T> &rhs );
+		bool                       operator==( const Vec3<T> &rhs ) const;
+		bool                       operator!=( const Vec3<T> &rhs ) const;
 		
 		bool                       operator+=( const Vec3<T> &rhs );
 		bool                       operator-=( const Vec3<T> &rhs );
@@ -179,17 +182,20 @@ namespace math
 	}
 
 	template<typename T>
-	bool Vec3<T>::operator==( const Vec3<T> &rhs )
+	bool Vec3<T>::operator==( const Vec3<T> &rhs ) const
 	{
-		// TODO: fix this
-		if( (abs(x - rhs.x) < (T)0.00001) && (abs(y - rhs.y) < (T)0.00001) && (abs(z - rhs.z) < (T)0.00001) )
-			return true;
-		else
-			return false;
+		if constexpr( std::is_floating_point_v<T> )
+		{
+			constexpr T tolerance = static_cast<T>(0.00001);
+			return std::abs(x - rhs.x) < tolerance
+				&& std::abs(y - rhs.y) < tolerance
+				&& std::abs(z - rhs.z) < tolerance;
+		}
+		return x == rhs.x && y == rhs.y && z == rhs.z;
 	}
 
 	template<typename T>
-	bool Vec3<T>::operator!=( const Vec3<T> &rhs )
+	bool Vec3<T>::operator!=( const Vec3<T> &rhs ) const
 	{
 		return !((*this)==rhs);
 	}

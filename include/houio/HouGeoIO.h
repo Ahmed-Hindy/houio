@@ -29,7 +29,7 @@ namespace houio
 		static bool                             exportGeometry( const std::string &filename, Geometry::Ptr geometry );
 		static bool                             exportGeometry( std::ostream *output, HouGeoAdapter::Ptr geometry, bool binary = true );
 
-		// Historical compatibility wrappers. New code should use exportVolume() or exportGeometry().
+		// Compatibility wrappers. New code should use exportVolume() or exportGeometry().
 		static bool                             xport( const std::string& filename, ScalarField::Ptr volume );
 		static bool                             xport( const std::string& filename, Geometry::Ptr geometry );
 		static bool                             xport( const std::string& filename, const std::vector<math::V3f>& points );

@@ -855,86 +855,49 @@ namespace houio
 			fail(DiagnosticCategory::io, "Parser failed while reading ASCII input", byteOffset);
 		}
 
-		// Read a quoted string one character at a time
+		// Read a quoted string one character at a time.
 		std::string Parser::readASCIIString()
 		{
-			std::string result = "";
-
-			while(true)
+			std::string result;
+			auto appendCharacter = [&]( char value )
+			{
+				if( static_cast<sint64>(result.size()) >= limits.maxStringBytes )
+					fail(DiagnosticCategory::malformed_input, "Parser ASCII-string byte limit exceeded", byteOffset);
+				result.push_back(value);
+			};
+			while( true )
 			{
 				char c = read<char>();
 				if( c == '\\' )
 				{
-					c =  read<char>();
-					if( (c=='"')||(c=='\\')||(c=='/') )result.append(&c, 1);
-					else
-					if( c=='b' ) result.push_back('\b');
-					else
-					if( c=='f' ) result.push_back('\f');
-					else
-					if( c=='n' ) result.push_back('\n');
-					else
-					if( c=='r' ) result.push_back('\r');
-					else
-					if( c=='t' ) result.push_back('\t');
-					else
-					if( c=='u' )
+					c = read<char>();
+					switch( c )
 					{
+					case '"':
+					case '\\':
+					case '/': appendCharacter(c); break;
+					case 'b': appendCharacter('\b'); break;
+					case 'f': appendCharacter('\f'); break;
+					case 'n': appendCharacter('\n'); break;
+					case 'r': appendCharacter('\r'); break;
+					case 't': appendCharacter('\t'); break;
+					case 'u':
 						fail(DiagnosticCategory::unsupported_input, "Parser does not support Unicode escape sequences");
-					}else
-						result.push_back('\\');
-						result.push_back(c);
-				}else
-				if( c == '"' )
+					default:
+						appendCharacter('\\');
+						appendCharacter(c);
+						break;
+					}
+				}
+				else if( c == '"' )
 				{
 					return result;
-				}else
-					result.append(&c, 1);
-
-			};
-
-
-
-		/*
-        ''' Read a quoted string one character at a time '''
-        word = []
-        while True:
-            c = self._readBytes(1)
-            if c == None:
-                self.error('Missing end-quote for string')
-                return None
-            if c == '\\':
-                c = self._readBytes(1)
-                if c in '"\\/': word.append(c)
-                elif c == 'b':  word.append('\b')
-                elif c == 'f':  word.append('\f')
-                elif c == 'n':  word.append('\n')
-                elif c == 'r':  word.append('\r')
-                elif c == 't':  word.append('\t')
-                elif c == 'u':
-                    if self._readBytes(4) == None:
-                        return False
-                    self.error('UNICODE string escape not supported')
-                else:
-                    word.append('\\')
-                    word.append(c)
-            elif c == '"':
-                return ''.join(word)
-            else:
-                word.append(c)
-		*/
-
-
-
-
-
-
-
-
-
-
-			// TODO:
-			return "";
+				}
+				else
+				{
+					appendCharacter(c);
+				}
+			}
 		}
 
 

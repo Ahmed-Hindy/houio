@@ -1,31 +1,51 @@
 #include <houio/json.h>
 
 #include <iostream>
-#include <fstream>
+#include <sstream>
+#include <string>
 
-
-
-
-
-// prints the file content of given houdini file
-void printLog( const std::string &path, std::ostream *out )
+namespace
 {
-	std::ifstream in( path.c_str(), std::ios_base::in | std::ios_base::binary );
-	houio::json::JSONLogger logger(*out);
-	houio::json::Parser p;
-	p.parse( &in, &logger );
+int fail(const std::string& message)
+{
+    std::cerr << "error: " << message << '\n';
+    return 1;
+}
 }
 
-
-
-
-
-int main(void)
+int main()
 {
-	printLog( std::string(TESTS_FILE_PATH)+"/test_box.bgeo", &std::cout );
-	printLog( std::string(TESTS_FILE_PATH)+"/test_volume.bgeo", &std::cout );
-	printLog( std::string(TESTS_FILE_PATH)+"/test_box.geo", &std::cout );
-	printLog( std::string(TESTS_FILE_PATH)+"/test_volume.geo", &std::cout );
+    const std::string document =
+        R"JSON(["pointcount",0,"vertexcount",0,"primitivecount",0])JSON";
+    std::istringstream input(document);
+    std::ostringstream output;
+    houio::json::JSONLogger logger(output);
+    houio::json::Parser parser;
+    houio::DiagnosticList diagnostics;
 
-	return 0;
+    if (!parser.parse(&input, &logger, &diagnostics))
+    {
+        return fail("JSON logger rejected a valid modern geometry header");
+    }
+    if (!diagnostics.empty())
+    {
+        return fail("JSON logger produced diagnostics for valid input");
+    }
+
+    const std::string log = output.str();
+    const std::string expectedLog =
+        "jsonBeginArray\n"
+        "\tjsonString pointcount\n"
+        "\tjsonInt64 0\n"
+        "\tjsonString vertexcount\n"
+        "\tjsonInt64 0\n"
+        "\tjsonString primitivecount\n"
+        "\tjsonInt64 0\n"
+        "jsonEndArray\n";
+    if (log != expectedLog)
+    {
+        return fail("JSON logger output does not match the expected sequence:\n" + log);
+    }
+
+    return 0;
 }

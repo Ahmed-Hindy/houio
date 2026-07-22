@@ -11,45 +11,6 @@ namespace houio
 
 namespace math
 {
-	
-
-
-
-	/*
-	//
-	//
-	//
-	bool rayHitPlaneValues( const Vec3f &planeNormal, const float &planeDistance, Ray &ray, float &hitDistance, Vec3f *hitPoint )
-	{
-        Vec3f rayOrigin    = ray.getOrigin();
-		Vec3f rayDirection = ray.getDirection();//ray.getTarget() - rayOrigin;
-		//Vec3f rayOrigin    = Vec3f( 0.0f, 10.0f, 0.0f );
-		//Vec3f rayDirection = Vec3f( 0.0f, -1.0f, 0.0f );
-
-
-		float temp = dotProduct( rayDirection, planeNormal );
-
-		// 
-		//if( temp >= 0.0f )
-		//	return false;
-
-		hitDistance = -(dotProduct( planeNormal, rayOrigin ) + planeDistance) / temp;
-
-		// the point must lie on the raysegment between origin and target to pass the test
-		if( (hitDistance > ray.getLength()) || (hitDistance < 0.0f) )
-			return false;
-
-		if( hitPoint )
-			*hitPoint = rayOrigin + hitDistance*rayDirection;
-
-		return true;
-	}
-	*/
-
-
-
-
-
 
 
 	//

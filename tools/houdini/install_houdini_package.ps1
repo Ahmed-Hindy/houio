@@ -1,13 +1,16 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter()]
-    [string]$SourceRoot = $PSScriptRoot,
+    [string]$SourceRoot = "",
 
     [Parameter()]
-    [string[]]$HoudiniVersions = @("21.0", "22.0"),
+    [string[]]$HoudiniVersions = @("20.0", "20.5", "21.0", "22.0"),
 
     [Parameter()]
     [string]$InstallDirectory = "",
+
+    [Parameter()]
+    [switch]$Install,
 
     [Parameter()]
     [switch]$Uninstall,
@@ -18,10 +21,38 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if ($Install -and $Uninstall) {
+    throw "Choose either -Install or -Uninstall, not both."
+}
+if (-not $Install -and -not $Uninstall) {
+    throw "No action selected. Use bootstrap_houdini_package.ps1 for transient testing, or pass -Install for a persistent installation."
+}
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+    $SourceRoot = $PSScriptRoot
+}
+
+function Resolve-AbsolutePath {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Description
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "$Description is empty."
+    }
+
+    try {
+        return [System.IO.Path]::GetFullPath($Path)
+    }
+    catch {
+        throw "Invalid $Description '$Path': $($_.Exception.Message)"
+    }
+}
+
 function Convert-ToPackagePath {
     param([Parameter(Mandatory)][string]$Path)
 
-    return ([System.IO.Path]::GetFullPath($Path) -replace "\\", "/")
+    return ((Resolve-AbsolutePath -Path $Path -Description "package path") -replace "\\", "/")
 }
 
 function Get-PackageDirectories {
@@ -33,13 +64,43 @@ function Get-PackageDirectories {
     )
     if (-not [string]::IsNullOrWhiteSpace($documentsDirectory)) {
         $directories.Add((Join-Path $documentsDirectory "houdini$HoudiniVersion\packages"))
+        return $directories
     }
 
     if (-not [string]::IsNullOrWhiteSpace($HOME)) {
-        $homePackageDirectory = Join-Path $HOME "houdini$HoudiniVersion\packages"
-        if (-not $directories.Contains($homePackageDirectory)) {
-            $directories.Add($homePackageDirectory)
+        $directories.Add((Join-Path $HOME "houdini$HoudiniVersion\packages"))
+    }
+    return $directories
+}
+
+function Get-LegacyPackageDirectories {
+    param([Parameter(Mandatory)][string]$HoudiniVersion)
+
+    $directories = [System.Collections.Generic.List[string]]::new()
+    if ([string]::IsNullOrWhiteSpace($HOME)) {
+        return $directories
+    }
+
+    $legacyDirectory = Resolve-AbsolutePath `
+        -Path (Join-Path $HOME "houdini$HoudiniVersion\packages") `
+        -Description "legacy package directory"
+    $canonicalDirectories = @(Get-PackageDirectories -HoudiniVersion $HoudiniVersion)
+    $matchesCanonical = $false
+    foreach ($canonicalDirectory in $canonicalDirectories) {
+        $canonicalPath = Resolve-AbsolutePath `
+            -Path $canonicalDirectory `
+            -Description "canonical package directory"
+        if ([string]::Equals(
+            $legacyDirectory,
+            $canonicalPath,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+            $matchesCanonical = $true
+            break
         }
+    }
+    if (-not $matchesCanonical) {
+        $directories.Add($legacyDirectory)
     }
     return $directories
 }
@@ -51,12 +112,16 @@ if ([string]::IsNullOrWhiteSpace($InstallDirectory)) {
     $InstallDirectory = Join-Path $env:LOCALAPPDATA "HouIO"
 }
 
-$resolvedInstallDirectory = [System.IO.Path]::GetFullPath($InstallDirectory)
+$resolvedInstallDirectory = Resolve-AbsolutePath -Path $InstallDirectory -Description "install directory"
 $loaderFileName = "houio_loader.json"
 
 if ($Uninstall) {
     foreach ($houdiniVersion in $HoudiniVersions) {
-        foreach ($packageDirectory in Get-PackageDirectories -HoudiniVersion $houdiniVersion) {
+        $packageDirectories = @(
+            @(Get-PackageDirectories -HoudiniVersion $houdiniVersion)
+            @(Get-LegacyPackageDirectories -HoudiniVersion $houdiniVersion)
+        ) | Sort-Object -Unique
+        foreach ($packageDirectory in $packageDirectories) {
             $loaderPath = Join-Path $packageDirectory $loaderFileName
             if (Test-Path -LiteralPath $loaderPath) {
                 if ($PSCmdlet.ShouldProcess($loaderPath, "Remove HouIO package loader")) {
@@ -76,7 +141,7 @@ if ($Uninstall) {
     return
 }
 
-$resolvedSourceRoot = [System.IO.Path]::GetFullPath($SourceRoot)
+$resolvedSourceRoot = Resolve-AbsolutePath -Path $SourceRoot -Description "package source root"
 $sourcePackageFile = Join-Path $resolvedSourceRoot "houio.json"
 $sourceContentDirectory = Join-Path $resolvedSourceRoot "houio"
 $sourceInstaller = Join-Path $resolvedSourceRoot "install_houdini_package.ps1"
@@ -112,6 +177,16 @@ $loaderJson = $loader | ConvertTo-Json -Depth 4
 $utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
 
 foreach ($houdiniVersion in $HoudiniVersions) {
+    foreach ($legacyPackageDirectory in Get-LegacyPackageDirectories -HoudiniVersion $houdiniVersion) {
+        $legacyLoaderPath = Join-Path $legacyPackageDirectory $loaderFileName
+        if (Test-Path -LiteralPath $legacyLoaderPath) {
+            if ($PSCmdlet.ShouldProcess($legacyLoaderPath, "Remove legacy HouIO package loader")) {
+                Remove-Item -LiteralPath $legacyLoaderPath -Force
+                Write-Host "Removed legacy loader $legacyLoaderPath"
+            }
+        }
+    }
+
     foreach ($packageDirectory in Get-PackageDirectories -HoudiniVersion $houdiniVersion) {
         $loaderPath = Join-Path $packageDirectory $loaderFileName
         if ($PSCmdlet.ShouldProcess($loaderPath, "Install HouIO package loader")) {
@@ -122,5 +197,10 @@ foreach ($houdiniVersion in $HoudiniVersions) {
     }
 }
 
+if ($WhatIfPreference) {
+    Write-Host "Dry run complete. No files were installed."
+    return
+}
+
 Write-Host "HouIO package files: $resolvedInstallDirectory"
-Write-Host "Restart Houdini 21/22, or reload the package from Houdini 22's Package Browser."
+Write-Host "Restart Houdini 20.0 or newer, or reload the package from Houdini 22's Package Browser."

@@ -1,11 +1,21 @@
 # HouIO for Houdini
 
-After installation, open a SOP network and use the Tab menu.
+HouIO supports Houdini 20.0 or newer.
 
-- **HouIO > HouIO Round Trip** creates a configured Python SOP after the selected SOP.
-- **HouIO > Convert Geometry File** converts a geometry file through HouIO.
-- **HouIO > Package Diagnostics** reports the active package, converter, and Blosc paths.
+For transient evaluation, extract the archive and run:
 
-The C++ converter runs as a separate process. Houdini loads only the Python bridge, avoiding Python ABI coupling between Houdini versions.
+```powershell
+.\bootstrap_houdini_package.ps1 -HoudiniVersion 20.0
+```
 
-The Houdini bridge supports `.geo`, `.bgeo`, `.bgeo.sc`, and bounded 32-bit Float `.vdb` grids. Sparse VDB grids become dense Houdini volumes while retaining level-set or Fog semantics.
+This launches Houdini with isolated package and preference directories. It does not install package files or modify Houdini user folders.
+
+Open a SOP network and use **Tab > HouIO**:
+
+- **HouIO Round Trip** creates a configured Python SOP after the selected node.
+- **Convert Geometry File** runs the bundled converter for `.geo`, `.bgeo`, and `.bgeo.sc` files.
+- **Package Diagnostics** reports the active package, converter, and C-Blosc paths.
+
+The converter runs as a separate process. Houdini loads only the Python bridge, avoiding Python ABI coupling between Houdini versions.
+
+The bridge preserves Houdini Volume Visualization detail metadata across the Houdini 20.x scalar layout and the Houdini 21.x+ dictionary layout. It supports bounded 32-bit Float SDF and Fog VDB grids through explicit dense-volume processing, then restores VDB primitives and classes for Python SOP round trips. Sparse VDB topology is rebuilt rather than preserved.

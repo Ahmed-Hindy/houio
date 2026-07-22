@@ -4,7 +4,10 @@ simple vector class
 
 ----------------------------------------------------------------------*/
 #pragma once
+
+#include <cmath>
 #include <iostream>
+#include <type_traits>
 
 namespace houio
 {
@@ -33,8 +36,8 @@ namespace math
 
 
 
-		bool                       operator==( const Vec2<T> &rhs );
-		bool                       operator!=( const Vec2<T> &rhs );
+		bool                       operator==( const Vec2<T> &rhs ) const;
+		bool                       operator!=( const Vec2<T> &rhs ) const;
 		
 		bool                       operator+=( const Vec2<T> &rhs );
 		bool                       operator-=( const Vec2<T> &rhs );
@@ -97,41 +100,19 @@ namespace math
 	{
 		x=-x; y=-y;
 	}
-	/*
-	// reflects the vector at the given normal
 	template<typename T>
-	void Vec2<T>::reflect( const Vec2<T> &normal )
+	bool Vec2<T>::operator==( const Vec2<T> &rhs ) const
 	{
-		normalize();
-
-		Vec2<T>	temp( x, y );
-		float	value;
-		
-		value = dot( normal, *this );
-		value *= (T)(2.0);
-
-		x = normal.x * value;
-		y = normal.y * value;
-		z = normal.z * value;
-
-		x -= temp.x;
-		y -= temp.y;
-		z -= temp.z;
-	}
-	*/
-
-	template<typename T>
-	bool Vec2<T>::operator==( const Vec2<T> &rhs )
-	{
-		// TODO: fix this
-		if( (abs(x - rhs.x) < (T)0.00001) && (abs(y - rhs.y) < (T)0.00001) )
-			return true;
-		else
-			return false;
+		if constexpr( std::is_floating_point_v<T> )
+		{
+			constexpr T tolerance = static_cast<T>(0.00001);
+			return std::abs(x - rhs.x) < tolerance && std::abs(y - rhs.y) < tolerance;
+		}
+		return x == rhs.x && y == rhs.y;
 	}
 
 	template<typename T>
-	bool Vec2<T>::operator!=( const Vec2<T> &rhs )
+	bool Vec2<T>::operator!=( const Vec2<T> &rhs ) const
 	{
 		return !((*this)==rhs);
 	}

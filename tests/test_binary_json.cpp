@@ -178,6 +178,18 @@ int verifyLengthValidation()
     {
         return result;
     }
+    if (const int result = expectParseFailure(
+            R"JSON(["test"])JSON", limits, "oversized ASCII string");
+        result != 0)
+    {
+        return result;
+    }
+    if (const int result = expectParseFailure(
+            R"JSON(["a\qb"])JSON", limits, "oversized escaped ASCII string");
+        result != 0)
+    {
+        return result;
+    }
 
     limits = houio::json::ParserLimits();
     limits.maxUniformArrayElements = 1;
