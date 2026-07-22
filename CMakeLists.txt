@@ -81,6 +81,41 @@ if(HOUIO_BUILD_TOOLS)
     add_executable(houio_convert tools/houio_convert.cpp)
     target_link_libraries(houio_convert PRIVATE houio::houio)
     target_compile_features(houio_convert PRIVATE cxx_std_20)
+
+    if(WIN32)
+        find_package(Python3 QUIET COMPONENTS Interpreter)
+        if(Python3_Interpreter_FOUND)
+            set(
+                HOUIO_HOUDINI_PACKAGE_ARCHIVE
+                "${CMAKE_CURRENT_BINARY_DIR}/houio-houdini-package-${PROJECT_VERSION}-windows-x86_64.zip"
+            )
+            file(
+                GLOB_RECURSE HOUIO_HOUDINI_PACKAGE_SOURCES
+                CONFIGURE_DEPENDS
+                "${CMAKE_CURRENT_SOURCE_DIR}/houdini/package/*"
+                "${CMAKE_CURRENT_SOURCE_DIR}/python/houio_hom/*"
+            )
+            add_custom_command(
+                OUTPUT "${HOUIO_HOUDINI_PACKAGE_ARCHIVE}"
+                COMMAND
+                    "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/build_houdini_package.py"
+                    --converter "$<TARGET_FILE:houio_convert>"
+                    --output "${HOUIO_HOUDINI_PACKAGE_ARCHIVE}"
+                    --version "${PROJECT_VERSION}"
+                DEPENDS
+                    houio_convert
+                    ${HOUIO_HOUDINI_PACKAGE_SOURCES}
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/build_houdini_package.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/install_houdini_package.ps1"
+                VERBATIM
+            )
+            add_custom_target(
+                houio_houdini_package
+                DEPENDS "${HOUIO_HOUDINI_PACKAGE_ARCHIVE}"
+            )
+        endif()
+    endif()
 endif()
 
 if(HOUIO_BUILD_TESTS)
