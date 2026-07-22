@@ -174,14 +174,25 @@ Generated archive:
 build/windows-msvc-release/houio-houdini-package-<version>-windows-x86_64.zip
 ```
 
-Install from an extracted archive:
+Test an extracted archive without installing anything:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
-  .\install_houdini_package.ps1
+  .\bootstrap_houdini_package.ps1 `
+  -HoudiniVersion 20.0
 ```
 
-The installer targets Houdini 20.0, 20.5, 21.0, and 22.0 by default.
+The bootstrap script launches Houdini with isolated process-local package and preference directories. It does not copy files into AppData or write to any Houdini user package folder. Close Houdini to remove the temporary bootstrap directory.
+
+A persistent installation requires the explicit `-Install` action:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\install_houdini_package.ps1 `
+  -Install
+```
+
+The persistent installer targets Houdini 20.0, 20.5, 21.0, and 22.0 by default.
 
 Inside a SOP network, use:
 

@@ -2,6 +2,14 @@
 
 HouIO supports Houdini 20.0 or newer.
 
+For transient evaluation, extract the archive and run:
+
+```powershell
+.\bootstrap_houdini_package.ps1 -HoudiniVersion 20.0
+```
+
+This launches Houdini with isolated package and preference directories. It does not install package files or modify Houdini user folders.
+
 Open a SOP network and use **Tab > HouIO**:
 
 - **HouIO Round Trip** creates a configured Python SOP after the selected node.

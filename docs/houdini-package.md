@@ -1,14 +1,15 @@
-# Installing the HouIO Houdini package
+# Testing and installing the HouIO Houdini package
 
-The Windows package contains:
+The Windows archive contains:
 
 - `houio_convert.exe`
-- `houio_hom` Python bridge
+- The `houio_hom` Python bridge
 - Shelf and Tab-menu tools
 - Package diagnostics
-- PowerShell installer
+- A transient bootstrap script
+- An explicit persistent installer
 
-The minimum supported Houdini version is 20.0.
+HouIO supports Houdini 20.0 or newer.
 
 Validated versions:
 
@@ -30,13 +31,97 @@ Output:
 build/windows-msvc-release/houio-houdini-package-<version>-windows-x86_64.zip
 ```
 
-## Install with PowerShell
+## Bootstrap without installing
 
-Extract the ZIP and run:
+Use this workflow for manual evaluation. It does not copy package files into AppData and does not write loader files into any Houdini user folder.
+
+Extract the archive:
+
+```powershell
+$Zip = "G:\Projects\Dev\Github\houio\build\windows-msvc-release\houio-houdini-package-0.2.0-windows-x86_64.zip"
+$Extract = "G:\Projects\Dev\Github\houio\build\manual-package-test"
+
+Remove-Item $Extract -Recurse -Force -ErrorAction SilentlyContinue
+Expand-Archive -LiteralPath $Zip -DestinationPath $Extract
+Set-Location $Extract
+```
+
+Launch a supported Houdini version with an isolated temporary package environment:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
-  .\install_houdini_package.ps1
+  .\bootstrap_houdini_package.ps1 `
+  -HoudiniVersion 20.0
+```
+
+The script:
+
+- Creates a temporary loader under the system temporary directory.
+- Points that loader at the extracted archive.
+- Uses a temporary `HOUDINI_USER_PREF_DIR`.
+- Disables the user `houdini.env` file for that process.
+- Launches Houdini with process-local environment variables.
+- Waits for Houdini to close.
+- Removes the temporary bootstrap directory after Houdini exits.
+
+The extracted archive remains unchanged except when an explicit `-BootstrapDirectory` is supplied inside it.
+
+Select another version:
+
+```powershell
+.\bootstrap_houdini_package.ps1 -HoudiniVersion 20.5
+.\bootstrap_houdini_package.ps1 -HoudiniVersion 21.0
+.\bootstrap_houdini_package.ps1 -HoudiniVersion 22.0
+```
+
+Use an exact executable when multiple builds are installed:
+
+```powershell
+.\bootstrap_houdini_package.ps1 `
+  -HoudiniExecutable "C:\Program Files\Side Effects Software\Houdini 21.0.631\bin\houdini.exe"
+```
+
+Validate the bootstrap files without launching Houdini:
+
+```powershell
+.\bootstrap_houdini_package.ps1 -ValidateOnly
+```
+
+Preserve the temporary directory for inspection:
+
+```powershell
+.\bootstrap_houdini_package.ps1 `
+  -HoudiniVersion 22.0 `
+  -KeepBootstrap
+```
+
+The script prints the preserved path.
+
+## Manual acceptance test
+
+Inside the bootstrapped Houdini session:
+
+1. Create a Geometry object and enter its SOP network.
+2. Create and select a Box SOP.
+3. Run **Tab > HouIO > Package Diagnostics**.
+4. Confirm the package root, converter, and C-Blosc checks pass.
+5. Run **Tab > HouIO > HouIO Round Trip**.
+6. Confirm the created node cooks without errors or warnings.
+7. Compare point and primitive counts with the source Box.
+8. Disable **Enabled** and confirm geometry passes through unchanged.
+9. Use **Convert Geometry File** to write `.bgeo.sc`.
+10. Load the result with a File SOP.
+
+Repeat the test in each Houdini version you intend to support.
+
+## Persistent installation
+
+Persistent installation is separate from bootstrap testing and requires an explicit action flag:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\install_houdini_package.ps1 `
+  -Install
 ```
 
 The installer:
@@ -48,23 +133,16 @@ The installer:
 Install one version:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File `
-  .\install_houdini_package.ps1 `
+.\install_houdini_package.ps1 `
+  -Install `
   -HoudiniVersions 20.0
 ```
 
-Restart Houdini after installation.
+Running the installer with no `-Install` or `-Uninstall` action stops without changing the system.
 
 ## Houdini 22 Package Browser
 
-Houdini 22 can install the ZIP directly:
-
-1. Open **Inspectors > Package Browser**.
-2. Choose **File > Install Package Archive**.
-3. Select the HouIO ZIP.
-4. Accept the installation location.
-
-The tools should become available immediately.
+Houdini 22 can install the ZIP directly through **Inspectors > Package Browser**. This is a persistent installation and is not the transient bootstrap workflow.
 
 ## Tools
 
@@ -76,8 +154,8 @@ Creates a configured Python SOP after the selected SOP.
 
 Parameters:
 
-- **Enabled** — bypasses HouIO when disabled.
-- **Timeout (seconds)** — limits converter execution; default `300`.
+- **Enabled** bypasses HouIO when disabled.
+- **Timeout (seconds)** limits converter execution; default `300`.
 
 ### Convert Geometry File
 
@@ -86,21 +164,6 @@ Converts `.geo`, `.bgeo`, or `.bgeo.sc` through the bundled executable.
 ### Package Diagnostics
 
 Reports the active package root, Houdini version, converter path, C-Blosc path, and runtime existence checks.
-
-## Manual acceptance test
-
-1. Create a Geometry object and enter its SOP network.
-2. Create and select a Box SOP.
-3. Run **Tab > HouIO > Package Diagnostics**.
-4. Confirm package, converter, and Blosc checks pass.
-5. Run **Tab > HouIO > HouIO Round Trip**.
-6. Confirm the created node cooks without errors or warnings.
-7. Compare point and primitive counts with the source Box.
-8. Disable **Enabled** and confirm geometry passes through unchanged.
-9. Use **Convert Geometry File** to write `.bgeo.sc`.
-10. Load the output with a File SOP.
-
-Repeat the diagnostics and Box round trip in every Houdini version you intend to support.
 
 ## Supported data
 
@@ -124,9 +187,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
   -Uninstall
 ```
 
-This removes the selected package loaders and installed HouIO files.
-
-Keep installed files while removing loaders:
+Keep package files while removing loaders:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
@@ -137,4 +198,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
 
 ## Development setup
 
-For a package that points directly at a source checkout and local converter build, use `tools/houdini/install_hom_bridge.ps1` and follow [Houdini integration on Windows](houdini-windows.md).
+For source-tree development, use `tools/houdini/install_hom_bridge.ps1` and follow [Houdini integration on Windows](houdini-windows.md).

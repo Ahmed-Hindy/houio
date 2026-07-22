@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_SOURCE_ROOT = PROJECT_ROOT / "houdini" / "package"
 PYTHON_PACKAGE_ROOT = PROJECT_ROOT / "python" / "houio_hom"
 INSTALLER_PATH = PROJECT_ROOT / "tools" / "houdini" / "install_houdini_package.ps1"
+BOOTSTRAP_PATH = PROJECT_ROOT / "tools" / "houdini" / "bootstrap_houdini_package.ps1"
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -75,6 +76,8 @@ def build_package(converter: Path, output: Path, version: str) -> Path:
         raise FileNotFoundError(f"Python bridge does not exist: {PYTHON_PACKAGE_ROOT}")
     if not INSTALLER_PATH.is_file():
         raise FileNotFoundError(f"Installer does not exist: {INSTALLER_PATH}")
+    if not BOOTSTRAP_PATH.is_file():
+        raise FileNotFoundError(f"Bootstrap script does not exist: {BOOTSTRAP_PATH}")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
@@ -90,6 +93,7 @@ def build_package(converter: Path, output: Path, version: str) -> Path:
         binary_root.mkdir(parents=True, exist_ok=True)
         shutil.copy2(converter, binary_root / converter.name)
         shutil.copy2(INSTALLER_PATH, staging_root / INSTALLER_PATH.name)
+        shutil.copy2(BOOTSTRAP_PATH, staging_root / BOOTSTRAP_PATH.name)
         write_package_file(staging_root / "houio.json", version)
 
         archive_base = output.with_suffix("")

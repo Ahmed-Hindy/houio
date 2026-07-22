@@ -107,6 +107,7 @@ if(HOUIO_BUILD_TOOLS)
                     houio_convert
                     ${HOUIO_HOUDINI_PACKAGE_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/build_houdini_package.py"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/bootstrap_houdini_package.ps1"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/install_houdini_package.ps1"
                 VERBATIM
             )

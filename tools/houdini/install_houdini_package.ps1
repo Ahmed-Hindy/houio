@@ -1,13 +1,16 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter()]
-    [string]$SourceRoot = $PSScriptRoot,
+    [string]$SourceRoot = "",
 
     [Parameter()]
     [string[]]$HoudiniVersions = @("20.0", "20.5", "21.0", "22.0"),
 
     [Parameter()]
     [string]$InstallDirectory = "",
+
+    [Parameter()]
+    [switch]$Install,
 
     [Parameter()]
     [switch]$Uninstall,
@@ -18,10 +21,38 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if ($Install -and $Uninstall) {
+    throw "Choose either -Install or -Uninstall, not both."
+}
+if (-not $Install -and -not $Uninstall) {
+    throw "No action selected. Use bootstrap_houdini_package.ps1 for transient testing, or pass -Install for a persistent installation."
+}
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+    $SourceRoot = $PSScriptRoot
+}
+
+function Resolve-AbsolutePath {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Description
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "$Description is empty."
+    }
+
+    try {
+        return [System.IO.Path]::GetFullPath($Path)
+    }
+    catch {
+        throw "Invalid $Description '$Path': $($_.Exception.Message)"
+    }
+}
+
 function Convert-ToPackagePath {
     param([Parameter(Mandatory)][string]$Path)
 
-    return ([System.IO.Path]::GetFullPath($Path) -replace "\\", "/")
+    return ((Resolve-AbsolutePath -Path $Path -Description "package path") -replace "\\", "/")
 }
 
 function Get-PackageDirectories {
@@ -49,7 +80,7 @@ if ([string]::IsNullOrWhiteSpace($InstallDirectory)) {
     $InstallDirectory = Join-Path $env:LOCALAPPDATA "HouIO"
 }
 
-$resolvedInstallDirectory = [System.IO.Path]::GetFullPath($InstallDirectory)
+$resolvedInstallDirectory = Resolve-AbsolutePath -Path $InstallDirectory -Description "install directory"
 $loaderFileName = "houio_loader.json"
 
 if ($Uninstall) {
@@ -74,7 +105,7 @@ if ($Uninstall) {
     return
 }
 
-$resolvedSourceRoot = [System.IO.Path]::GetFullPath($SourceRoot)
+$resolvedSourceRoot = Resolve-AbsolutePath -Path $SourceRoot -Description "package source root"
 $sourcePackageFile = Join-Path $resolvedSourceRoot "houio.json"
 $sourceContentDirectory = Join-Path $resolvedSourceRoot "houio"
 $sourceInstaller = Join-Path $resolvedSourceRoot "install_houdini_package.ps1"
@@ -118,6 +149,11 @@ foreach ($houdiniVersion in $HoudiniVersions) {
             Write-Host "Installed $loaderPath"
         }
     }
+}
+
+if ($WhatIfPreference) {
+    Write-Host "Dry run complete. No files were installed."
+    return
 }
 
 Write-Host "HouIO package files: $resolvedInstallDirectory"

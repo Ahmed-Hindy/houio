@@ -90,6 +90,19 @@ add_test(
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package_consumer.cmake"
 )
 
+if(WIN32 AND TARGET houio_houdini_package)
+    add_test(
+        NAME houio.houdini_package.bootstrap
+        COMMAND
+            "${CMAKE_COMMAND}"
+            "-DHOUIO_BINARY_DIR=${PROJECT_BINARY_DIR}"
+            "-DHOUIO_BUILD_CONFIG=$<CONFIG>"
+            "-DHOUIO_HOUDINI_PACKAGE_ARCHIVE=${HOUIO_HOUDINI_PACKAGE_ARCHIVE}"
+            "-DHOUIO_HOUDINI_BOOTSTRAP_EXTRACT_DIR=${CMAKE_CURRENT_BINARY_DIR}/houdini_package_bootstrap"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_houdini_bootstrap_test.cmake"
+    )
+endif()
+
 add_executable(houio_roundtrip_geometry roundtrip_geometry.cpp)
 target_link_libraries(houio_roundtrip_geometry PRIVATE houio::houio)
 target_compile_features(houio_roundtrip_geometry PRIVATE cxx_std_20)
