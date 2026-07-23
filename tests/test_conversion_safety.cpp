@@ -28,7 +28,7 @@ houio::HouGeo::Ptr importPointOnlyGeometry(int pointCount)
 int verifyDeclaredPointCount()
 {
     houio::HouGeo::Ptr geometry = importPointOnlyGeometry(3);
-    if (!geometry || geometry->pointcount() != 3)
+    if (!geometry || geometry->pointCount() != 3)
     {
         return fail("declared pointcount was lost when no point attributes existed");
     }
@@ -197,8 +197,7 @@ int verifyNonNumericAttributesAreSkipped()
     if (!geometry)
         return fail("dictionary-attribute conversion fixture did not import");
 
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
-    geometry->getPrimitives(primitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
     if (primitives.size() != 1)
         return fail("dictionary-attribute conversion fixture lost its polygon");
 

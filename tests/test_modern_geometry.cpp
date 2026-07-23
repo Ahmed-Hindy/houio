@@ -147,12 +147,12 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
     {
         return fail("geometry is null");
     }
-    if (geometry->pointcount() != 4 || geometry->vertexcount() != 4 || geometry->primitivecount() != 1)
+    if (geometry->pointCount() != 4 || geometry->vertexCount() != 4 || geometry->primitiveCount() != 1)
     {
         return fail("unexpected geometry counts");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr position = geometry->getPointAttribute("P");
+    houio::HouGeoAdapter::AttributeAdapter::Ptr position = geometry->pointAttribute("P");
     if (!position)
     {
         return fail("modern tuple-based P attribute is missing");
@@ -164,13 +164,13 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
             + ", elements=" + std::to_string(position->getNumElements()));
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr normals = geometry->getVertexAttribute("N");
+    houio::HouGeoAdapter::AttributeAdapter::Ptr normals = geometry->vertexAttribute("N");
     if (!normals || normals->getTupleSize() != 3 || normals->getNumElements() != 4)
     {
         return fail("vertex N attribute was not preserved");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr uv = geometry->getVertexAttribute("uv");
+    houio::HouGeoAdapter::AttributeAdapter::Ptr uv = geometry->vertexAttribute("uv");
     if (!uv || uv->getTupleSize() != 2 || uv->getNumElements() != 4)
     {
         return fail("vertex uv attribute was not preserved");
@@ -185,14 +185,14 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
         return fail("representative vertex attribute values were not preserved");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr name = geometry->getPrimitiveAttribute("name");
+    houio::HouGeoAdapter::AttributeAdapter::Ptr name = geometry->primitiveAttribute("name");
     if (!name || name->getType() != houio::HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING
         || name->getNumElements() != 1 || name->getString(0) != "prop")
     {
         return fail("indexed primitive string attribute was not preserved");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr piece = geometry->getPrimitiveAttribute("piece");
+    houio::HouGeoAdapter::AttributeAdapter::Ptr piece = geometry->primitiveAttribute("piece");
     if (!piece || piece->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32
         || piece->getTupleSize() != 1 || piece->getNumElements() != 1)
     {
@@ -204,8 +204,7 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
         return fail("primitive integer attribute value was not preserved");
     }
 
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
-    geometry->getPrimitives(primitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
     if (primitives.size() != 1)
     {
         return fail("unexpected primitive container count");

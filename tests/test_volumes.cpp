@@ -56,8 +56,7 @@ houio::HouGeo::HouVolume::Ptr importVolume(const std::string& source, houio::Dia
         return houio::HouGeo::HouVolume::Ptr();
     }
 
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
-    geometry->getPrimitives(primitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
     if (primitives.size() != 1)
     {
         return houio::HouGeo::HouVolume::Ptr();
@@ -191,8 +190,8 @@ int verifyBinaryRoundTrip()
 
     houio::HouGeo::Ptr sourceGeometry = houio::HouGeo::create();
     sourceGeometry->addPrimitive(sourceField);
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> sourcePrimitives;
-    sourceGeometry->getPrimitives(sourcePrimitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> sourcePrimitives =
+        sourceGeometry->primitives();
     houio::HouGeo::HouVolume::Ptr sourceVolume = sourcePrimitives.size() == 1
         ? std::dynamic_pointer_cast<houio::HouGeo::HouVolume>(sourcePrimitives.front())
         : houio::HouGeo::HouVolume::Ptr();
@@ -224,8 +223,8 @@ int verifyBinaryRoundTrip()
         return fail("volume binary re-import failed");
     }
 
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
-    importedGeometry->getPrimitives(primitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives =
+        importedGeometry->primitives();
     houio::HouGeo::HouVolume::Ptr importedVolume = primitives.size() == 1
         ? std::dynamic_pointer_cast<houio::HouGeo::HouVolume>(primitives.front())
         : houio::HouGeo::HouVolume::Ptr();

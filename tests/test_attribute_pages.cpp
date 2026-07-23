@@ -34,7 +34,7 @@ std::vector<houio::sint32> attributeValues(const houio::HouGeo::Ptr& geometry)
     {
         throw std::runtime_error("Paged geometry did not import");
     }
-    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->getPointAttribute("paged");
+    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->pointAttribute("paged");
     if (!attribute || attribute->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32
         || attribute->getTupleSize() != 3 || attribute->getNumElements() != 5)
     {

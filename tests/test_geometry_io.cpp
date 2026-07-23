@@ -72,7 +72,7 @@ int verifyRawRoundtrip(const std::filesystem::path &directory)
         return fail("raw bgeo format detection failed");
 
     const houio::GeometryReadResult<houio::HouGeo::Ptr> readResult = houio::GeometryIO::readHouGeo(path);
-    if( !readResult || readResult.value->pointcount() != 2 || readResult.value->primitivecount() != 0 )
+    if( !readResult || readResult.value->pointCount() != 2 || readResult.value->primitiveCount() != 0 )
         return fail("raw bgeo round-trip failed");
     return 0;
 }
@@ -98,7 +98,7 @@ int verifyScfRoundtrip(const std::filesystem::path &directory)
         return fail("SCF format detection failed");
 
     const houio::GeometryReadResult<houio::HouGeo::Ptr> readResult = houio::GeometryIO::readHouGeo(path);
-    if( !readResult || readResult.value->pointcount() != 2 || readResult.value->primitivecount() != 0 )
+    if( !readResult || readResult.value->pointCount() != 2 || readResult.value->primitiveCount() != 0 )
         return fail("SCF round-trip failed");
 
     std::vector<char> scfBytes = readBytes(path);

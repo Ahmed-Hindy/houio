@@ -285,8 +285,8 @@ namespace houio
         if( !houGeoResult.value )
             return result;
 
-        std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
-        houGeoResult.value->getPrimitives(primitives);
+        const std::vector<HouGeoAdapter::Primitive::Ptr> primitives =
+            houGeoResult.value->primitives();
         if( primitives.empty() )
         {
             result.value = HouGeoIO::convertToGeometry(
@@ -335,8 +335,8 @@ namespace houio
         if( !houGeoResult )
             return result;
 
-        std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
-        houGeoResult.value->getPrimitives(primitives);
+        const std::vector<HouGeoAdapter::Primitive::Ptr> primitives =
+            houGeoResult.value->primitives();
         if( primitives.empty() )
         {
             appendResultError(result.diagnostics, DiagnosticCategory::schema,

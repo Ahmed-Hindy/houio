@@ -295,6 +295,7 @@ namespace houio
         void addPrimitive(PolyPrimitive::Ptr polygon);
         void setTopology(HouTopology::Ptr topology);
 
+    private:
         [[nodiscard]] sint64 pointcount() const override;
         [[nodiscard]] sint64 vertexcount() const override;
         [[nodiscard]] sint64 primitivecount() const override;
@@ -302,7 +303,7 @@ namespace houio
         [[nodiscard]] AttributeAdapter::Ptr getPointAttribute(const std::string& name) override;
         void getVertexAttributeNames(std::vector<std::string>& names) const override;
         [[nodiscard]] AttributeAdapter::Ptr getVertexAttribute(const std::string& name) override;
-        [[nodiscard]] bool hasPrimitiveAttribute(const std::string& name) const override;
+        [[nodiscard]] bool hasPrimitiveAttributeLegacy(const std::string& name) const override;
         void getPrimitiveAttributeNames(std::vector<std::string>& names) const override;
         [[nodiscard]] AttributeAdapter::Ptr getPrimitiveAttribute(const std::string& name) override;
         void getPrimitives(std::vector<Primitive::Ptr>& primitives) override;
@@ -322,6 +323,7 @@ namespace houio
             std::vector<bool>& membership) const override;
         [[nodiscard]] Topology::Ptr getTopology() override;
 
+    public:
         struct SharedPrimitiveData
         {
             std::map<std::string, json::ObjectPtr> sharedVoxelData;

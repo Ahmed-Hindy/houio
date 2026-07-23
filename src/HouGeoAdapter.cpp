@@ -141,6 +141,135 @@ namespace houio
         return false;
     }
 
+    sint64 HouGeoAdapter::pointCount() const
+    {
+        return pointcount();
+    }
+
+    sint64 HouGeoAdapter::vertexCount() const
+    {
+        return vertexcount();
+    }
+
+    sint64 HouGeoAdapter::primitiveCount() const
+    {
+        return primitivecount();
+    }
+
+    std::vector<std::string> HouGeoAdapter::pointAttributeNames() const
+    {
+        std::vector<std::string> names;
+        getPointAttributeNames(names);
+        return names;
+    }
+
+    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::pointAttribute(const std::string& name)
+    {
+        return getPointAttribute(name);
+    }
+
+    std::vector<std::string> HouGeoAdapter::vertexAttributeNames() const
+    {
+        std::vector<std::string> names;
+        getVertexAttributeNames(names);
+        return names;
+    }
+
+    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::vertexAttribute(const std::string& name)
+    {
+        return getVertexAttribute(name);
+    }
+
+    std::vector<std::string> HouGeoAdapter::globalAttributeNames() const
+    {
+        std::vector<std::string> names;
+        getGlobalAttributeNames(names);
+        return names;
+    }
+
+    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::globalAttribute(const std::string& name)
+    {
+        return getGlobalAttribute(name);
+    }
+
+    std::vector<std::string> HouGeoAdapter::primitiveAttributeNames() const
+    {
+        std::vector<std::string> names;
+        getPrimitiveAttributeNames(names);
+        return names;
+    }
+
+    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::primitiveAttribute(
+        const std::string& name)
+    {
+        return getPrimitiveAttribute(name);
+    }
+
+    std::vector<std::string> HouGeoAdapter::pointGroupNames() const
+    {
+        std::vector<std::string> names;
+        getPointGroupNames(names);
+        return names;
+    }
+
+    std::optional<std::vector<bool>> HouGeoAdapter::pointGroupMembership(
+        const std::string& name) const
+    {
+        std::vector<bool> membership;
+        if (!getPointGroupMembership(name, membership))
+            return std::nullopt;
+        return membership;
+    }
+
+    std::vector<std::string> HouGeoAdapter::vertexGroupNames() const
+    {
+        std::vector<std::string> names;
+        getVertexGroupNames(names);
+        return names;
+    }
+
+    std::optional<std::vector<bool>> HouGeoAdapter::vertexGroupMembership(
+        const std::string& name) const
+    {
+        std::vector<bool> membership;
+        if (!getVertexGroupMembership(name, membership))
+            return std::nullopt;
+        return membership;
+    }
+
+    std::vector<std::string> HouGeoAdapter::primitiveGroupNames() const
+    {
+        std::vector<std::string> names;
+        getPrimitiveGroupNames(names);
+        return names;
+    }
+
+    std::optional<std::vector<bool>> HouGeoAdapter::primitiveGroupMembership(
+        const std::string& name) const
+    {
+        std::vector<bool> membership;
+        if (!getPrimitiveGroupMembership(name, membership))
+            return std::nullopt;
+        return membership;
+    }
+
+    bool HouGeoAdapter::hasPrimitiveAttribute(const std::string& name) const
+    {
+        return hasPrimitiveAttributeLegacy(name);
+    }
+
+    std::vector<HouGeoAdapter::Primitive::Ptr> HouGeoAdapter::primitives()
+    {
+        std::vector<Primitive::Ptr> result;
+        getPrimitives(result);
+        return result;
+    }
+
+    HouGeoAdapter::Topology::Ptr HouGeoAdapter::topology()
+    {
+        return getTopology();
+    }
+
     sint64 HouGeoAdapter::pointcount() const
     {
         return 0;
@@ -225,7 +354,7 @@ namespace houio
         return false;
     }
 
-    bool HouGeoAdapter::hasPrimitiveAttribute(const std::string&) const
+    bool HouGeoAdapter::hasPrimitiveAttributeLegacy(const std::string&) const
     {
         return false;
     }

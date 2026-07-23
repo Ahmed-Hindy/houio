@@ -336,8 +336,8 @@ namespace houio
 			Geometry::Ptr result;
 
 		// Cast and validate the domain sizes before allocating convenience geometry.
-		const sint64 numPoints = houGeo->pointcount();
-		const sint64 numVertices = houGeo->vertexcount();
+		const sint64 numPoints = houGeo->pointCount();
+		const sint64 numVertices = houGeo->vertexCount();
 		const size_t pointCount = checkedConversionCount(numPoints, "Point count");
 		const size_t vertexCount = checkedConversionCount(numVertices, "Vertex count");
 
@@ -405,17 +405,14 @@ namespace houio
 		// attributes ---
 		std::vector<Attribute::Ptr> geoAttrs;
 
-		std::vector<std::string> pointAttributesNames;
-		houGeo->getPointAttributeNames(pointAttributesNames);
-
-		std::vector<std::string> vertexAttributesNames;
-		houGeo->getVertexAttributeNames(vertexAttributesNames);
+		const std::vector<std::string> pointAttributesNames = houGeo->pointAttributeNames();
+		const std::vector<std::string> vertexAttributesNames = houGeo->vertexAttributeNames();
 
 		// convert point attributes ---
-		for( std::vector<std::string>::iterator it = pointAttributesNames.begin(), end = pointAttributesNames.end();  it != end; ++it )
+		for (const std::string& attribute_name : pointAttributesNames)
 		{
-			std::string attrName = *it;
-			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->getPointAttribute(attrName);
+			std::string attrName = attribute_name;
+			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->pointAttribute(attrName);
 			const std::string attributePath = "attributes.pointattributes." + attrName;
 			validateDomainAttribute(houAttr, numPoints, attributePath);
 			if( houAttr->getType() != HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
@@ -543,10 +540,10 @@ namespace houio
 
 		// convert vertex attributes ---
 		std::vector<std::pair<Attribute::Ptr, Attribute::Ptr>> vertex2pointAttr;
-		for( std::vector<std::string>::iterator it = vertexAttributesNames.begin(), end = vertexAttributesNames.end();  it != end; ++it )
+		for (const std::string& attribute_name : vertexAttributesNames)
 		{
-			std::string attrName = *it;
-			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->getVertexAttribute(attrName);
+			std::string attrName = attribute_name;
+			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->vertexAttribute(attrName);
 			const std::string attributePath = "attributes.vertexattributes." + attrName;
 			validateDomainAttribute(houAttr, numVertices, attributePath);
 			if( houAttr->getType() != HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
@@ -918,9 +915,9 @@ namespace houio
 		json::BinaryWriter writer(output);
 		ExportContext context(writer);
 
-		const sint64 pointCount = geometry->pointcount();
-		const sint64 vertexCount = geometry->vertexcount();
-		const sint64 primitiveCount = geometry->primitivecount();
+		const sint64 pointCount = geometry->pointCount();
+		const sint64 vertexCount = geometry->vertexCount();
+		const sint64 primitiveCount = geometry->primitiveCount();
 		if( pointCount < 0 || vertexCount < 0 || primitiveCount < 0 )
 			throw std::runtime_error( "HouGeoIO::exportGeometry received negative geometry counts" );
 
@@ -937,8 +934,8 @@ namespace houio
 
 		writer.jsonString( "topology" );
 		writer.jsonBeginArray();
-		if( geometry->getTopology() )
-			exportTopology(context, geometry->getTopology());
+		if (const HouGeoAdapter::Topology::Ptr geometry_topology = geometry->topology())
+			exportTopology(context, geometry_topology);
 		writer.jsonEndArray();
 
 		writer.jsonString( "attributes" );
@@ -946,34 +943,26 @@ namespace houio
 
 		writer.jsonString( "pointattributes" );
 		writer.jsonBeginArray();
-		std::vector<std::string> pointAttributeNames;
-		geometry->getPointAttributeNames(pointAttributeNames);
-		for( const std::string &name : pointAttributeNames )
-			exportAttribute(context, geometry->getPointAttribute(name));
+		for (const std::string& name : geometry->pointAttributeNames())
+			exportAttribute(context, geometry->pointAttribute(name));
 		writer.jsonEndArray();
 
 		writer.jsonString( "vertexattributes" );
 		writer.jsonBeginArray();
-		std::vector<std::string> vertexAttributeNames;
-		geometry->getVertexAttributeNames(vertexAttributeNames);
-		for( const std::string &name : vertexAttributeNames )
-			exportAttribute(context, geometry->getVertexAttribute(name));
+		for (const std::string& name : geometry->vertexAttributeNames())
+			exportAttribute(context, geometry->vertexAttribute(name));
 		writer.jsonEndArray();
 
 		writer.jsonString( "primitiveattributes" );
 		writer.jsonBeginArray();
-		std::vector<std::string> primitiveAttributeNames;
-		geometry->getPrimitiveAttributeNames(primitiveAttributeNames);
-		for( const std::string &name : primitiveAttributeNames )
-			exportAttribute(context, geometry->getPrimitiveAttribute(name));
+		for (const std::string& name : geometry->primitiveAttributeNames())
+			exportAttribute(context, geometry->primitiveAttribute(name));
 		writer.jsonEndArray();
 
 		writer.jsonString( "globalattributes" );
 		writer.jsonBeginArray();
-		std::vector<std::string> globalAttributeNames;
-		geometry->getGlobalAttributeNames(globalAttributeNames);
-		for( const std::string &name : globalAttributeNames )
-			exportAttribute(context, geometry->getGlobalAttribute(name));
+		for (const std::string& name : geometry->globalAttributeNames())
+			exportAttribute(context, geometry->globalAttribute(name));
 		writer.jsonEndArray();
 
 		writer.jsonEndArray();
@@ -983,8 +972,7 @@ namespace houio
 			writer.jsonString( "primitives" );
 			writer.jsonBeginArray();
 
-			std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
-			geometry->getPrimitives(primitives);
+			const std::vector<HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
 
 			int topologyVertexOffset = 0;
 			for( const HouGeoAdapter::Primitive::Ptr &primitive : primitives )
@@ -1004,53 +992,47 @@ namespace houio
 			writer.jsonEndArray();
 		}
 
-		std::vector<std::string> pointGroupNames;
-		geometry->getPointGroupNames(pointGroupNames);
-		if( !pointGroupNames.empty() )
+		const std::vector<std::string> point_group_names = geometry->pointGroupNames();
+		if (!point_group_names.empty())
 		{
 			writer.jsonString("pointgroups");
 			writer.jsonBeginArray();
-			for( const std::string &name : pointGroupNames )
+			for (const std::string& name : point_group_names)
 			{
-				std::vector<bool> membership;
-				if( !geometry->getPointGroupMembership(name, membership)
-					|| membership.size() != static_cast<size_t>(pointCount) )
-					throw std::runtime_error( "HouGeoIO::exportGeometry invalid point group " + name );
-				exportGroup(context, name, membership);
+				const auto membership = geometry->pointGroupMembership(name);
+				if (!membership || membership->size() != static_cast<size_t>(pointCount))
+					throw std::runtime_error("HouGeoIO::exportGeometry invalid point group " + name);
+				exportGroup(context, name, *membership);
 			}
 			writer.jsonEndArray();
 		}
 
-		std::vector<std::string> vertexGroupNames;
-		geometry->getVertexGroupNames(vertexGroupNames);
-		if( !vertexGroupNames.empty() )
+		const std::vector<std::string> vertex_group_names = geometry->vertexGroupNames();
+		if (!vertex_group_names.empty())
 		{
 			writer.jsonString("vertexgroups");
 			writer.jsonBeginArray();
-			for( const std::string &name : vertexGroupNames )
+			for (const std::string& name : vertex_group_names)
 			{
-				std::vector<bool> membership;
-				if( !geometry->getVertexGroupMembership(name, membership)
-					|| membership.size() != static_cast<size_t>(vertexCount) )
-					throw std::runtime_error( "HouGeoIO::exportGeometry invalid vertex group " + name );
-				exportGroup(context, name, membership);
+				const auto membership = geometry->vertexGroupMembership(name);
+				if (!membership || membership->size() != static_cast<size_t>(vertexCount))
+					throw std::runtime_error("HouGeoIO::exportGeometry invalid vertex group " + name);
+				exportGroup(context, name, *membership);
 			}
 			writer.jsonEndArray();
 		}
 
-		std::vector<std::string> primitiveGroupNames;
-		geometry->getPrimitiveGroupNames(primitiveGroupNames);
-		if( !primitiveGroupNames.empty() )
+		const std::vector<std::string> primitive_group_names = geometry->primitiveGroupNames();
+		if (!primitive_group_names.empty())
 		{
 			writer.jsonString("primitivegroups");
 			writer.jsonBeginArray();
-			for( const std::string &name : primitiveGroupNames )
+			for (const std::string& name : primitive_group_names)
 			{
-				std::vector<bool> membership;
-				if( !geometry->getPrimitiveGroupMembership(name, membership)
-					|| membership.size() != static_cast<size_t>(primitiveCount) )
-					throw std::runtime_error( "HouGeoIO::exportGeometry invalid primitive group " + name );
-				exportGroup(context, name, membership);
+				const auto membership = geometry->primitiveGroupMembership(name);
+				if (!membership || membership->size() != static_cast<size_t>(primitiveCount))
+					throw std::runtime_error("HouGeoIO::exportGeometry invalid primitive group " + name);
+				exportGroup(context, name, *membership);
 			}
 			writer.jsonEndArray();
 		}

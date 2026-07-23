@@ -42,7 +42,7 @@ int verifyHalfConversion()
 
 int verifyHalfAttribute(const houio::HouGeo::Ptr& geometry)
 {
-    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->getPointAttribute("half_value");
+    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->pointAttribute("half_value");
     if (!attribute
         || attribute->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16
         || attribute->getTupleSize() != 1 || attribute->getNumElements() != 2)
@@ -59,12 +59,12 @@ int verifyHalfAttribute(const houio::HouGeo::Ptr& geometry)
 
 int verifyInt64Attribute(const houio::HouGeo::Ptr& geometry)
 {
-    if (!geometry || geometry->pointcount() != 2)
+    if (!geometry || geometry->pointCount() != 2)
     {
         return fail("Int64 geometry has unexpected point count");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->getPointAttribute("large_id");
+    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->pointAttribute("large_id");
     if (!attribute
         || attribute->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64
         || attribute->getTupleSize() != 1 || attribute->getNumElements() != 2)

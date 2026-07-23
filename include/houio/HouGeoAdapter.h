@@ -4,6 +4,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -180,6 +181,31 @@ namespace houio
 
         virtual ~HouGeoAdapter() = default;
 
+        [[nodiscard]] sint64 pointCount() const;
+        [[nodiscard]] sint64 vertexCount() const;
+        [[nodiscard]] sint64 primitiveCount() const;
+        [[nodiscard]] std::vector<std::string> pointAttributeNames() const;
+        [[nodiscard]] AttributeAdapter::Ptr pointAttribute(const std::string& name);
+        [[nodiscard]] std::vector<std::string> vertexAttributeNames() const;
+        [[nodiscard]] AttributeAdapter::Ptr vertexAttribute(const std::string& name);
+        [[nodiscard]] std::vector<std::string> globalAttributeNames() const;
+        [[nodiscard]] AttributeAdapter::Ptr globalAttribute(const std::string& name);
+        [[nodiscard]] std::vector<std::string> primitiveAttributeNames() const;
+        [[nodiscard]] AttributeAdapter::Ptr primitiveAttribute(const std::string& name);
+        [[nodiscard]] std::vector<std::string> pointGroupNames() const;
+        [[nodiscard]] std::optional<std::vector<bool>> pointGroupMembership(
+            const std::string& name) const;
+        [[nodiscard]] std::vector<std::string> vertexGroupNames() const;
+        [[nodiscard]] std::optional<std::vector<bool>> vertexGroupMembership(
+            const std::string& name) const;
+        [[nodiscard]] std::vector<std::string> primitiveGroupNames() const;
+        [[nodiscard]] std::optional<std::vector<bool>> primitiveGroupMembership(
+            const std::string& name) const;
+        [[nodiscard]] bool hasPrimitiveAttribute(const std::string& name) const;
+        [[nodiscard]] std::vector<Primitive::Ptr> primitives();
+        [[nodiscard]] Topology::Ptr topology();
+
+    protected:
         [[nodiscard]] virtual sint64 pointcount() const;
         [[nodiscard]] virtual sint64 vertexcount() const;
         [[nodiscard]] virtual sint64 primitivecount() const;
@@ -201,7 +227,7 @@ namespace houio
         [[nodiscard]] virtual bool getPrimitiveGroupMembership(
             const std::string& name,
             std::vector<bool>& membership) const;
-        [[nodiscard]] virtual bool hasPrimitiveAttribute(const std::string& name) const;
+        [[nodiscard]] virtual bool hasPrimitiveAttributeLegacy(const std::string& name) const;
         virtual void getPrimitiveAttributeNames(std::vector<std::string>& names) const = 0;
         [[nodiscard]] virtual AttributeAdapter::Ptr getPrimitiveAttribute(
             const std::string& name) = 0;

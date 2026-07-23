@@ -332,7 +332,7 @@ namespace houio
 	}
 
 
-	bool HouGeo::hasPrimitiveAttribute( const std::string &name )const
+	bool HouGeo::hasPrimitiveAttributeLegacy( const std::string &name )const
 	{
 		auto it = m_primitiveAttributes.find( name );
 		if( it != m_primitiveAttributes.end() )

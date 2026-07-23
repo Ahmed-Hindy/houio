@@ -45,8 +45,8 @@ int main()
         return 1;
     }
 
-    std::cout << "points=" << readResult.value->pointcount() << '\n';
-    std::cout << "vertices=" << readResult.value->vertexcount() << '\n';
-    std::cout << "primitives=" << readResult.value->primitivecount() << '\n';
+    std::cout << "points=" << readResult.value->pointCount() << '\n';
+    std::cout << "vertices=" << readResult.value->vertexCount() << '\n';
+    std::cout << "primitives=" << readResult.value->primitiveCount() << '\n';
     return 0;
 }

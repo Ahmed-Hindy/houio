@@ -145,8 +145,8 @@ bool roundtripOnce(const houio::HouGeoAdapter::Ptr& source)
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
     houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
-    return imported && imported->pointcount() == 4 && imported->vertexcount() == 0
-           && imported->primitivecount() == 0;
+    return imported && imported->pointCount() == 4 && imported->vertexCount() == 0
+           && imported->primitiveCount() == 0;
 }
 
 int verifyAdapterDictionaryExport()
@@ -158,7 +158,7 @@ int verifyAdapterDictionaryExport()
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
     houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
-    auto attribute = imported ? imported->getGlobalAttribute("settings")
+    auto attribute = imported ? imported->globalAttribute("settings")
                               : houio::HouGeoAdapter::AttributeAdapter::Ptr();
     auto dictionary = attribute ? attribute->getDictionary(0)
                                 : std::shared_ptr<houio::json::Object>();
