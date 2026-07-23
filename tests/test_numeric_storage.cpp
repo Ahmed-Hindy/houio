@@ -1,6 +1,5 @@
 #include <houio/HouGeoIO.h>
 
-#include <cstring>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -15,28 +14,16 @@ int fail(const std::string& message)
 
 houio::uword readHalfBits(const houio::HouGeoAdapter::AttributeAdapter::Ptr& attribute, int index)
 {
-    houio::HouGeoAdapter::RawPointer::Ptr rawPointer = attribute->getRawPointer();
-    if (!rawPointer || !rawPointer->ptr)
-    {
-        throw std::runtime_error("Float16 attribute has no raw data");
-    }
-    houio::uword value = 0;
-    const auto* bytes = static_cast<const unsigned char*>(rawPointer->ptr);
-    std::memcpy(&value, bytes + static_cast<size_t>(index) * sizeof(value), sizeof(value));
-    return value;
+    if (index < 0)
+        throw std::out_of_range("Float16 attribute index cannot be negative");
+    return attribute->rawData().read<houio::uword>(static_cast<size_t>(index));
 }
 
 houio::sint64 readInt64(const houio::HouGeoAdapter::AttributeAdapter::Ptr& attribute, int index)
 {
-    houio::HouGeoAdapter::RawPointer::Ptr rawPointer = attribute->getRawPointer();
-    if (!rawPointer || !rawPointer->ptr)
-    {
-        throw std::runtime_error("Int64 attribute has no raw data");
-    }
-    houio::sint64 value = 0;
-    const auto* bytes = static_cast<const unsigned char*>(rawPointer->ptr);
-    std::memcpy(&value, bytes + static_cast<size_t>(index) * sizeof(value), sizeof(value));
-    return value;
+    if (index < 0)
+        throw std::out_of_range("Int64 attribute index cannot be negative");
+    return attribute->rawData().read<houio::sint64>(static_cast<size_t>(index));
 }
 
 int verifyHalfConversion()

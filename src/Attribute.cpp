@@ -142,30 +142,6 @@ namespace houio
         return std::span<const std::byte>(data_).subspan(offset, elementByteSize());
     }
 
-    void* Attribute::getRawPointer() noexcept
-    {
-        return data_.empty() ? nullptr : data_.data();
-    }
-
-    const void* Attribute::getRawPointer() const noexcept
-    {
-        return data_.empty() ? nullptr : data_.data();
-    }
-
-    void* Attribute::getRawPointer(int index)
-    {
-        if (index < 0)
-            throw std::out_of_range("Attribute index cannot be negative");
-        return elementBytes(static_cast<std::size_t>(index)).data();
-    }
-
-    const void* Attribute::getRawPointer(int index) const
-    {
-        if (index < 0)
-            throw std::out_of_range("Attribute index cannot be negative");
-        return elementBytes(static_cast<std::size_t>(index)).data();
-    }
-
     Attribute::Ptr Attribute::create(
         int component_count,
         ComponentType component_type,

@@ -42,19 +42,25 @@ namespace houio::detail
 
         std::uint32_t readLittleUInt32(std::span<const char> input, std::size_t offset)
         {
-            const auto *bytes = reinterpret_cast<const unsigned char*>(input.data() + offset);
-            return static_cast<std::uint32_t>(bytes[0])
-                | (static_cast<std::uint32_t>(bytes[1]) << 8U)
-                | (static_cast<std::uint32_t>(bytes[2]) << 16U)
-                | (static_cast<std::uint32_t>(bytes[3]) << 24U);
+            const auto byte = [&](std::size_t index)
+            {
+                return static_cast<std::uint32_t>(
+                    static_cast<unsigned char>(input[offset + index]));
+            };
+            return byte(0)
+                | (byte(1) << 8U)
+                | (byte(2) << 16U)
+                | (byte(3) << 24U);
         }
 
         std::uint64_t readBigUInt64(std::span<const char> input, std::size_t offset)
         {
-            const auto *bytes = reinterpret_cast<const unsigned char*>(input.data() + offset);
             std::uint64_t value = 0;
-            for( std::size_t byteIndex = 0; byteIndex < 8; ++byteIndex )
-                value = (value << 8U) | static_cast<std::uint64_t>(bytes[byteIndex]);
+            for (std::size_t byte_index = 0; byte_index < 8; ++byte_index)
+            {
+                const auto byte = static_cast<unsigned char>(input[offset + byte_index]);
+                value = (value << 8U) | static_cast<std::uint64_t>(byte);
+            }
             return value;
         }
 
@@ -80,38 +86,41 @@ namespace houio::detail
             return true;
         }
 
-        std::string environmentValue(const char *name)
+        std::string environmentValue(const char* name)
         {
 #if defined(_WIN32)
-            char *value = nullptr;
-            std::size_t valueBytes = 0;
-            if( _dupenv_s(&value, &valueBytes, name) != 0 || !value )
+            std::size_t required_bytes = 0;
+            if (getenv_s(&required_bytes, nullptr, 0, name) != 0 || required_bytes == 0)
                 return {};
-            std::string result(value);
-            std::free(value);
-            return result;
+            std::string value(required_bytes - 1, '\0');
+            if (getenv_s(&required_bytes, value.data(), value.size() + 1, name) != 0)
+                return {};
+            return value;
 #else
-            const char *value = std::getenv(name);
+            const char* value = std::getenv(name);
             return value ? std::string(value) : std::string();
 #endif
         }
 
 #if defined(_WIN32)
-        std::string windowsErrorMessage(DWORD errorCode)
+        std::string windowsErrorMessage(DWORD error_code)
         {
-            if( errorCode == ERROR_SUCCESS )
+            if (error_code == ERROR_SUCCESS)
                 return "unknown Windows loader error";
-            LPSTR messageBuffer = nullptr;
-            const DWORD messageLength = FormatMessageA(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM
-                    | FORMAT_MESSAGE_IGNORE_INSERTS,
-                nullptr, errorCode, 0, reinterpret_cast<LPSTR>(&messageBuffer), 0, nullptr);
-            std::string message = messageLength > 0 && messageBuffer
-                ? std::string(messageBuffer, messageLength)
-                : "Windows loader error " + std::to_string(errorCode);
-            if( messageBuffer )
-                LocalFree(messageBuffer);
-            while( !message.empty() && (message.back() == '\r' || message.back() == '\n') )
+
+            std::array<char, 1024> message_buffer{};
+            const DWORD message_length = FormatMessageA(
+                FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                nullptr,
+                error_code,
+                0,
+                message_buffer.data(),
+                static_cast<DWORD>(message_buffer.size()),
+                nullptr);
+            std::string message = message_length > 0
+                ? std::string(message_buffer.data(), message_length)
+                : "Windows loader error " + std::to_string(error_code);
+            while (!message.empty() && (message.back() == '\r' || message.back() == '\n'))
                 message.pop_back();
             return message;
         }

@@ -79,8 +79,6 @@ namespace houio
         [[nodiscard]] math::V3f localToVoxel(const math::V3f& local_position) const;
         [[nodiscard]] math::V3f voxelToLocal(const math::V3f& voxel_position) const;
 
-        [[nodiscard]] T* getRawPointer() noexcept;
-        [[nodiscard]] const T* getRawPointer() const noexcept;
         [[nodiscard]] std::span<T> values() noexcept;
         [[nodiscard]] std::span<const T> values() const noexcept;
 
@@ -385,18 +383,6 @@ namespace houio
     const math::M44f& Field<T>::localToWorldMatrix() const noexcept
     {
         return local_to_world_;
-    }
-
-    template<typename T>
-    T* Field<T>::getRawPointer() noexcept
-    {
-        return data_.data();
-    }
-
-    template<typename T>
-    const T* Field<T>::getRawPointer() const noexcept
-    {
-        return data_.data();
     }
 
     template<typename T>

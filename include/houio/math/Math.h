@@ -46,24 +46,24 @@ namespace houio
 ///
 namespace math
 {
-	inline float radToDeg( float rad )
+	[[nodiscard]] constexpr float radToDeg(float radians) noexcept
 	{
-		return (float) ( (rad * 180.0f) / MATH_PIf );
+		return (radians * 180.0f) / MATH_PIf;
 	}
 
-	inline float degToRad( float degree )
+	[[nodiscard]] constexpr float degToRad(float degrees) noexcept
 	{
-		return (float) (( degree *  MATH_PIf)/180.0f );
+		return (degrees * MATH_PIf) / 180.0f;
 	}
 
-	inline double radToDeg( double rad )
+	[[nodiscard]] constexpr double radToDeg(double radians) noexcept
 	{
-		return (double) ( (rad * 180.0) / MATH_PI );
+		return (radians * 180.0) / MATH_PI;
 	}
 
-	inline double degToRad( double degree )
+	[[nodiscard]] constexpr double degToRad(double degrees) noexcept
 	{
-		return (double) (( degree *  MATH_PI)/180.0 );
+		return (degrees * MATH_PI) / 180.0;
 	}
 
 	inline float sign( float f )
@@ -140,29 +140,37 @@ namespace math
 		return ((a << ALPHASHIFT) + (r << REDSHIFT) + (g << GREENSHIFT) + (b << BLUESHIFT));
 	}
 
-	inline unsigned int	getAlpha( const Color &color )
+	[[nodiscard]] inline unsigned int getAlpha(const Color& color)
 	{
-		return (unsigned int)(color.a*255.0f);
+		return static_cast<unsigned int>(color.a * 255.0f);
 	}
 
-	inline unsigned int	getRed(		const Color &color )
+	[[nodiscard]] inline unsigned int getRed(const Color& color)
 	{
-		return (unsigned int)(color.r*255.0f);
+		return static_cast<unsigned int>(color.r * 255.0f);
 	}
 
-	inline unsigned int	getGreen(	const Color &color )
+	[[nodiscard]] inline unsigned int getGreen(const Color& color)
 	{
-		return (unsigned int)(color.g*255.0f);
+		return static_cast<unsigned int>(color.g * 255.0f);
 	}
 
-	inline unsigned int	getBlue(	const Color &color )
+	[[nodiscard]] inline unsigned int getBlue(const Color& color)
 	{
-		return (unsigned int)(color.b*255.0f);
+		return static_cast<unsigned int>(color.b * 255.0f);
 	}
 
-	inline Color setRGBColor(const unsigned int &r, const unsigned int &g, const unsigned int &b, const unsigned int &a )
+	[[nodiscard]] inline Color setRGBColor(
+		unsigned int red,
+		unsigned int green,
+		unsigned int blue,
+		unsigned int alpha)
 	{
-		return Color( ((float)r)/255.0f, ((float)g)/255.0f, ((float)b)/255.0f, ((float)a)/255.0f );
+		return Color(
+			static_cast<float>(red) / 255.0f,
+			static_cast<float>(green) / 255.0f,
+			static_cast<float>(blue) / 255.0f,
+			static_cast<float>(alpha) / 255.0f);
 	}
 
 	//
@@ -254,9 +262,9 @@ namespace math
 	float mapValueTo0_1( const float &sourceRangeMin, const float &sourceRangeMax, const float &value );
 
 	template<typename T, typename R>
-	inline T lerp( T x0, T x1, R t )
+	[[nodiscard]] constexpr T lerp(T start, T end, R factor)
 	{
-		return T(x0*((R)(1.0)-t) + x1*t);
+		return T(start * (static_cast<R>(1.0) - factor) + end * factor);
 	}
 
 
@@ -315,20 +323,32 @@ namespace math
 		}
 	}
 
-	inline bool quadratic(float A, float B, float C, float *t0, float *t1)
+	[[nodiscard]] inline bool quadratic(
+		float coefficient_a,
+		float coefficient_b,
+		float coefficient_c,
+		float* first_root,
+		float* second_root)
 	{
-		// Find quadratic discriminant
-		float discrim = B * B - 4.f * A * C;
-		if (discrim <= 0.) return false;
-		float rootDiscrim = sqrtf(discrim);
+		if (first_root == nullptr || second_root == nullptr || coefficient_a == 0.0f)
+			return false;
 
-		// Compute quadratic _t_ values
-		float q;
-		if (B < 0) q = -.5f * (B - rootDiscrim);
-		else       q = -.5f * (B + rootDiscrim);
-		*t0 = q / A;
-		*t1 = C / q;
-		if (*t0 > *t1) std::swap(*t0, *t1);
+		const float discriminant = coefficient_b * coefficient_b
+			- 4.0f * coefficient_a * coefficient_c;
+		if (discriminant <= 0.0f)
+			return false;
+
+		const float root_discriminant = std::sqrt(discriminant);
+		const float q = coefficient_b < 0.0f
+			? -0.5f * (coefficient_b - root_discriminant)
+			: -0.5f * (coefficient_b + root_discriminant);
+		if (q == 0.0f)
+			return false;
+
+		*first_root = q / coefficient_a;
+		*second_root = coefficient_c / q;
+		if (*first_root > *second_root)
+			std::swap(*first_root, *second_root);
 		return true;
 	}
 

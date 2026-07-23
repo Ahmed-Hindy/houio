@@ -261,7 +261,7 @@ namespace houio
         std::istringstream input(parserStorage, std::ios::in | std::ios::binary);
         try
         {
-            result.value = HouGeoIO::import(&input, options.parserLimits, &result.diagnostics);
+            result.value = HouGeoIO::import(input, options.parserLimits, &result.diagnostics);
             result.succeeded = static_cast<bool>(result.value);
         }
         catch( const DiagnosticException &exception )
@@ -397,7 +397,7 @@ namespace houio
         try
         {
             std::ostringstream rawOutput(std::ios::out | std::ios::binary);
-            if( !HouGeoIO::exportGeometry(&rawOutput, geometry, true) )
+            if( !HouGeoIO::exportGeometry(rawOutput, geometry, true) )
             {
                 appendResultError(result.diagnostics, DiagnosticCategory::io,
                     "HouIO failed to serialize geometry");

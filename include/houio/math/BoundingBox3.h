@@ -194,10 +194,10 @@ namespace math
 			return false;
 	}
 
-	typedef BoundingBox3<float> BoundingBox3f;
-	typedef BoundingBox3<double> BoundingBox3d;
-	typedef BoundingBox3<float> Box3f;
-	typedef BoundingBox3<double> Box3d;
+	using BoundingBox3f = BoundingBox3<float>;
+	using BoundingBox3d = BoundingBox3<double>;
+	using Box3f = BoundingBox3<float>;
+	using Box3d = BoundingBox3<double>;
 
 }
 

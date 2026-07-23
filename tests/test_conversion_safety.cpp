@@ -1,5 +1,6 @@
 #include <houio/HouGeoIO.h>
 
+#include <array>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -226,6 +227,38 @@ int verifyNonNumericAttributesAreSkipped()
     return 0;
 }
 
+int verifyRawDataViewBounds()
+{
+    const houio::HouGeoAdapter::RawDataView unavailable;
+    if (unavailable.available())
+        return fail("default RawDataView unexpectedly reports available data");
+    try
+    {
+        static_cast<void>(unavailable.read<houio::sint32>(0));
+        return fail("unavailable RawDataView allowed a scalar read");
+    }
+    catch (const std::logic_error&)
+    {
+    }
+
+    const std::array<houio::sint32, 2> values = {7, 11};
+    const auto view = houio::HouGeoAdapter::RawDataView::from<houio::sint32>(values);
+    if (!view.available() || view.sizeBytes() != sizeof(values)
+        || view.read<houio::sint32>(0) != 7 || view.read<houio::sint32>(1) != 11)
+    {
+        return fail("RawDataView did not preserve bounded scalar data");
+    }
+    try
+    {
+        static_cast<void>(view.read<houio::sint32>(2));
+        return fail("RawDataView allowed an out-of-range scalar read");
+    }
+    catch (const std::out_of_range&)
+    {
+    }
+    return 0;
+}
+
 int verifyAttributeAndStringBounds()
 {
     houio::Attribute oversized(4, houio::Attribute::FLOAT);
@@ -271,6 +304,10 @@ int main()
         return result;
     }
     if (const int result = verifyNonNumericAttributesAreSkipped(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyRawDataViewBounds(); result != 0)
     {
         return result;
     }

@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <limits>
+#include <type_traits>
 
 
 
@@ -147,43 +148,41 @@ namespace houio
 				+ static_cast<size_t>(x);
 		}
 
-		void storeNumericComponent( char *data, size_t destinationIndex,
-			HouGeoAdapter::AttributeAdapter::Storage storage, const json::Value &value )
+		template<typename T>
+		void storeNumericValue(std::span<std::byte> data, size_t destination_index, const T& value)
 		{
-			if( !data )
-				throw std::invalid_argument( "Numeric attribute storage is null" );
+			static_assert(std::is_trivially_copyable_v<T>);
+			if (destination_index > std::numeric_limits<size_t>::max() / sizeof(T))
+				throw std::out_of_range("Numeric attribute destination index overflow");
+			const size_t byte_offset = destination_index * sizeof(T);
+			if (byte_offset > data.size() || sizeof(T) > data.size() - byte_offset)
+				throw std::out_of_range("Numeric attribute destination index is outside storage");
+			std::memcpy(data.data() + byte_offset, &value, sizeof(T));
+		}
+
+		void storeNumericComponent(
+			std::span<std::byte> data,
+			size_t destination_index,
+			HouGeoAdapter::AttributeAdapter::Storage storage,
+			const json::Value& value)
+		{
 			switch( storage )
 			{
 			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16:
-			{
-				const uword converted = floatToHalfBits(value.as<real32>());
-				std::memcpy(data + destinationIndex * sizeof(converted), &converted, sizeof(converted));
+				storeNumericValue(data, destination_index, floatToHalfBits(value.as<real32>()));
 				break;
-			}
 			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32:
-			{
-				const real32 converted = value.as<real32>();
-				std::memcpy(data + destinationIndex * sizeof(converted), &converted, sizeof(converted));
+				storeNumericValue(data, destination_index, value.as<real32>());
 				break;
-			}
 			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64:
-			{
-				const real64 converted = value.as<real64>();
-				std::memcpy(data + destinationIndex * sizeof(converted), &converted, sizeof(converted));
+				storeNumericValue(data, destination_index, value.as<real64>());
 				break;
-			}
 			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32:
-			{
-				const sint32 converted = value.as<sint32>();
-				std::memcpy(data + destinationIndex * sizeof(converted), &converted, sizeof(converted));
+				storeNumericValue(data, destination_index, value.as<sint32>());
 				break;
-			}
 			case HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64:
-			{
-				const sint64 converted = value.as<sint64>();
-				std::memcpy(data + destinationIndex * sizeof(converted), &converted, sizeof(converted));
+				storeNumericValue(data, destination_index, value.as<sint64>());
 				break;
-			}
 			default:
 				throw std::runtime_error( "Unsupported numeric attribute storage" );
 			}
@@ -368,7 +367,7 @@ namespace houio
 
 	HouGeo::Ptr HouGeo::create()
 	{
-		return HouGeo::Ptr( new HouGeo() );
+		return std::make_shared<HouGeo>();
 	}
 
 	void HouGeo::addPrimitive( ScalarField::Ptr field )
@@ -525,11 +524,11 @@ namespace houio
 	{
 	}
 
-	HouGeoAdapter::RawPointer::Ptr HouGeo::HouAttribute::getRawPointer()
+	HouGeoAdapter::RawDataView HouGeo::HouAttribute::rawData() const
 	{
-		if( m_attr )
-			return HouGeoAdapter::RawPointer::create( m_attr->getRawPointer() );
-		return HouGeoAdapter::RawPointer::create( nullptr );
+		if (!m_attr)
+			return {};
+		return HouGeoAdapter::RawDataView(m_attr->bytes());
 	}
 
 	int HouGeo::HouAttribute::getNumElements()const
@@ -852,7 +851,7 @@ namespace houio
 			int attrNumComponents = attrData->get<int>("size");
 			attr->m_attr = std::make_shared<Attribute>( attrNumComponents, attrComponentType );
 			attr->m_attr->resize(elementCount);
-			char *data = (char*)attr->m_attr->getRawPointer();
+			std::span<std::byte> data = attr->m_attr->bytes();
 
 			const int attrComponentSize = AttributeAdapter::storageSize(attrStorage);
 			if( attrStorage == AttributeAdapter::ATTR_STORAGE_INVALID || attrComponentSize <= 0 )
@@ -1324,28 +1323,32 @@ namespace houio
 				if( pointIndex < 0 || static_cast<sint64>(pointIndex) >= positionAttribute->getNumElements() )
 					throw std::runtime_error( "HouGeo::loadVolumePrimitive point index is outside P" );
 
-				HouGeoAdapter::RawPointer::Ptr rawPosition = positionAttribute->getRawPointer();
-				if( !rawPosition || !rawPosition->ptr )
-					throw std::runtime_error( "HouGeo::loadVolumePrimitive P has no data" );
+				const HouGeoAdapter::RawDataView position_data = positionAttribute->rawData();
+				if (!position_data.available())
+					throw std::runtime_error("HouGeo::loadVolumePrimitive P has no data");
 
-				const size_t tupleOffset = static_cast<size_t>(pointIndex)
+				const size_t tuple_offset = static_cast<size_t>(pointIndex)
 					* static_cast<size_t>(positionAttribute->getTupleSize());
 				if( positionAttribute->m_storage == AttributeAdapter::ATTR_STORAGE_FPREAL16 )
 				{
-					const uword *values = static_cast<const uword*>(rawPosition->ptr) + tupleOffset;
-					position = math::V3f(halfBitsToFloat(values[0]), halfBitsToFloat(values[1]),
-						halfBitsToFloat(values[2]));
+					position = math::V3f(
+						halfBitsToFloat(position_data.read<uword>(tuple_offset)),
+						halfBitsToFloat(position_data.read<uword>(tuple_offset + 1)),
+						halfBitsToFloat(position_data.read<uword>(tuple_offset + 2)));
 				}
 				else if( positionAttribute->m_storage == AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 				{
-					const real32 *values = static_cast<const real32*>(rawPosition->ptr) + tupleOffset;
-					position = math::V3f(values[0], values[1], values[2]);
+					position = math::V3f(
+						position_data.read<real32>(tuple_offset),
+						position_data.read<real32>(tuple_offset + 1),
+						position_data.read<real32>(tuple_offset + 2));
 				}
 				else if( positionAttribute->m_storage == AttributeAdapter::ATTR_STORAGE_FPREAL64 )
 				{
-					const real64 *values = static_cast<const real64*>(rawPosition->ptr) + tupleOffset;
-					position = math::V3f(static_cast<real32>(values[0]), static_cast<real32>(values[1]),
-						static_cast<real32>(values[2]));
+					position = math::V3f(
+						static_cast<real32>(position_data.read<real64>(tuple_offset)),
+						static_cast<real32>(position_data.read<real64>(tuple_offset + 1)),
+						static_cast<real32>(position_data.read<real64>(tuple_offset + 2)));
 				}
 				else
 				{
@@ -1375,7 +1378,7 @@ namespace houio
 				if( sharedData == sharedPrimitiveData.sharedVoxelData.end() )
 					throw std::runtime_error( "HouGeo::loadVolumePrimitive shared voxel data was not found" );
 				loadVoxelData(sharedData->second, volumePrimitive->field->getResolution(),
-					volumePrimitive->field->getRawPointer());
+					volumePrimitive->field->values());
 			});
 		}
 		else
@@ -1383,7 +1386,7 @@ namespace houio
 			withSchemaPath("voxels", [&]()
 			{
 				loadVoxelData(toObject(volume->getArray("voxels")), volumePrimitive->field->getResolution(),
-					volumePrimitive->field->getRawPointer());
+					volumePrimitive->field->values());
 			});
 		}
 
@@ -1405,13 +1408,16 @@ namespace houio
 		m_primitives.push_back(volumePrimitive);
 	}
 
-	void HouGeo::loadVoxelData( json::ObjectPtr voxelObject, const math::V3i& resolution, float* voxelData )
+	void HouGeo::loadVoxelData(
+		json::ObjectPtr voxelObject,
+		const math::V3i& resolution,
+		std::span<float> voxelData)
 	{
 		if( !voxelObject )
 			throw std::invalid_argument( "HouGeo::loadVoxelData received null voxel data" );
 		const size_t voxelCount = volumeVoxelCount(resolution);
-		if( !voxelData )
-			throw std::invalid_argument( "HouGeo::loadVoxelData received null volume storage" );
+		if (voxelData.size() != voxelCount)
+			throw std::invalid_argument("HouGeo::loadVoxelData volume storage size mismatch");
 
 		const bool hasTiledArray = voxelObject->hasKey("tiledarray");
 		const bool hasConstantArray = voxelObject->hasKey("constantarray");
@@ -1421,7 +1427,7 @@ namespace houio
 		if( hasConstantArray )
 		{
 			const float constantValue = voxelObject->get<float>("constantarray");
-			std::fill(voxelData, voxelData + voxelCount, constantValue);
+			std::fill(voxelData.begin(), voxelData.end(), constantValue);
 			return;
 		}
 
@@ -1549,10 +1555,11 @@ namespace houio
 		return field->localToWorldMatrix();
 	}
 
-	// returns raw pointer to the data
-	HouGeoAdapter::RawPointer::Ptr HouGeo::HouVolume::getRawPointer()
+	HouGeoAdapter::RawDataView HouGeo::HouVolume::rawData() const
 	{
-		return HouGeoAdapter::RawPointer::create(field->getRawPointer());
+		if (!field)
+			return {};
+		return HouGeoAdapter::RawDataView::from<real32>(field->values());
 	}
 
 
@@ -1686,12 +1693,14 @@ namespace houio
 		if( hasRunLengthData )
 		{
 			for( sint64 i=0;i<vertexCountData->size();i+=2 )
-				appendPolygons(vertexCountData->get<int>((int)i), vertexCountData->get<int>((int)i+1));
+				appendPolygons(
+					vertexCountData->get<int>(static_cast<int>(i)),
+					vertexCountData->get<int>(static_cast<int>(i + 1)));
 		}
 		else
 		{
 			for( sint64 i=0;i<vertexCountData->size();++i )
-				appendPolygons(vertexCountData->get<int>((int)i), 1);
+				appendPolygons(vertexCountData->get<int>(static_cast<int>(i)), 1);
 		}
 
 		if( primitiveCount != expectedPrimitiveCount )

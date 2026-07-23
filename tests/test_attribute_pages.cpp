@@ -40,13 +40,14 @@ std::vector<houio::sint32> attributeValues(const houio::HouGeo::Ptr& geometry)
     {
         throw std::runtime_error("Paged attribute metadata was not preserved");
     }
-    houio::HouGeoAdapter::RawPointer::Ptr rawPointer = attribute->getRawPointer();
-    if (!rawPointer || !rawPointer->ptr)
-    {
-        throw std::runtime_error("Paged attribute has no data");
-    }
+    const houio::HouGeoAdapter::RawDataView raw_data = attribute->rawData();
     std::vector<houio::sint32> values(15);
-    std::memcpy(values.data(), rawPointer->ptr, values.size() * sizeof(values.front()));
+    const std::size_t expected_bytes = values.size() * sizeof(values.front());
+    if (!raw_data.available() || raw_data.sizeBytes() != expected_bytes)
+    {
+        throw std::runtime_error("Paged attribute has inconsistent data");
+    }
+    std::memcpy(values.data(), raw_data.bytes().data(), expected_bytes);
     return values;
 }
 

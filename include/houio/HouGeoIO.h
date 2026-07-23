@@ -10,15 +10,32 @@ namespace houio
 
 	struct HouGeoIO
 	{
-		static HouGeo::Ptr                      import( std::istream *in );
-		static HouGeo::Ptr                      import( std::istream *in, DiagnosticList *diagnostics );
-		static HouGeo::Ptr                      import( std::istream *in, const json::ParserLimits &limits );
-		static HouGeo::Ptr                      import( std::istream *in, const json::ParserLimits &limits, DiagnosticList *diagnostics );
+		[[nodiscard]] static HouGeo::Ptr import(std::istream& input);
+		[[nodiscard]] static HouGeo::Ptr import(std::istream& input, DiagnosticList* diagnostics);
+		[[nodiscard]] static HouGeo::Ptr import(
+			std::istream& input,
+			const json::ParserLimits& limits);
+		[[nodiscard]] static HouGeo::Ptr import(
+			std::istream& input,
+			const json::ParserLimits& limits,
+			DiagnosticList* diagnostics);
+
+		// Checked compatibility overloads for existing pointer-based callers.
+		[[nodiscard]] static HouGeo::Ptr import(std::istream* input);
+		[[nodiscard]] static HouGeo::Ptr import(std::istream* input, DiagnosticList* diagnostics);
+		[[nodiscard]] static HouGeo::Ptr import(
+			std::istream* input,
+			const json::ParserLimits& limits);
+		[[nodiscard]] static HouGeo::Ptr import(
+			std::istream* input,
+			const json::ParserLimits& limits,
+			DiagnosticList* diagnostics);
 		static Geometry::Ptr                    importGeometry( const std::string &path );
 		static Geometry::Ptr                    importGeometry( const std::string &path, DiagnosticList *diagnostics );
 		static ScalarField::Ptr                 importVolume(const std::string &path);
 		static ScalarField::Ptr                 importVolume(const std::string &path, DiagnosticList *diagnostics);
-		static void                             makeLog( const std::string &path, std::ostream *output );
+		static void makeLog(const std::string& path, std::ostream& output);
+		static void makeLog(const std::string& path, std::ostream* output);
 
 		// Lossy convenience conversion. Requires P, one fixed polygon size, and domain-consistent attributes.
 		// Vertex attributes are flattened to points by duplicating points where values differ.
@@ -27,14 +44,28 @@ namespace houio
 
 		static bool                             exportVolume( const std::string &filename, ScalarField::Ptr volume );
 		static bool                             exportGeometry( const std::string &filename, Geometry::Ptr geometry );
-		static bool                             exportGeometry( std::ostream *output, HouGeoAdapter::Ptr geometry, bool binary = true );
+		[[nodiscard]] static bool exportGeometry(
+			std::ostream& output,
+			HouGeoAdapter::Ptr geometry,
+			bool binary = true);
+		[[nodiscard]] static bool exportGeometry(
+			std::ostream* output,
+			HouGeoAdapter::Ptr geometry,
+			bool binary = true);
 
 		// Compatibility wrappers. New code should use exportVolume() or exportGeometry().
 		static bool                             xport( const std::string& filename, ScalarField::Ptr volume );
 		static bool                             xport( const std::string& filename, Geometry::Ptr geometry );
 		static bool                             xport( const std::string& filename, const std::vector<math::V3f>& points );
 		static bool                             xport( const std::string& filename, const std::map<std::string, std::vector<math::V3f>>& pointAttributes );
-		static bool                             xport( std::ostream *output, HouGeoAdapter::Ptr geometry, bool binary = true );
+		[[nodiscard]] static bool xport(
+			std::ostream& output,
+			HouGeoAdapter::Ptr geometry,
+			bool binary = true);
+		[[nodiscard]] static bool xport(
+			std::ostream* output,
+			HouGeoAdapter::Ptr geometry,
+			bool binary = true);
 
 	private:
 		friend class GeometryIO;

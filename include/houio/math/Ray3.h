@@ -200,8 +200,8 @@ namespace math
 	//bool RayHitTriangle( const Vector &vPoint1, const Vector &vPoint2, const Vector &vPoint3, CRay &oRay );
 	//bool RayHitTriangleValues( const Vector &vPoint1, const Vector &vPoint2, const Vector &vPoint3, CRay &oRay, float &fHit, Vector *pHitPoint, float *pU, float *pV );
 
-	typedef Ray3<float> Ray3f;
-	typedef Ray3<double> Ray3d;
+	using Ray3f = Ray3<float>;
+	using Ray3d = Ray3<double>;
 }
 
 } // namespace houio

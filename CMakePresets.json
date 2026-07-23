@@ -29,6 +29,18 @@
       }
     },
     {
+      "name": "windows-msvc-werror",
+      "displayName": "Windows MSVC Warnings as Errors",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-msvc-werror",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HOUIO_BUILD_TESTS": "ON",
+        "HOUIO_BUILD_EXAMPLES": "ON",
+        "HOUIO_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
       "name": "windows-msvc-asan",
       "displayName": "Windows MSVC AddressSanitizer",
       "generator": "Ninja",
@@ -88,6 +100,10 @@
       "configurePreset": "windows-msvc-release"
     },
     {
+      "name": "windows-msvc-werror",
+      "configurePreset": "windows-msvc-werror"
+    },
+    {
       "name": "windows-msvc-asan",
       "configurePreset": "windows-msvc-asan"
     },
@@ -118,6 +134,13 @@
     {
       "name": "windows-msvc-release",
       "configurePreset": "windows-msvc-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-msvc-werror",
+      "configurePreset": "windows-msvc-werror",
       "output": {
         "outputOnFailure": true
       }

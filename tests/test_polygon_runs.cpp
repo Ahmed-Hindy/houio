@@ -213,13 +213,12 @@ int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
     {
         return fail("global integer attribute metadata was not preserved");
     }
-    const houio::HouGeoAdapter::RawPointer::Ptr versionPointer = version->getRawPointer();
-    if (!versionPointer || !versionPointer->ptr)
+    const houio::HouGeoAdapter::RawDataView version_data = version->rawData();
+    if (!version_data.available())
     {
         return fail("global integer attribute data is unavailable");
     }
-    const auto* versionData = static_cast<const houio::sint32*>(versionPointer->ptr);
-    if (versionData[0] != 22)
+    if (version_data.read<houio::sint32>(0) != 22)
     {
         return fail("global integer attribute value was not preserved");
     }

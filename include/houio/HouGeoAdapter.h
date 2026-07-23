@@ -1,7 +1,13 @@
 #pragma once
 
+#include <cstddef>
+#include <cstring>
+#include <limits>
 #include <memory>
+#include <span>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <houio/math/Math.h>
@@ -20,20 +26,47 @@ namespace houio
         using Ptr = std::shared_ptr<HouGeoAdapter>;
         using ConstPtr = std::shared_ptr<const HouGeoAdapter>;
 
-        class RawPointer final
+        class RawDataView final
         {
         public:
-            using Ptr = std::shared_ptr<RawPointer>;
+            RawDataView() = default;
 
-            explicit RawPointer(const void* data) noexcept : ptr(data), data_(data) {}
-            [[nodiscard]] static Ptr create(const void* data);
-            [[nodiscard]] const void* get() const noexcept { return data_; }
+            explicit RawDataView(std::span<const std::byte> bytes) noexcept
+                : bytes_(bytes), available_(true)
+            {
+            }
 
-            // Compatibility field for existing synchronous exporters.
-            const void* ptr = nullptr;
+            template<typename T>
+            [[nodiscard]] static RawDataView from(std::span<const T> values) noexcept
+            {
+                static_assert(std::is_trivially_copyable_v<T>);
+                return RawDataView(std::as_bytes(values));
+            }
+
+            [[nodiscard]] bool available() const noexcept { return available_; }
+            [[nodiscard]] bool empty() const noexcept { return bytes_.empty(); }
+            [[nodiscard]] std::size_t sizeBytes() const noexcept { return bytes_.size(); }
+            [[nodiscard]] std::span<const std::byte> bytes() const noexcept { return bytes_; }
+
+            template<typename T>
+            [[nodiscard]] T read(std::size_t scalar_index) const
+            {
+                static_assert(std::is_trivially_copyable_v<T>);
+                if (!available_)
+                    throw std::logic_error("RawDataView is unavailable");
+                if (scalar_index > std::numeric_limits<std::size_t>::max() / sizeof(T))
+                    throw std::out_of_range("RawDataView scalar index overflow");
+                const std::size_t byte_offset = scalar_index * sizeof(T);
+                if (byte_offset > bytes_.size() || sizeof(T) > bytes_.size() - byte_offset)
+                    throw std::out_of_range("RawDataView scalar index is outside the byte range");
+                T value{};
+                std::memcpy(&value, bytes_.data() + byte_offset, sizeof(T));
+                return value;
+            }
 
         private:
-            const void* data_ = nullptr;
+            std::span<const std::byte> bytes_;
+            bool available_ = false;
         };
 
         class AttributeAdapter
@@ -78,7 +111,7 @@ namespace houio
             [[nodiscard]] virtual Storage getStorage() const;
             virtual void getPacking(std::vector<int>& packing) const;
             [[nodiscard]] virtual int getNumElements() const;
-            [[nodiscard]] virtual RawPointer::Ptr getRawPointer();
+            [[nodiscard]] virtual RawDataView rawData() const;
             [[nodiscard]] virtual std::string getString(int index) const = 0;
             [[nodiscard]] virtual std::shared_ptr<json::Object> getDictionary(int index) const;
 
@@ -130,7 +163,7 @@ namespace houio
             [[nodiscard]] virtual std::string getVisualizationMode() const;
             [[nodiscard]] virtual real32 getVisualizationIso() const;
             [[nodiscard]] virtual real32 getVisualizationDensity() const;
-            [[nodiscard]] virtual RawPointer::Ptr getRawPointer();
+            [[nodiscard]] virtual RawDataView rawData() const;
         };
 
         class PolyPrimitive : public Primitive

@@ -37,7 +37,7 @@ namespace houio
             [[nodiscard]] int getNumElements() const override;
             [[nodiscard]] std::string getString(int index) const override;
             [[nodiscard]] std::shared_ptr<json::Object> getDictionary(int index) const override;
-            [[nodiscard]] RawPointer::Ptr getRawPointer() override;
+            [[nodiscard]] RawDataView rawData() const override;
 
             int addString(const std::string& value);
 
@@ -182,7 +182,7 @@ namespace houio
             [[nodiscard]] math::M44f getTransform() const override;
             [[nodiscard]] int getVertex() const override;
             [[nodiscard]] math::Vec3i getResolution() const override;
-            [[nodiscard]] RawPointer::Ptr getRawPointer() override;
+            [[nodiscard]] RawDataView rawData() const override;
             [[nodiscard]] real32 getVoxel(int x, int y, int z) const override;
             [[nodiscard]] std::string getVisualizationMode() const override;
             [[nodiscard]] real32 getVisualizationIso() const override;
@@ -353,7 +353,7 @@ namespace houio
         void loadVoxelData(
             json::ObjectPtr voxel_object,
             const math::V3i& resolution,
-            float* voxel_data);
+            std::span<float> voxel_data);
 
         std::vector<Primitive::Ptr> m_primitives;
         std::map<std::string, HouAttribute::Ptr> m_pointAttributes;

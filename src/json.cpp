@@ -78,7 +78,7 @@ namespace houio
 		{
 		}
 
-		void Token::event( Parser *p, int key )
+		void Token::event(Parser* p, bool key)
 		{
 			if (type == JID_ARRAY_BEGIN)
 				p->handler->jsonBeginArray();
@@ -120,16 +120,16 @@ namespace houio
 				sint64 numElements = std::get<sint64>(value);
 				switch( uaType )
 				{
-				case Token::JID_BOOL:p->handler->uaBool( numElements, p );break;
-				case Token::JID_INT8:p->handler->uaInt8( numElements, p );break;
-				case Token::JID_INT16:p->handler->uaInt16( numElements, p );break;
-				case Token::JID_INT32:p->handler->uaInt32( numElements, p );break;
-				case Token::JID_INT64:p->handler->uaInt64( numElements, p );break;
-				case Token::JID_REAL16:p->handler->uaReal16( numElements, p );break;
-				case Token::JID_REAL32:p->handler->uaReal32( numElements, p );break;
-				case Token::JID_REAL64:p->handler->uaReal64( numElements, p );break;
-				case Token::JID_UINT8:p->handler->uaUInt8( numElements, p );break;
-				case Token::JID_STRING:p->handler->uaString( numElements, p );break;
+				case Token::JID_BOOL:p->handler->uaBool(numElements, *p);break;
+				case Token::JID_INT8:p->handler->uaInt8(numElements, *p);break;
+				case Token::JID_INT16:p->handler->uaInt16(numElements, *p);break;
+				case Token::JID_INT32:p->handler->uaInt32(numElements, *p);break;
+				case Token::JID_INT64:p->handler->uaInt64(numElements, *p);break;
+				case Token::JID_REAL16:p->handler->uaReal16(numElements, *p);break;
+				case Token::JID_REAL32:p->handler->uaReal32(numElements, *p);break;
+				case Token::JID_REAL64:p->handler->uaReal64(numElements, *p);break;
+				case Token::JID_UINT8:p->handler->uaUInt8(numElements, *p);break;
+				case Token::JID_STRING:p->handler->uaString(numElements, *p);break;
 				case Token::JID_NULL:
 				case Token::JID_MAP_BEGIN:
 				case Token::JID_MAP_END:
@@ -182,12 +182,25 @@ namespace houio
 				throw std::invalid_argument( "Parser nesting depth must be greater than zero" );
 		}
 
-		bool Parser::parse( std::istream *in, Handler *h )
+		bool Parser::parse(std::istream& input, Handler& event_handler)
+		{
+			return parse(&input, &event_handler, nullptr);
+		}
+
+		bool Parser::parse(
+			std::istream& input,
+			Handler& event_handler,
+			DiagnosticList& output_diagnostics)
+		{
+			return parse(&input, &event_handler, &output_diagnostics);
+		}
+
+		bool Parser::parse(std::istream* in, Handler* h)
 		{
 			return parse(in, h, nullptr);
 		}
 
-		bool Parser::parse( std::istream *in, Handler *h, DiagnosticList *outputDiagnostics )
+		bool Parser::parse(std::istream* in, Handler* h, DiagnosticList* outputDiagnostics)
 		{
 			if( !in || !h || !in->good() )
 			{
@@ -737,10 +750,12 @@ namespace houio
 			if( stateStack.empty() )
 				fail(DiagnosticCategory::malformed_input, "Parser state stack underflow", tokenOffset);
 
-			int n = (int)stateStack.size();
+			if (stateStack.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
+				fail(DiagnosticCategory::malformed_input, "Parser state depth exceeds int range", tokenOffset);
+			const int previous_depth = static_cast<int>(stateStack.size());
 			stateStack.pop();
 
-			if( n == 1 )
+			if (previous_depth == 1)
 				state = STATE_COMPLETE;
 			else
 				state = stateStack.top();
@@ -909,17 +924,23 @@ namespace houio
 		// Writer ==================================================
 
 
-		BinaryWriter::BinaryWriter( std::ostream *out )
+		BinaryWriter::BinaryWriter(std::ostream& output)
+			: stream(&output)
 		{
-			if( !out )
-				throw std::invalid_argument( "BinaryWriter requires a valid output stream" );
-			stream = out;
 			jsonMagic();
 		}
 
-		bool BinaryWriter::writeId( Token::Type id )
+		BinaryWriter::BinaryWriter(std::ostream* output)
 		{
-			return write<ubyte>( (ubyte)id );
+			if (!output)
+				throw std::invalid_argument("BinaryWriter requires a valid output stream");
+			stream = output;
+			jsonMagic();
+		}
+
+		bool BinaryWriter::writeId(Token::Type id)
+		{
+			return write<ubyte>(static_cast<ubyte>(id));
 		}
 
 		bool BinaryWriter::writeLength( const sint64 &length )
@@ -980,43 +1001,49 @@ namespace houio
 			jsonString(key);
 		}
 
-		void BinaryWriter::jsonInt( const sint64 &value )
+		void BinaryWriter::jsonInt(const sint64& value)
 		{
-			if( (value >= -0x80) && (value < 0x80) )
+			if (value >= std::numeric_limits<sbyte>::min()
+				&& value <= std::numeric_limits<sbyte>::max())
 			{
-				writeId( Token::JID_INT8 );
-				write<sbyte>( (sbyte)value );
-			}else if( (value >= -0x8000) && (value < 0x8000) )
+				writeId(Token::JID_INT8);
+				write<sbyte>(static_cast<sbyte>(value));
+			}
+			else if (value >= std::numeric_limits<sword>::min()
+				&& value <= std::numeric_limits<sword>::max())
 			{
-				writeId( Token::JID_INT16 );
-				write<sword>( (sword)value );
-			}else if( (value >= -(sint64)0x80000000) && (value < (sint64)0x80000000) )
+				writeId(Token::JID_INT16);
+				write<sword>(static_cast<sword>(value));
+			}
+			else if (value >= std::numeric_limits<sint32>::min()
+				&& value <= std::numeric_limits<sint32>::max())
 			{
-				writeId( Token::JID_INT32 );
-				write<sint32>( (sint32)value );
-			}else
+				writeId(Token::JID_INT32);
+				write<sint32>(static_cast<sint32>(value));
+			}
+			else
 			{
-				writeId( Token::JID_INT64 );
-				write<sint64>( value );
+				writeId(Token::JID_INT64);
+				write<sint64>(value);
 			}
 		}
 
-		void BinaryWriter::jsonUInt8( const ubyte &value )
+		void BinaryWriter::jsonUInt8(const ubyte& value)
 		{
-			writeId( Token::JID_UINT8 );
-			write<sbyte>( (ubyte)value );
+			writeId(Token::JID_UINT8);
+			write<ubyte>(value);
 		}
 
-		void BinaryWriter::jsonInt8( const sbyte &value )
+		void BinaryWriter::jsonInt8(const sbyte& value)
 		{
-			writeId( Token::JID_INT8 );
-			write<sbyte>( (sbyte)value );
+			writeId(Token::JID_INT8);
+			write<sbyte>(value);
 		}
 
-		void BinaryWriter::jsonInt32( const sint32 &value )
+		void BinaryWriter::jsonInt32(const sint32& value)
 		{
-			writeId( Token::JID_INT32 );
-			write<sint32>( (sint32)value );
+			writeId(Token::JID_INT32);
+			write<sint32>(value);
 		}
 
 		void BinaryWriter::jsonInt64( const sint64 &value )
@@ -1061,12 +1088,16 @@ namespace houio
 
 		// ASCIIWriter =============================================
 
-		ASCIIWriter::ASCIIWriter( std::ostream *out )
+		ASCIIWriter::ASCIIWriter(std::ostream& output)
+			: stream(&output)
 		{
-			stream = out;
-			gotKey = false;
-			firstItem = false;
-			indentLevel = 0;
+		}
+
+		ASCIIWriter::ASCIIWriter(std::ostream* output)
+		{
+			if (!output)
+				throw std::invalid_argument("ASCIIWriter requires a valid output stream");
+			stream = output;
 		}
 
 		void ASCIIWriter::write( const std::string &text )
@@ -1631,17 +1662,15 @@ namespace houio
 			jsonValue<real64>(value);
 		}
 
-		void JSONReader::uaBool(sint64 element_count, Parser* parser)
+		void JSONReader::uaBool(sint64 element_count, Parser& parser)
 		{
-			if (!parser)
-				throw std::invalid_argument("JSONReader::uaBool received a null parser");
 			if (element_count < 0)
 				throw std::length_error("JSONReader::uaBool received a negative element count");
 			jsonBeginArray();
 			sint64 elements_remaining = element_count;
 			while (elements_remaining > 0)
 			{
-				const uint32 bits = parser->read<uint32>();
+				const uint32 bits = parser.read<uint32>();
 				const int bit_count = static_cast<int>(std::min<sint64>(elements_remaining, 32));
 				elements_remaining -= bit_count;
 				for (int bit_index = 0; bit_index < bit_count; ++bit_index)
@@ -1650,62 +1679,58 @@ namespace houio
 			jsonEndArray();
 		}
 
-		void JSONReader::uaReal16(sint64 element_count, Parser* parser)
+		void JSONReader::uaReal16(sint64 element_count, Parser& parser)
 		{
-			if (!parser)
-				throw std::invalid_argument("JSONReader::uaReal16 received a null parser");
 			if (element_count < 0)
 				throw std::length_error("JSONReader::uaReal16 received a negative element count");
 			jsonBeginArray();
 			for (sint64 element_index = 0; element_index < element_count; ++element_index)
-				jsonReal32(halfBitsToFloat(parser->read<uword>()));
+				jsonReal32(halfBitsToFloat(parser.read<uword>()));
 			jsonEndArray();
 		}
 
-		void JSONReader::uaReal32(sint64 element_count, Parser* parser)
+		void JSONReader::uaReal32(sint64 element_count, Parser& parser)
 		{
 			jsonUniformArray<real32, real32>(element_count, parser);
 		}
 
-		void JSONReader::uaReal64(sint64 element_count, Parser* parser)
+		void JSONReader::uaReal64(sint64 element_count, Parser& parser)
 		{
 			jsonUniformArray<real64, real64>(element_count, parser);
 		}
 
-		void JSONReader::uaInt8(sint64 element_count, Parser* parser)
+		void JSONReader::uaInt8(sint64 element_count, Parser& parser)
 		{
 			jsonUniformArray<sint32, sbyte>(element_count, parser);
 		}
 
-		void JSONReader::uaInt16(sint64 element_count, Parser* parser)
+		void JSONReader::uaInt16(sint64 element_count, Parser& parser)
 		{
 			jsonUniformArray<sint32, sword>(element_count, parser);
 		}
 
-		void JSONReader::uaInt32(sint64 element_count, Parser* parser)
+		void JSONReader::uaInt32(sint64 element_count, Parser& parser)
 		{
 			jsonUniformArray<sint32, sint32>(element_count, parser);
 		}
 
-		void JSONReader::uaInt64(sint64 element_count, Parser* parser)
+		void JSONReader::uaInt64(sint64 element_count, Parser& parser)
 		{
 			jsonUniformArray<sint64, sint64>(element_count, parser);
 		}
 
-		void JSONReader::uaUInt8(sint64 element_count, Parser* parser)
+		void JSONReader::uaUInt8(sint64 element_count, Parser& parser)
 		{
 			jsonUniformArray<ubyte, ubyte>(element_count, parser);
 		}
 
-		void JSONReader::uaString(sint64 element_count, Parser* parser)
+		void JSONReader::uaString(sint64 element_count, Parser& parser)
 		{
-			if (!parser)
-				throw std::invalid_argument("JSONReader::uaString received a null parser");
 			if (element_count < 0)
 				throw std::length_error("JSONReader::uaString received a negative element count");
 			jsonBeginArray();
 			for (sint64 element_index = 0; element_index < element_count; ++element_index)
-				jsonString(parser->readBinaryString());
+				jsonString(parser.readBinaryString());
 			jsonEndArray();
 		}
 

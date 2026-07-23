@@ -43,8 +43,8 @@ int verifyBoundsChecks()
     {
         try
         {
-            static_cast<void>(attribute->getRawPointer(invalidIndex));
-            return fail("getRawPointer accepted an invalid index");
+            static_cast<void>(attribute->elementBytes(static_cast<std::size_t>(invalidIndex)));
+            return fail("elementBytes accepted an invalid index");
         }
         catch (const std::out_of_range&)
         {

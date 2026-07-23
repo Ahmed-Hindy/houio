@@ -36,11 +36,12 @@ bool exerciseInput(std::span<const std::uint8_t> bytes)
         houio::json::JSONReader reader;
         houio::json::Parser parser(limits);
         houio::DiagnosticList parserDiagnostics;
-        parser.parse(&parserInput, &reader, &parserDiagnostics);
+        static_cast<void>(parser.parse(parserInput, reader, parserDiagnostics));
 
         std::istringstream geometryInput(inputData, std::ios::in | std::ios::binary);
         houio::DiagnosticList geometryDiagnostics;
-        houio::HouGeoIO::import(&geometryInput, limits, &geometryDiagnostics);
+        static_cast<void>(houio::HouGeoIO::import(
+            geometryInput, limits, &geometryDiagnostics));
     }
     catch (const std::exception& error)
     {

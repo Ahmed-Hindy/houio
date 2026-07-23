@@ -34,27 +34,29 @@ namespace houio
 		// Scalar handlers preserve 32-bit and 64-bit integer and floating-point widths.
 		struct Handler
 		{
-			virtual void                               jsonBeginArray() = 0;
-			virtual void                                 jsonEndArray() = 0;
-			virtual void                                 jsonBeginMap() = 0;
-			virtual void                                   jsonEndMap() = 0;
-			virtual void         jsonString( const std::string &value ) = 0;
-			virtual void              jsonKey( const std::string &key ) = 0;
-			virtual void                  jsonBool( const bool &value ) = 0;
-			virtual void               jsonInt32( const sint32 &value ) = 0;
-			virtual void               jsonInt64( const sint64 &value ) = 0;
-			virtual void              jsonReal32( const real32 &value ) = 0;
-			virtual void              jsonReal64( const real64 &value ) = 0;
-			virtual void   uaBool( sint64 numElements, Parser *parser ) = 0;
-			virtual void uaReal16( sint64 numElements, Parser *parser ) = 0;
-			virtual void uaReal32( sint64 numElements, Parser *parser ) = 0;
-			virtual void uaReal64( sint64 numElements, Parser *parser ) = 0;
-			virtual void   uaInt8( sint64 numElements, Parser *parser ) = 0;
-			virtual void  uaInt16( sint64 numElements, Parser *parser ) = 0;
-			virtual void  uaInt32( sint64 numElements, Parser *parser ) = 0;
-			virtual void  uaInt64( sint64 numElements, Parser *parser ) = 0;
-			virtual void  uaUInt8( sint64 numElements, Parser *parser ) = 0;
-			virtual void uaString( sint64 numElements, Parser *parser ) = 0;
+			virtual ~Handler() = default;
+
+			virtual void jsonBeginArray() = 0;
+			virtual void jsonEndArray() = 0;
+			virtual void jsonBeginMap() = 0;
+			virtual void jsonEndMap() = 0;
+			virtual void jsonString(const std::string& value) = 0;
+			virtual void jsonKey(const std::string& key) = 0;
+			virtual void jsonBool(const bool& value) = 0;
+			virtual void jsonInt32(const sint32& value) = 0;
+			virtual void jsonInt64(const sint64& value) = 0;
+			virtual void jsonReal32(const real32& value) = 0;
+			virtual void jsonReal64(const real64& value) = 0;
+			virtual void uaBool(sint64 element_count, Parser& parser) = 0;
+			virtual void uaReal16(sint64 element_count, Parser& parser) = 0;
+			virtual void uaReal32(sint64 element_count, Parser& parser) = 0;
+			virtual void uaReal64(sint64 element_count, Parser& parser) = 0;
+			virtual void uaInt8(sint64 element_count, Parser& parser) = 0;
+			virtual void uaInt16(sint64 element_count, Parser& parser) = 0;
+			virtual void uaInt32(sint64 element_count, Parser& parser) = 0;
+			virtual void uaInt64(sint64 element_count, Parser& parser) = 0;
+			virtual void uaUInt8(sint64 element_count, Parser& parser) = 0;
+			virtual void uaString(sint64 element_count, Parser& parser) = 0;
 		};
 
 
@@ -102,8 +104,10 @@ namespace houio
 				uword,
 				std::string>;
 			Token();
-			void event( Parser *p, int key = false );
+			void event(Parser* parser, bool key = false);
 
+		private:
+			friend struct Parser;
 
 			Type                                type; // also encodes value type
 			Value                              value;
@@ -129,6 +133,35 @@ namespace houio
 
 		template<typename T, typename Variant>
 		inline constexpr size_t variantIndex = VariantIndex<T, Variant>::value;
+
+		template<typename>
+		inline constexpr bool alwaysFalse = false;
+
+		template<typename T>
+		[[nodiscard]] constexpr Token::Type uniformArrayToken()
+		{
+			using ValueType = std::remove_cv_t<T>;
+			if constexpr (std::is_same_v<ValueType, real32>)
+				return Token::JID_REAL32;
+			else if constexpr (std::is_same_v<ValueType, real64>)
+				return Token::JID_REAL64;
+			else if constexpr (std::is_same_v<ValueType, bool>)
+				return Token::JID_BOOL;
+			else if constexpr (std::is_same_v<ValueType, sbyte>)
+				return Token::JID_INT8;
+			else if constexpr (std::is_same_v<ValueType, sword>)
+				return Token::JID_INT16;
+			else if constexpr (std::is_same_v<ValueType, sint32>)
+				return Token::JID_INT32;
+			else if constexpr (std::is_same_v<ValueType, sint64>)
+				return Token::JID_INT64;
+			else if constexpr (std::is_same_v<ValueType, ubyte>)
+				return Token::JID_UINT8;
+			else if constexpr (std::is_same_v<ValueType, uword>)
+				return Token::JID_UINT16;
+			else
+				static_assert(alwaysFalse<ValueType>, "Unsupported uniform JSON array type");
+		}
 
 		template<typename T>
 		T fromString(const std::string& value)
@@ -188,8 +221,18 @@ namespace houio
 			Parser();
 			explicit Parser( const ParserLimits &limits );
 
-			bool parse( std::istream *in, Handler *h );
-			bool parse( std::istream *in, Handler *h, DiagnosticList *diagnostics );
+			[[nodiscard]] bool parse(std::istream& input, Handler& handler);
+			[[nodiscard]] bool parse(
+				std::istream& input,
+				Handler& handler,
+				DiagnosticList& diagnostics);
+
+			// Compatibility overloads. Prefer the reference-based API above.
+			[[nodiscard]] bool parse(std::istream* input, Handler* handler);
+			[[nodiscard]] bool parse(
+				std::istream* input,
+				Handler* handler,
+				DiagnosticList* diagnostics);
 			bool                          parseStream();
 			void             validateSeekableInputSize();
 			void                 validateTrailingInput();
@@ -215,7 +258,9 @@ namespace houio
 			bool                  tryReadASCIIChar( char &value );
 
 
-			// 
+		private:
+			friend struct Token;
+
 			State                                 state;
 			std::stack<State>                stateStack;
 			Handler                            *handler;
@@ -273,7 +318,7 @@ namespace houio
 		// Writer ==================================================
 		struct Writer
 		{
-			virtual                                   ~Writer(){};
+			virtual ~Writer() = default;
 			virtual void                       jsonBeginArray() = 0;
 			virtual void                         jsonEndArray() = 0;
 			virtual void                         jsonBeginMap() = 0;
@@ -290,9 +335,11 @@ namespace houio
 			virtual void      jsonReal64( const real64 &value ) = 0;
 		};
 
-		struct BinaryWriter : public Writer
+		class BinaryWriter final : public Writer
 		{
-			BinaryWriter( std::ostream *out );
+		public:
+			explicit BinaryWriter(std::ostream& output);
+			explicit BinaryWriter(std::ostream* output);
 
 			bool jsonMagic();
 			virtual void                               jsonBeginArray()override;
@@ -329,8 +376,8 @@ namespace houio
 
 
 
-			// 
-			std::ostream                                                *stream;
+		private:
+			std::ostream* stream = nullptr;
 		};
 
 		template<typename T>
@@ -364,83 +411,38 @@ namespace houio
 		}
 
 		template<typename T>
-		bool BinaryWriter::jsonUniformArray( const std::vector<T> &data )
+		bool BinaryWriter::jsonUniformArray(const std::vector<T>& data)
 		{
-			Token::Type type = Token::JID_NULL;
-			if( typeid(T) == typeid(real32) )
-				type = Token::JID_REAL32;
-			else if( typeid(T) == typeid(real64) )
-				type = Token::JID_REAL64;
-			else if( typeid(T) == typeid(bool) )
-				type = Token::JID_BOOL;
-			else if( typeid(T) == typeid(sbyte) )
-				type = Token::JID_INT8;
-			else if( typeid(T) == typeid(sword) )
-				type = Token::JID_INT16;
-			else if( typeid(T) == typeid(sint32) )
-				type = Token::JID_INT32;
-			else if( typeid(T) == typeid(sint64) )
-				type = Token::JID_INT64;
-			else if( typeid(T) == typeid(ubyte) )
-				type = Token::JID_UINT8;
-			else if( typeid(T) == typeid(uword) )
-				type = Token::JID_UINT16;
-			else
-				throw std::runtime_error("BinaryWriter::jsonUniformArray: unable to handle type");
-			
-			if( data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
-				throw std::length_error( "BinaryWriter::jsonUniformArray element count exceeds sint64 range" );
-			const sint64 elementCount = static_cast<sint64>(data.size());
-			writeId( Token::JID_UNIFORM_ARRAY );
-			write<sbyte>( static_cast<sbyte>(type) );
-			writeLength(elementCount);
-			if( !data.empty() )
-				write<T>(data.data(), elementCount);
-
-			return true;
+			if (data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
+				throw std::length_error("BinaryWriter::jsonUniformArray element count exceeds sint64 range");
+			const sint64 element_count = static_cast<sint64>(data.size());
+			const Token::Type type = uniformArrayToken<T>();
+			return writeId(Token::JID_UNIFORM_ARRAY)
+				&& write<ubyte>(static_cast<ubyte>(type))
+				&& writeLength(element_count)
+				&& write<T>(data.data(), element_count);
 		}
 		template<typename T>
-		bool BinaryWriter::jsonUniformArray( const T *data, sint64 numElements )
+		bool BinaryWriter::jsonUniformArray(const T* data, sint64 element_count)
 		{
-			Token::Type type = Token::JID_NULL;
-			if( typeid(T) == typeid(real32) )
-				type = Token::JID_REAL32;
-			else if( typeid(T) == typeid(real64) )
-				type = Token::JID_REAL64;
-			else if( typeid(T) == typeid(bool) )
-				type = Token::JID_BOOL;
-			else if( typeid(T) == typeid(sbyte) )
-				type = Token::JID_INT8;
-			else if( typeid(T) == typeid(sword) )
-				type = Token::JID_INT16;
-			else if( typeid(T) == typeid(sint32) )
-				type = Token::JID_INT32;
-			else if( typeid(T) == typeid(sint64) )
-				type = Token::JID_INT64;
-			else if( typeid(T) == typeid(ubyte) )
-				type = Token::JID_UINT8;
-			else if( typeid(T) == typeid(uword) )
-				type = Token::JID_UINT16;
-			else
-				throw std::runtime_error("BinaryWriter::jsonUniformArray: unable to handle type");
-			
-			if( numElements < 0 )
-				throw std::length_error( "BinaryWriter::jsonUniformArray received a negative element count" );
-			if( numElements > 0 && !data )
-				throw std::invalid_argument( "BinaryWriter::jsonUniformArray received null data" );
-			writeId( Token::JID_UNIFORM_ARRAY );
-			write<sbyte>( static_cast<sbyte>(type) );
-			writeLength(numElements);
-			write<T>(data, numElements);
-
-			return true;
+			if (element_count < 0)
+				throw std::length_error("BinaryWriter::jsonUniformArray received a negative element count");
+			if (element_count > 0 && !data)
+				throw std::invalid_argument("BinaryWriter::jsonUniformArray received null data");
+			const Token::Type type = uniformArrayToken<T>();
+			return writeId(Token::JID_UNIFORM_ARRAY)
+				&& write<ubyte>(static_cast<ubyte>(type))
+				&& writeLength(element_count)
+				&& write<T>(data, element_count);
 		}
 
 
 		// ASCIIWriter ==================================================
-		struct ASCIIWriter : public Writer
+		class ASCIIWriter final : public Writer
 		{
-			ASCIIWriter( std::ostream *out );
+		public:
+			explicit ASCIIWriter(std::ostream& output);
+			explicit ASCIIWriter(std::ostream* output);
 
 			virtual void                               jsonBeginArray()override;
 			virtual void                                 jsonEndArray()override;
@@ -464,24 +466,25 @@ namespace houio
 			void                                                 writeNewline();
 			void                                                  writePrefix();
 
-			int                                                     indentLevel;
-			bool                                                      firstItem;
-			bool                                                         gotKey;
-			std::stack<Token::Type>                                       stack;
-			std::string                                                  prefix;
-			// 
-			std::ostream                                                *stream;
+		private:
+			int indentLevel = 0;
+			bool firstItem = false;
+			bool gotKey = false;
+			std::stack<Token::Type> stack;
+			std::string prefix;
+			std::ostream* stream = nullptr;
 		};
 
 
 
 		// JSONLogger ==================================================
-		struct JSONLogger : public Handler
+		class JSONLogger final : public Handler
 		{
+		public:
 			JSONLogger() : out(std::cout), indentLevel(0)
 			{
 			}
-			JSONLogger( std::ostream &outputStream ) : out(outputStream), indentLevel(0)
+			explicit JSONLogger(std::ostream& outputStream) : out(outputStream), indentLevel(0)
 			{
 			}
 
@@ -561,120 +564,121 @@ namespace houio
 				out << "jsonEndMap\n";std::flush(out);
 			}
 
-			virtual void uaBool( sint64 numElements, Parser *parser )
+			void uaBool(sint64 element_count, Parser& parser) override
 			{
 				indent();
-				if( numElements < 0 )
-					throw std::length_error( "JSONLogger::uaBool received a negative element count" );
-				sint64 elementsRemaining = numElements;
+				if (element_count < 0)
+					throw std::length_error("JSONLogger::uaBool received a negative element count");
+				sint64 elements_remaining = element_count;
 				out << "jsonArray [";
-				while( elementsRemaining > 0 )
+				while (elements_remaining > 0)
 				{
-					const uint32 bits = parser->read<uint32>();
-					const int bitCount = static_cast<int>(std::min<sint64>(elementsRemaining, 32));
-					for( int bitIndex=0;bitIndex<bitCount;++bitIndex )
-						out << ((bits & (uint32(1) << bitIndex)) != 0 ? 1 : 0) << " ";
-					elementsRemaining -= bitCount;
+					const uint32 bits = parser.read<uint32>();
+					const int bit_count = static_cast<int>(std::min<sint64>(elements_remaining, 32));
+					for (int bit_index = 0; bit_index < bit_count; ++bit_index)
+						out << ((bits & (uint32(1) << bit_index)) != 0 ? 1 : 0) << " ";
+					elements_remaining -= bit_count;
 				}
 				out << "]\n";
 				std::flush(out);
 			}
 
-			virtual void uaReal16( sint64 numElements, Parser *parser )
+			void uaReal16(sint64 element_count, Parser& parser) override
 			{
 				indent();
-				out << "jsonArray<real16> (" << numElements << ") [";
-				for( sint64 elementIndex=0;elementIndex<numElements;++elementIndex )
-					out << halfBitsToFloat(parser->read<uword>()) << " ";
+				out << "jsonArray<real16> (" << element_count << ") [";
+				for (sint64 element_index = 0; element_index < element_count; ++element_index)
+					out << halfBitsToFloat(parser.read<uword>()) << " ";
 				out << "]---\n";
 				std::flush(out);
 			}
 
-			virtual void uaReal32( sint64 numElements, Parser *parser )
+			void uaReal32(sint64 element_count, Parser& parser) override
 			{
-				ua<real32>( numElements, parser, "<real32>" );
+				uniformArray<real32>(element_count, parser, "<real32>");
 			}
 
-			virtual void uaReal64( sint64 numElements, Parser *parser )
+			void uaReal64(sint64 element_count, Parser& parser) override
 			{
-				ua<real64>( numElements, parser, "<real64>" );
+				uniformArray<real64>(element_count, parser, "<real64>");
 			}
 
-			virtual void uaInt8( sint64 numElements, Parser *parser )
+			void uaInt8(sint64 element_count, Parser& parser) override
 			{
-				ua<sbyte>( numElements, parser, "<int8>" );
+				uniformArray<sbyte>(element_count, parser, "<int8>");
 			}
 
-			virtual void uaInt16( sint64 numElements, Parser *parser )
+			void uaInt16(sint64 element_count, Parser& parser) override
 			{
-				ua<sword>( numElements, parser, "<int16>" );
+				uniformArray<sword>(element_count, parser, "<int16>");
 			}
 
-			virtual void uaInt32( sint64 numElements, Parser *parser )
+			void uaInt32(sint64 element_count, Parser& parser) override
 			{
-				ua<sint32>( numElements, parser, "<int32>" );
+				uniformArray<sint32>(element_count, parser, "<int32>");
 			}
 
-			virtual void uaInt64( sint64 numElements, Parser *parser )
+			void uaInt64(sint64 element_count, Parser& parser) override
 			{
-				ua<sint64>( numElements, parser, "<sint64>" );
+				uniformArray<sint64>(element_count, parser, "<sint64>");
 			}
 
-			virtual void uaUInt8( sint64 numElements, Parser *parser )
+			void uaUInt8(sint64 element_count, Parser& parser) override
 			{
 				indent();
-				if( numElements < 0 )
-					throw std::length_error( "JSONLogger::uaUInt8 received a negative element count" );
+				if (element_count < 0)
+					throw std::length_error("JSONLogger::uaUInt8 received a negative element count");
 				out << "jsonArray<uint8> [";
-				sint64 elementsRemaining = numElements;
-				while( elementsRemaining > 0 )
+				sint64 elements_remaining = element_count;
+				while (elements_remaining > 0)
 				{
-					const size_t chunkSize = static_cast<size_t>(std::min<sint64>(elementsRemaining, 4096));
-					std::vector<ubyte> data(chunkSize);
-					parser->read<ubyte>(data.data(), static_cast<sint64>(chunkSize));
-					for( ubyte value : data )
+					const size_t chunk_size = static_cast<size_t>(std::min<sint64>(elements_remaining, 4096));
+					std::vector<ubyte> data(chunk_size);
+					parser.read<ubyte>(data.data(), static_cast<sint64>(chunk_size));
+					for (ubyte value : data)
 						out << static_cast<int>(value) << " ";
-					elementsRemaining -= static_cast<sint64>(chunkSize);
+					elements_remaining -= static_cast<sint64>(chunk_size);
 				}
 				out << "]\n";
 				std::flush(out);
 			}
 
-			virtual void uaString( sint64 numElements, Parser *parser )
+			void uaString(sint64 element_count, Parser& parser) override
 			{
 				indent();
-				if( numElements < 0 )
-					throw std::length_error( "JSONLogger::uaString received a negative element count" );
+				if (element_count < 0)
+					throw std::length_error("JSONLogger::uaString received a negative element count");
 				out << "jsonArray<string> [";
-				for(sint64 i=0;i<numElements;++i)
-					out << parser->readBinaryString() << " ";
+				for (sint64 element_index = 0; element_index < element_count; ++element_index)
+					out << parser.readBinaryString() << " ";
 				out << "]\n";
 				std::flush(out);
 			}
 
 			template<typename T>
-			void ua( sint64 numElements, Parser *parser, std::string type = "" )
+			void uniformArray(sint64 element_count, Parser& parser, const std::string& type_name = {})
 			{
 				indent();
-				if( numElements < 0 )
-					throw std::length_error( "JSONLogger uniform array received a negative element count" );
-				out << "jsonArray"<<type<<" ("<< numElements << ") [";
-				sint64 elementsRemaining = numElements;
-				while( elementsRemaining > 0 )
+				if (element_count < 0)
+					throw std::length_error("JSONLogger uniform array received a negative element count");
+				out << "jsonArray" << type_name << " (" << element_count << ") [";
+				sint64 elements_remaining = element_count;
+				while (elements_remaining > 0)
 				{
-					const size_t chunkSize = static_cast<size_t>(std::min<sint64>(elementsRemaining, 4096));
-					std::vector<T> data(chunkSize);
-					parser->read<T>(data.data(), static_cast<sint64>(chunkSize));
-					for( const T &value : data )
+					const size_t chunk_size = static_cast<size_t>(std::min<sint64>(elements_remaining, 4096));
+					std::vector<T> data(chunk_size);
+					parser.read<T>(data.data(), static_cast<sint64>(chunk_size));
+					for (const T& value : data)
 						out << value << " ";
-					elementsRemaining -= static_cast<sint64>(chunkSize);
+					elements_remaining -= static_cast<sint64>(chunk_size);
 				}
 				out << "]---\n";
 				std::flush(out);
 			}
 
-			std::ostream &out;
-			int indentLevel;
+		private:
+			std::ostream& out;
+			int indentLevel = 0;
 		};
 
 		// JSONCPP ==================================================
@@ -905,22 +909,22 @@ namespace houio
 			void jsonInt64(const sint64& value) override;
 			void jsonReal32(const real32& value) override;
 			void jsonReal64(const real64& value) override;
-			void uaBool(sint64 element_count, Parser* parser) override;
-			void uaReal16(sint64 element_count, Parser* parser) override;
-			void uaReal32(sint64 element_count, Parser* parser) override;
-			void uaReal64(sint64 element_count, Parser* parser) override;
-			void uaInt8(sint64 element_count, Parser* parser) override;
-			void uaInt16(sint64 element_count, Parser* parser) override;
-			void uaInt32(sint64 element_count, Parser* parser) override;
-			void uaInt64(sint64 element_count, Parser* parser) override;
-			void uaUInt8(sint64 element_count, Parser* parser) override;
-			void uaString(sint64 element_count, Parser* parser) override;
+			void uaBool(sint64 element_count, Parser& parser) override;
+			void uaReal16(sint64 element_count, Parser& parser) override;
+			void uaReal32(sint64 element_count, Parser& parser) override;
+			void uaReal64(sint64 element_count, Parser& parser) override;
+			void uaInt8(sint64 element_count, Parser& parser) override;
+			void uaInt16(sint64 element_count, Parser& parser) override;
+			void uaInt32(sint64 element_count, Parser& parser) override;
+			void uaInt64(sint64 element_count, Parser& parser) override;
+			void uaUInt8(sint64 element_count, Parser& parser) override;
+			void uaString(sint64 element_count, Parser& parser) override;
 
 		private:
 			template<typename T>
 			void jsonValue(const T& value);
 			template<typename T, typename Source>
-			void jsonUniformArray(sint64 element_count, Parser* parser);
+			void jsonUniformArray(sint64 element_count, Parser& parser);
 
 			void pushContainer();
 			void popContainer();
@@ -952,10 +956,8 @@ namespace houio
 		}
 
 		template<typename T, typename Source>
-		void JSONReader::jsonUniformArray(sint64 element_count, Parser* parser)
+		void JSONReader::jsonUniformArray(sint64 element_count, Parser& parser)
 		{
-			if (!parser)
-				throw std::invalid_argument("JSONReader::jsonUniformArray received a null parser");
 			if (element_count < 0)
 				throw std::length_error("JSONReader::jsonUniformArray received a negative element count");
 			const size_t count = static_cast<size_t>(element_count);
@@ -975,7 +977,7 @@ namespace houio
 				const size_t chunk_size = static_cast<size_t>(
 					std::min<sint64>(elements_remaining, chunk_capacity));
 				std::vector<Source> source_data(chunk_size);
-				parser->read<Source>(source_data.data(), static_cast<sint64>(chunk_size));
+				parser.read<Source>(source_data.data(), static_cast<sint64>(chunk_size));
 				for (const Source& source_value : source_data)
 					converted_data.push_back(static_cast<T>(source_value));
 				elements_remaining -= static_cast<sint64>(chunk_size);
@@ -1004,14 +1006,25 @@ namespace houio
 
 
 		// JSONWriter =========================================
-		struct JSONWriter
+		class JSONWriter final
 		{
-			explicit JSONWriter( std::ostream *out, bool binary = false )
+		public:
+			explicit JSONWriter(std::ostream& output, bool binary = false)
 			{
-				if(binary)
-					writer_ = std::make_unique<BinaryWriter>(out);
+				if (binary)
+					writer_ = std::make_unique<BinaryWriter>(output);
 				else
-					writer_ = std::make_unique<ASCIIWriter>(out);
+					writer_ = std::make_unique<ASCIIWriter>(output);
+			}
+
+			explicit JSONWriter(std::ostream* output, bool binary = false)
+			{
+				if (!output)
+					throw std::invalid_argument("JSONWriter requires a valid output stream");
+				if (binary)
+					writer_ = std::make_unique<BinaryWriter>(*output);
+				else
+					writer_ = std::make_unique<ASCIIWriter>(*output);
 			}
 
 			~JSONWriter() = default;

@@ -94,12 +94,6 @@ namespace houio
         [[nodiscard]] std::span<std::byte> elementBytes(std::size_t index);
         [[nodiscard]] std::span<const std::byte> elementBytes(std::size_t index) const;
 
-        // Compatibility pointer access. Prefer bytes() and elementBytes().
-        [[nodiscard]] void* getRawPointer() noexcept;
-        [[nodiscard]] const void* getRawPointer() const noexcept;
-        [[nodiscard]] void* getRawPointer(int index);
-        [[nodiscard]] const void* getRawPointer(int index) const;
-
         [[nodiscard]] static Ptr create(
             int component_count,
             ComponentType component_type,

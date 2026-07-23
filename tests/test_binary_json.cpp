@@ -52,7 +52,8 @@ int expectParseFailure(const std::string& binaryData, const houio::json::ParserL
     houio::json::Parser parser(limits);
     try
     {
-        parser.parse(&input, &reader);
+        if (parser.parse(input, reader))
+            return fail(description + " was unexpectedly accepted");
     }
     catch (const std::exception&)
     {
@@ -350,8 +351,8 @@ int verifyInputBudgetAndTrailingData()
     houio::json::Parser streamingParser(limits);
     try
     {
-        streamingParser.parse(&nonSeekableInput, &reader);
-        return fail("streaming input byte limit was not rejected");
+        if (streamingParser.parse(nonSeekableInput, reader))
+            return fail("streaming input byte limit was not rejected");
     }
     catch (const std::exception&)
     {
@@ -530,7 +531,7 @@ int verifyParserReuse()
 int verifyWriterValidation()
 {
     std::ostringstream output(std::ios::out | std::ios::binary);
-    houio::json::BinaryWriter writer(&output);
+    houio::json::BinaryWriter writer(output);
     try
     {
         writer.writeLength(-1);
@@ -544,6 +545,36 @@ int verifyWriterValidation()
     {
         writer.jsonUniformArray<houio::sint32>(nullptr, 1);
         return fail("writer accepted null uniform-array data");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+
+    try
+    {
+        houio::json::BinaryWriter invalid_binary_writer(
+            static_cast<std::ostream*>(nullptr));
+        return fail("binary writer accepted a null output stream");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+
+    try
+    {
+        houio::json::ASCIIWriter invalid_ascii_writer(
+            static_cast<std::ostream*>(nullptr));
+        return fail("ASCII writer accepted a null output stream");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+
+    try
+    {
+        houio::json::JSONWriter invalid_json_writer(
+            static_cast<std::ostream*>(nullptr));
+        return fail("JSON writer accepted a null output stream");
     }
     catch (const std::invalid_argument&)
     {

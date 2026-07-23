@@ -176,9 +176,11 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
         return fail("vertex uv attribute was not preserved");
     }
 
-    const auto* normalData = static_cast<const houio::real32*>(normals->getRawPointer()->ptr);
-    const auto* uvData = static_cast<const houio::real32*>(uv->getRawPointer()->ptr);
-    if (!normalData || normalData[2] != 1.0f || !uvData || uvData[4] != 1.0f || uvData[5] != 1.0f)
+    const auto normal_data = normals->rawData();
+    const auto uv_data = uv->rawData();
+    if (!normal_data.available() || normal_data.read<houio::real32>(2) != 1.0f
+        || !uv_data.available() || uv_data.read<houio::real32>(4) != 1.0f
+        || uv_data.read<houio::real32>(5) != 1.0f)
     {
         return fail("representative vertex attribute values were not preserved");
     }
@@ -196,8 +198,8 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
     {
         return fail("primitive integer attribute metadata was not preserved");
     }
-    const auto* pieceData = static_cast<const houio::sint32*>(piece->getRawPointer()->ptr);
-    if (!pieceData || pieceData[0] != 7)
+    const auto piece_data = piece->rawData();
+    if (!piece_data.available() || piece_data.read<houio::sint32>(0) != 7)
     {
         return fail("primitive integer attribute value was not preserved");
     }

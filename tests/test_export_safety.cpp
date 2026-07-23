@@ -175,7 +175,7 @@ int verifyCompatibilityWrapper(const houio::HouGeoAdapter::Ptr& validGeometry)
 {
     std::ostringstream preferredOutput(std::ios::out | std::ios::binary);
     std::ostringstream compatibilityOutput(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::exportGeometry(&preferredOutput, validGeometry, true)
+    if (!houio::HouGeoIO::exportGeometry(preferredOutput, validGeometry, true)
         || !houio::HouGeoIO::xport(&compatibilityOutput, validGeometry, true))
     {
         return fail("preferred or compatibility export API failed");
@@ -197,7 +197,8 @@ int verifyExceptionRecovery(const houio::HouGeoAdapter::Ptr& validGeometry)
     std::ostringstream invalidOutput(std::ios::out | std::ios::binary);
     try
     {
-        houio::HouGeoIO::xport(&invalidOutput, createInvalidPointGeometry(), true);
+        static_cast<void>(houio::HouGeoIO::xport(
+            invalidOutput, createInvalidPointGeometry(), true));
         return fail("invalid P attribute did not raise an exception");
     }
     catch (const std::runtime_error&)
@@ -250,7 +251,7 @@ int verifyNegativeTopologyRejection(const houio::HouGeoAdapter::Ptr& validGeomet
     std::ostringstream output(std::ios::out | std::ios::binary);
     try
     {
-        houio::HouGeoIO::xport(&output, geometry, true);
+        static_cast<void>(houio::HouGeoIO::xport(output, geometry, true));
         return fail("export accepted a negative topology index");
     }
     catch (const std::runtime_error&)
