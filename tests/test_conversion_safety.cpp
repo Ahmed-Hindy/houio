@@ -53,14 +53,11 @@ int verifyInvalidPolygonPointReference()
     geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("P", positions));
 
     auto topology = std::make_shared<houio::HouGeo::HouTopology>();
-    topology->indexBuffer = {0, 1, 2};
+    topology->setIndices({0, 1, 2});
     geometry->setTopology(topology);
 
     auto polygon = std::make_shared<houio::HouGeo::HouPoly>();
-    polygon->m_numPolys = 1;
-    polygon->m_perPolyVertexCount = {3};
-    polygon->m_perPolyVertexListOffset = {0};
-    polygon->m_vertices = {0, 1, 2};
+    polygon->setPolygonData(1, {3}, {0}, {0, 1, 2}, true);
     geometry->addPrimitive(polygon);
 
     houio::DiagnosticList diagnostics;
@@ -76,14 +73,11 @@ int verifyInvalidPolygonPointReference()
 int verifyPolygonAccessorSafety()
 {
     houio::HouGeo::HouPoly polygon;
-    polygon.m_numPolys = 1;
-    polygon.m_perPolyVertexCount = {3};
-    polygon.m_perPolyVertexListOffset = {1};
-    polygon.m_vertices = {0, 1, 2};
+    polygon.setPolygonData(1, {3}, {1}, {0, 1, 2}, true);
 
     try
     {
-        polygon.numVertices(-1);
+        static_cast<void>(polygon.numVertices(-1));
         return fail("negative polygon index was accepted");
     }
     catch (const std::out_of_range&)
@@ -92,7 +86,7 @@ int verifyPolygonAccessorSafety()
 
     try
     {
-        polygon.vertices(0);
+        static_cast<void>(polygon.vertices(0));
         return fail("polygon range beyond stored vertices was accepted");
     }
     catch (const std::runtime_error&)
@@ -245,10 +239,10 @@ int verifyAttributeAndStringBounds()
     }
 
     houio::HouGeo::HouAttribute strings;
-    strings.strings = {"first"};
+    strings.setStringValues({"first"});
     try
     {
-        strings.getString(1);
+        static_cast<void>(strings.getString(1));
         return fail("HouAttribute accepted an out-of-range string index");
     }
     catch (const std::out_of_range&)

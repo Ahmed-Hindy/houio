@@ -244,7 +244,7 @@ int verifyNegativeTopologyRejection(const houio::HouGeoAdapter::Ptr& validGeomet
 {
     houio::HouGeo::Ptr geometry = createPointGeometry();
     houio::HouGeo::HouTopology::Ptr topology = std::make_shared<houio::HouGeo::HouTopology>();
-    topology->indexBuffer.push_back(-1);
+    topology->appendIndex(-1);
     geometry->setTopology(topology);
 
     std::ostringstream output(std::ios::out | std::ios::binary);

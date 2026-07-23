@@ -357,7 +357,7 @@ namespace houio
                 result.value.clear();
                 return result;
             }
-            result.value.push_back(volume->field);
+            result.value.push_back(volume->scalarField());
         }
         result.succeeded = true;
         return result;

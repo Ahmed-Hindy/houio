@@ -233,11 +233,11 @@ int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
     const auto settings = std::dynamic_pointer_cast<houio::HouGeo::HouAttribute>(
         geometry->getGlobalAttribute("settings"));
     if (!settings || settings->getType() != houio::HouGeoAdapter::AttributeAdapter::ATTR_TYPE_DICT
-        || settings->dictionaries.size() != 1)
+        || settings->dictionaryValues().size() != 1)
     {
         return fail("global dictionary attribute metadata was not preserved");
     }
-    const auto dictionary = settings->dictionaries.front();
+    const auto dictionary = settings->dictionaryValues().front();
     const auto emptySetting = dictionary->getObject("empty");
     const auto countSetting = dictionary->getObject("count");
     const auto rangeSetting = dictionary->getObject("range");

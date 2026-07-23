@@ -200,9 +200,7 @@ int verifyBinaryRoundTrip()
     {
         return fail("volume source primitive was not created");
     }
-    sourceVolume->visualizationMode = "iso";
-    sourceVolume->visualizationIso = 0.125f;
-    sourceVolume->visualizationDensity = 0.75f;
+    sourceVolume->setVisualization("iso", 0.125f, 0.75f);
 
     std::ostringstream output(std::ios::out | std::ios::binary);
     if (!houio::HouGeoIO::xport(&output, sourceGeometry))

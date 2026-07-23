@@ -317,7 +317,7 @@ namespace houio
 					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 						"HouGeoIO::convertToGeometry polygon vertices exceed the vertex domain", -1,
 						"conversion.primitive"});
-				poly->vertices(polygonIndex);
+				static_cast<void>(poly->vertices(polygonIndex));
 				observedVertexCount += static_cast<size_t>(polygonVertexCount);
 			}
 			if( observedVertexCount != vertexCount )
@@ -754,38 +754,44 @@ namespace houio
 		if( geometry->numPrimitives() > 0 )
 		{
 			HouGeo::HouTopology::Ptr topology = std::make_shared<HouGeo::HouTopology>();
-			const std::span<const Geometry::Index> geometryIndices = geometry->indexBuffer();
-			topology->indexBuffer.reserve(geometryIndices.size());
-			for( const unsigned int pointIndex : geometryIndices )
+			const std::span<const Geometry::Index> geometry_indices = geometry->indexBuffer();
+			topology->reserve(geometry_indices.size());
+			for (const unsigned int point_index : geometry_indices)
 			{
-				if( pointIndex > static_cast<unsigned int>(std::numeric_limits<int>::max()) )
-					throw std::overflow_error( "HouGeoIO::adaptGeometry point index exceeds int range" );
-				topology->indexBuffer.push_back(static_cast<int>(pointIndex));
+				if (point_index > static_cast<unsigned int>(std::numeric_limits<int>::max()))
+					throw std::overflow_error("HouGeoIO::adaptGeometry point index exceeds int range");
+				topology->appendIndex(static_cast<int>(point_index));
 			}
 			houdiniGeometry->setTopology(topology);
 
 			// The simplified Geometry model uses a fixed vertex count, so all polygons form one run.
-			HouGeo::HouPoly::Ptr polygonRun = std::make_shared<HouGeo::HouPoly>();
-			const int primitiveCount = geometry->numPrimitives();
-			const int verticesPerPrimitive = geometry->numPrimitiveVertices();
-			polygonRun->m_numPolys = primitiveCount;
-			polygonRun->m_perPolyVertexListOffset.assign(static_cast<size_t>(primitiveCount), 0);
-			for( int primitiveIndex=1;primitiveIndex<primitiveCount;++primitiveIndex )
+			HouGeo::HouPoly::Ptr polygon_run = std::make_shared<HouGeo::HouPoly>();
+			const int primitive_count = geometry->numPrimitives();
+			const int vertices_per_primitive = geometry->numPrimitiveVertices();
+			std::vector<int> vertex_offsets(static_cast<size_t>(primitive_count), 0);
+			for (int primitive_index = 1; primitive_index < primitive_count; ++primitive_index)
 			{
-				polygonRun->m_perPolyVertexListOffset[static_cast<size_t>(primitiveIndex)] =
-					polygonRun->m_perPolyVertexListOffset[static_cast<size_t>(primitiveIndex - 1)]
-					+ verticesPerPrimitive;
+				vertex_offsets[static_cast<size_t>(primitive_index)] =
+					vertex_offsets[static_cast<size_t>(primitive_index - 1)]
+					+ vertices_per_primitive;
 			}
-			polygonRun->m_perPolyVertexCount.assign(static_cast<size_t>(primitiveCount), verticesPerPrimitive);
+			std::vector<int> vertex_counts(
+				static_cast<size_t>(primitive_count),
+				vertices_per_primitive);
 
-			if( geometryIndices.size() > static_cast<size_t>(std::numeric_limits<int>::max()) )
-				throw std::overflow_error( "HouGeoIO::adaptGeometry index buffer exceeds int range" );
-			polygonRun->m_vertices.resize(geometryIndices.size());
-			for( size_t vertexIndex=0;vertexIndex<geometryIndices.size();++vertexIndex )
-				polygonRun->m_vertices[vertexIndex] = static_cast<int>(vertexIndex);
+			if (geometry_indices.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
+				throw std::overflow_error("HouGeoIO::adaptGeometry index buffer exceeds int range");
+			std::vector<int> point_indices(geometry_indices.size());
+			for (size_t vertex_index = 0; vertex_index < geometry_indices.size(); ++vertex_index)
+				point_indices[vertex_index] = static_cast<int>(vertex_index);
 
-			polygonRun->m_closed = geometry->primitiveType() != Geometry::LINE;
-			houdiniGeometry->addPrimitive(polygonRun);
+			polygon_run->setPolygonData(
+				primitive_count,
+				std::move(vertex_counts),
+				std::move(vertex_offsets),
+				std::move(point_indices),
+				geometry->primitiveType() != Geometry::LINE);
+			houdiniGeometry->addPrimitive(polygon_run);
 		}
 
 		return houdiniGeometry;
