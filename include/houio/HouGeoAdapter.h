@@ -4,140 +4,175 @@
 #include <string>
 #include <vector>
 
-#include <houio/Attribute.h>
 #include <houio/math/Math.h>
 #include <houio/types.h>
 
-
-
 namespace houio
 {
-	namespace json
-	{
-		struct Object;
-	}
+    namespace json
+    {
+        struct Object;
+    }
 
-	struct HouGeoAdapter
-	{
-		using Ptr = std::shared_ptr<HouGeoAdapter>;
+    class HouGeoAdapter
+    {
+    public:
+        using Ptr = std::shared_ptr<HouGeoAdapter>;
+        using ConstPtr = std::shared_ptr<const HouGeoAdapter>;
 
-		struct RawPointer final
-		{
-			using Ptr = std::shared_ptr<RawPointer>;
+        class RawPointer final
+        {
+        public:
+            using Ptr = std::shared_ptr<RawPointer>;
 
-			explicit RawPointer(const void* data_value) noexcept : ptr(data_value) {}
-			static Ptr create(const void* data);
+            explicit RawPointer(const void* data) noexcept : ptr(data), data_(data) {}
+            [[nodiscard]] static Ptr create(const void* data);
+            [[nodiscard]] const void* get() const noexcept { return data_; }
 
-			const void* ptr = nullptr;
-		};
+            // Compatibility field for existing synchronous exporters.
+            const void* ptr = nullptr;
 
-		struct AttributeAdapter
-		{
-			using Ptr = std::shared_ptr<AttributeAdapter>;
+        private:
+            const void* data_ = nullptr;
+        };
 
-			virtual ~AttributeAdapter();
-			enum Type
-			{
-				ATTR_TYPE_INVALID  = 0,
-				ATTR_TYPE_NUMERIC  = 1,
-				ATTR_TYPE_STRING   = 2,
-				ATTR_TYPE_DICT     = 3
-			};
-			enum Storage
-			{
-				ATTR_STORAGE_INVALID  = 0,
-				ATTR_STORAGE_FPREAL32 = 1,
-				ATTR_STORAGE_FPREAL64 = 2,
-				ATTR_STORAGE_INT32 = 3,
-				ATTR_STORAGE_INT64 = 4,
-				ATTR_STORAGE_FPREAL16 = 5
-			};
-			virtual std::string              getName()const;
-			virtual Type                     getType()const;
-			virtual int                      getTupleSize()const;
-			virtual Storage                  getStorage()const;
-			virtual void                     getPacking( std::vector<int> &packing )const;
-			virtual int                      getNumElements()const;
-			virtual RawPointer::Ptr          getRawPointer();
-			virtual std::string              getString( int index )const=0;
-			virtual std::shared_ptr<json::Object> getDictionary( int index )const;
-			static Type                      type( const std::string &typeName );
-			static Storage                   storage( const std::string &storageName );
-			static int                       storageSize( Storage storage );
-		};
+        class AttributeAdapter
+        {
+        public:
+            using Ptr = std::shared_ptr<AttributeAdapter>;
+            using ConstPtr = std::shared_ptr<const AttributeAdapter>;
 
-		struct Topology
-		{
-			using Ptr = std::shared_ptr<Topology>;
+            enum class Type
+            {
+                invalid,
+                numeric,
+                string,
+                dictionary,
+            };
 
-			virtual ~Topology();
+            enum class Storage
+            {
+                invalid,
+                float32,
+                float64,
+                int32,
+                int64,
+                float16,
+            };
 
-			virtual void                          getIndices( std::vector<int> &indices )const=0;
-			virtual void                          addIndices( std::vector<int> &indices )=0;
-			virtual sint64                        getNumIndices()const=0;
-		};
+            static constexpr Type ATTR_TYPE_INVALID = Type::invalid;
+            static constexpr Type ATTR_TYPE_NUMERIC = Type::numeric;
+            static constexpr Type ATTR_TYPE_STRING = Type::string;
+            static constexpr Type ATTR_TYPE_DICT = Type::dictionary;
+            static constexpr Storage ATTR_STORAGE_INVALID = Storage::invalid;
+            static constexpr Storage ATTR_STORAGE_FPREAL32 = Storage::float32;
+            static constexpr Storage ATTR_STORAGE_FPREAL64 = Storage::float64;
+            static constexpr Storage ATTR_STORAGE_INT32 = Storage::int32;
+            static constexpr Storage ATTR_STORAGE_INT64 = Storage::int64;
+            static constexpr Storage ATTR_STORAGE_FPREAL16 = Storage::float16;
 
-		struct Primitive
-		{
-			using Ptr = std::shared_ptr<Primitive>;
-			enum Type
-			{
-				PRIM_VOLUME,
-				PRIM_POLY
-			};
-			virtual ~Primitive() = default;
+            virtual ~AttributeAdapter();
+            [[nodiscard]] virtual std::string getName() const;
+            [[nodiscard]] virtual Type getType() const;
+            [[nodiscard]] virtual int getTupleSize() const;
+            [[nodiscard]] virtual Storage getStorage() const;
+            virtual void getPacking(std::vector<int>& packing) const;
+            [[nodiscard]] virtual int getNumElements() const;
+            [[nodiscard]] virtual RawPointer::Ptr getRawPointer();
+            [[nodiscard]] virtual std::string getString(int index) const = 0;
+            [[nodiscard]] virtual std::shared_ptr<json::Object> getDictionary(int index) const;
 
-			// Primitive runs override this to report the number of represented records.
-			virtual int numPrimitives()const{return 1;}
-		};
+            [[nodiscard]] static Type type(const std::string& type_name);
+            [[nodiscard]] static Storage storage(const std::string& storage_name);
+            [[nodiscard]] static int storageSize(Storage storage_type);
+        };
 
-		struct VolumePrimitive : public Primitive
-		{
-			using Ptr = std::shared_ptr<VolumePrimitive>;
+        class Topology
+        {
+        public:
+            using Ptr = std::shared_ptr<Topology>;
+            using ConstPtr = std::shared_ptr<const Topology>;
 
-			virtual math::M44f                 getTransform()const=0;
-			virtual int                        getVertex()const=0;
-			virtual math::Vec3i                getResolution()const;
-			virtual real32                     getVoxel( int i, int j, int k )const=0;
-			virtual std::string                getVisualizationMode()const;
-			virtual real32                     getVisualizationIso()const;
-			virtual real32                     getVisualizationDensity()const;
-			virtual RawPointer::Ptr            getRawPointer(); // returns raw pointer to the data
-		};
+            virtual ~Topology();
+            virtual void getIndices(std::vector<int>& indices) const = 0;
+            virtual void addIndices(const std::vector<int>& indices) = 0;
+            [[nodiscard]] virtual sint64 getNumIndices() const = 0;
+        };
 
-		struct PolyPrimitive : public Primitive
-		{
-			using Ptr = std::shared_ptr<PolyPrimitive>;
+        class Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<Primitive>;
+            using ConstPtr = std::shared_ptr<const Primitive>;
 
-			virtual int                        numPolys()const;
-			virtual int                        numVertices( int poly )const;
-			virtual int const*                 vertices(int poly=0)const;
-			virtual int numPrimitives()const override{return numPolys();}
-			virtual bool closed()const;
-		};
+            enum class Type
+            {
+                volume,
+                polygon,
+            };
 
+            static constexpr Type PRIM_VOLUME = Type::volume;
+            static constexpr Type PRIM_POLY = Type::polygon;
 
-		virtual sint64                pointcount()const;
-		virtual sint64                vertexcount()const;
-		virtual sint64                primitivecount()const;
-		virtual void                  getPointAttributeNames( std::vector<std::string> &names )const;
-		virtual AttributeAdapter::Ptr getPointAttribute( const std::string &name );
-		virtual void                  getVertexAttributeNames( std::vector<std::string> &names )const;
-		virtual AttributeAdapter::Ptr getVertexAttribute( const std::string &name );
-		virtual void                  getGlobalAttributeNames( std::vector<std::string> &names )const;
-		virtual AttributeAdapter::Ptr getGlobalAttribute( const std::string &name );
-		virtual void                  getPointGroupNames( std::vector<std::string> &names )const;
-		virtual bool                  getPointGroupMembership( const std::string &name, std::vector<bool> &membership )const;
-		virtual void                  getVertexGroupNames( std::vector<std::string> &names )const;
-		virtual bool                  getVertexGroupMembership( const std::string &name, std::vector<bool> &membership )const;
-		virtual void                  getPrimitiveGroupNames( std::vector<std::string> &names )const;
-		virtual bool                  getPrimitiveGroupMembership( const std::string &name, std::vector<bool> &membership )const;
-		virtual bool                  hasPrimitiveAttribute( const std::string &name )const;
-		virtual void                  getPrimitiveAttributeNames( std::vector<std::string> &names )const=0;
-		virtual AttributeAdapter::Ptr getPrimitiveAttribute( const std::string &name )=0;
-		virtual void                  getPrimitives( std::vector<HouGeoAdapter::Primitive::Ptr>& primitives );
-		virtual Topology::Ptr         getTopology();
-	};
+            virtual ~Primitive() = default;
+            [[nodiscard]] virtual int numPrimitives() const { return 1; }
+        };
+
+        class VolumePrimitive : public Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<VolumePrimitive>;
+
+            [[nodiscard]] virtual math::M44f getTransform() const = 0;
+            [[nodiscard]] virtual int getVertex() const = 0;
+            [[nodiscard]] virtual math::Vec3i getResolution() const;
+            [[nodiscard]] virtual real32 getVoxel(int x, int y, int z) const = 0;
+            [[nodiscard]] virtual std::string getVisualizationMode() const;
+            [[nodiscard]] virtual real32 getVisualizationIso() const;
+            [[nodiscard]] virtual real32 getVisualizationDensity() const;
+            [[nodiscard]] virtual RawPointer::Ptr getRawPointer();
+        };
+
+        class PolyPrimitive : public Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<PolyPrimitive>;
+
+            [[nodiscard]] virtual int numPolys() const;
+            [[nodiscard]] virtual int numVertices(int polygon_index) const;
+            [[nodiscard]] virtual const int* vertices(int polygon_index = 0) const;
+            [[nodiscard]] int numPrimitives() const override { return numPolys(); }
+            [[nodiscard]] virtual bool closed() const;
+        };
+
+        virtual ~HouGeoAdapter() = default;
+
+        [[nodiscard]] virtual sint64 pointcount() const;
+        [[nodiscard]] virtual sint64 vertexcount() const;
+        [[nodiscard]] virtual sint64 primitivecount() const;
+        virtual void getPointAttributeNames(std::vector<std::string>& names) const;
+        [[nodiscard]] virtual AttributeAdapter::Ptr getPointAttribute(const std::string& name);
+        virtual void getVertexAttributeNames(std::vector<std::string>& names) const;
+        [[nodiscard]] virtual AttributeAdapter::Ptr getVertexAttribute(const std::string& name);
+        virtual void getGlobalAttributeNames(std::vector<std::string>& names) const;
+        [[nodiscard]] virtual AttributeAdapter::Ptr getGlobalAttribute(const std::string& name);
+        virtual void getPointGroupNames(std::vector<std::string>& names) const;
+        [[nodiscard]] virtual bool getPointGroupMembership(
+            const std::string& name,
+            std::vector<bool>& membership) const;
+        virtual void getVertexGroupNames(std::vector<std::string>& names) const;
+        [[nodiscard]] virtual bool getVertexGroupMembership(
+            const std::string& name,
+            std::vector<bool>& membership) const;
+        virtual void getPrimitiveGroupNames(std::vector<std::string>& names) const;
+        [[nodiscard]] virtual bool getPrimitiveGroupMembership(
+            const std::string& name,
+            std::vector<bool>& membership) const;
+        [[nodiscard]] virtual bool hasPrimitiveAttribute(const std::string& name) const;
+        virtual void getPrimitiveAttributeNames(std::vector<std::string>& names) const = 0;
+        [[nodiscard]] virtual AttributeAdapter::Ptr getPrimitiveAttribute(
+            const std::string& name) = 0;
+        virtual void getPrimitives(std::vector<Primitive::Ptr>& primitives);
+        [[nodiscard]] virtual Topology::Ptr getTopology();
+    };
 }
-
-

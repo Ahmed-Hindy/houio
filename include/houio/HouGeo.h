@@ -57,7 +57,7 @@ namespace houio
 			HouTopology();
 			typedef std::shared_ptr<HouTopology> Ptr;
 			virtual void                          getIndices( std::vector<int> &indices )const override;
-			virtual void                          addIndices( std::vector<int> &indices );
+			void                                  addIndices( const std::vector<int> &indices ) override;
 			virtual sint64                        getNumIndices()const;
 
 			std::vector<int>                      indexBuffer;

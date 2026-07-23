@@ -580,7 +580,7 @@ namespace houio
 		indices.insert( indices.begin(), indexBuffer.begin(), indexBuffer.end() );
 	}
 
-	void HouGeo::HouTopology::addIndices( std::vector<int> &indices )
+	void HouGeo::HouTopology::addIndices( const std::vector<int> &indices )
 	{
 		indexBuffer.insert( indexBuffer.end(), indices.begin(), indices.end() );
 	}
