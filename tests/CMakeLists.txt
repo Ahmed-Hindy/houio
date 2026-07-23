@@ -31,6 +31,11 @@ target_link_libraries(houio_test_modern_geometry PRIVATE houio::houio)
 target_compile_features(houio_test_modern_geometry PRIVATE cxx_std_20)
 add_test(NAME houio.modern_geometry COMMAND houio_test_modern_geometry)
 
+add_executable(houio_test_geometry_container test_geometry_container.cpp)
+target_link_libraries(houio_test_geometry_container PRIVATE houio::houio)
+target_compile_features(houio_test_geometry_container PRIVATE cxx_std_20)
+add_test(NAME houio.geometry_container COMMAND houio_test_geometry_container)
+
 add_executable(houio_test_polygon_runs test_polygon_runs.cpp)
 target_link_libraries(houio_test_polygon_runs PRIVATE houio::houio)
 target_compile_features(houio_test_polygon_runs PRIVATE cxx_std_20)

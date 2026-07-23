@@ -42,25 +42,38 @@ namespace houio
         void transform(const math::M44f& transform_matrix);
         void addNormals();
 
-        [[nodiscard]] math::BoundingBox3f getBound();
+        [[nodiscard]] math::BoundingBox3f getBound() const;
 
         [[nodiscard]] Attribute::Ptr getAttr(const std::string& name);
+        [[nodiscard]] Attribute::CPtr getAttr(const std::string& name) const;
         void setAttr(const std::string& name, Attribute::Ptr attribute);
-        [[nodiscard]] bool hasAttr(const std::string& name);
+        [[nodiscard]] bool hasAttr(const std::string& name) const;
         void getAttrNames(std::vector<std::string>& names) const;
         void removeAttr(const std::string& name);
 
         [[nodiscard]] const AttributeMap& attributes() const noexcept
         {
-            return m_attributes;
+            return attributes_;
         }
 
-        [[nodiscard]] PrimitiveType primitiveType();
-        [[nodiscard]] unsigned int numPrimitives();
-        [[nodiscard]] unsigned int numPrimitiveVertices();
+        [[nodiscard]] PrimitiveType primitiveType() const noexcept
+        {
+            return primitive_type_;
+        }
+
+        [[nodiscard]] unsigned int numPrimitives() const noexcept
+        {
+            return primitive_count_;
+        }
+
+        [[nodiscard]] unsigned int numPrimitiveVertices() const noexcept
+        {
+            return vertices_per_primitive_;
+        }
+
         [[nodiscard]] std::span<const Index> indexBuffer() const noexcept
         {
-            return m_indexBuffer;
+            return indices_;
         }
 
         unsigned int addPoint(Index point_index);
@@ -101,15 +114,19 @@ namespace houio
         [[nodiscard]] static Ptr createBox(
             const math::BoundingBox3f& bound,
             PrimitiveType primitive_type = PrimitiveType::triangle);
-        [[nodiscard]] static Ptr createLine(const math::V3f& point0, const math::V3f& point1);
+        [[nodiscard]] static Ptr createLine(
+            const math::V3f& point0,
+            const math::V3f& point1);
         [[nodiscard]] static Ptr merge(const std::vector<Ptr>& geometries);
 
     private:
-        AttributeMap m_attributes;
-        PrimitiveType m_primitiveType;
-        std::vector<Index> m_indexBuffer;
-        bool m_indexBufferIsDirty = true;
-        unsigned int m_numPrimitives = 0;
-        unsigned int m_numPrimitiveVertices = 0;
+        [[nodiscard]] static unsigned int fixedVertexCount(PrimitiveType primitive_type);
+        void appendFixedPrimitive(std::span<const Index> point_indices);
+
+        AttributeMap attributes_;
+        PrimitiveType primitive_type_;
+        std::vector<Index> indices_;
+        unsigned int primitive_count_ = 0;
+        unsigned int vertices_per_primitive_ = 0;
     };
 }
