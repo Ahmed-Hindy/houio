@@ -16,6 +16,8 @@
 
 namespace houio
 {
+    class HouGeoIO;
+
     namespace json
     {
         struct Object;
@@ -106,19 +108,32 @@ namespace houio
             static constexpr Storage ATTR_STORAGE_FPREAL16 = Storage::float16;
 
             virtual ~AttributeAdapter();
+
+            [[nodiscard]] std::string name() const;
+            [[nodiscard]] Type type() const;
+            [[nodiscard]] int tupleSize() const;
+            [[nodiscard]] Storage storage() const;
+            [[nodiscard]] std::vector<int> packing() const;
+            [[nodiscard]] int elementCount() const;
+            [[nodiscard]] std::string stringValue(int index) const;
+            [[nodiscard]] std::shared_ptr<json::Object> dictionaryValue(int index) const;
+            [[nodiscard]] virtual RawDataView rawData() const;
+
+            [[nodiscard]] static Type parseType(const std::string& type_name);
+            [[nodiscard]] static Storage parseStorage(const std::string& storage_name);
+            [[nodiscard]] static int storageSize(Storage storage_type);
+
+        protected:
+            friend class ::houio::HouGeoIO;
+
             [[nodiscard]] virtual std::string getName() const;
             [[nodiscard]] virtual Type getType() const;
             [[nodiscard]] virtual int getTupleSize() const;
             [[nodiscard]] virtual Storage getStorage() const;
             virtual void getPacking(std::vector<int>& packing) const;
             [[nodiscard]] virtual int getNumElements() const;
-            [[nodiscard]] virtual RawDataView rawData() const;
             [[nodiscard]] virtual std::string getString(int index) const = 0;
             [[nodiscard]] virtual std::shared_ptr<json::Object> getDictionary(int index) const;
-
-            [[nodiscard]] static Type type(const std::string& type_name);
-            [[nodiscard]] static Storage storage(const std::string& storage_name);
-            [[nodiscard]] static int storageSize(Storage storage_type);
         };
 
         class Topology

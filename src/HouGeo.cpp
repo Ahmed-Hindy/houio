@@ -840,11 +840,13 @@ namespace houio
 		HouGeo::HouAttribute::Ptr attr = std::make_shared<HouGeo::HouAttribute>();
 
 		std::string attrName = attrDef->get<std::string>("name");
-		AttributeAdapter::Type attrType = AttributeAdapter::type(attrDef->get<std::string>("type"));
+		AttributeAdapter::Type attrType = AttributeAdapter::parseType(
+			attrDef->get<std::string>("type"));
 
 		if( attrType == AttributeAdapter::ATTR_TYPE_NUMERIC )
 		{
-			AttributeAdapter::Storage attrStorage = AttributeAdapter::storage(attrData->get<std::string>("storage"));
+			AttributeAdapter::Storage attrStorage = AttributeAdapter::parseStorage(
+				attrData->get<std::string>("storage"));
 			int attrTupleSize = attrData->get<int>("size");
 
 			Attribute::ComponentType attrComponentType = Attribute::componentType(attrData->get<std::string>("storage"));

@@ -202,13 +202,13 @@ int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
     }
 
     const auto fixture = geometry->globalAttribute("fixture");
-    if (!fixture || fixture->getString(0) != "polygon_runs")
+    if (!fixture || fixture->stringValue(0) != "polygon_runs")
     {
         return fail("global string attribute was not preserved");
     }
 
     const auto version = geometry->globalAttribute("version");
-    if (!version || version->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32)
+    if (!version || version->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::int32)
     {
         return fail("global integer attribute metadata was not preserved");
     }
@@ -223,14 +223,14 @@ int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
     }
 
     const auto emptyValue = geometry->globalAttribute("empty_value");
-    if (!emptyValue || emptyValue->getString(0) != "")
+    if (!emptyValue || emptyValue->stringValue(0) != "")
     {
         return fail("empty global string attribute was not preserved");
     }
 
     const auto settings = std::dynamic_pointer_cast<houio::HouGeo::HouAttribute>(
         geometry->globalAttribute("settings"));
-    if (!settings || settings->getType() != houio::HouGeoAdapter::AttributeAdapter::ATTR_TYPE_DICT
+    if (!settings || settings->type() != houio::HouGeoAdapter::AttributeAdapter::Type::dictionary
         || settings->dictionaryValues().size() != 1)
     {
         return fail("global dictionary attribute metadata was not preserved");

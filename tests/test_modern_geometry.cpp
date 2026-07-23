@@ -157,21 +157,21 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
     {
         return fail("modern tuple-based P attribute is missing");
     }
-    if (position->getTupleSize() != expectedPositionTupleSize || position->getNumElements() != 4)
+    if (position->tupleSize() != expectedPositionTupleSize || position->elementCount() != 4)
     {
         return fail(
-            "unexpected P metadata: tuple_size=" + std::to_string(position->getTupleSize())
-            + ", elements=" + std::to_string(position->getNumElements()));
+            "unexpected P metadata: tuple_size=" + std::to_string(position->tupleSize())
+            + ", elements=" + std::to_string(position->elementCount()));
     }
 
     houio::HouGeoAdapter::AttributeAdapter::Ptr normals = geometry->vertexAttribute("N");
-    if (!normals || normals->getTupleSize() != 3 || normals->getNumElements() != 4)
+    if (!normals || normals->tupleSize() != 3 || normals->elementCount() != 4)
     {
         return fail("vertex N attribute was not preserved");
     }
 
     houio::HouGeoAdapter::AttributeAdapter::Ptr uv = geometry->vertexAttribute("uv");
-    if (!uv || uv->getTupleSize() != 2 || uv->getNumElements() != 4)
+    if (!uv || uv->tupleSize() != 2 || uv->elementCount() != 4)
     {
         return fail("vertex uv attribute was not preserved");
     }
@@ -186,15 +186,15 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
     }
 
     houio::HouGeoAdapter::AttributeAdapter::Ptr name = geometry->primitiveAttribute("name");
-    if (!name || name->getType() != houio::HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING
-        || name->getNumElements() != 1 || name->getString(0) != "prop")
+    if (!name || name->type() != houio::HouGeoAdapter::AttributeAdapter::Type::string
+        || name->elementCount() != 1 || name->stringValue(0) != "prop")
     {
         return fail("indexed primitive string attribute was not preserved");
     }
 
     houio::HouGeoAdapter::AttributeAdapter::Ptr piece = geometry->primitiveAttribute("piece");
-    if (!piece || piece->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32
-        || piece->getTupleSize() != 1 || piece->getNumElements() != 1)
+    if (!piece || piece->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::int32
+        || piece->tupleSize() != 1 || piece->elementCount() != 1)
     {
         return fail("primitive integer attribute metadata was not preserved");
     }

@@ -274,7 +274,7 @@ int verifyAttributeAndStringBounds()
     strings.setStringValues({"first"});
     try
     {
-        static_cast<void>(strings.getString(1));
+        static_cast<void>(strings.stringValue(1));
         return fail("HouAttribute accepted an out-of-range string index");
     }
     catch (const std::out_of_range&)

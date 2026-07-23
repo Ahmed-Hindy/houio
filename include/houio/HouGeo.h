@@ -29,6 +29,9 @@ namespace houio
             HouAttribute();
             HouAttribute(const std::string& name, Attribute::Ptr attribute);
 
+        private:
+            friend class HouGeo;
+
             [[nodiscard]] std::string getName() const override;
             [[nodiscard]] Type getType() const override;
             [[nodiscard]] int getTupleSize() const override;
@@ -39,6 +42,7 @@ namespace houio
             [[nodiscard]] std::shared_ptr<json::Object> getDictionary(int index) const override;
             [[nodiscard]] RawDataView rawData() const override;
 
+        public:
             int addString(const std::string& value);
 
             void setName(std::string name)

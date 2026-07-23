@@ -44,8 +44,8 @@ int verifyHalfAttribute(const houio::HouGeo::Ptr& geometry)
 {
     houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->pointAttribute("half_value");
     if (!attribute
-        || attribute->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16
-        || attribute->getTupleSize() != 1 || attribute->getNumElements() != 2)
+        || attribute->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::float16
+        || attribute->tupleSize() != 1 || attribute->elementCount() != 2)
     {
         return fail("Float16 attribute metadata was not preserved");
     }
@@ -66,8 +66,8 @@ int verifyInt64Attribute(const houio::HouGeo::Ptr& geometry)
 
     houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->pointAttribute("large_id");
     if (!attribute
-        || attribute->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64
-        || attribute->getTupleSize() != 1 || attribute->getNumElements() != 2)
+        || attribute->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::int64
+        || attribute->tupleSize() != 1 || attribute->elementCount() != 2)
     {
         return fail("Int64 attribute metadata was not preserved");
     }

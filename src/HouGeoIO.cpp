@@ -48,10 +48,10 @@ namespace houio
 			if( !attribute )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry encountered a null attribute", -1, path});
-			if( attribute->getTupleSize() <= 0 )
+			if (attribute->tupleSize() <= 0)
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry attribute has an invalid tuple size", -1, path});
-			if( attribute->getNumElements() != expectedCount )
+			if (attribute->elementCount() != expectedCount)
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry attribute element count does not match its domain", -1, path});
 		}
@@ -60,12 +60,12 @@ namespace houio
 			const HouGeoAdapter::AttributeAdapter::Ptr& attribute,
 			const std::string& path)
 		{
-			const int component_bytes = HouGeoAdapter::AttributeAdapter::storageSize(attribute->getStorage());
-			if (component_bytes <= 0 || attribute->getTupleSize() <= 0 || attribute->getNumElements() < 0)
+			const int component_bytes = HouGeoAdapter::AttributeAdapter::storageSize(attribute->storage());
+			if (component_bytes <= 0 || attribute->tupleSize() <= 0 || attribute->elementCount() < 0)
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO attribute has invalid numeric storage metadata", -1, path});
-			const size_t component_count = static_cast<size_t>(attribute->getTupleSize());
-			const size_t element_count = static_cast<size_t>(attribute->getNumElements());
+			const size_t component_count = static_cast<size_t>(attribute->tupleSize());
+			const size_t element_count = static_cast<size_t>(attribute->elementCount());
 			const size_t component_size = static_cast<size_t>(component_bytes);
 			if (component_count > std::numeric_limits<size_t>::max() / component_size)
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,

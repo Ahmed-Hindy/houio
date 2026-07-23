@@ -160,7 +160,7 @@ int verifyAdapterDictionaryExport()
     houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
     auto attribute = imported ? imported->globalAttribute("settings")
                               : houio::HouGeoAdapter::AttributeAdapter::Ptr();
-    auto dictionary = attribute ? attribute->getDictionary(0)
+    auto dictionary = attribute ? attribute->dictionaryValue(0)
                                 : std::shared_ptr<houio::json::Object>();
     auto label = dictionary ? dictionary->getObject("label")
                             : std::shared_ptr<houio::json::Object>();

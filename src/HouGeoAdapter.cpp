@@ -6,6 +6,49 @@ namespace houio
 {
     HouGeoAdapter::AttributeAdapter::~AttributeAdapter() = default;
 
+    std::string HouGeoAdapter::AttributeAdapter::name() const
+    {
+        return getName();
+    }
+
+    HouGeoAdapter::AttributeAdapter::Type HouGeoAdapter::AttributeAdapter::type() const
+    {
+        return getType();
+    }
+
+    int HouGeoAdapter::AttributeAdapter::tupleSize() const
+    {
+        return getTupleSize();
+    }
+
+    HouGeoAdapter::AttributeAdapter::Storage HouGeoAdapter::AttributeAdapter::storage() const
+    {
+        return getStorage();
+    }
+
+    std::vector<int> HouGeoAdapter::AttributeAdapter::packing() const
+    {
+        std::vector<int> result;
+        getPacking(result);
+        return result;
+    }
+
+    int HouGeoAdapter::AttributeAdapter::elementCount() const
+    {
+        return getNumElements();
+    }
+
+    std::string HouGeoAdapter::AttributeAdapter::stringValue(int index) const
+    {
+        return getString(index);
+    }
+
+    std::shared_ptr<json::Object> HouGeoAdapter::AttributeAdapter::dictionaryValue(
+        int index) const
+    {
+        return getDictionary(index);
+    }
+
     std::string HouGeoAdapter::AttributeAdapter::getName() const
     {
         return {};
@@ -46,7 +89,7 @@ namespace houio
         return nullptr;
     }
 
-    HouGeoAdapter::AttributeAdapter::Type HouGeoAdapter::AttributeAdapter::type(
+    HouGeoAdapter::AttributeAdapter::Type HouGeoAdapter::AttributeAdapter::parseType(
         const std::string& type_name)
     {
         if (type_name == "numeric")
@@ -58,7 +101,7 @@ namespace houio
         return Type::invalid;
     }
 
-    HouGeoAdapter::AttributeAdapter::Storage HouGeoAdapter::AttributeAdapter::storage(
+    HouGeoAdapter::AttributeAdapter::Storage HouGeoAdapter::AttributeAdapter::parseStorage(
         const std::string& storage_name)
     {
         if (storage_name == "fpreal16")
