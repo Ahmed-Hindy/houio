@@ -1,257 +1,145 @@
-/*---------------------------------------------------------------------
-
-
-
-----------------------------------------------------------------------*/
 #pragma once
 
-namespace houio
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <stdexcept>
+
+namespace houio::math
 {
+    template<typename T>
+    class Matrix22
+    {
+    public:
+        static constexpr std::size_t dimension = 2;
+        std::array<T, dimension * dimension> ma{};
 
+        constexpr Matrix22() noexcept = default;
 
-namespace math
-{
-	//
-	//
-	// memory storage is row major (which is native to the c++ arrays)
-    //     | 0  1  |
-    // M = | 2  3  |
-	//
-	// index the matrix with matrix.m[row][column] -> _m12 means: first row, second column
-	//
-	//           m11 m12
-	//           m21 m22
-	//
-	//
-	template<typename T>
-	class Matrix22
-	{
-	public:
-        Matrix22();
-		~Matrix22();
-		Matrix22( const T &_11, const T &_12,
-			      const T &_21, const T &_22 );
+        constexpr Matrix22(
+            const T& value00,
+            const T& value01,
+            const T& value10,
+            const T& value11) noexcept
+            : ma{value00, value01, value10, value11}
+        {
+        }
 
-		// convience matrix creation functions
-		static Matrix22<T>                                                                 Zero( void );  // returns the zeromatrix
-		static Matrix22<T>                                                             Identity( void );  // returns the identitymatrix
-		static Matrix22<T>                                             RotationMatrix( const T &angle );  // returns a matrix which defines a rotation with the T-specified amount (in radians)
+        [[nodiscard]] static constexpr Matrix22 Zero() noexcept
+        {
+            return Matrix22{};
+        }
 
-		// public methods
-		void                                                                          transpose( void );
-		Matrix22<T>                                                             transposed( void )const;
-		void                                                                             invert( void );
-		T                                                                                       trace(); //returns sum of elements in main diagonal
+        [[nodiscard]] static constexpr Matrix22 Identity() noexcept
+        {
+            return Matrix22(T{1}, T{}, T{}, T{1});
+        }
 
-		// operators
-		bool                                                       operator==( const Matrix22<T> &rhs );
-		bool                                                       operator!=( const Matrix22<T> &rhs );
-		
-		bool                                                       operator+=( const Matrix22<T> &rhs );
-		bool                                                       operator-=( const Matrix22<T> &rhs );
+        [[nodiscard]] static Matrix22 RotationMatrix(const T& angle)
+        {
+            using std::cos;
+            using std::sin;
+            const T sine = static_cast<T>(sin(angle));
+            const T cosine = static_cast<T>(cos(angle));
+            return Matrix22(cosine, -sine, sine, cosine);
+        }
 
-		bool                                                                 operator+=( const T &rhs );
-		bool                                                                 operator-=( const T &rhs );
-		bool                                                                 operator*=( const T &rhs );
-		bool                                                                 operator/=( const T &rhs );
+        [[nodiscard]] constexpr T& operator()(std::size_t row, std::size_t column)
+        {
+            return ma.at(row * dimension + column);
+        }
 
-		union
-		{
-			struct
-			{
-				T _11, _12;	
-				T _21, _22;
-			};
-			T m[2][2];
-			T ma[4];
-		};
-	};
-	
-	
-	
-	
-	template<typename T>
-	Matrix22<T>::Matrix22()
-	{
-		_11=_12=
-		_21=_22=(T)0.0;
-	}
+        [[nodiscard]] constexpr const T& operator()(
+            std::size_t row,
+            std::size_t column) const
+        {
+            return ma.at(row * dimension + column);
+        }
 
-	template<typename T>
-	Matrix22<T>::Matrix22( const T &_11, const T &_12,
-                          const T &_21, const T &_22 )
-	{
-        this->_11=_11; this->_12=_12;
-        this->_21=_21; this->_22=_22;
-	}
+        constexpr void transpose() noexcept
+        {
+            std::swap(ma[1], ma[2]);
+        }
 
-	template<typename T>
-	Matrix22<T>::~Matrix22()
-	{
-	}
+        [[nodiscard]] constexpr Matrix22 transposed() const noexcept
+        {
+            Matrix22 result = *this;
+            result.transpose();
+            return result;
+        }
 
-	// returns the zeromatrix
-	template<typename T>
-	Matrix22<T> Matrix22<T>::Zero( void )
-	{
-		return Matrix22<T>( (T)0.0, (T)0.0,
-			              (T)0.0, (T)0.0);
-	}
+        void invert()
+        {
+            const T determinant = ma[0] * ma[3] - ma[1] * ma[2];
+            using std::abs;
+            if (abs(determinant) <= static_cast<T>(1.0e-12))
+                throw std::domain_error("Matrix22 is singular");
+            const T reciprocal = T{1} / determinant;
+            *this = Matrix22(
+                ma[3] * reciprocal,
+                -ma[1] * reciprocal,
+                -ma[2] * reciprocal,
+                ma[0] * reciprocal);
+        }
 
-	// returns the identitymatrix
-	template<typename T>
-	Matrix22<T> Matrix22<T>::Identity( void )
-	{
-		return Matrix22<T>( (T)1.0, (T)0.0,
-			              (T)0.0, (T)1.0);
-	}
+        [[nodiscard]] constexpr T trace() const noexcept
+        {
+            return ma[0] + ma[3];
+        }
 
+        [[nodiscard]] constexpr bool operator==(const Matrix22& rhs) const noexcept
+        {
+            return ma == rhs.ma;
+        }
 
-	// returns a matrix which defines a rotation with the T-specified amount (in radians)
-	template<typename T>
-	Matrix22<T> Matrix22<T>::RotationMatrix( const T &angle )
-	{
-		T s = sin( angle );
-		T c = cos( angle );
-		return Matrix22<T>( c, -s,
-			                s, c );
-	}
+        [[nodiscard]] constexpr bool operator!=(const Matrix22& rhs) const noexcept
+        {
+            return !(*this == rhs);
+        }
 
-	template<typename T>
-	void Matrix22<T>::transpose( void )
-	{
-		Matrix22<T> temp = *this;
+        constexpr Matrix22& operator+=(const Matrix22& rhs) noexcept
+        {
+            for (std::size_t index = 0; index < ma.size(); ++index)
+                ma[index] += rhs.ma[index];
+            return *this;
+        }
 
-		_11 = temp._11;
-		_12 = temp._21;
+        constexpr Matrix22& operator-=(const Matrix22& rhs) noexcept
+        {
+            for (std::size_t index = 0; index < ma.size(); ++index)
+                ma[index] -= rhs.ma[index];
+            return *this;
+        }
 
-		_21 = temp._12;
-		_22 = temp._22;
-	}
+        constexpr Matrix22& operator+=(const T& rhs) noexcept
+        {
+            for (T& value : ma)
+                value += rhs;
+            return *this;
+        }
 
-	template<typename T>
-	Matrix22<T> Matrix22<T>::transposed( void )const
-	{
-		Matrix22<T> m = *this;
-		m.transpose();
-		return m;
-	}
+        constexpr Matrix22& operator-=(const T& rhs) noexcept
+        {
+            for (T& value : ma)
+                value -= rhs;
+            return *this;
+        }
 
-	template<typename T>
-	void Matrix22<T>::invert( void )
-	{
-		// a b
-		// c d
-		//Then the inverse is 1/(ad-cb) * d -b-c a
-		//T c = (T)1.0/( _11*_22 - _21*_12 );
-		//*this = Matrix22<T>( c*_22, -c*_12, -c*_21, c*_11 );
-	}
+        constexpr Matrix22& operator*=(const T& rhs) noexcept
+        {
+            for (T& value : ma)
+                value *= rhs;
+            return *this;
+        }
 
+        constexpr Matrix22& operator/=(const T& rhs)
+        {
+            for (T& value : ma)
+                value /= rhs;
+            return *this;
+        }
+    };
 
-	//returns sum of elements in main diagonal
-	template<typename T>
-	T Matrix22<T>::trace()
-	{
-		return _11 + _22;
-	}
-
-	template<typename T>
-	bool Matrix22<T>::operator==( const Matrix22<T> &rhs )
-	{
-		if( _11==rhs._11 && _12==rhs._12 &&
-			_21==rhs._21 && _22==rhs._22 )
-			return true;
-		else
-			return false; 
-	}
-
-	template<typename T>
-	bool Matrix22<T>::operator!=( const Matrix22<T> &rhs )
-	{
-		return !((*this)==rhs);
-	}
-
-	template<typename T>
-	bool Matrix22<T>::operator+=( const Matrix22<T> &rhs )
-	{
-		_11+=rhs._11;
-		_12+=rhs._12;
-
-
-		_21+=rhs._21;
-		_22+=rhs._22;
-
-		return true;
-	}
-
-	template<typename T>
-	bool Matrix22<T>::operator-=( const Matrix22<T> &rhs )
-	{
-		_11-=rhs._11;
-		_12-=rhs._12;
-
-
-		_21-=rhs._21;
-		_22-=rhs._22;
-
-		return true;
-	}
-
-	template<typename T>
-	bool Matrix22<T>::operator+=( const T &rhs )
-	{
-		_11+=rhs;
-		_12+=rhs;
-
-
-		_21+=rhs;
-		_22+=rhs;
-
-		return true;
-	}
-
-
-	template<typename T>
-	bool Matrix22<T>::operator-=( const T &rhs )
-	{
-		_11-=rhs;
-		_12-=rhs;
-
-		_21-=rhs;
-		_22-=rhs;
-
-		return true;
-	}
-
-	template<typename T>
-	bool Matrix22<T>::operator*=( const T &rhs )
-	{
-		_11*=rhs;
-		_12*=rhs;
-
-		_21*=rhs;
-		_22*=rhs;
-
-		return true;
-	}
-
-
-	template<typename T>
-	bool Matrix22<T>::operator/=( const T &rhs )
-	{
-		_11/=rhs;
-		_12/=rhs;
-
-		_21/=rhs;
-		_22/=rhs;
-
-		return true;
-	}
-
-
-
-	typedef Matrix22<float> Matrix22f;
-	typedef Matrix22<double> Matrix22d;
+    using Matrix22f = Matrix22<float>;
+    using Matrix22d = Matrix22<double>;
 }
-
-} // namespace houio

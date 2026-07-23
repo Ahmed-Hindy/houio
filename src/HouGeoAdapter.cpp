@@ -9,18 +9,9 @@ namespace houio
 
 
 	// HouGeoAdapter::RawPointer ==================================================
-	HouGeoAdapter::RawPointer::~RawPointer()
+	HouGeoAdapter::RawPointer::Ptr HouGeoAdapter::RawPointer::create(const void* data)
 	{
-		if(freeOnDestruction)
-			free(ptr);
-	}
-
-	HouGeoAdapter::RawPointer::Ptr HouGeoAdapter::RawPointer::create( void *ptr, bool freeOnDestruction )
-	{
-		HouGeoAdapter::RawPointer *rp = new HouGeoAdapter::RawPointer();
-		rp->ptr = ptr;
-		rp->freeOnDestruction = freeOnDestruction;
-		return HouGeoAdapter::RawPointer::Ptr(rp);
+		return std::make_shared<RawPointer>(data);
 	}
 
 	// HouGeoAdapter::Attribute ==================================================

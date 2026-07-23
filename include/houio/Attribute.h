@@ -1,250 +1,235 @@
 #pragma once
+
+#include <cstddef>
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <span>
 #include <stdexcept>
+#include <string>
+#include <type_traits>
 #include <vector>
+
 #include <houio/math/Math.h>
-
-
+#include <houio/types.h>
 
 namespace houio
 {
+    class Attribute
+    {
+    public:
+        using Ptr = std::shared_ptr<Attribute>;
+        using CPtr = std::shared_ptr<const Attribute>;
 
-	// basicly a list manager
-	struct Attribute
-	{
-		typedef std::shared_ptr<Attribute> Ptr;
-		typedef std::shared_ptr<const Attribute> CPtr;
+        enum class ComponentType
+        {
+            invalid,
+            int32,
+            float32,
+            int64,
+            float16,
+        };
 
-		enum ComponentType
-		{
-			INVALID,
-			INT,
-			FLOAT,
-			INT64,
-			HALF
-		};
+        // Compatibility names retained while callers migrate to scoped values.
+        static constexpr ComponentType INVALID = ComponentType::invalid;
+        static constexpr ComponentType INT = ComponentType::int32;
+        static constexpr ComponentType FLOAT = ComponentType::float32;
+        static constexpr ComponentType INT64 = ComponentType::int64;
+        static constexpr ComponentType HALF = ComponentType::float16;
 
-		Attribute( int numComponents=3, ComponentType componentType = FLOAT );
-		~Attribute();
+        explicit Attribute(
+            int component_count = 3,
+            ComponentType component_type = ComponentType::float32);
+        ~Attribute() = default;
 
-		Attribute::Ptr copy();
+        [[nodiscard]] Ptr copy() const;
 
-		template<typename T>
-		unsigned int appendElement( const T &value );
-		template<typename T>
-		unsigned int appendElement( const T &v0, const T &v1 );
-		template<typename T>
-		unsigned int appendElement( const T &v0, const T &v1, const T &v2 );
-		template<typename T>
-		unsigned int appendElement( const T &v0, const T &v1, const T &v2, const T &v3 );
+        template<typename T>
+        unsigned int appendElement(const T& value);
+        template<typename T>
+        unsigned int appendElement(const T& value0, const T& value1);
+        template<typename T>
+        unsigned int appendElement(const T& value0, const T& value1, const T& value2);
+        template<typename T>
+        unsigned int appendElement(
+            const T& value0,
+            const T& value1,
+            const T& value2,
+            const T& value3);
 
-		template<typename T>
-		T &get( unsigned int index );
+        template<typename T>
+        [[nodiscard]] T get(unsigned int index) const;
 
-		template<typename T>
-		void set( unsigned int index, T value );
-		template<typename T>
-		void set( unsigned int index, T v0, T v1 );
-		template<typename T>
-		void set( unsigned int index, T v0, T v1, T v2 );
-		template<typename T>
-		void set( unsigned int index, T v0, T v1, T v2, T v3 );
+        template<typename T>
+        void set(unsigned int index, const T& value);
+        template<typename T>
+        void set(unsigned int index, const T& value0, const T& value1);
+        template<typename T>
+        void set(unsigned int index, const T& value0, const T& value1, const T& value2);
+        template<typename T>
+        void set(
+            unsigned int index,
+            const T& value0,
+            const T& value1,
+            const T& value2,
+            const T& value3);
 
+        void clear() noexcept;
+        void resize(std::size_t element_count);
+        void fillZero() noexcept;
+        void append(const Attribute& source);
+        unsigned int duplicateElement(unsigned int source_index);
 
-		void clear()
-		{
-			m_data.clear();
-			m_numElements = 0;
-			m_isDirty = true;
-		}
+        [[nodiscard]] int numElements() const;
+        [[nodiscard]] int numComponents() const noexcept;
+        [[nodiscard]] ComponentType elementComponentType() const noexcept;
+        [[nodiscard]] int elementComponentSize() const noexcept;
+        [[nodiscard]] std::size_t elementByteSize() const noexcept;
+        [[nodiscard]] std::size_t byteSize() const noexcept;
+        [[nodiscard]] bool isDirty() const noexcept;
+        void markClean() noexcept;
 
-		void resize( size_t numElements )
-		{
-			const size_t componentCount = static_cast<size_t>(numComponents());
-			const size_t componentBytes = static_cast<size_t>(elementComponentSize());
-			if( componentCount != 0 && numElements > std::numeric_limits<size_t>::max() / componentCount )
-				throw std::length_error( "Attribute element count exceeds addressable storage" );
-			const size_t scalarCount = numElements * componentCount;
-			if( componentBytes != 0 && scalarCount > std::numeric_limits<size_t>::max() / componentBytes )
-				throw std::length_error( "Attribute byte count exceeds addressable storage" );
-			m_data.resize(scalarCount * componentBytes);
-			m_numElements = numElements;
-			m_isDirty = true;
-		}
+        [[nodiscard]] std::span<std::byte> bytes() noexcept;
+        [[nodiscard]] std::span<const std::byte> bytes() const noexcept;
+        [[nodiscard]] std::span<std::byte> elementBytes(std::size_t index);
+        [[nodiscard]] std::span<const std::byte> elementBytes(std::size_t index) const;
 
+        // Compatibility pointer access. Prefer bytes() and elementBytes().
+        [[nodiscard]] void* getRawPointer() noexcept;
+        [[nodiscard]] const void* getRawPointer() const noexcept;
+        [[nodiscard]] void* getRawPointer(int index);
+        [[nodiscard]] const void* getRawPointer(int index) const;
 
-		int numElements()const
-		{
-			if( m_numElements > static_cast<size_t>(std::numeric_limits<int>::max()) )
-				throw std::overflow_error( "Attribute element count exceeds int range" );
-			return static_cast<int>(m_numElements);
-		}
+        [[nodiscard]] static Ptr create(
+            int component_count,
+            ComponentType component_type,
+            const void* raw_data,
+            int element_count);
+        [[nodiscard]] static Ptr createM33f();
+        [[nodiscard]] static Ptr createM44f();
+        [[nodiscard]] static Ptr createV4f(int element_count = 0);
+        [[nodiscard]] static Ptr createV3f(int element_count = 0);
+        [[nodiscard]] static Ptr createV2f(int element_count = 0);
+        [[nodiscard]] static Ptr createFloat(int element_count = 0);
+        [[nodiscard]] static Ptr createInt(int element_count = 0);
 
-		int numComponents()const
-		{
-			return m_numComponents;
-		}
+        [[nodiscard]] static int componentSize(ComponentType component_type);
+        [[nodiscard]] static ComponentType componentType(const std::string& storage_name);
 
-		ComponentType elementComponentType();
+    private:
+        template<typename T>
+        static constexpr bool isByteCopyable = std::is_trivially_copyable_v<T>;
 
-		int elementComponentSize()const
-		{
-			return m_componentSize;
-		}
+        [[nodiscard]] std::size_t checkedElementOffset(std::size_t index) const;
+        [[nodiscard]] unsigned int checkedNextElementIndex() const;
+        void validateElementRepresentation(std::size_t representation_bytes) const;
+        void appendElementBytes(std::span<const std::byte> source);
+        void setElementBytes(std::size_t index, std::span<const std::byte> source);
 
-		void *getRawPointer()
-		{
-			if (m_data.empty())
-				return 0;
-			return (void *)&m_data[0];
-		}
-		void *getRawPointer( int index )
-		{
-			if( index < 0 )
-				throw std::out_of_range( "Attribute index cannot be negative" );
-			const size_t byteOffset = static_cast<size_t>(index) * static_cast<size_t>(numComponents())
-				* static_cast<size_t>(elementComponentSize());
-			if( byteOffset >= m_data.size() )
-				throw std::out_of_range( "Attribute index exceeds stored data" );
-			return static_cast<void*>(m_data.data() + byteOffset);
-		}
+        std::vector<std::byte> data_;
+        int component_size_ = 0;
+        ComponentType component_type_ = ComponentType::invalid;
+        int component_count_ = 0;
+        std::size_t element_count_ = 0;
+        bool dirty_ = true;
+    };
 
+    template<typename T>
+    unsigned int Attribute::appendElement(const T& value)
+    {
+        static_assert(isByteCopyable<T>, "Attribute values must be trivially copyable");
+        validateElementRepresentation(sizeof(T));
+        const unsigned int index = checkedNextElementIndex();
+        const auto source = std::as_bytes(std::span<const T>(&value, 1));
+        appendElementBytes(source);
+        return index;
+    }
 
+    template<typename T>
+    unsigned int Attribute::appendElement(const T& value0, const T& value1)
+    {
+        static_assert(isByteCopyable<T>, "Attribute values must be trivially copyable");
+        const T values[] = {value0, value1};
+        validateElementRepresentation(sizeof(values));
+        const unsigned int index = checkedNextElementIndex();
+        appendElementBytes(std::as_bytes(std::span<const T>(values)));
+        return index;
+    }
 
+    template<typename T>
+    unsigned int Attribute::appendElement(const T& value0, const T& value1, const T& value2)
+    {
+        static_assert(isByteCopyable<T>, "Attribute values must be trivially copyable");
+        const T values[] = {value0, value1, value2};
+        validateElementRepresentation(sizeof(values));
+        const unsigned int index = checkedNextElementIndex();
+        appendElementBytes(std::as_bytes(std::span<const T>(values)));
+        return index;
+    }
 
+    template<typename T>
+    unsigned int Attribute::appendElement(
+        const T& value0,
+        const T& value1,
+        const T& value2,
+        const T& value3)
+    {
+        static_assert(isByteCopyable<T>, "Attribute values must be trivially copyable");
+        const T values[] = {value0, value1, value2, value3};
+        validateElementRepresentation(sizeof(values));
+        const unsigned int index = checkedNextElementIndex();
+        appendElementBytes(std::as_bytes(std::span<const T>(values)));
+        return index;
+    }
 
-		std::vector<unsigned char> m_data;
-		int               m_componentSize; // size in memory of a component of an element in byte
-		ComponentType     m_componentType;
-		int               m_numComponents; // number of components per element
-		size_t              m_numElements;
+    template<typename T>
+    T Attribute::get(unsigned int index) const
+    {
+        static_assert(isByteCopyable<T>, "Attribute values must be trivially copyable");
+        validateElementRepresentation(sizeof(T));
+        T value{};
+        const auto source = elementBytes(index);
+        std::memcpy(&value, source.data(), sizeof(T));
+        return value;
+    }
 
-		//
-		// static creators
-		//
-		static Attribute::Ptr create(int numComponents, ComponentType componentType, const unsigned char *raw, int numElements );
-		static Attribute::Ptr createM33f();
-		static Attribute::Ptr createM44f();
-		static Attribute::Ptr createV4f( int numElements = 0 );
-		static Attribute::Ptr createV3f( int numElements = 0 );
-		static Attribute::Ptr createV2f( int numElements = 0 );
-		static Attribute::Ptr createFloat(int numElements = 0);
-		static Attribute::Ptr createInt(int numElements = 0);
+    template<typename T>
+    void Attribute::set(unsigned int index, const T& value)
+    {
+        static_assert(isByteCopyable<T>, "Attribute values must be trivially copyable");
+        validateElementRepresentation(sizeof(T));
+        setElementBytes(index, std::as_bytes(std::span<const T>(&value, 1)));
+    }
 
-		//
-		// static utilities
-		//
-		static int             componentSize( ComponentType ct );
-		static ComponentType   componentType(const std::string& ct );
+    template<typename T>
+    void Attribute::set(unsigned int index, const T& value0, const T& value1)
+    {
+        static_assert(isByteCopyable<T>, "Attribute values must be trivially copyable");
+        const T values[] = {value0, value1};
+        validateElementRepresentation(sizeof(values));
+        setElementBytes(index, std::as_bytes(std::span<const T>(values)));
+    }
 
-		bool                   m_isDirty; // indicates update on gpu required
-	};
+    template<typename T>
+    void Attribute::set(unsigned int index, const T& value0, const T& value1, const T& value2)
+    {
+        static_assert(isByteCopyable<T>, "Attribute values must be trivially copyable");
+        const T values[] = {value0, value1, value2};
+        validateElementRepresentation(sizeof(values));
+        setElementBytes(index, std::as_bytes(std::span<const T>(values)));
+    }
 
-
-	template<typename T>
-	unsigned int Attribute::appendElement( const T &value )
-	{
-		if( m_numElements > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) )
-			throw std::overflow_error( "Attribute element index exceeds unsigned int range" );
-		const unsigned int elementIndex = static_cast<unsigned int>(m_numElements);
-		const size_t byteOffset = m_data.size();
-		m_data.resize(byteOffset + sizeof(T));
-		std::memcpy(m_data.data() + byteOffset, &value, sizeof(T));
-		++m_numElements;
-		m_isDirty = true;
-		return elementIndex;
-	}
-
-	template<typename T>
-	unsigned int Attribute::appendElement( const T &v0, const T &v1 )
-	{
-		const T values[] = {v0, v1};
-		if( m_numElements > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) )
-			throw std::overflow_error( "Attribute element index exceeds unsigned int range" );
-		const unsigned int elementIndex = static_cast<unsigned int>(m_numElements);
-		const size_t byteOffset = m_data.size();
-		m_data.resize(byteOffset + sizeof(values));
-		std::memcpy(m_data.data() + byteOffset, values, sizeof(values));
-		++m_numElements;
-		m_isDirty = true;
-		return elementIndex;
-	}
-
-	template<typename T>
-	unsigned int Attribute::appendElement( const T &v0, const T &v1, const T &v2 )
-	{
-		const T values[] = {v0, v1, v2};
-		if( m_numElements > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) )
-			throw std::overflow_error( "Attribute element index exceeds unsigned int range" );
-		const unsigned int elementIndex = static_cast<unsigned int>(m_numElements);
-		const size_t byteOffset = m_data.size();
-		m_data.resize(byteOffset + sizeof(values));
-		std::memcpy(m_data.data() + byteOffset, values, sizeof(values));
-		++m_numElements;
-		m_isDirty = true;
-		return elementIndex;
-	}
-
-	template<typename T>
-	unsigned int Attribute::appendElement( const T &v0, const T &v1, const T &v2, const T &v3 )
-	{
-		const T values[] = {v0, v1, v2, v3};
-		if( m_numElements > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) )
-			throw std::overflow_error( "Attribute element index exceeds unsigned int range" );
-		const unsigned int elementIndex = static_cast<unsigned int>(m_numElements);
-		const size_t byteOffset = m_data.size();
-		m_data.resize(byteOffset + sizeof(values));
-		std::memcpy(m_data.data() + byteOffset, values, sizeof(values));
-		++m_numElements;
-		m_isDirty = true;
-		return elementIndex;
-	}
-
-	template<typename T>
-	T &Attribute::get( unsigned int index )
-	{
-		T *data = (T*)&m_data[index * sizeof(T)];
-		return *data;
-	}
-
-	template<typename T>
-	void Attribute::set( unsigned int index, T value )
-	{
-		T *data = (T*)&m_data[index * sizeof(T)];
-		*data = value;
-		m_isDirty = true;
-	}
-
-	template<typename T>
-	void Attribute::set( unsigned int index, T v0, T v1 )
-	{
-		T *data = (T*)&m_data[index * sizeof(T) * 2];
-		*data++ = v0;
-		*data++ = v1;
-		m_isDirty = true;
-	}
-
-	template<typename T>
-	void Attribute::set( unsigned int index, T v0, T v1, T v2 )
-	{
-		T *data = (T*)&m_data[index * sizeof(T) * 3];
-		*data++ = v0;
-		*data++ = v1;
-		*data++ = v2;
-		m_isDirty = true;
-	}
-
-	template<typename T>
-	void Attribute::set( unsigned int index, T v0, T v1, T v2, T v3 )
-	{
-		T *data = (T*)&m_data[index * sizeof(T) * 4];
-		*data++ = v0;
-		*data++ = v1;
-		*data++ = v2;
-		*data++ = v3;
-		m_isDirty = true;
-	}
-
-} // namespace houio
+    template<typename T>
+    void Attribute::set(
+        unsigned int index,
+        const T& value0,
+        const T& value1,
+        const T& value2,
+        const T& value3)
+    {
+        static_assert(isByteCopyable<T>, "Attribute values must be trivially copyable");
+        const T values[] = {value0, value1, value2, value3};
+        validateElementRepresentation(sizeof(values));
+        setElementBytes(index, std::as_bytes(std::span<const T>(values)));
+    }
+}

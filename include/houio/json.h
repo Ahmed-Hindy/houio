@@ -3,8 +3,8 @@
 // Houdini ASCII and binary JSON parser, event handlers, value tree, and writers.
 
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
-#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -13,12 +13,13 @@
 #include <sstream>
 #include <stack>
 #include <stdexcept>
+#include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <houio/Diagnostic.h>
 #include <houio/HalfFloat.h>
 #include <houio/types.h>
-#include <ttl/var/variant.hpp>
 
 
 
@@ -88,17 +89,17 @@ namespace houio
 				JID_MAGIC               = 0x7f
 			};
 
-			typedef ttl::var::variant<bool,           // bool
-									  sbyte,          // int8
-									  sword,          // int16
-									  sint32,         // int32
-									  sint64,         // int64
-									  real32,         // real16 values are widened to real32
-									  real64,         // real64
-									  ubyte,          // uint8
-									  uword,          // uint16
-									  std::string    // string
-									  > Value;
+			using Value = std::variant<
+				bool,
+				sbyte,
+				sword,
+				sint32,
+				sint64,
+				real32,
+				real64,
+				ubyte,
+				uword,
+				std::string>;
 			Token();
 			void event( Parser *p, int key = false );
 
@@ -110,6 +111,23 @@ namespace houio
 
 
 		// UTILITY FUNCTIONS ======================================
+
+		template<typename T, typename Variant>
+		struct VariantIndex;
+
+		template<typename T, typename... Rest>
+		struct VariantIndex<T, std::variant<T, Rest...>> : std::integral_constant<size_t, 0>
+		{
+		};
+
+		template<typename T, typename First, typename... Rest>
+		struct VariantIndex<T, std::variant<First, Rest...>>
+			: std::integral_constant<size_t, 1 + VariantIndex<T, std::variant<Rest...>>::value>
+		{
+		};
+
+		template<typename T, typename Variant>
+		inline constexpr size_t variantIndex = VariantIndex<T, Variant>::value;
 
 		template<typename T>
 		T fromString(const std::string& value)
@@ -670,14 +688,14 @@ namespace houio
 		struct Value
 		{
 
-			typedef ttl::var::variant<bool,           // order
-									  sint32,         // must
-									  real32,         // not
-									  real64,         // change
-									  std::string,    // !!!!!! - because index is used in is* methods
-									  ubyte,          // also: if you add something here you need to update Value::cpyTo, JSONWriter::operators
-									  sint64
-									  > Variant;
+			using Variant = std::variant<
+				bool,
+				sint32,
+				real32,
+				real64,
+				std::string,
+				ubyte,
+				sint64>;
 
 			Value();
 
@@ -873,7 +891,7 @@ namespace houio
 		{
 			T dest = T();
 			VariantConverter<T> conv(dest);
-			ttl::var::apply_visitor(conv, m_value);
+			std::visit(conv, m_value);
 			return dest;
 		}
 
@@ -916,11 +934,11 @@ namespace houio
 			void                     append(ArrayPtr &array );
 
 		//private:
-			std::vector<Value>                     m_values;
-			bool                                m_isUniform;
-			unsigned char*                    m_uniformdata;
-			sint64                     m_numUniformElements;
-			int                               m_uniformType; // integer which equals Variant::which()
+			std::vector<Value> values;
+			bool uses_uniform_storage;
+			std::vector<std::byte> uniform_data;
+			sint64 uniform_element_count;
+			int uniform_type_index;
 		};
 
 
@@ -1054,7 +1072,7 @@ namespace houio
 				|| elementCount > std::numeric_limits<size_t>::max() / sizeof(S) )
 				throw std::length_error( "JSONReader::jsonUA allocation size overflow" );
 
-			typedef ttl::meta::find_equivalent_type<const T&, Value::Variant::list> found;
+			constexpr size_t uniformTypeIndex = variantIndex<T, Value::Variant>;
 			std::vector<T> convertedData;
 			sint64 elementsRemaining = numElements;
 			constexpr size_t chunkCapacity = 4096;
@@ -1072,16 +1090,14 @@ namespace houio
 
 			Value v = Value::createArray();
 			ArrayPtr ua = v.asArray();
-			ua->m_isUniform = true;
-			ua->m_numUniformElements = numElements;
-			ua->m_uniformType = found::index;
+			ua->uses_uniform_storage = true;
+			ua->uniform_element_count = numElements;
+			ua->uniform_type_index = static_cast<int>(uniformTypeIndex);
 
 			const size_t destinationBytes = elementCount * sizeof(T);
-			ua->m_uniformdata = static_cast<unsigned char*>(std::malloc(destinationBytes));
-			if( destinationBytes > 0 && !ua->m_uniformdata )
-				throw std::bad_alloc();
+			ua->uniform_data.resize(destinationBytes);
 			if( destinationBytes > 0 )
-				std::memcpy(ua->m_uniformdata, convertedData.data(), destinationBytes);
+				std::memcpy(ua->uniform_data.data(), convertedData.data(), destinationBytes);
 
 			if( m_root.isArray() )
 				m_root.asArray()->append(v);
@@ -1093,34 +1109,31 @@ namespace houio
 		// JSONWriter =========================================
 		struct JSONWriter
 		{
-			JSONWriter( std::ostream *out, bool binary = false )
+			explicit JSONWriter( std::ostream *out, bool binary = false )
 			{
 				if(binary)
-					m_writer = new BinaryWriter(out);
+					writer_ = std::make_unique<BinaryWriter>(out);
 				else
-					m_writer = new ASCIIWriter(out);
+					writer_ = std::make_unique<ASCIIWriter>(out);
 			}
 
-			~JSONWriter()
-			{
-				delete m_writer;
-			}
+			~JSONWriter() = default;
 
 			bool                    write( ObjectPtr object );
 			bool                        write( ArrayPtr arr );
 			bool                        write( Value &value );
 
 			//used in combination with visitor pattern
-			void operator()( bool value ){m_writer->jsonBool(value);}
-			void operator()( ubyte value ){m_writer->jsonUInt8(value);}
-			void operator()( sbyte value ){m_writer->jsonInt8(value);}
-			void operator()( sint32 value ){m_writer->jsonInt32(value);}
-			void operator()( sint64 value ){m_writer->jsonInt64(value);}
-			void operator()( real32 value ){m_writer->jsonReal32(value);}
-			void operator()( real64 value ){m_writer->jsonReal64(value);}
-			void operator()( const std::string &value ){m_writer->jsonString(value);}
+			void operator()( bool value ){writer_->jsonBool(value);}
+			void operator()( ubyte value ){writer_->jsonUInt8(value);}
+			void operator()( sbyte value ){writer_->jsonInt8(value);}
+			void operator()( sint32 value ){writer_->jsonInt32(value);}
+			void operator()( sint64 value ){writer_->jsonInt64(value);}
+			void operator()( real32 value ){writer_->jsonReal32(value);}
+			void operator()( real64 value ){writer_->jsonReal64(value);}
+			void operator()( const std::string &value ){writer_->jsonString(value);}
 		private:
-			Writer                                  *m_writer;
+			std::unique_ptr<Writer> writer_;
 		};
 
 	}

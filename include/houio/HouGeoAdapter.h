@@ -19,21 +19,21 @@ namespace houio
 
 	struct HouGeoAdapter
 	{
-		typedef std::shared_ptr<HouGeoAdapter> Ptr;
+		using Ptr = std::shared_ptr<HouGeoAdapter>;
 
-		struct RawPointer
+		struct RawPointer final
 		{
-			typedef std::shared_ptr<RawPointer> Ptr;
+			using Ptr = std::shared_ptr<RawPointer>;
 
-			~RawPointer();
-			static Ptr           create( void *ptr, bool freeOnDestruction = false );
-			void*                ptr;
-			bool                 freeOnDestruction;
+			explicit RawPointer(const void* data_value) noexcept : ptr(data_value) {}
+			static Ptr create(const void* data);
+
+			const void* ptr = nullptr;
 		};
 
 		struct AttributeAdapter
 		{
-			typedef std::shared_ptr<AttributeAdapter> Ptr;
+			using Ptr = std::shared_ptr<AttributeAdapter>;
 
 			virtual ~AttributeAdapter();
 			enum Type
@@ -68,7 +68,7 @@ namespace houio
 
 		struct Topology
 		{
-			typedef std::shared_ptr<Topology> Ptr;
+			using Ptr = std::shared_ptr<Topology>;
 
 			virtual ~Topology();
 
@@ -79,7 +79,7 @@ namespace houio
 
 		struct Primitive
 		{
-			typedef std::shared_ptr<Primitive> Ptr;
+			using Ptr = std::shared_ptr<Primitive>;
 			enum Type
 			{
 				PRIM_VOLUME,
@@ -93,7 +93,7 @@ namespace houio
 
 		struct VolumePrimitive : public Primitive
 		{
-			typedef std::shared_ptr<VolumePrimitive> Ptr;
+			using Ptr = std::shared_ptr<VolumePrimitive>;
 
 			virtual math::M44f                 getTransform()const=0;
 			virtual int                        getVertex()const=0;
@@ -107,7 +107,7 @@ namespace houio
 
 		struct PolyPrimitive : public Primitive
 		{
-			typedef std::shared_ptr<PolyPrimitive> Ptr;
+			using Ptr = std::shared_ptr<PolyPrimitive>;
 
 			virtual int                        numPolys()const;
 			virtual int                        numVertices( int poly )const;

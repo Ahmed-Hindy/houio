@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cmath>
+#include <ostream>
+#include <stdexcept>
 #include <type_traits>
 
 namespace houio::math
@@ -8,17 +10,28 @@ namespace houio::math
     template<typename T>
     struct Vec4
     {
-        constexpr Vec4() : x{}, y{}, z{}, w{} {}
+        T x{};
+        T y{};
+        T z{};
+        T w{};
 
-        constexpr Vec4(const T& xValue, const T& yValue, const T& zValue, const T& wValue)
-            : x(xValue), y(yValue), z(zValue), w(wValue)
+        constexpr Vec4() noexcept = default;
+        constexpr Vec4(
+            const T& x_value,
+            const T& y_value,
+            const T& z_value,
+            const T& w_value) noexcept
+            : x(x_value), y(y_value), z(z_value), w(w_value)
         {
         }
 
-        constexpr Vec4(const T& value) : x(value), y(value), z(value), w(value) {}
+        explicit constexpr Vec4(const T& value) noexcept
+            : x(value), y(value), z(value), w(value)
+        {
+        }
 
         template<typename S>
-        constexpr Vec4(const Vec4<S>& value)
+        constexpr Vec4(const Vec4<S>& value) noexcept
             : x(static_cast<T>(value.x)),
               y(static_cast<T>(value.y)),
               z(static_cast<T>(value.z)),
@@ -26,7 +39,7 @@ namespace houio::math
         {
         }
 
-        bool operator==(const Vec4<T>& rhs) const
+        [[nodiscard]] constexpr bool operator==(const Vec4& rhs) const noexcept
         {
             if constexpr (std::is_floating_point_v<T>)
             {
@@ -39,23 +52,44 @@ namespace houio::math
             return x == rhs.x && y == rhs.y && z == rhs.z && w == rhs.w;
         }
 
-        bool operator!=(const Vec4<T>& rhs) const
+        [[nodiscard]] constexpr bool operator!=(const Vec4& rhs) const noexcept
         {
             return !(*this == rhs);
         }
 
-        union
+        [[nodiscard]] constexpr const T& operator[](int index) const
         {
-            struct
-            {
-                T x;
-                T y;
-                T z;
-                T w;
-            };
-            T v[4];
-        };
+            if (index == 0)
+                return x;
+            if (index == 1)
+                return y;
+            if (index == 2)
+                return z;
+            if (index == 3)
+                return w;
+            throw std::out_of_range("Vec4 index is out of range");
+        }
+
+        [[nodiscard]] constexpr T& operator[](int index)
+        {
+            if (index == 0)
+                return x;
+            if (index == 1)
+                return y;
+            if (index == 2)
+                return z;
+            if (index == 3)
+                return w;
+            throw std::out_of_range("Vec4 index is out of range");
+        }
     };
+
+    template<typename T>
+    std::ostream& operator<<(std::ostream& stream, const Vec4<T>& value)
+    {
+        return stream << '(' << value.x << ' ' << value.y << ' '
+                      << value.z << ' ' << value.w << ')';
+    }
 
     using Vec4f = Vec4<float>;
     using V4f = Vec4<float>;

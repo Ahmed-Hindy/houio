@@ -100,16 +100,16 @@ namespace houio
 		template<typename T>
 		std::vector<T> copyUniformValues( const json::ArrayPtr &array )
 		{
-			if( array->m_numUniformElements < 0 )
+			if( array->uniform_element_count < 0 )
 				throw std::runtime_error( "Cannot export a uniform array with a negative element count" );
-			const size_t elementCount = static_cast<size_t>(array->m_numUniformElements);
+			const size_t elementCount = static_cast<size_t>(array->uniform_element_count);
 			if( elementCount > std::numeric_limits<size_t>::max() / sizeof(T) )
 				throw std::length_error( "Uniform JSON array byte count overflow" );
-			if( elementCount > 0 && !array->m_uniformdata )
-				throw std::runtime_error( "Cannot export a uniform array with missing data" );
+			if( elementCount * sizeof(T) != array->uniform_data.size() )
+				throw std::runtime_error( "Cannot export a uniform array with inconsistent storage" );
 			std::vector<T> values(elementCount);
 			if( elementCount > 0 )
-				std::memcpy(values.data(), array->m_uniformdata, elementCount * sizeof(T));
+				std::memcpy(values.data(), array->uniform_data.data(), elementCount * sizeof(T));
 			return values;
 		}
 
@@ -121,7 +121,7 @@ namespace houio
 				throw std::runtime_error( "Cannot export a null JSON array" );
 			if( array->isUniform() )
 			{
-				switch( array->m_uniformType )
+				switch( array->uniform_type_index )
 				{
 				case 1:
 					writer.jsonUniformArray(copyUniformValues<sint32>(array));
@@ -144,7 +144,7 @@ namespace houio
 			}
 
 			writer.jsonBeginArray();
-			for( const json::Value &item : array->m_values )
+			for( const json::Value &item : array->values )
 				writeJsonValue(writer, item);
 			writer.jsonEndArray();
 		}
@@ -173,7 +173,7 @@ namespace houio
 			else
 			{
 				JsonScalarWriter scalarWriter{writer};
-				ttl::var::apply_visitor(scalarWriter, value.getVariant());
+				std::visit(scalarWriter, value.getVariant());
 			}
 		}
 	}
@@ -564,7 +564,7 @@ namespace houio
 			// create point attribute which we will derive from this vertex attribute
 			Attribute::Ptr pointAttr = attr->copy();
 			pointAttr->resize(pointCount);
-			std::fill(pointAttr->m_data.begin(), pointAttr->m_data.end(), static_cast<unsigned char>(0));
+			pointAttr->fillZero();
 
 			result->setAttr( attrName, pointAttr );
 			vertex2pointAttr.push_back( std::make_pair( attr, pointAttr ) );
@@ -1289,7 +1289,7 @@ namespace houio
 		const math::M33f transform( rotationScale.ma[0], rotationScale.ma[1], rotationScale.ma[2],
 			rotationScale.ma[4], rotationScale.ma[5], rotationScale.ma[6],
 			rotationScale.ma[8], rotationScale.ma[9], rotationScale.ma[10]);
-		writer.jsonUniformArray<real32>( transform.ma, 9 );
+		writer.jsonUniformArray<real32>(transform.ma.data(), 9);
 
 		writer.jsonString("res");
 		writer.jsonUniformArray<sint32>( &resolution.x, 3 );

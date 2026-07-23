@@ -91,33 +91,33 @@ namespace houio
 			else if (type == JID_STRING)
 			{
 				if( key )
-					p->handler->jsonKey( ttl::var::get<std::string>( value ) );
+					p->handler->jsonKey(std::get<std::string>(value));
 				else
-					p->handler->jsonString( ttl::var::get<std::string>( value ) );
+					p->handler->jsonString(std::get<std::string>(value));
 			}
 			else if (type == JID_BOOL)
-				p->handler->jsonBool( ttl::var::get<bool>( value ) );
+				p->handler->jsonBool(std::get<bool>(value));
 			else if (type == JID_INT8)
-				p->handler->jsonInt32( ttl::var::get<sbyte>( value ) );
+				p->handler->jsonInt32(std::get<sbyte>(value));
 			else if (type == JID_INT16)
-				p->handler->jsonInt32( ttl::var::get<sword>( value ) );
+				p->handler->jsonInt32(std::get<sword>(value));
 			else if (type == JID_INT32)
-				p->handler->jsonInt32( ttl::var::get<sint32>( value ) );
+				p->handler->jsonInt32(std::get<sint32>(value));
 			else if (type == JID_INT64)
-				p->handler->jsonInt64( ttl::var::get<sint64>( value ) );
+				p->handler->jsonInt64(std::get<sint64>(value));
 			else if (type == JID_REAL16)
-				p->handler->jsonReal32( ttl::var::get<real32>( value ) );
+				p->handler->jsonReal32(std::get<real32>(value));
 			else if (type == JID_REAL32)
-				p->handler->jsonReal32( ttl::var::get<real32>( value ) );
+				p->handler->jsonReal32(std::get<real32>(value));
 			else if (type == JID_REAL64)
-				p->handler->jsonReal64( ttl::var::get<real64>( value ) );
+				p->handler->jsonReal64(std::get<real64>(value));
 			else if (type == JID_UINT8)
-				p->handler->jsonInt32( ttl::var::get<ubyte>( value ) );
+				p->handler->jsonInt32(std::get<ubyte>(value));
 			else if (type == JID_UINT16)
-				p->handler->jsonInt32( ttl::var::get<uword>( value ) );
+				p->handler->jsonInt32(std::get<uword>(value));
 			else if (type == JID_UNIFORM_ARRAY)
 			{
-				sint64 numElements = ttl::var::get<sint64>( value );
+				sint64 numElements = std::get<sint64>(value);
 				switch( uaType )
 				{
 				case Token::JID_BOOL:p->handler->uaBool( numElements, p );break;
@@ -1230,15 +1230,15 @@ namespace houio
 		{
 			if( !dst )
 				throw std::invalid_argument( "Value::cpyTo received a null destination" );
-			switch( m_value.which() )
+			switch( m_value.index() )
 			{
-			case 0: std::memcpy(dst, &ttl::var::get<bool>(m_value), sizeof(bool));break;
-			case 1: std::memcpy(dst, &ttl::var::get<sint32>(m_value), sizeof(sint32));break;
-			case 2: std::memcpy(dst, &ttl::var::get<real32>(m_value), sizeof(real32));break;
-			case 3: std::memcpy(dst, &ttl::var::get<real64>(m_value), sizeof(real64));break;
+			case 0: std::memcpy(dst, &std::get<bool>(m_value), sizeof(bool));break;
+			case 1: std::memcpy(dst, &std::get<sint32>(m_value), sizeof(sint32));break;
+			case 2: std::memcpy(dst, &std::get<real32>(m_value), sizeof(real32));break;
+			case 3: std::memcpy(dst, &std::get<real64>(m_value), sizeof(real64));break;
 			case 4: throw std::invalid_argument( "Value::cpyTo does not support strings" );
-			case 5: std::memcpy(dst, &ttl::var::get<ubyte>(m_value), sizeof(ubyte));break;
-			case 6: std::memcpy(dst, &ttl::var::get<sint64>(m_value), sizeof(sint64));break;
+			case 5: std::memcpy(dst, &std::get<ubyte>(m_value), sizeof(ubyte));break;
+			case 6: std::memcpy(dst, &std::get<sint64>(m_value), sizeof(sint64));break;
 			default: throw std::runtime_error( "Value::cpyTo encountered an invalid variant type" );
 			}
 		}
@@ -1275,7 +1275,7 @@ namespace houio
 
 		bool Value::isString()const
 		{
-			return m_value.which()==4;
+			return m_value.index()==4;
 		}
 
 		Value Value::createArray()
@@ -1310,15 +1310,12 @@ namespace houio
 		}
 
 		// Array ----
-		Array::Array() : m_isUniform(false), m_uniformdata(nullptr), m_numUniformElements(0), m_uniformType(-1)
+		Array::Array()
+			: uses_uniform_storage(false), uniform_element_count(0), uniform_type_index(-1)
 		{
 		}
 
-		Array::~Array()
-		{
-			if( m_isUniform && m_uniformdata )
-				free(m_uniformdata);
-		}
+		Array::~Array() = default;
 
 		ArrayPtr Array::create()
 		{
@@ -1327,12 +1324,12 @@ namespace houio
 
 		bool Array::isUniform()const
 		{
-			return m_isUniform;
+			return uses_uniform_storage;
 		}
 
 		void Array::append( const Value &value )
 		{
-			m_values.push_back( value );
+			values.push_back(value);
 		}
 
 		void Array::append(ObjectPtr &object)
@@ -1353,11 +1350,11 @@ namespace houio
 
 		sint64 Array::size()const
 		{
-			if( m_isUniform )
-				return m_numUniformElements;
-			if( m_values.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
+			if( uses_uniform_storage )
+				return uniform_element_count;
+			if( values.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
 				throw std::length_error( "Array size exceeds sint64 range" );
-			return static_cast<sint64>(m_values.size());
+			return static_cast<sint64>(values.size());
 		}
 
 		Value Array::getValue( const int index )
@@ -1365,36 +1362,36 @@ namespace houio
 			const sint64 elementCount = size();
 			if( index < 0 || static_cast<sint64>(index) >= elementCount )
 				throw std::out_of_range( "Array index is out of range" );
-			if( !m_isUniform )
-				return m_values[static_cast<size_t>(index)];
-			if( !m_uniformdata )
+			if( !uses_uniform_storage )
+				return values[static_cast<size_t>(index)];
+			if( uniform_element_count > 0 && uniform_data.empty() )
 				throw std::runtime_error( "Uniform array has no storage" );
 
 			const size_t elementIndex = static_cast<size_t>(index);
-			switch( m_uniformType )
+			switch( uniform_type_index )
 			{
 			case 0:
 			{
 				bool value = false;
-				std::memcpy(&value, m_uniformdata + sizeof(bool) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data.data() + sizeof(bool) * elementIndex, sizeof(value));
 				return Value::create<bool>(value);
 			}
 			case 1:
 			{
 				sint32 value = 0;
-				std::memcpy(&value, m_uniformdata + sizeof(sint32) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data.data() + sizeof(sint32) * elementIndex, sizeof(value));
 				return Value::create<sint32>(value);
 			}
 			case 2:
 			{
 				real32 value = 0.0f;
-				std::memcpy(&value, m_uniformdata + sizeof(real32) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data.data() + sizeof(real32) * elementIndex, sizeof(value));
 				return Value::create<real32>(value);
 			}
 			case 3:
 			{
 				real64 value = 0.0;
-				std::memcpy(&value, m_uniformdata + sizeof(real64) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data.data() + sizeof(real64) * elementIndex, sizeof(value));
 				return Value::create<real64>(value);
 			}
 			case 4:
@@ -1402,13 +1399,13 @@ namespace houio
 			case 5:
 			{
 				ubyte value = 0;
-				std::memcpy(&value, m_uniformdata + sizeof(ubyte) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data.data() + sizeof(ubyte) * elementIndex, sizeof(value));
 				return Value::create<ubyte>(value);
 			}
 			case 6:
 			{
 				sint64 value = 0;
-				std::memcpy(&value, m_uniformdata + sizeof(sint64) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data.data() + sizeof(sint64) * elementIndex, sizeof(value));
 				return Value::create<sint64>(value);
 			}
 			default:
@@ -1675,22 +1672,22 @@ namespace houio
 
 		bool JSONWriter::write( ObjectPtr object )
 		{
-			m_writer->jsonBeginMap();
+			writer_->jsonBeginMap();
 			for( std::map<std::string, Value>::iterator it = object->m_values.begin(), end = object->m_values.end(); it != end; ++it )
 			{
-				m_writer->jsonKey( it->first );
+				writer_->jsonKey(it->first);
 				write( it->second );
 			}
-			m_writer->jsonEndMap();
+			writer_->jsonEndMap();
 			return true;
 		}
 
 		bool JSONWriter::write( ArrayPtr array )
 		{
-			m_writer->jsonBeginArray();
-			for( std::vector<Value>::iterator it = array->m_values.begin(), end = array->m_values.end(); it != end; ++it )
+			writer_->jsonBeginArray();
+			for( std::vector<Value>::iterator it = array->values.begin(), end = array->values.end(); it != end; ++it )
 				write( *it );
-			m_writer->jsonEndArray();
+			writer_->jsonEndArray();
 			return true;
 		}
 
@@ -1704,7 +1701,7 @@ namespace houio
 			else
 			if( !value.isNull() )
 			{
-				ttl::var::apply_visitor( *this, value.getVariant() );
+				std::visit(*this, value.getVariant());
 			}
 			return false;
 		}

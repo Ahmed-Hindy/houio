@@ -43,6 +43,15 @@ foreach(installed_file IN LISTS installed_files)
     endif()
 endforeach()
 
+foreach(retired_install_path IN ITEMS
+    "${package_root}/include/ttl"
+    "${package_root}/include/houio/math/Half"
+)
+    if(EXISTS "${retired_install_path}")
+        message(FATAL_ERROR "Retired implementation detail was installed: ${retired_install_path}")
+    endif()
+endforeach()
+
 set(
     configure_command
     "${CMAKE_COMMAND}"

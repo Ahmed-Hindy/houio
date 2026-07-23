@@ -1,8 +1,14 @@
+#include <houio/math/Color.h>
+#include <houio/math/Matrix22Algo.h>
+#include <houio/math/Matrix33Algo.h>
+#include <houio/math/Matrix44Algo.h>
 #include <houio/math/Vec2.h>
 #include <houio/math/Vec3.h>
 #include <houio/math/Vec4.h>
 
+#include <cmath>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 namespace
@@ -11,6 +17,28 @@ int fail(const std::string& message)
 {
     std::cerr << "error: " << message << '\n';
     return 1;
+}
+
+template<typename T>
+bool nearlyEqual(T lhs, T rhs, T tolerance = static_cast<T>(1.0e-5))
+{
+    return std::abs(lhs - rhs) <= tolerance;
+}
+
+template<typename Matrix>
+bool isIdentity(const Matrix& matrix)
+{
+    using T = typename decltype(matrix.ma)::value_type;
+    for (std::size_t row = 0; row < Matrix::dimension; ++row)
+    {
+        for (std::size_t column = 0; column < Matrix::dimension; ++column)
+        {
+            const T expected = row == column ? T{1} : T{};
+            if (!nearlyEqual(matrix(row, column), expected))
+                return false;
+        }
+    }
+    return true;
 }
 }
 
@@ -54,6 +82,76 @@ int main()
         || nearValue4 != houio::math::Vec4f(1.000001f, 2.0f, 3.0f, 4.0f))
     {
         return fail("Vec4 floating-point comparison lost its tolerance");
+    }
+
+    houio::math::Vec2f normalized2(3.0f, 4.0f);
+    normalized2.normalize();
+    if (std::abs(normalized2.getLength() - 1.0f) > 0.00001f)
+        return fail("Vec2 normalization produced the wrong length");
+
+    houio::math::Vec3f indexed3(1.0f, 2.0f, 3.0f);
+    indexed3[1] = 4.0f;
+    if (indexed3.y != 4.0f || indexed3[2] != 3.0f)
+        return fail("Vec3 checked indexing changed valid access");
+    try
+    {
+        static_cast<void>(indexed3[3]);
+        return fail("Vec3 accepted an out-of-range index");
+    }
+    catch (const std::out_of_range&)
+    {
+    }
+
+    houio::math::Color color(2.0f, -1.0f, 0.5f, 1.5f);
+    color.clamp();
+    if (color.r != 1.0f || color.g != 0.0f || color.b != 0.5f || color.a != 1.0f)
+        return fail("Color clamp did not constrain every component");
+    try
+    {
+        static_cast<void>(color[4]);
+        return fail("Color accepted an out-of-range index");
+    }
+    catch (const std::out_of_range&)
+    {
+    }
+
+    const houio::math::Matrix22f matrix22(4.0f, 7.0f, 2.0f, 6.0f);
+    houio::math::Matrix22f inverse22 = matrix22;
+    inverse22.invert();
+    if (!isIdentity(matrix22 * inverse22))
+        return fail("Matrix22 inverse did not produce identity");
+
+    const houio::math::Matrix33f matrix33(
+        1.0f, 2.0f, 3.0f,
+        0.0f, 1.0f, 4.0f,
+        5.0f, 6.0f, 0.0f);
+    houio::math::Matrix33f inverse33 = matrix33;
+    inverse33.invert();
+    if (!isIdentity(matrix33 * inverse33))
+        return fail("Matrix33 inverse did not produce identity");
+
+    houio::math::Matrix44f matrix44 =
+        houio::math::Matrix44f::ScaleMatrix(2.0f, 3.0f, 4.0f)
+        * houio::math::Matrix44f::TranslationMatrix(5.0f, 6.0f, 7.0f);
+    const houio::math::Vec3f transformed =
+        houio::math::transform(houio::math::Vec3f(1.0f, 1.0f, 1.0f), matrix44);
+    if (transformed != houio::math::Vec3f(7.0f, 9.0f, 11.0f))
+        return fail("Matrix44 row-vector transform changed scale/translation semantics");
+
+    const houio::math::Matrix44f inverse44 = matrix44.inverted();
+    if (!isIdentity(matrix44 * inverse44))
+        return fail("Matrix44 inverse did not produce identity");
+    const houio::math::Vec3f recovered = houio::math::transform(transformed, inverse44);
+    if (recovered != houio::math::Vec3f(1.0f, 1.0f, 1.0f))
+        return fail("Matrix44 inverse did not recover the original point");
+
+    try
+    {
+        static_cast<void>(matrix44(4, 0));
+        return fail("Matrix44 accepted an out-of-range row");
+    }
+    catch (const std::out_of_range&)
+    {
     }
 
     return 0;

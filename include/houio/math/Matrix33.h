@@ -1,380 +1,193 @@
-/*---------------------------------------------------------------------
-
-
-
-----------------------------------------------------------------------*/
 #pragma once
 
-#include "Vec3.h"
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <stdexcept>
 
-namespace houio
+#include <houio/math/Vec3.h>
+
+namespace houio::math
 {
+    template<typename T>
+    class Matrix33
+    {
+    public:
+        static constexpr std::size_t dimension = 3;
+        std::array<T, dimension * dimension> ma{};
 
+        constexpr Matrix33() noexcept = default;
 
-namespace math
-{
-	//
-	//
-	// memory storage is row major (which is native to the c++ arrays)
-    //     | 0  1  2 |
-    // M = | 3  4  5 |
-	//     | 6  7  8 |
-	//
-	// index the matrix with matrix.m[row][column] -> _m12 means: first row, second column
-	//
-	//           m11 m12 m13
-	//           m21 m22 m23
-	//           m31 m32 m33
-	//
-	template<typename T>
-	struct Matrix33
-	{
-        Matrix33();
-		~Matrix33();
-		Matrix33( const T &_11, const T &_12, const T &_13,
-			       const T &_21, const T &_22, const T &_23,
-				   const T &_31, const T &_32, const T &_33);
+        constexpr Matrix33(
+            const T& value00,
+            const T& value01,
+            const T& value02,
+            const T& value10,
+            const T& value11,
+            const T& value12,
+            const T& value20,
+            const T& value21,
+            const T& value22) noexcept
+            : ma{
+                  value00, value01, value02,
+                  value10, value11, value12,
+                  value20, value21, value22}
+        {
+        }
 
-		// convience matrix creation functions
-		static Matrix33<T>                                                                 Zero( void ); // returns the zeromatrix
-		static Matrix33<T>                                                             Identity( void ); // returns the identitymatrix
-		static Matrix33<T>                        RotationMatrix( const Vec3<T> &axis, const T &angle );  // returns a matrix with a transformation that rotates around a certain axis which starts at the origin
+        [[nodiscard]] static constexpr Matrix33 Zero() noexcept
+        {
+            return Matrix33{};
+        }
 
-		// public methods
-		void                                                                          transpose( void );
-		Matrix33<T>                                                                  transposed( void );
-		void                                                                             invert( void );
+        [[nodiscard]] static constexpr Matrix33 Identity() noexcept
+        {
+            return Matrix33(
+                T{1}, T{}, T{},
+                T{}, T{1}, T{},
+                T{}, T{}, T{1});
+        }
 
-		T                                                                              getDeterminant(); // computes and returns the determinant
-		T                                                                                       trace(); //returns sum of elements in main diagonal
+        [[nodiscard]] static Matrix33 RotationMatrix(const Vec3<T>& axis, const T& angle)
+        {
+            const Vec3<T> normalized_axis = axis.normalized();
+            using std::cos;
+            using std::sin;
+            const T cosine = static_cast<T>(cos(angle));
+            const T sine = static_cast<T>(sin(angle));
+            const T one_minus_cosine = T{1} - cosine;
+            const T xy = one_minus_cosine * normalized_axis.x * normalized_axis.y;
+            const T xz = one_minus_cosine * normalized_axis.x * normalized_axis.z;
+            const T yz = one_minus_cosine * normalized_axis.y * normalized_axis.z;
+            const T sx = sine * normalized_axis.x;
+            const T sy = sine * normalized_axis.y;
+            const T sz = sine * normalized_axis.z;
+            return Matrix33(
+                one_minus_cosine * normalized_axis.x * normalized_axis.x + cosine,
+                xy + sz,
+                xz - sy,
+                xy - sz,
+                one_minus_cosine * normalized_axis.y * normalized_axis.y + cosine,
+                yz + sx,
+                xz + sy,
+                yz - sx,
+                one_minus_cosine * normalized_axis.z * normalized_axis.z + cosine);
+        }
 
-		// operators
-		bool                                                       operator==( const Matrix33<T> &rhs );
-		bool                                                       operator!=( const Matrix33<T> &rhs );
-		
-		bool                                                       operator+=( const Matrix33<T> &rhs );
-		bool                                                       operator-=( const Matrix33<T> &rhs );
+        [[nodiscard]] constexpr T& operator()(std::size_t row, std::size_t column)
+        {
+            return ma.at(row * dimension + column);
+        }
 
-		bool                                                                 operator+=( const T &rhs );
-		bool                                                                 operator-=( const T &rhs );
-		bool                                                                 operator*=( const T &rhs );
-		bool                                                                 operator/=( const T &rhs );
+        [[nodiscard]] constexpr const T& operator()(
+            std::size_t row,
+            std::size_t column) const
+        {
+            return ma.at(row * dimension + column);
+        }
 
-		union
-		{
-			struct
-			{
-				T _11, _12, _13;
-				T _21, _22, _23;
-				T _31, _32, _33;
-			};
-			T m[3][3];
-			T ma[9];
-		};
-	};
+        constexpr void transpose() noexcept
+        {
+            std::swap(ma[1], ma[3]);
+            std::swap(ma[2], ma[6]);
+            std::swap(ma[5], ma[7]);
+        }
 
+        [[nodiscard]] constexpr Matrix33 transposed() const noexcept
+        {
+            Matrix33 result = *this;
+            result.transpose();
+            return result;
+        }
 
-	
-	template<typename T>
-	Matrix33<T>::Matrix33()
-	{
-		_11=_12=_13=
-		_21=_22=_23=
-		_31=_32=_33=(T)0.0;
-	}
+        [[nodiscard]] constexpr T trace() const noexcept
+        {
+            return ma[0] + ma[4] + ma[8];
+        }
 
-	template<typename T>
-	Matrix33<T>::Matrix33( const T &_11, const T &_12, const T &_13,
-                          const T &_21, const T &_22, const T &_23,
-						  const T &_31, const T &_32, const T &_33)
-	{
-        this->_11=_11; this->_12=_12; this->_13=_13;
-        this->_21=_21; this->_22=_22; this->_23=_23;
-		this->_31=_31; this->_32=_32; this->_33=_33;
-	}
+        [[nodiscard]] constexpr T getDeterminant() const noexcept
+        {
+            return ma[0] * (ma[4] * ma[8] - ma[5] * ma[7])
+                - ma[1] * (ma[3] * ma[8] - ma[5] * ma[6])
+                + ma[2] * (ma[3] * ma[7] - ma[4] * ma[6]);
+        }
 
-	template<typename T>
-	Matrix33<T>::~Matrix33()
-	{
-	}
+        void invert()
+        {
+            const T determinant = getDeterminant();
+            using std::abs;
+            if (abs(determinant) <= static_cast<T>(1.0e-12))
+                throw std::domain_error("Matrix33 is singular");
+            const T reciprocal = T{1} / determinant;
+            const Matrix33 source = *this;
+            ma = {
+                (source.ma[4] * source.ma[8] - source.ma[5] * source.ma[7]) * reciprocal,
+                (source.ma[2] * source.ma[7] - source.ma[1] * source.ma[8]) * reciprocal,
+                (source.ma[1] * source.ma[5] - source.ma[2] * source.ma[4]) * reciprocal,
+                (source.ma[5] * source.ma[6] - source.ma[3] * source.ma[8]) * reciprocal,
+                (source.ma[0] * source.ma[8] - source.ma[2] * source.ma[6]) * reciprocal,
+                (source.ma[2] * source.ma[3] - source.ma[0] * source.ma[5]) * reciprocal,
+                (source.ma[3] * source.ma[7] - source.ma[4] * source.ma[6]) * reciprocal,
+                (source.ma[1] * source.ma[6] - source.ma[0] * source.ma[7]) * reciprocal,
+                (source.ma[0] * source.ma[4] - source.ma[1] * source.ma[3]) * reciprocal,
+            };
+        }
 
-	// returns the zeromatrix
-	template<typename T>
-	Matrix33<T> Matrix33<T>::Zero( void )
-	{
-		return Matrix33<T>( (T)0.0, (T)0.0, (T)0.0,
-			              (T)0.0, (T)0.0, (T)0.0,
-						  (T)0.0, (T)0.0, (T)0.0);
-	}
+        [[nodiscard]] constexpr bool operator==(const Matrix33& rhs) const noexcept
+        {
+            return ma == rhs.ma;
+        }
 
-	// returns the identitymatrix
-	template<typename T>
-	Matrix33<T> Matrix33<T>::Identity( void )
-	{
-		return Matrix33<T>( (T)1.0, (T)0.0, (T)0.0,
-			              (T)0.0, (T)1.0, (T)0.0,
-						  (T)0.0, (T)0.0, (T)1.0);
-	}
+        [[nodiscard]] constexpr bool operator!=(const Matrix33& rhs) const noexcept
+        {
+            return !(*this == rhs);
+        }
 
+        constexpr Matrix33& operator+=(const Matrix33& rhs) noexcept
+        {
+            for (std::size_t index = 0; index < ma.size(); ++index)
+                ma[index] += rhs.ma[index];
+            return *this;
+        }
 
-	//
-	// returns a matrix with a transformation that rotates around a certain axis which starts at the origin
-	//
-	// code from Graphics Gems (Glassner, Academic Press, 1990)
-	//
-	template<typename T>
-	Matrix33<T> Matrix33<T>::RotationMatrix( const Vec3<T> &axis, const T &angle )
-	{
-		T c = cos( angle );
-		T t = (T)1.0 - c;
-		T s = sin( angle );
-		T txy = t*axis.x*axis.y;
-		T txz = t*axis.x*axis.z;
-		T tyz = t*axis.y*axis.z;
-		T sx = s*axis.x;
-		T sy = s*axis.y;
-		T sz = s*axis.z;
-		return Matrix33<T>( t*axis.x*axis.x+c, txy+sz, txz-sy,
-			              txy-sz, t*axis.y*axis.y+c, tyz+sx,
-						  txz+sy, tyz-sx, t*axis.z*axis.z+c);
-	}
+        constexpr Matrix33& operator-=(const Matrix33& rhs) noexcept
+        {
+            for (std::size_t index = 0; index < ma.size(); ++index)
+                ma[index] -= rhs.ma[index];
+            return *this;
+        }
 
-	template<typename T>
-	void Matrix33<T>::transpose( void )
-	{
-		Matrix33<T> temp = *this;
+        constexpr Matrix33& operator+=(const T& rhs) noexcept
+        {
+            for (T& value : ma)
+                value += rhs;
+            return *this;
+        }
 
-		_11 = temp._11;
-		_12 = temp._21;
-		_13 = temp._31;
+        constexpr Matrix33& operator-=(const T& rhs) noexcept
+        {
+            for (T& value : ma)
+                value -= rhs;
+            return *this;
+        }
 
-		_21 = temp._12;
-		_22 = temp._22;
-		_23 = temp._32;
+        constexpr Matrix33& operator*=(const T& rhs) noexcept
+        {
+            for (T& value : ma)
+                value *= rhs;
+            return *this;
+        }
 
-		_31 = temp._13;
-		_32 = temp._23;
-		_33 = temp._33;
-	}
+        constexpr Matrix33& operator/=(const T& rhs)
+        {
+            for (T& value : ma)
+                value /= rhs;
+            return *this;
+        }
+    };
 
-	template<typename T>
-	Matrix33<T> Matrix33<T>::transposed( void )
-	{
-		Matrix33<T> m = *this;
-		m.transpose();
-		return m;
-	}
-
-	// computes the determinant of a 2x2 matrix
-	//
-	template<typename T>
-	inline T Det( T &_11, T &_12,
-					  T &_21, T &_22 )
-	{
-		return _11*_22 - _12*_21;
-	}
-
-	//returns sum of elements in main diagonal
-	template<typename T>
-	T Matrix33<T>::trace()
-	{
-		return _11+_22+_33;
-	}
-
-	// computes and returns the determinant
-	template<typename T>
-	T Matrix33<T>::getDeterminant()
-	{
-		// rule of sarrus
-		return _11*_22*_33 + _21*_32*_13 + _31*_12*_23 - _13*_22*_31 - _23*_32*_11 - _33*_12*_21;
-	}
-
-
-
-	template<typename T>
-	void Matrix33<T>::invert( void )
-	{
-		T det =	_11*Det(_22, _23,
-							_32, _33 ) -
-					_12*Det(_21, _23,
-							_31, _33 ) +
-					_13*Det(_21, _22,
-							_31, _32 );
-		// determinant must be not zero
-		if( fabsf( det ) < (T)0.00001 )
-			// error determinant is zero
-			return;
-
-		det = (T)1.0 / det;
-
-		Matrix33<T> mMatrix;
-
-		// Row1
-		mMatrix._11 = Det( _22, _23,
-						   _32, _33 );
-		mMatrix._12 = -Det( _12, _13,
-						   _32, _33 );
-		mMatrix._13 = Det( _12, _13,
-						   _22, _23 );
-		// Row2
-		mMatrix._21 = -Det( _21, _23,
-						   _31, _33 );
-		mMatrix._22 = Det( _11, _13,
-						   _31, _33 );
-		mMatrix._23 = -Det( _11, _13,
-						   _21, _23 );
-		// Row2
-		mMatrix._31 = Det( _21, _22,
-						   _31, _32 );
-		mMatrix._32 = -Det( _11, _12,
-						   _31, _32 );
-		mMatrix._33 = Det( _11, _12,
-						   _21, _22 );
-
-		_11 = det*mMatrix._11;
-		_12 = det*mMatrix._12;
-		_13 = det*mMatrix._13;
-
-		_21 = det*mMatrix._21;
-		_22 = det*mMatrix._22;
-		_23 = det*mMatrix._23;
-
-		_31 = det*mMatrix._31;
-		_32 = det*mMatrix._32;
-		_33 = det*mMatrix._33;
-	}
-
-	template<typename T>
-	bool Matrix33<T>::operator==( const Matrix33<T> &rhs )
-	{
-		if( _11==rhs._11 && _12==rhs._12 && _13==rhs._13 &&
-			_21==rhs._21 && _22==rhs._22 && _23==rhs._23 &&
-			_31==rhs._31 && _32==rhs._32 && _33==rhs._33 )
-			return true;
-		else
-			return false; 
-	}
-
-	template<typename T>
-	bool Matrix33<T>::operator!=( const Matrix33<T> &rhs )
-	{
-		return !((*this)==rhs);
-	}
-
-	template<typename T>
-	bool Matrix33<T>::operator+=( const Matrix33<T> &rhs )
-	{
-		_11+=rhs._11;
-		_12+=rhs._12;
-		_13+=rhs._13;
-
-		_21+=rhs._21;
-		_22+=rhs._22;
-		_23+=rhs._23;
-
-		_31+=rhs._31;
-		_32+=rhs._32;
-		_33+=rhs._33;
-
-		return true;
-	}
-
-	template<typename T>
-	bool Matrix33<T>::operator-=( const Matrix33<T> &rhs )
-	{
-		_11-=rhs._11;
-		_12-=rhs._12;
-		_13-=rhs._13;
-
-		_21-=rhs._21;
-		_22-=rhs._22;
-		_23-=rhs._23;
-
-		_31-=rhs._31;
-		_32-=rhs._32;
-		_33-=rhs._33;
-
-		return true;
-	}
-
-	template<typename T>
-	bool Matrix33<T>::operator+=( const T &rhs )
-	{
-		_11+=rhs;
-		_12+=rhs;
-		_13+=rhs;
-
-		_21+=rhs;
-		_22+=rhs;
-		_23+=rhs;
-
-		_31+=rhs;
-		_32+=rhs;
-		_33+=rhs;
-		return true;
-	}
-
-	template<typename T>
-	bool Matrix33<T>::operator-=( const T &rhs )
-	{
-		_11-=rhs;
-		_12-=rhs;
-		_13-=rhs;
-
-		_21-=rhs;
-		_22-=rhs;
-		_23-=rhs;
-
-		_31-=rhs;
-		_32-=rhs;
-		_33-=rhs;
-		return true;
-	}
-
-	template<typename T>
-	bool Matrix33<T>::operator*=( const T &rhs )
-	{
-		_11*=rhs;
-		_12*=rhs;
-		_13*=rhs;
-
-		_21*=rhs;
-		_22*=rhs;
-		_23*=rhs;
-
-		_31*=rhs;
-		_32*=rhs;
-		_33*=rhs;
-		return true;
-	}
-
-
-	template<typename T>
-	bool Matrix33<T>::operator/=( const T &rhs )
-	{
-		_11/=rhs;
-		_12/=rhs;
-		_13/=rhs;
-
-		_21/=rhs;
-		_22/=rhs;
-		_23/=rhs;
-
-		_31/=rhs;
-		_32/=rhs;
-		_33/=rhs;
-		return true;
-	}
-
-
-
-
-
-
-	typedef Matrix33<float> Matrix33f;
-	typedef Matrix33<float> M33f;
-	typedef Matrix33<double> Matrix33d;
-	typedef Matrix33<double> M33d;
+    using Matrix33f = Matrix33<float>;
+    using M33f = Matrix33<float>;
+    using Matrix33d = Matrix33<double>;
+    using M33d = Matrix33<double>;
 }
-
-} // namespace houio

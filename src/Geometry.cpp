@@ -164,12 +164,9 @@ namespace houio
 				throw std::runtime_error( "Geometry::duplicatePoint encountered a null attribute" );
 			if( attr->numElements() != pointCount )
 				throw std::runtime_error( "Geometry::duplicatePoint attribute counts are inconsistent" );
-			const size_t elementBytes = static_cast<size_t>(attr->numComponents())
-				* static_cast<size_t>(attr->elementComponentSize());
-			std::vector<unsigned char> sourceValue(elementBytes);
-			std::memcpy(sourceValue.data(), attr->getRawPointer(static_cast<int>(index)), elementBytes);
-			attr->resize(static_cast<size_t>(newIndex) + 1);
-			std::memcpy(attr->getRawPointer(newIndex), sourceValue.data(), elementBytes);
+			const unsigned int duplicatedIndex = attr->duplicateElement(index);
+			if( duplicatedIndex != static_cast<unsigned int>(newIndex) )
+				throw std::runtime_error( "Geometry::duplicatePoint produced inconsistent attribute indices" );
 		}
 		return static_cast<unsigned int>(newIndex);
 	}
@@ -643,8 +640,7 @@ namespace houio
 				Attribute::Ptr src = geo->getAttr(attr_name);
 				Attribute::Ptr dst = result->getAttr(attr_name);
 
-				dst->m_data.insert(dst->m_data.end(), src->m_data.begin(), src->m_data.end());
-				dst->m_numElements += src->m_numElements;
+				dst->append(*src);
 			}
 			// merge indices
 			for( auto& index : geo->m_indexBuffer )
