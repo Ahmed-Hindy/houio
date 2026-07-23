@@ -1,6 +1,7 @@
 #include <houio/HouGeoIO.h>
 #include <houio/GeometryIO.h>
 
+#include <array>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -283,31 +284,6 @@ namespace houio
 			}
 			throw DiagnosticException(std::move(diagnostic));
 		}
-	}
-
-	HouGeo::Ptr HouGeoIO::import(std::istream* input)
-	{
-		return input ? import(*input) : nullptr;
-	}
-
-	HouGeo::Ptr HouGeoIO::import(std::istream* input, DiagnosticList* diagnostics)
-	{
-		return input ? import(*input, diagnostics) : nullptr;
-	}
-
-	HouGeo::Ptr HouGeoIO::import(
-		std::istream* input,
-		const json::ParserLimits& limits)
-	{
-		return input ? import(*input, limits) : nullptr;
-	}
-
-	HouGeo::Ptr HouGeoIO::import(
-		std::istream* input,
-		const json::ParserLimits& limits,
-		DiagnosticList* diagnostics)
-	{
-		return input ? import(*input, limits, diagnostics) : nullptr;
 	}
 
 	Geometry::Ptr HouGeoIO::importGeometry( const std::string &path )
@@ -795,13 +771,6 @@ namespace houio
 			throw std::runtime_error("HouGeoIO::makeLog could not parse the input geometry");
 	}
 
-	void HouGeoIO::makeLog(const std::string& path, std::ostream* output)
-	{
-		if (!output)
-			throw std::invalid_argument("HouGeoIO::makeLog requires a valid output stream");
-		makeLog(path, *output);
-	}
-
 
 
 	HouGeo::Ptr HouGeoIO::adaptVolume( ScalarField::Ptr volume )
@@ -816,11 +785,6 @@ namespace houio
 	bool HouGeoIO::exportVolume( const std::string &filename, ScalarField::Ptr volume )
 	{
 		return static_cast<bool>(GeometryIO::writeVolume(filename, volume));
-	}
-
-	bool HouGeoIO::xport( const std::string &filename, ScalarField::Ptr volume )
-	{
-		return exportVolume(filename, volume);
 	}
 
 	HouGeo::Ptr HouGeoIO::adaptGeometry( Geometry::Ptr geometry )
@@ -905,24 +869,22 @@ namespace houio
 		return static_cast<bool>(GeometryIO::writeGeometry(filename, geometry));
 	}
 
-	bool HouGeoIO::xport( const std::string &filename, Geometry::Ptr geometry )
+	bool HouGeoIO::exportPoints(
+		const std::string& filename,
+		std::span<const math::V3f> points)
 	{
-		return exportGeometry(filename, geometry);
+		std::map<std::string, std::vector<math::V3f>> point_attributes;
+		point_attributes["P"] = std::vector<math::V3f>(points.begin(), points.end());
+		return exportPointAttributes(filename, point_attributes);
 	}
 
-	bool HouGeoIO::xport( const std::string& filename, const std::vector<math::V3f>& points )
-	{
-		std::map<std::string, std::vector<math::V3f>> pointAttributes;
-		pointAttributes["P"] = points;
-		return xport(filename, pointAttributes);
-	}
-
-	bool HouGeoIO::xport( const std::string& filename,
-		const std::map<std::string, std::vector<math::V3f>>& pointAttributes )
+	bool HouGeoIO::exportPointAttributes(
+		const std::string& filename,
+		const std::map<std::string, std::vector<math::V3f>>& point_attributes)
 	{
 		Geometry::Ptr geometry = Geometry::createPointGeometry();
 
-		for( const auto &entry : pointAttributes )
+		for( const auto &entry : point_attributes )
 		{
 			const std::string &name = entry.first;
 			const std::vector<math::V3f> &values = entry.second;
@@ -934,34 +896,16 @@ namespace houio
 			const std::span<const std::byte> source_bytes = std::as_bytes(std::span(values));
 			std::span<std::byte> destination_bytes = attribute->bytes();
 			if (source_bytes.size() != destination_bytes.size())
-				throw std::runtime_error("HouGeoIO::xport point attribute byte size mismatch");
+				throw std::runtime_error("HouGeoIO::exportPointAttributes byte size mismatch");
 			std::memcpy(destination_bytes.data(), source_bytes.data(), source_bytes.size());
 			geometry->setAttr(name, attribute);
 		}
 
-		return xport(filename, geometry);
+		return exportGeometry(filename, geometry);
 	}
 
 
 
-
-	bool HouGeoIO::xport(std::ostream& output, HouGeoAdapter::Ptr geometry, bool binary)
-	{
-		return exportGeometry(output, std::move(geometry), binary);
-	}
-
-	bool HouGeoIO::xport(std::ostream* output, HouGeoAdapter::Ptr geometry, bool binary)
-	{
-		return output && exportGeometry(*output, std::move(geometry), binary);
-	}
-
-	bool HouGeoIO::exportGeometry(
-		std::ostream* output,
-		HouGeoAdapter::Ptr geometry,
-		bool binary)
-	{
-		return output && exportGeometry(*output, std::move(geometry), binary);
-	}
 
 	bool HouGeoIO::exportGeometry(
 		std::ostream& output,
@@ -1434,10 +1378,15 @@ namespace houio
 		const math::M33f transform( rotationScale.ma[0], rotationScale.ma[1], rotationScale.ma[2],
 			rotationScale.ma[4], rotationScale.ma[5], rotationScale.ma[6],
 			rotationScale.ma[8], rotationScale.ma[9], rotationScale.ma[10]);
-		writer.jsonUniformArray<real32>(transform.ma.data(), 9);
+		writer.jsonUniformArray(std::span<const real32>(transform.ma));
 
 		writer.jsonString("res");
-		writer.jsonUniformArray<sint32>( &resolution.x, 3 );
+		const std::array<sint32, 3> resolution_values = {
+			resolution.x,
+			resolution.y,
+			resolution.z,
+		};
+		writer.jsonUniformArray(std::span<const sint32>(resolution_values));
 
 		writer.jsonString("border");
 		writer.jsonBeginMap();

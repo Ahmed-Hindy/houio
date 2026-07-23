@@ -115,13 +115,13 @@ int main()
     }
 
     std::ostringstream output(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::xport(&output, geometry, true))
+    if (!houio::HouGeoIO::exportGeometry(output, geometry, true))
     {
         return fail("failed to export Int64 attribute fixture");
     }
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
-    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(&input);
+    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
     if (const int result = verifyInt64Attribute(imported); result != 0)
     {
         return result;

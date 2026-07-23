@@ -19,7 +19,7 @@ bool importRejected(const std::string& sourceText)
     try
     {
         std::istringstream source(sourceText);
-        return !houio::HouGeoIO::import(&source);
+        return !houio::HouGeoIO::import(source);
     }
     catch (const std::exception&)
     {
@@ -36,7 +36,7 @@ int expectImportDiagnostic(const std::string& sourceText, houio::DiagnosticCateg
 {
     std::istringstream source(sourceText);
     houio::DiagnosticList diagnostics;
-    if (houio::HouGeoIO::import(&source, &diagnostics))
+    if (houio::HouGeoIO::import(source, &diagnostics))
     {
         return fail(description + " unexpectedly imported");
     }

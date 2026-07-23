@@ -184,7 +184,7 @@ namespace houio
 
 		bool Parser::parse(std::istream& input, Handler& event_handler)
 		{
-			return parse(&input, &event_handler, nullptr);
+			return parseInternal(input, event_handler, nullptr);
 		}
 
 		bool Parser::parse(
@@ -192,17 +192,15 @@ namespace houio
 			Handler& event_handler,
 			DiagnosticList& output_diagnostics)
 		{
-			return parse(&input, &event_handler, &output_diagnostics);
+			return parseInternal(input, event_handler, &output_diagnostics);
 		}
 
-		bool Parser::parse(std::istream* in, Handler* h)
+		bool Parser::parseInternal(
+			std::istream& input,
+			Handler& event_handler,
+			DiagnosticList* outputDiagnostics)
 		{
-			return parse(in, h, nullptr);
-		}
-
-		bool Parser::parse(std::istream* in, Handler* h, DiagnosticList* outputDiagnostics)
-		{
-			if( !in || !h || !in->good() )
+			if (!input.good())
 			{
 				Diagnostic diagnostic{DiagnosticSeverity::error, DiagnosticCategory::io,
 					"Parser requires a readable input stream and a valid handler", 0, ""};
@@ -218,8 +216,8 @@ namespace houio
 			byteOffset = 0;
 			tokenOffset = -1;
 			knownInputBytes = -1;
-			handler = h;
-			stream = in;
+			handler = &event_handler;
+			stream = &input;
 
 			try
 			{
@@ -849,8 +847,8 @@ namespace houio
 				fail(DiagnosticCategory::malformed_input, "Parser binary-string byte limit exceeded");
 
 			std::string value(static_cast<size_t>(length), '\0');
-			if( length > 0 )
-				read(value.data(), length);
+			if (length > 0)
+				read(std::span<char>(value.data(), value.size()));
 			return value;
 		}
 
@@ -925,16 +923,8 @@ namespace houio
 
 
 		BinaryWriter::BinaryWriter(std::ostream& output)
-			: stream(&output)
+			: stream(output)
 		{
-			jsonMagic();
-		}
-
-		BinaryWriter::BinaryWriter(std::ostream* output)
-		{
-			if (!output)
-				throw std::invalid_argument("BinaryWriter requires a valid output stream");
-			stream = output;
 			jsonMagic();
 		}
 
@@ -992,8 +982,8 @@ namespace houio
 			const sint64 length = static_cast<sint64>(value.size());
 			writeId(Token::JID_STRING);
 			writeLength(length);
-			if( !value.empty() )
-				write<char>(value.data(), length);
+			if (!value.empty())
+				write(std::span<const char>(value.data(), value.size()));
 		}
 
 		void BinaryWriter::jsonKey( const std::string &key )
@@ -1075,18 +1065,6 @@ namespace houio
 				&& write(data);
 		}
 
-		bool BinaryWriter::jsonUniformArrayReal16(
-			const uword* data,
-			sint64 element_count)
-		{
-			if (element_count < 0)
-				throw std::length_error("BinaryWriter::jsonUniformArrayReal16 received a negative element count");
-			if (element_count > 0 && !data)
-				throw std::invalid_argument("BinaryWriter::jsonUniformArrayReal16 received null data");
-			return jsonUniformArrayReal16(
-				std::span<const uword>(data, static_cast<size_t>(element_count)));
-		}
-
 		void BinaryWriter::jsonBool( const bool &value )
 		{
 			if( value )
@@ -1100,20 +1078,13 @@ namespace houio
 		// ASCIIWriter =============================================
 
 		ASCIIWriter::ASCIIWriter(std::ostream& output)
-			: stream(&output)
+			: stream(output)
 		{
-		}
-
-		ASCIIWriter::ASCIIWriter(std::ostream* output)
-		{
-			if (!output)
-				throw std::invalid_argument("ASCIIWriter requires a valid output stream");
-			stream = output;
 		}
 
 		void ASCIIWriter::write( const std::string &text )
 		{
-			stream->write( text.c_str(), text.size() );
+			stream.write(text.c_str(), static_cast<std::streamsize>(text.size()));
 		}
 
 		void ASCIIWriter::jsonBeginArray()

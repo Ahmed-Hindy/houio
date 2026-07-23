@@ -25,7 +25,7 @@ std::string geometryDocument(const std::string& valuesObject)
 houio::HouGeo::Ptr importPagedAttribute(const std::string& valuesObject)
 {
     std::istringstream input(geometryDocument(valuesObject));
-    return houio::HouGeoIO::import(&input);
+    return houio::HouGeoIO::import(input);
 }
 
 std::vector<houio::sint32> attributeValues(const houio::HouGeo::Ptr& geometry)
@@ -110,7 +110,7 @@ bool importRejected(const std::string& valuesObject)
 {
     std::istringstream input(geometryDocument(valuesObject));
     houio::DiagnosticList diagnostics;
-    return !houio::HouGeoIO::import(&input, &diagnostics) && diagnostics.size() == 1
+    return !houio::HouGeoIO::import(input, &diagnostics) && diagnostics.size() == 1
         && diagnostics.front().severity == houio::DiagnosticSeverity::error
         && diagnostics.front().path == "attributes.pointattributes[0]";
 }

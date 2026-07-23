@@ -140,13 +140,11 @@ houio::HouGeo::Ptr createInvalidPointGeometry()
 bool roundtripOnce(const houio::HouGeoAdapter::Ptr& source)
 {
     std::ostringstream output(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::exportGeometry(&output, source, true))
-    {
+    if (!houio::HouGeoIO::exportGeometry(output, source, true))
         return false;
-    }
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
-    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(&input);
+    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
     return imported && imported->pointcount() == 4 && imported->vertexcount() == 0
            && imported->primitivecount() == 0;
 }
@@ -155,11 +153,11 @@ int verifyAdapterDictionaryExport()
 {
     auto source = std::make_shared<DictionaryGeometryAdapter>();
     std::ostringstream output(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::exportGeometry(&output, source, true))
+    if (!houio::HouGeoIO::exportGeometry(output, source, true))
         return fail("abstract adapter dictionary export failed");
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
-    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(&input);
+    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
     auto attribute = imported ? imported->getGlobalAttribute("settings")
                               : houio::HouGeoAdapter::AttributeAdapter::Ptr();
     auto dictionary = attribute ? attribute->getDictionary(0)
@@ -171,23 +169,15 @@ int verifyAdapterDictionaryExport()
     return 0;
 }
 
-int verifyCompatibilityWrapper(const houio::HouGeoAdapter::Ptr& validGeometry)
+int verifyReferenceStreamApi(const houio::HouGeoAdapter::Ptr& validGeometry)
 {
-    std::ostringstream preferredOutput(std::ios::out | std::ios::binary);
-    std::ostringstream compatibilityOutput(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::exportGeometry(preferredOutput, validGeometry, true)
-        || !houio::HouGeoIO::xport(&compatibilityOutput, validGeometry, true))
+    std::ostringstream output(std::ios::out | std::ios::binary);
+    if (!houio::HouGeoIO::exportGeometry(output, validGeometry, true))
+        return fail("reference-based export API failed");
+    if (houio::HouGeoIO::exportGeometry(
+            output, houio::HouGeoAdapter::Ptr(), true))
     {
-        return fail("preferred or compatibility export API failed");
-    }
-    if (preferredOutput.str() != compatibilityOutput.str())
-    {
-        return fail("xport compatibility wrapper changed the exported bytes");
-    }
-    if (houio::HouGeoIO::exportGeometry(nullptr, validGeometry, true)
-        || houio::HouGeoIO::exportGeometry(&preferredOutput, houio::HouGeoAdapter::Ptr(), true))
-    {
-        return fail("exportGeometry accepted a null stream or geometry");
+        return fail("exportGeometry accepted a null geometry");
     }
     return 0;
 }
@@ -197,7 +187,7 @@ int verifyExceptionRecovery(const houio::HouGeoAdapter::Ptr& validGeometry)
     std::ostringstream invalidOutput(std::ios::out | std::ios::binary);
     try
     {
-        static_cast<void>(houio::HouGeoIO::xport(
+        static_cast<void>(houio::HouGeoIO::exportGeometry(
             invalidOutput, createInvalidPointGeometry(), true));
         return fail("invalid P attribute did not raise an exception");
     }
@@ -215,7 +205,7 @@ int verifyExceptionRecovery(const houio::HouGeoAdapter::Ptr& validGeometry)
 int verifyAsciiRejection(const houio::HouGeoAdapter::Ptr& validGeometry)
 {
     std::ostringstream output;
-    if (houio::HouGeoIO::xport(&output, validGeometry, false))
+    if (houio::HouGeoIO::exportGeometry(output, validGeometry, false))
     {
         return fail("ASCII geometry export unexpectedly succeeded");
     }
@@ -230,7 +220,7 @@ int verifyOutputFailure(const houio::HouGeoAdapter::Ptr& validGeometry)
 {
     RejectingStreamBuffer streamBuffer;
     std::ostream output(&streamBuffer);
-    if (houio::HouGeoIO::xport(&output, validGeometry, true))
+    if (houio::HouGeoIO::exportGeometry(output, validGeometry, true))
     {
         return fail("export did not report a failed output stream");
     }
@@ -251,7 +241,7 @@ int verifyNegativeTopologyRejection(const houio::HouGeoAdapter::Ptr& validGeomet
     std::ostringstream output(std::ios::out | std::ios::binary);
     try
     {
-        static_cast<void>(houio::HouGeoIO::xport(output, geometry, true));
+        static_cast<void>(houio::HouGeoIO::exportGeometry(output, geometry, true));
         return fail("export accepted a negative topology index");
     }
     catch (const std::runtime_error&)
@@ -314,7 +304,7 @@ int main()
     {
         return result;
     }
-    if (const int result = verifyCompatibilityWrapper(validGeometry); result != 0)
+    if (const int result = verifyReferenceStreamApi(validGeometry); result != 0)
     {
         return result;
     }

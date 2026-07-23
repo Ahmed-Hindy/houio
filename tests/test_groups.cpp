@@ -122,18 +122,18 @@ int verifyGroups(const houio::HouGeo::Ptr& geometry)
 int main()
 {
     std::istringstream source(groupedGeometry());
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&source);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(source);
     if (const int result = verifyGroups(geometry); result != 0)
     {
         return result;
     }
 
     std::ostringstream binaryOutput(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::xport(&binaryOutput, geometry, true))
+    if (!houio::HouGeoIO::exportGeometry(binaryOutput, geometry, true))
     {
         return fail("failed to export grouped geometry");
     }
 
     std::istringstream binaryInput(binaryOutput.str(), std::ios::in | std::ios::binary);
-    return verifyGroups(houio::HouGeoIO::import(&binaryInput));
+    return verifyGroups(houio::HouGeoIO::import(binaryInput));
 }

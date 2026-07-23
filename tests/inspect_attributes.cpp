@@ -97,7 +97,7 @@ int inspectPrimitiveAttributes(const std::string& inputPath)
 
     houio::json::JSONReader reader;
     houio::json::Parser parser;
-    if (!parser.parse(&input, &reader))
+    if (!parser.parse(input, reader))
     {
         std::cerr << "error: parse failed\n";
         return 1;

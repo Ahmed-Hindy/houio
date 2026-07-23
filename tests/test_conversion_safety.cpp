@@ -22,7 +22,7 @@ houio::HouGeo::Ptr importPointOnlyGeometry(int pointCount)
     document << "[\"pointcount\"," << pointCount
              << ",\"vertexcount\",0,\"primitivecount\",0]";
     std::istringstream input(document.str());
-    return houio::HouGeoIO::import(&input);
+    return houio::HouGeoIO::import(input);
 }
 
 int verifyDeclaredPointCount()
@@ -193,7 +193,7 @@ int verifyNonNumericAttributesAreSkipped()
     ])JSON";
 
     std::istringstream input(document);
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(input);
     if (!geometry)
         return fail("dictionary-attribute conversion fixture did not import");
 

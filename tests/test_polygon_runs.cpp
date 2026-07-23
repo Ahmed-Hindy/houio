@@ -274,20 +274,20 @@ template <typename Verifier>
 int verifyRoundtrip(const char* sourceText, Verifier verifier)
 {
     std::istringstream source(sourceText);
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&source);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(source);
     if (const int result = verifier(geometry); result != 0)
     {
         return result;
     }
 
     std::ostringstream binaryOutput(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::xport(&binaryOutput, geometry, true))
+    if (!houio::HouGeoIO::exportGeometry(binaryOutput, geometry, true))
     {
         return fail("failed to export polygon-run geometry");
     }
 
     std::istringstream binaryInput(binaryOutput.str(), std::ios::in | std::ios::binary);
-    return verifier(houio::HouGeoIO::import(&binaryInput));
+    return verifier(houio::HouGeoIO::import(binaryInput));
 }
 }
 

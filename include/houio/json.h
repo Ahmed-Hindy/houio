@@ -228,12 +228,6 @@ namespace houio
 				Handler& handler,
 				DiagnosticList& diagnostics);
 
-			// Compatibility overloads. Prefer the reference-based API above.
-			[[nodiscard]] bool parse(std::istream* input, Handler* handler);
-			[[nodiscard]] bool parse(
-				std::istream* input,
-				Handler* handler,
-				DiagnosticList* diagnostics);
 			bool                          parseStream();
 			void             validateSeekableInputSize();
 			void                 validateTrailingInput();
@@ -253,8 +247,6 @@ namespace houio
 			[[nodiscard]] T read();
 			template<typename T>
 			void read(std::span<T> destination);
-			template<typename T>
-			void read(T* destination, sint64 element_count);
 			sint64                         readLength();
 			std::string              readBinaryString();
 			std::string               readASCIIString();
@@ -263,6 +255,11 @@ namespace houio
 
 		private:
 			friend struct Token;
+
+			[[nodiscard]] bool parseInternal(
+				std::istream& input,
+				Handler& event_handler,
+				DiagnosticList* diagnostics);
 
 			State                                 state;
 			std::stack<State>                stateStack;
@@ -321,16 +318,6 @@ namespace houio
 					"Parser::read encountered truncated input", byteOffset);
 		}
 
-		template<typename T>
-		void Parser::read(T* destination, sint64 element_count)
-		{
-			if (element_count < 0)
-				throw std::length_error("Parser::read received a negative element count");
-			if (element_count > 0 && !destination)
-				throw std::invalid_argument("Parser::read received a null destination");
-			read(std::span<T>(destination, static_cast<size_t>(element_count)));
-		}
-
 
 		// Writer ==================================================
 		struct Writer
@@ -356,7 +343,6 @@ namespace houio
 		{
 		public:
 			explicit BinaryWriter(std::ostream& output);
-			explicit BinaryWriter(std::ostream* output);
 
 			bool jsonMagic();
 			virtual void                               jsonBeginArray()override;
@@ -380,10 +366,7 @@ namespace houio
 			bool jsonUniformArray(std::span<const T> data);
 			template<typename T>
 			bool jsonUniformArray(const std::vector<T>& data);
-			template<typename T>
-			bool jsonUniformArray(const T* data, sint64 element_count);
 			bool jsonUniformArrayReal16(std::span<const uword> data);
-			bool jsonUniformArrayReal16(const uword* data, sint64 element_count);
 
 			bool                                      writeId( Token::Type id );
 			bool                            writeLength( const sint64 &length );
@@ -393,13 +376,11 @@ namespace houio
 			bool write(const T& value);
 			template<typename T>
 			bool write(std::span<const T> values);
-			template<typename T>
-			bool write(const T* values, sint64 element_count);
 
 
 
 		private:
-			std::ostream* stream = nullptr;
+			std::ostream& stream;
 		};
 
 		template<typename T>
@@ -413,10 +394,8 @@ namespace houio
 		bool BinaryWriter::write(std::span<const T> values)
 		{
 			static_assert(std::is_trivially_copyable_v<T>);
-			if (!stream)
-				return false;
 			if (values.empty())
-				return stream->good();
+				return stream.good();
 			const uint64 element_count = static_cast<uint64>(values.size());
 			const uint64 maximum_bytes =
 				static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
@@ -424,18 +403,8 @@ namespace houio
 				throw std::length_error("BinaryWriter::write byte count exceeds streamsize range");
 			const std::streamsize byte_count =
 				static_cast<std::streamsize>(element_count * sizeof(T));
-			stream->write(reinterpret_cast<const char*>(values.data()), byte_count);
-			return stream->good();
-		}
-
-		template<typename T>
-		bool BinaryWriter::write(const T* values, sint64 element_count)
-		{
-			if (element_count < 0)
-				throw std::length_error("BinaryWriter::write received a negative element count");
-			if (element_count > 0 && !values)
-				throw std::invalid_argument("BinaryWriter::write received a null source");
-			return write(std::span<const T>(values, static_cast<size_t>(element_count)));
+			stream.write(reinterpret_cast<const char*>(values.data()), byte_count);
+			return stream.good();
 		}
 
 		template<typename T>
@@ -457,24 +426,12 @@ namespace houio
 			return jsonUniformArray(std::span<const T>(data));
 		}
 
-		template<typename T>
-		bool BinaryWriter::jsonUniformArray(const T* data, sint64 element_count)
-		{
-			if (element_count < 0)
-				throw std::length_error("BinaryWriter::jsonUniformArray received a negative element count");
-			if (element_count > 0 && !data)
-				throw std::invalid_argument("BinaryWriter::jsonUniformArray received null data");
-			return jsonUniformArray(
-				std::span<const T>(data, static_cast<size_t>(element_count)));
-		}
-
 
 		// ASCIIWriter ==================================================
 		class ASCIIWriter final : public Writer
 		{
 		public:
 			explicit ASCIIWriter(std::ostream& output);
-			explicit ASCIIWriter(std::ostream* output);
 
 			virtual void                               jsonBeginArray()override;
 			virtual void                                 jsonEndArray()override;
@@ -504,7 +461,7 @@ namespace houio
 			bool gotKey = false;
 			std::stack<Token::Type> stack;
 			std::string prefix;
-			std::ostream* stream = nullptr;
+			std::ostream& stream;
 		};
 
 
@@ -1041,16 +998,6 @@ namespace houio
 					writer_ = std::make_unique<BinaryWriter>(output);
 				else
 					writer_ = std::make_unique<ASCIIWriter>(output);
-			}
-
-			explicit JSONWriter(std::ostream* output, bool binary = false)
-			{
-				if (!output)
-					throw std::invalid_argument("JSONWriter requires a valid output stream");
-				if (binary)
-					writer_ = std::make_unique<BinaryWriter>(*output);
-				else
-					writer_ = std::make_unique<ASCIIWriter>(*output);
 			}
 
 			~JSONWriter() = default;

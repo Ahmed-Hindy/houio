@@ -246,19 +246,19 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
 int main()
 {
     std::istringstream source(modernQuadGeometry());
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&source);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(source);
     if (const int result = verifyGeometry(geometry, 3); result != 0)
     {
         return result;
     }
 
     std::ostringstream binaryOutput(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::xport(&binaryOutput, geometry, true))
+    if (!houio::HouGeoIO::exportGeometry(binaryOutput, geometry, true))
     {
         return fail("failed to export modern quad geometry");
     }
 
     std::istringstream binaryInput(binaryOutput.str(), std::ios::in | std::ios::binary);
-    houio::HouGeo::Ptr roundtripGeometry = houio::HouGeoIO::import(&binaryInput);
+    houio::HouGeo::Ptr roundtripGeometry = houio::HouGeoIO::import(binaryInput);
     return verifyGeometry(roundtripGeometry, 4);
 }

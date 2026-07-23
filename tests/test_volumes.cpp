@@ -50,7 +50,7 @@ std::string identityTransform()
 houio::HouGeo::HouVolume::Ptr importVolume(const std::string& source, houio::DiagnosticList* diagnostics)
 {
     std::istringstream input(source);
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input, diagnostics);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(input, diagnostics);
     if (!geometry)
     {
         return houio::HouGeo::HouVolume::Ptr();
@@ -203,7 +203,7 @@ int verifyBinaryRoundTrip()
     sourceVolume->setVisualization("iso", 0.125f, 0.75f);
 
     std::ostringstream output(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::xport(&output, sourceGeometry))
+    if (!houio::HouGeoIO::exportGeometry(output, sourceGeometry))
     {
         return fail("volume binary export failed");
     }
@@ -218,7 +218,7 @@ int verifyBinaryRoundTrip()
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
     houio::DiagnosticList diagnostics;
-    houio::HouGeo::Ptr importedGeometry = houio::HouGeoIO::import(&input, &diagnostics);
+    houio::HouGeo::Ptr importedGeometry = houio::HouGeoIO::import(input, &diagnostics);
     if (!importedGeometry || !diagnostics.empty())
     {
         return fail("volume binary re-import failed");
