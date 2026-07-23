@@ -5,6 +5,10 @@
 ----------------------------------------------------------------------*/
 #include <houio/math/Math.h>
 
+#include <algorithm>
+#include <limits>
+#include <stdexcept>
+
 namespace houio
 {
 
@@ -398,67 +402,126 @@ namespace math
 		return x*x*x*(x*(x*6.0f - 15.0f) + 10.0f);
 	}
 
-	static signed char coefs[16] = {
-		-1, 2,-1, 0,
-		 3,-5, 0, 2,
-		-3, 4, 1, 0,
-		 1,-1, 0, 0 };
-
-	void evalCatmullRom( const float *keyPos, const float *keyT, int num, int dim, float t, float *v )
+	namespace
 	{
-		if( t<0.0f )t=0.0f;
-		if( t>1.0f )t=1.0f;
-
-		// find key
-		int k = 0;while( keyT[k] < t )k++;
-
-		// interpolant
-		const float h = (t-keyT[k-1])/(keyT[k]-keyT[k-1]);
-
-		// init result
-		for( int i=0; i < dim; i++ ) v[i] = 0.0f;
-
-		// add basis functions
-		for( int i=0; i<4; i++ )
+		void validateInterpolationData(
+			std::span<const float> key_positions,
+			std::span<const float> key_times,
+			std::size_t tuple_width,
+			std::span<float> output)
 		{
-			int kn = k+i-2;
-			if( kn<0 ) kn=0;
-			else if( kn>(num-1) )
-				kn=num-1;
+			if (key_times.empty())
+				throw std::invalid_argument("Interpolation requires at least one key");
+			if (tuple_width == 0)
+				throw std::invalid_argument("Interpolation tuple width must be positive");
+			if (key_times.size() > std::numeric_limits<std::size_t>::max() / tuple_width
+				|| key_positions.size() != key_times.size() * tuple_width)
+			{
+				throw std::invalid_argument("Interpolation key storage does not match its metadata");
+			}
+			if (output.size() != tuple_width)
+				throw std::invalid_argument("Interpolation output size does not match tuple width");
+			for (std::size_t key_index = 1; key_index < key_times.size(); ++key_index)
+			{
+				if (!(key_times[key_index] > key_times[key_index - 1]))
+					throw std::invalid_argument("Interpolation key times must be strictly increasing");
+			}
+		}
 
-			const signed char *co = coefs + 4*i;
+		void copyInterpolationKey(
+			std::span<const float> key_positions,
+			std::size_t tuple_width,
+			std::size_t key_index,
+			std::span<float> output)
+		{
+			const std::size_t offset = key_index * tuple_width;
+			std::copy_n(key_positions.begin() + static_cast<std::ptrdiff_t>(offset),
+				tuple_width, output.begin());
+		}
 
-			const float b  = 0.5f*(((co[0]*h + co[1])*h + co[2])*h + co[3]);
-
-			for( int j=0; j < dim; j++ ) v[j] += b * keyPos[kn*dim+j];
+		std::size_t rightInterpolationKey(
+			std::span<const float> key_times,
+			float time)
+		{
+			return static_cast<std::size_t>(
+				std::upper_bound(key_times.begin(), key_times.end(), time) - key_times.begin());
 		}
 	}
 
-	void evalLinear( const float *keyPos, const float *keyT, int num, int dim, float t, float *v )
+	void evaluateLinear(
+		std::span<const float> key_positions,
+		std::span<const float> key_times,
+		std::size_t tuple_width,
+		float time,
+		std::span<float> output)
 	{
-		if( t<0.0f )t=0.0f;
-		if( t>1.0f )t=1.0f;
-
-		// find key
-		int k = 0;while( (keyT[k] < t)&&(k<num) )k++;
-		if(k == num)
+		validateInterpolationData(key_positions, key_times, tuple_width, output);
+		if (key_times.size() == 1 || time <= key_times.front())
 		{
-			for( int i=0; i < dim; i++ ) v[i] = keyPos[k-1*dim+i];
+			copyInterpolationKey(key_positions, tuple_width, 0, output);
 			return;
 		}
-		int kn = k-1;
-
-		if(kn < 0)
+		if (time >= key_times.back())
 		{
-			for( int i=0; i < dim; i++ ) v[i] = keyPos[0*dim+i];
+			copyInterpolationKey(key_positions, tuple_width, key_times.size() - 1, output);
 			return;
 		}
 
-		// interpolant
-		const float h = (t-keyT[kn])/(keyT[k]-keyT[kn]);
+		const std::size_t right_key = rightInterpolationKey(key_times, time);
+		const std::size_t left_key = right_key - 1;
+		const float factor = (time - key_times[left_key])
+			/ (key_times[right_key] - key_times[left_key]);
+		const std::size_t left_offset = left_key * tuple_width;
+		const std::size_t right_offset = right_key * tuple_width;
+		for (std::size_t component = 0; component < tuple_width; ++component)
+		{
+			output[component] = (1.0f - factor) * key_positions[left_offset + component]
+				+ factor * key_positions[right_offset + component];
+		}
+	}
 
-		// init result
-		for( int i=0; i < dim; i++ ) v[i] = (1.0f - h)*keyPos[(kn)*dim+i] + h*keyPos[k*dim+i];
+	void evaluateCatmullRom(
+		std::span<const float> key_positions,
+		std::span<const float> key_times,
+		std::size_t tuple_width,
+		float time,
+		std::span<float> output)
+	{
+		validateInterpolationData(key_positions, key_times, tuple_width, output);
+		if (key_times.size() == 1 || time <= key_times.front())
+		{
+			copyInterpolationKey(key_positions, tuple_width, 0, output);
+			return;
+		}
+		if (time >= key_times.back())
+		{
+			copyInterpolationKey(key_positions, tuple_width, key_times.size() - 1, output);
+			return;
+		}
+
+		const std::size_t key_2 = rightInterpolationKey(key_times, time);
+		const std::size_t key_1 = key_2 - 1;
+		const std::size_t key_0 = key_1 == 0 ? 0 : key_1 - 1;
+		const std::size_t key_3 = std::min(key_2 + 1, key_times.size() - 1);
+		const float factor = (time - key_times[key_1])
+			/ (key_times[key_2] - key_times[key_1]);
+		const float factor_squared = factor * factor;
+		const float factor_cubed = factor_squared * factor;
+
+		for (std::size_t component = 0; component < tuple_width; ++component)
+		{
+			const float value_0 = key_positions[key_0 * tuple_width + component];
+			const float value_1 = key_positions[key_1 * tuple_width + component];
+			const float value_2 = key_positions[key_2 * tuple_width + component];
+			const float value_3 = key_positions[key_3 * tuple_width + component];
+			output[component] = 0.5f * (
+				2.0f * value_1
+				+ (-value_0 + value_2) * factor
+				+ (2.0f * value_0 - 5.0f * value_1 + 4.0f * value_2 - value_3)
+					* factor_squared
+				+ (-value_0 + 3.0f * value_1 - 3.0f * value_2 + value_3)
+					* factor_cubed);
+		}
 	}
 }
 

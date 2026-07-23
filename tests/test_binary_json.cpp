@@ -220,7 +220,8 @@ int verifyFloat16Tokens()
     houio::json::BinaryWriter writer(&output);
     writer.jsonMagic();
     writer.jsonBeginArray();
-    writer.jsonUniformArrayReal16(halfValues, 3);
+    if (!writer.jsonUniformArrayReal16(std::span<const houio::uword>(halfValues)))
+        return fail("failed to write Float16 uniform array");
     writer.jsonEndArray();
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
@@ -426,23 +427,20 @@ int verifyArrayAndValueSafety()
     {
     }
 
-    houio::sint64 integerValue = 0x102030405060708LL;
-    char integerBytes[sizeof(integerValue)]{};
-    houio::json::Value::create<houio::sint64>(integerValue).cpyTo(integerBytes);
-    houio::sint64 integerCopy = 0;
-    std::memcpy(&integerCopy, integerBytes, sizeof(integerCopy));
-    if (integerCopy != integerValue)
+    const houio::sint64 integer_value = 0x102030405060708LL;
+    const houio::json::Value typed_value =
+        houio::json::Value::create<houio::sint64>(integer_value);
+    if (typed_value.as<houio::sint64>() != integer_value)
     {
-        return fail("int64 Value::cpyTo changed the value");
+        return fail("int64 Value::as changed the value");
     }
 
     try
     {
-        char destination = 0;
-        houio::json::Value::create<std::string>("text").cpyTo(&destination);
-        return fail("string Value::cpyTo was accepted");
+        static_cast<void>(houio::json::Value::createArray().as<houio::sint64>());
+        return fail("non-scalar Value::as was accepted");
     }
-    catch (const std::invalid_argument&)
+    catch (const std::logic_error&)
     {
     }
 
@@ -543,7 +541,7 @@ int verifyWriterValidation()
 
     try
     {
-        writer.jsonUniformArray<houio::sint32>(nullptr, 1);
+        static_cast<void>(writer.jsonUniformArray<houio::sint32>(nullptr, 1));
         return fail("writer accepted null uniform-array data");
     }
     catch (const std::invalid_argument&)

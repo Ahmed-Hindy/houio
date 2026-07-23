@@ -3,6 +3,7 @@
 // Houdini ASCII and binary JSON parser, event handlers, value tree, and writers.
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstring>
 #include <iostream>
@@ -249,9 +250,11 @@ namespace houio
 
 
 			template<typename T>
-			T                                    read();
+			[[nodiscard]] T read();
 			template<typename T>
-			void     read( T *dst, sint64 numElements );
+			void read(std::span<T> destination);
+			template<typename T>
+			void read(T* destination, sint64 element_count);
 			sint64                         readLength();
 			std::string              readBinaryString();
 			std::string               readASCIIString();
@@ -279,39 +282,53 @@ namespace houio
 		template<typename T>
 		T Parser::read()
 		{
-			T value{};
-			read(&value, 1);
-			return value;
+			std::array<T, 1> value{};
+			read(std::span<T>(value));
+			return value.front();
 		}
+
 		template<typename T>
-		void Parser::read( T *dst, sint64 numElements )
+		void Parser::read(std::span<T> destination)
 		{
-			if( !stream )
-				throw std::runtime_error( "Parser::read has no input stream" );
-			if( numElements < 0 )
-				throw std::length_error( "Parser::read received a negative element count" );
-			if( numElements == 0 )
+			static_assert(std::is_trivially_copyable_v<T>);
+			if (!stream)
+				throw std::runtime_error("Parser::read has no input stream");
+			if (destination.empty())
 				return;
-			if( !dst )
-				throw std::invalid_argument( "Parser::read received a null destination" );
+			const uint64 element_count = static_cast<uint64>(destination.size());
+			const uint64 maximum_bytes = static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
+			if (element_count > maximum_bytes / sizeof(T))
+				throw std::length_error("Parser::read byte count exceeds streamsize range");
 
-			const uint64 elementCount = static_cast<uint64>(numElements);
-			const uint64 maximumBytes = static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
-			if( elementCount > maximumBytes / sizeof(T) )
-				throw std::length_error( "Parser::read byte count exceeds streamsize range" );
-
-			const std::streamsize byteCount = static_cast<std::streamsize>(elementCount * sizeof(T));
-			if( byteOffset < 0 || byteOffset > limits.maxInputBytes
-				|| byteCount > limits.maxInputBytes - byteOffset )
+			const std::streamsize byte_count =
+				static_cast<std::streamsize>(element_count * sizeof(T));
+			if (byteOffset < 0 || byteOffset > limits.maxInputBytes
+				|| byte_count > limits.maxInputBytes - byteOffset)
+			{
 				fail(DiagnosticCategory::malformed_input, "Parser input byte limit exceeded", byteOffset);
-			if( knownInputBytes >= 0 && (byteOffset > knownInputBytes
-				|| byteCount > knownInputBytes - byteOffset) )
-				fail(DiagnosticCategory::malformed_input, "Parser::read encountered truncated input", knownInputBytes);
-			stream->read(reinterpret_cast<char*>(dst), byteCount);
-			const std::streamsize bytesRead = stream->gcount();
-			byteOffset += static_cast<sint64>(bytesRead);
-			if( bytesRead != byteCount )
-				fail(DiagnosticCategory::malformed_input, "Parser::read encountered truncated input", byteOffset);
+			}
+			if (knownInputBytes >= 0 && (byteOffset > knownInputBytes
+				|| byte_count > knownInputBytes - byteOffset))
+			{
+				fail(DiagnosticCategory::malformed_input,
+					"Parser::read encountered truncated input", knownInputBytes);
+			}
+			stream->read(reinterpret_cast<char*>(destination.data()), byte_count);
+			const std::streamsize bytes_read = stream->gcount();
+			byteOffset += static_cast<sint64>(bytes_read);
+			if (bytes_read != byte_count)
+				fail(DiagnosticCategory::malformed_input,
+					"Parser::read encountered truncated input", byteOffset);
+		}
+
+		template<typename T>
+		void Parser::read(T* destination, sint64 element_count)
+		{
+			if (element_count < 0)
+				throw std::length_error("Parser::read received a negative element count");
+			if (element_count > 0 && !destination)
+				throw std::invalid_argument("Parser::read received a null destination");
+			read(std::span<T>(destination, static_cast<size_t>(element_count)));
 		}
 
 
@@ -360,19 +377,24 @@ namespace houio
 
 
 			template<typename T>
-			bool                 jsonUniformArray( const std::vector<T> &data );
+			bool jsonUniformArray(std::span<const T> data);
 			template<typename T>
-			bool          jsonUniformArray( const T *data, sint64 numElements );
-			bool       jsonUniformArrayReal16( const uword *data, sint64 numElements );
+			bool jsonUniformArray(const std::vector<T>& data);
+			template<typename T>
+			bool jsonUniformArray(const T* data, sint64 element_count);
+			bool jsonUniformArrayReal16(std::span<const uword> data);
+			bool jsonUniformArrayReal16(const uword* data, sint64 element_count);
 
 			bool                                      writeId( Token::Type id );
 			bool                            writeLength( const sint64 &length );
 
 
 			template<typename T>
-			bool                                            write( const T &v );
+			bool write(const T& value);
 			template<typename T>
-			bool                      write( const T *dst, sint64 numElements );
+			bool write(std::span<const T> values);
+			template<typename T>
+			bool write(const T* values, sint64 element_count);
 
 
 
@@ -381,37 +403,43 @@ namespace houio
 		};
 
 		template<typename T>
-		bool BinaryWriter::write( const T &v )
+		bool BinaryWriter::write(const T& value)
 		{
-			if( !stream )
-				return false;
-			stream->write(reinterpret_cast<const char*>(&v), static_cast<std::streamsize>(sizeof(T)));
-			return stream->good();
+			static_assert(std::is_trivially_copyable_v<T>);
+			return write(std::span<const T>(&value, 1));
 		}
+
 		template<typename T>
-		bool BinaryWriter::write( const T *dst, sint64 numElements )
+		bool BinaryWriter::write(std::span<const T> values)
 		{
-			if( !stream )
+			static_assert(std::is_trivially_copyable_v<T>);
+			if (!stream)
 				return false;
-			if( numElements < 0 )
-				throw std::length_error( "BinaryWriter::write received a negative element count" );
-			if( numElements == 0 )
+			if (values.empty())
 				return stream->good();
-			if( !dst )
-				throw std::invalid_argument( "BinaryWriter::write received a null source" );
-
-			const uint64 elementCount = static_cast<uint64>(numElements);
-			const uint64 maximumBytes = static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
-			if( elementCount > maximumBytes / sizeof(T) )
-				throw std::length_error( "BinaryWriter::write byte count exceeds streamsize range" );
-
-			const std::streamsize byteCount = static_cast<std::streamsize>(elementCount * sizeof(T));
-			stream->write(reinterpret_cast<const char*>(dst), byteCount);
+			const uint64 element_count = static_cast<uint64>(values.size());
+			const uint64 maximum_bytes =
+				static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
+			if (element_count > maximum_bytes / sizeof(T))
+				throw std::length_error("BinaryWriter::write byte count exceeds streamsize range");
+			const std::streamsize byte_count =
+				static_cast<std::streamsize>(element_count * sizeof(T));
+			stream->write(reinterpret_cast<const char*>(values.data()), byte_count);
 			return stream->good();
 		}
 
 		template<typename T>
-		bool BinaryWriter::jsonUniformArray(const std::vector<T>& data)
+		bool BinaryWriter::write(const T* values, sint64 element_count)
+		{
+			if (element_count < 0)
+				throw std::length_error("BinaryWriter::write received a negative element count");
+			if (element_count > 0 && !values)
+				throw std::invalid_argument("BinaryWriter::write received a null source");
+			return write(std::span<const T>(values, static_cast<size_t>(element_count)));
+		}
+
+		template<typename T>
+		bool BinaryWriter::jsonUniformArray(std::span<const T> data)
 		{
 			if (data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
 				throw std::length_error("BinaryWriter::jsonUniformArray element count exceeds sint64 range");
@@ -420,8 +448,15 @@ namespace houio
 			return writeId(Token::JID_UNIFORM_ARRAY)
 				&& write<ubyte>(static_cast<ubyte>(type))
 				&& writeLength(element_count)
-				&& write<T>(data.data(), element_count);
+				&& write(data);
 		}
+
+		template<typename T>
+		bool BinaryWriter::jsonUniformArray(const std::vector<T>& data)
+		{
+			return jsonUniformArray(std::span<const T>(data));
+		}
+
 		template<typename T>
 		bool BinaryWriter::jsonUniformArray(const T* data, sint64 element_count)
 		{
@@ -429,11 +464,8 @@ namespace houio
 				throw std::length_error("BinaryWriter::jsonUniformArray received a negative element count");
 			if (element_count > 0 && !data)
 				throw std::invalid_argument("BinaryWriter::jsonUniformArray received null data");
-			const Token::Type type = uniformArrayToken<T>();
-			return writeId(Token::JID_UNIFORM_ARRAY)
-				&& write<ubyte>(static_cast<ubyte>(type))
-				&& writeLength(element_count)
-				&& write<T>(data, element_count);
+			return jsonUniformArray(
+				std::span<const T>(data, static_cast<size_t>(element_count)));
 		}
 
 
@@ -634,7 +666,7 @@ namespace houio
 				{
 					const size_t chunk_size = static_cast<size_t>(std::min<sint64>(elements_remaining, 4096));
 					std::vector<ubyte> data(chunk_size);
-					parser.read<ubyte>(data.data(), static_cast<sint64>(chunk_size));
+					parser.read(std::span<ubyte>(data));
 					for (ubyte value : data)
 						out << static_cast<int>(value) << " ";
 					elements_remaining -= static_cast<sint64>(chunk_size);
@@ -667,7 +699,7 @@ namespace houio
 				{
 					const size_t chunk_size = static_cast<size_t>(std::min<sint64>(elements_remaining, 4096));
 					std::vector<T> data(chunk_size);
-					parser.read<T>(data.data(), static_cast<sint64>(chunk_size));
+					parser.read(std::span<T>(data));
 					for (const T& value : data)
 						out << value << " ";
 					elements_remaining -= static_cast<sint64>(chunk_size);
@@ -713,12 +745,6 @@ namespace houio
 
 			template<typename T>
 			[[nodiscard]] T as() const;
-
-			void copyTo(void* destination) const;
-			void cpyTo(char* destination) const
-			{
-				copyTo(destination);
-			}
 
 			[[nodiscard]] ArrayPtr asArray();
 			[[nodiscard]] ConstArrayPtr asArray() const;
@@ -977,7 +1003,7 @@ namespace houio
 				const size_t chunk_size = static_cast<size_t>(
 					std::min<sint64>(elements_remaining, chunk_capacity));
 				std::vector<Source> source_data(chunk_size);
-				parser.read<Source>(source_data.data(), static_cast<sint64>(chunk_size));
+				parser.read(std::span<Source>(source_data));
 				for (const Source& source_value : source_data)
 					converted_data.push_back(static_cast<T>(source_value));
 				elements_remaining -= static_cast<sint64>(chunk_size);

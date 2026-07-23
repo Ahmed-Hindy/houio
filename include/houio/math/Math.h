@@ -7,6 +7,8 @@
 
 #include <math.h>
 #include <cmath>
+#include <cstddef>
+#include <span>
 
 #define MATH_PIf 3.14159265f
 #define MATH_PI 3.14159265
@@ -296,8 +298,18 @@ namespace math
 	float clamp( float x, float left, float right );
 	float smoothstep( float x );
 	float smoothstep(float edge0, float edge1, float x);
-	void evalCatmullRom( const float *keyPos, const float *keyT, int num, int dim, float t, float *v );
-	void evalLinear( const float *keyPos, const float *keyT, int num, int dim, float t, float *v );
+	void evaluateCatmullRom(
+		std::span<const float> key_positions,
+		std::span<const float> key_times,
+		std::size_t tuple_width,
+		float time,
+		std::span<float> output);
+	void evaluateLinear(
+		std::span<const float> key_positions,
+		std::span<const float> key_times,
+		std::size_t tuple_width,
+		float time,
+		std::span<float> output);
 
 
 	inline float sRGBToLinear( float c_srgb )

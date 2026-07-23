@@ -530,25 +530,25 @@ namespace houio
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attr = Attribute::create(numComponents, Attribute::HALF,
-					raw_data.bytes().data(), houAttr->getNumElements());
+					raw_data.bytes(), houAttr->getNumElements());
 			}
 			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attr = Attribute::create(numComponents, Attribute::FLOAT,
-					raw_data.bytes().data(), houAttr->getNumElements());
+					raw_data.bytes(), houAttr->getNumElements());
 			}
 			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attr = Attribute::create(numComponents, Attribute::INT,
-					raw_data.bytes().data(), houAttr->getNumElements());
+					raw_data.bytes(), houAttr->getNumElements());
 			}
 			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attr = Attribute::create(numComponents, Attribute::INT64,
-					raw_data.bytes().data(), houAttr->getNumElements());
+					raw_data.bytes(), houAttr->getNumElements());
 			}
 			else
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
@@ -623,19 +623,19 @@ namespace houio
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attr = Attribute::create(numComponents, Attribute::HALF,
-					raw_data.bytes().data(), houAttr->getNumElements());
+					raw_data.bytes(), houAttr->getNumElements());
 			}
 			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attr = Attribute::create(numComponents, Attribute::FLOAT,
-					raw_data.bytes().data(), houAttr->getNumElements());
+					raw_data.bytes(), houAttr->getNumElements());
 			}
 			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attr = Attribute::create(numComponents, Attribute::INT64,
-					raw_data.bytes().data(), houAttr->getNumElements());
+					raw_data.bytes(), houAttr->getNumElements());
 			}
 
 			if( !attr )
@@ -1220,7 +1220,7 @@ namespace houio
 						promotedData[destinationOffset + 2u] = source[sourceOffset + 2u];
 						promotedData[destinationOffset + 3u] = floatToHalfBits(1.0f);
 					}
-					writer.jsonUniformArrayReal16(promotedData.data(), static_cast<sint64>(promotedData.size()));
+					writer.jsonUniformArrayReal16(std::span<const uword>(promotedData));
 				}
 				else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 				{
@@ -1244,7 +1244,7 @@ namespace houio
 			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
 			{
 				const std::vector<uword> values = copyRawValues<uword>(raw_data, scalar_count, name);
-				writer.jsonUniformArrayReal16(values.data(), static_cast<sint64>(values.size()));
+				writer.jsonUniformArrayReal16(std::span<const uword>(values));
 			}
 			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
 				writer.jsonUniformArray(copyRawValues<real32>(raw_data, scalar_count, name));

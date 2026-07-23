@@ -97,7 +97,7 @@ namespace houio
         [[nodiscard]] static Ptr create(
             int component_count,
             ComponentType component_type,
-            const void* raw_data,
+            std::span<const std::byte> raw_data,
             int element_count);
         [[nodiscard]] static Ptr createM33f();
         [[nodiscard]] static Ptr createM44f();

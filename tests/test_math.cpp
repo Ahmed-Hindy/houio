@@ -2,10 +2,12 @@
 #include <houio/math/Matrix22Algo.h>
 #include <houio/math/Matrix33Algo.h>
 #include <houio/math/Matrix44Algo.h>
+#include <houio/math/Math.h>
 #include <houio/math/Vec2.h>
 #include <houio/math/Vec3.h>
 #include <houio/math/Vec4.h>
 
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -151,6 +153,55 @@ int main()
         return fail("Matrix44 accepted an out-of-range row");
     }
     catch (const std::out_of_range&)
+    {
+    }
+
+    const std::array<float, 2> linear_times = {0.0f, 1.0f};
+    const std::array<float, 4> linear_positions = {0.0f, 0.0f, 2.0f, 4.0f};
+    std::array<float, 2> linear_output{};
+    houio::math::evaluateLinear(
+        linear_positions, linear_times, 2, 0.5f, linear_output);
+    if (!nearlyEqual(linear_output[0], 1.0f)
+        || !nearlyEqual(linear_output[1], 2.0f))
+    {
+        return fail("bounded linear interpolation produced the wrong midpoint");
+    }
+    houio::math::evaluateLinear(
+        linear_positions, linear_times, 2, -1.0f, linear_output);
+    if (linear_output[0] != 0.0f || linear_output[1] != 0.0f)
+        return fail("linear interpolation did not clamp before the first key");
+    houio::math::evaluateLinear(
+        linear_positions, linear_times, 2, 2.0f, linear_output);
+    if (linear_output[0] != 2.0f || linear_output[1] != 4.0f)
+        return fail("linear interpolation did not clamp after the last key");
+
+    const std::array<float, 4> spline_times = {0.0f, 1.0f, 2.0f, 3.0f};
+    const std::array<float, 4> spline_positions = {0.0f, 1.0f, 2.0f, 3.0f};
+    std::array<float, 1> spline_output{};
+    houio::math::evaluateCatmullRom(
+        spline_positions, spline_times, 1, 1.5f, spline_output);
+    if (!nearlyEqual(spline_output[0], 1.5f))
+        return fail("bounded Catmull-Rom interpolation produced the wrong midpoint");
+
+    try
+    {
+        const std::array<float, 2> duplicate_times = {0.0f, 0.0f};
+        houio::math::evaluateLinear(
+            linear_positions, duplicate_times, 2, 0.0f, linear_output);
+        return fail("interpolation accepted non-increasing key times");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+
+    try
+    {
+        std::array<float, 1> undersized_output{};
+        houio::math::evaluateLinear(
+            linear_positions, linear_times, 2, 0.5f, undersized_output);
+        return fail("interpolation accepted an output span with the wrong size");
+    }
+    catch (const std::invalid_argument&)
     {
     }
 

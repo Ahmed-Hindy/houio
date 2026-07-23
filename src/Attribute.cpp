@@ -17,11 +17,7 @@ namespace houio
 
     Attribute::Ptr Attribute::copy() const
     {
-        return create(
-            component_count_,
-            component_type_,
-            data_.empty() ? nullptr : data_.data(),
-            numElements());
+        return create(component_count_, component_type_, data_, numElements());
     }
 
     void Attribute::clear() noexcept
@@ -145,7 +141,7 @@ namespace houio
     Attribute::Ptr Attribute::create(
         int component_count,
         ComponentType component_type,
-        const void* raw_data,
+        std::span<const std::byte> raw_data,
         int element_count)
     {
         if (element_count < 0)
@@ -153,13 +149,9 @@ namespace houio
 
         auto attribute = std::make_shared<Attribute>(component_count, component_type);
         attribute->resize(static_cast<std::size_t>(element_count));
-        if (!attribute->data_.empty())
-        {
-            if (!raw_data)
-                throw std::invalid_argument(
-                    "Attribute raw data cannot be null for non-empty storage");
-            std::memcpy(attribute->data_.data(), raw_data, attribute->data_.size());
-        }
+        if (raw_data.size() != attribute->data_.size())
+            throw std::invalid_argument("Attribute raw byte count does not match its metadata");
+        std::copy(raw_data.begin(), raw_data.end(), attribute->data_.begin());
         return attribute;
     }
 

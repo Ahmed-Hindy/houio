@@ -1064,16 +1064,27 @@ namespace houio
 			write<real64>(value );
 		}
 
-		bool BinaryWriter::jsonUniformArrayReal16( const uword *data, sint64 numElements )
+		bool BinaryWriter::jsonUniformArrayReal16(std::span<const uword> data)
 		{
-			if( numElements < 0 )
-				throw std::length_error( "BinaryWriter::jsonUniformArrayReal16 received a negative element count" );
-			if( numElements > 0 && !data )
-				throw std::invalid_argument( "BinaryWriter::jsonUniformArrayReal16 received null data" );
+			if (data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
+				throw std::length_error("BinaryWriter::jsonUniformArrayReal16 element count exceeds sint64 range");
+			const sint64 element_count = static_cast<sint64>(data.size());
 			return writeId(Token::JID_UNIFORM_ARRAY)
 				&& write<sbyte>(static_cast<sbyte>(Token::JID_REAL16))
-				&& writeLength(numElements)
-				&& write<uword>(data, numElements);
+				&& writeLength(element_count)
+				&& write(data);
+		}
+
+		bool BinaryWriter::jsonUniformArrayReal16(
+			const uword* data,
+			sint64 element_count)
+		{
+			if (element_count < 0)
+				throw std::length_error("BinaryWriter::jsonUniformArrayReal16 received a negative element count");
+			if (element_count > 0 && !data)
+				throw std::invalid_argument("BinaryWriter::jsonUniformArrayReal16 received null data");
+			return jsonUniformArrayReal16(
+				std::span<const uword>(data, static_cast<size_t>(element_count)));
 		}
 
 		void BinaryWriter::jsonBool( const bool &value )
@@ -1253,24 +1264,6 @@ namespace houio
 
 		
 		// Value ----
-		void Value::copyTo(void* destination) const
-		{
-			if (!destination)
-				throw std::invalid_argument("Value::copyTo received a null destination");
-			if (kind_ != Kind::scalar)
-				throw std::logic_error("Value::copyTo requires a scalar value");
-			std::visit(
-				[destination](const auto& scalar)
-				{
-					using Scalar = std::remove_cvref_t<decltype(scalar)>;
-					if constexpr (std::is_same_v<Scalar, std::string>)
-						throw std::invalid_argument("Value::copyTo does not support strings");
-					else
-						std::memcpy(destination, &scalar, sizeof(Scalar));
-				},
-				scalar_);
-		}
-
 		ArrayPtr Value::asArray()
 		{
 			return array_;

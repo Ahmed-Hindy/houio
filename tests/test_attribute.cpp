@@ -62,9 +62,12 @@ int verifyBoundsChecks()
 
     try
     {
-        static_cast<void>(
-            houio::Attribute::create(1, houio::Attribute::FLOAT, nullptr, 1));
-        return fail("Attribute::create accepted null non-empty storage");
+        static_cast<void>(houio::Attribute::create(
+            1,
+            houio::Attribute::FLOAT,
+            std::span<const std::byte>(),
+            1));
+        return fail("Attribute::create accepted mismatched non-empty storage");
     }
     catch (const std::invalid_argument&)
     {
