@@ -1546,7 +1546,7 @@ namespace houio
 
 	math::M44f HouGeo::HouVolume::getTransform()const
 	{
-		return field->m_localToWorld;
+		return field->localToWorldMatrix();
 	}
 
 	// returns raw pointer to the data

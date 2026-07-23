@@ -752,8 +752,9 @@ namespace houio
 		if( geometry->numPrimitives() > 0 )
 		{
 			HouGeo::HouTopology::Ptr topology = std::make_shared<HouGeo::HouTopology>();
-			topology->indexBuffer.reserve(geometry->m_indexBuffer.size());
-			for( const unsigned int pointIndex : geometry->m_indexBuffer )
+			const std::span<const Geometry::Index> geometryIndices = geometry->indexBuffer();
+			topology->indexBuffer.reserve(geometryIndices.size());
+			for( const unsigned int pointIndex : geometryIndices )
 			{
 				if( pointIndex > static_cast<unsigned int>(std::numeric_limits<int>::max()) )
 					throw std::overflow_error( "HouGeoIO::adaptGeometry point index exceeds int range" );
@@ -775,10 +776,10 @@ namespace houio
 			}
 			polygonRun->m_perPolyVertexCount.assign(static_cast<size_t>(primitiveCount), verticesPerPrimitive);
 
-			if( geometry->m_indexBuffer.size() > static_cast<size_t>(std::numeric_limits<int>::max()) )
+			if( geometryIndices.size() > static_cast<size_t>(std::numeric_limits<int>::max()) )
 				throw std::overflow_error( "HouGeoIO::adaptGeometry index buffer exceeds int range" );
-			polygonRun->m_vertices.resize(geometry->m_indexBuffer.size());
-			for( size_t vertexIndex=0;vertexIndex<geometry->m_indexBuffer.size();++vertexIndex )
+			polygonRun->m_vertices.resize(geometryIndices.size());
+			for( size_t vertexIndex=0;vertexIndex<geometryIndices.size();++vertexIndex )
 				polygonRun->m_vertices[vertexIndex] = static_cast<int>(vertexIndex);
 
 			polygonRun->m_closed = geometry->primitiveType() != Geometry::LINE;

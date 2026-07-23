@@ -1,527 +1,614 @@
 #pragma once
 
-#include <vector>
-#include <iostream>
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <fstream>
-#include <memory>
-#include <cstring>
 #include <limits>
+#include <memory>
+#include <span>
 #include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 #include <houio/math/Math.h>
 
 namespace houio
 {
-
-	template<typename T>
-	struct Field
-	{
-		typedef std::shared_ptr< Field<T> > Ptr;
-		typedef std::shared_ptr< const Field<T> > CPtr;
-
-		static Ptr create( math::V3i res = math::V3i(10), math::M44f l2w = math::M44f() );
-		static Ptr       create( math::V3i res, math::Box3f bound, T initialValue = T() );
-		template<typename R> static Ptr                 create( typename Field<R>::Ptr t);
-		static Ptr                                    load( const std::string &filename );
-
-		Field();
-
-		T                                           evaluate( const math::V3f &vsP )const;
-		T                                              sample( int i, int j, int k )const;
-		T                                                  &lvalue( int i, int j, int k );
-
-		math::V3i                                                    getResolution()const;
-		void                                                resize( int x, int y, int z );
-		void                                               resize( math::V3i resolution );
-
-		void                            setLocalToWorld( const math::M44f &localToWorld );
-		void                                         setBound( const math::Box3f &bound );
-
-		math::Box3f                                                          bound()const; // returns bounding box in worldspace
-		math::V3f                                                     getVoxelSize()const; // returns voxelsize in worldspace
-
-		math::V3f                               worldToLocal( const math::V3f &wsP )const; // converts given worldspace position to localspace
-		math::V3f                               localToWorld( const math::V3f &lsP )const; // converts given localspace position to worldspace
-		math::V3f                               worldToVoxel( const math::V3f &wsP )const; // converts given worldspace position to voxelspace
-		math::V3f                               voxelToWorld( const math::V3f &vsP )const; // converts given voxelspace position to worldspace
-		math::V3f                               localToVoxel( const math::V3f &lsP )const; // converts given localspace position to voxelspace
-		math::V3f                               voxelToLocal( const math::V3f &vsP )const; // converts given voxelspace position to localspace
-
-		T                                                                *getRawPointer();
-		const T                                                     *getRawPointer()const;
-
-
-		// utility functions ---
-		void                                                               fill( T value ); // fills all voxels with the same value
-		void                                   fill( T value, const math::Box3f &wsBound ); // fills all voxels with the same value within given (worldspace)bound
-		void                                                           multiply( T value ); // multiplies all voxelswith given value
-		void                                          store( const std::string &filename ); // saves field to file
-		void                        storeWithoutBoundingBox( const std::string &filename ); // saves field to file
-
-
-
-	//private:
-		math::M44f                                                          m_localToWorld; // transforms 0-1 space to world space
-		math::M44f                                                          m_worldToLocal;
-		math::M44f                                                          m_worldToVoxel; // transforms from worldspace to voxelspace
-		math::M44f                                                          m_voxelToWorld;
-
-		math::V3f                                                           m_sampleLocation; // sample location within one voxel (allows staggered grids etc.)
-
-		math::V3i                                                             m_resolution;
-
-		math::Box3f                                                                m_bound;
-
-		std::vector<T>                                                              m_data;
-
-		static const int                                                        m_dataType; // e.g. float, double, v3f etc.
-	};
-
-
-	template<typename T>
-	typename Field<T>::Ptr Field<T>::create( math::V3i res, math::M44f l2w )
-	{
-		Field<T>::Ptr field = Field<T>::Ptr(new Field<T>());
-		field->resize(res);
-		field->setLocalToWorld(l2w);
-		return field;
-	}
-
-	template<typename T>
-	typename Field<T>::Ptr Field<T>::create( math::V3i res, math::Box3f bound, T initialValue )
-	{
-		Field<T>::Ptr field = Field<T>::Ptr(new Field<T>());
-		field->resize(res);
-		field->setBound(bound);
-		field->fill( initialValue );
-		return field;
-	}
-
-
-	template<typename T>
-	template<typename R>
-	typename Field<T>::Ptr Field<T>::create( typename Field<R>::Ptr src)
-	{
-		Field<T>::Ptr dst = Field<T>::create( src->getResolution(), src->bound() );
-		typename std::vector<R>::iterator srcIt = src->m_data.begin();
-		typename std::vector<T>::iterator dstIt = dst->m_data.begin();
-		typename std::vector<T>::iterator dstEnd = dst->m_data.end();
-		for( ; dstIt != dstEnd; ++dstIt, ++srcIt )
-			*dstIt = (T)*srcIt;
-		return dst;
-	}
-
-	template<typename T>
-	Field<T>::Field() : m_sampleLocation(0.5f)
-	{
-		resize( math::V3i(1) );
-		setLocalToWorld( math::M44f::Identity() );
-	}
-
-	template<typename T>
-	typename Field<T>::Ptr Field<T>::load( const std::string &filename )
-	{
-		std::ifstream input(filename.c_str(), std::ios_base::in | std::ios_base::binary);
-		if( !input.good() )
-			return Field<T>::Ptr();
-
-		math::V3i resolution;
-		math::Box3f storedBound;
-		int dataType = 0;
-		input.read(reinterpret_cast<char*>(&resolution), static_cast<std::streamsize>(sizeof(int) * 3));
-		input.read(reinterpret_cast<char*>(&storedBound), static_cast<std::streamsize>(sizeof(float) * 6));
-		input.read(reinterpret_cast<char*>(&dataType), static_cast<std::streamsize>(sizeof(int)));
-		if( !input.good() || dataType != m_dataType )
-			return Field<T>::Ptr();
-
-		Field<T>::Ptr field = Field<T>::create();
-		try
-		{
-			field->resize(resolution);
-		}
-		catch( const std::exception & )
-		{
-			return Field<T>::Ptr();
-		}
-
-		if( field->m_data.size() > static_cast<size_t>(std::numeric_limits<std::streamsize>::max()) / sizeof(T) )
-			return Field<T>::Ptr();
-		const std::streamsize byteCount = static_cast<std::streamsize>(field->m_data.size() * sizeof(T));
-		if( byteCount > 0 )
-		{
-			input.read(reinterpret_cast<char*>(field->m_data.data()), byteCount);
-			if( input.gcount() != byteCount )
-				return Field<T>::Ptr();
-		}
-
-		field->setBound(storedBound);
-		return field;
-	}
-
-	template<typename T>
-	void Field<T>::store( const std::string &filename )
-	{
-		std::ofstream output(filename.c_str(), std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
-		if( !output.good() )
-			return;
-
-		output.write(reinterpret_cast<const char*>(&m_resolution), static_cast<std::streamsize>(sizeof(int) * 3));
-		const math::Box3f storedBound = bound();
-		output.write(reinterpret_cast<const char*>(&storedBound), static_cast<std::streamsize>(sizeof(float) * 6));
-		output.write(reinterpret_cast<const char*>(&m_dataType), static_cast<std::streamsize>(sizeof(int)));
-		if( m_data.size() > static_cast<size_t>(std::numeric_limits<std::streamsize>::max()) / sizeof(T) )
-			throw std::length_error( "Field storage exceeds streamsize range" );
-		const std::streamsize byteCount = static_cast<std::streamsize>(m_data.size() * sizeof(T));
-		if( byteCount > 0 )
-			output.write(reinterpret_cast<const char*>(m_data.data()), byteCount);
-	}
-
-	template<typename T>
-	void Field<T>::storeWithoutBoundingBox( const std::string &filename )
-	{
-		std::ofstream output(filename.c_str(), std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
-		if( !output.good() )
-			return;
-
-		output.write(reinterpret_cast<const char*>(&m_resolution), static_cast<std::streamsize>(sizeof(int) * 3));
-		output.write(reinterpret_cast<const char*>(&m_dataType), static_cast<std::streamsize>(sizeof(int)));
-		if( m_data.size() > static_cast<size_t>(std::numeric_limits<std::streamsize>::max()) / sizeof(T) )
-			throw std::length_error( "Field storage exceeds streamsize range" );
-		const std::streamsize byteCount = static_cast<std::streamsize>(m_data.size() * sizeof(T));
-		if( byteCount > 0 )
-			output.write(reinterpret_cast<const char*>(m_data.data()), byteCount);
-	}
-
-	template<typename T>
-	void Field<T>::resize( int x, int y, int z )
-	{
-		resize(math::V3i(x, y, z));
-	}
-
-
-	template<typename T>
-	void Field<T>::resize( math::V3i resolution )
-	{
-		if( resolution.x < 0 || resolution.y < 0 || resolution.z < 0 )
-			throw std::invalid_argument( "Field resolution cannot be negative" );
-
-		const size_t resolutionX = static_cast<size_t>(resolution.x);
-		const size_t resolutionY = static_cast<size_t>(resolution.y);
-		const size_t resolutionZ = static_cast<size_t>(resolution.z);
-		if( resolutionX != 0 && resolutionY > std::numeric_limits<size_t>::max() / resolutionX )
-			throw std::length_error( "Field resolution exceeds addressable storage" );
-		const size_t resolutionXY = resolutionX * resolutionY;
-		if( resolutionXY != 0 && resolutionZ > std::numeric_limits<size_t>::max() / resolutionXY )
-			throw std::length_error( "Field resolution exceeds addressable storage" );
-
-		m_resolution = resolution;
-		const size_t voxelCount = resolutionXY * resolutionZ;
-		m_data.assign(voxelCount, T());
-		if( voxelCount == 0 )
-		{
-			m_worldToVoxel = math::M44f::Identity();
-			m_voxelToWorld = math::M44f::Identity();
-			return;
-		}
-		m_worldToVoxel = m_worldToLocal*math::M44f().scale( math::V3f(m_resolution) );
-		m_voxelToWorld = m_worldToVoxel.inverse();
-	}
-
-	template<typename T>
-	T Field<T>::sample( int i, int j, int k )const
-	{
-		return m_data[k*m_resolution.x*m_resolution.y + j*m_resolution.x + i];
-	}
-
-	template<typename T>
-	T &Field<T>::lvalue( int i, int j, int k )
-	{
-		return m_data[k*m_resolution.x*m_resolution.y + j*m_resolution.x + i];
-	}
-
-	template<typename T>
-	T Field<T>::evaluate( const math::V3f &vsP )const
-	{
-		typedef float real_t;
-		typedef math::Vec3<real_t> Vector;
-
-		Vector vs = vsP;
-
-		// take sample location within voxel into account
-		vs -= m_sampleLocation;
-
-		real_t tx = vs.x - floor(vs.x);
-		real_t ty = vs.y - floor(vs.y);
-		real_t tz = vs.z - floor(vs.z);
-
-		// lower left corner
-		math::V3i c1;
-		c1.x = (int)floor(vs.x);
-		c1.y = (int)floor(vs.y);
-		c1.z = (int)floor(vs.z);
-
-		// upper right corner
-		math::V3i c2 = c1+math::V3i(1);
-		math::V3i res = getResolution();
-
-		// clamp the indexing coordinates
-		c1.x = std::max(0, std::min(c1.x, res.x-1));
-		c2.x = std::max(0, std::min(c2.x, res.x-1));
-		c1.y = std::max(0, std::min(c1.y, res.y-1));
-		c2.y = std::max(0, std::min(c2.y, res.y-1));
-		c1.z = std::max(0, std::min(c1.z, res.z-1));
-		c2.z = std::max(0, std::min(c2.z, res.z-1));
-
-		//lerp...
-		return math::lerp( math::lerp( math::lerp( sample( c1.x, c1.y, c1.z ), sample( c2.x, c1.y, c1.z ), (real_t)tx ), math::lerp( sample( c1.x, c2.y, c1.z ), sample( c2.x, c2.y, c1.z ), (real_t)tx ), (real_t)ty ), math::lerp( math::lerp( sample( c1.x, c1.y, c2.z ), sample( c2.x, c1.y, c2.z ), (real_t)tx ), math::lerp( sample( c1.x, c2.y, c2.z ), sample( c2.x, c2.y, c2.z ), (real_t)tx ), (real_t)ty ), (real_t)tz );
-	}
-
-	template<typename T>
-	math::V3i Field<T>::getResolution()const
-	{
-		return m_resolution;
-	}
-
-	// returns voxelsize in worldspace
-	template<typename T>
-	math::V3f Field<T>::getVoxelSize()const
-	{
-		math::V3f v0 = voxelToWorld( math::V3f(0.0f,0.0f, 0.0f) );
-		math::V3f v1 = voxelToWorld( math::V3f(1.0f,1.0f, 1.0f) );
-		return math::V3f( v1.x - v0.x, v1.y - v0.y, v1.z - v0.z );
-	}
-
-	template<typename T>
-	T *Field<T>::getRawPointer()
-	{
-		return m_data.data();
-	}
-
-	template<typename T>
-	const T *Field<T>::getRawPointer()const
-	{
-		return m_data.data();
-	}
-
-	template<typename T>
-	void Field<T>::setLocalToWorld( const math::M44f &localToWorld )
-	{
-		m_localToWorld = localToWorld;
-		m_worldToLocal = m_localToWorld.inverse();
-		m_worldToVoxel = m_worldToLocal*math::M44f().scale( math::V3f((float)m_resolution.x, (float)m_resolution.y, (float)m_resolution.z) );
-		m_voxelToWorld = m_worldToVoxel.inverse();
-
-		m_bound.makeEmpty();
-		m_bound.extendBy( math::V3f( 0.0f, 0.0f, 0.0f ) * m_localToWorld );
-		m_bound.extendBy( math::V3f( 1.0f, 0.0f, 0.0f ) * m_localToWorld );
-		m_bound.extendBy( math::V3f( 0.0f, 1.0f, 0.0f ) * m_localToWorld );
-		m_bound.extendBy( math::V3f( 1.0f, 1.0f, 0.0f ) * m_localToWorld );
-		m_bound.extendBy( math::V3f( 0.0f, 0.0f, 1.0f ) * m_localToWorld );
-		m_bound.extendBy( math::V3f( 1.0f, 0.0f, 1.0f ) * m_localToWorld );
-		m_bound.extendBy( math::V3f( 0.0f, 1.0f, 1.0f ) * m_localToWorld );
-		m_bound.extendBy( math::V3f( 1.0f, 1.0f, 1.0f ) * m_localToWorld );
-	}
-
-	template<typename T>
-	void Field<T>::setBound( const math::Box3f &bound )
-	{
-		m_bound = bound;
-		math::V3f dim = m_bound.size();
-
-		m_localToWorld = math::M44f().scale( math::V3f(dim.x, dim.y, dim.z) )*math::M44f().translate(m_bound.minPoint);
-		m_worldToLocal = m_localToWorld.inverse();
-		m_worldToVoxel = m_worldToLocal*math::M44f().scale( math::V3f((float)m_resolution.x, (float)m_resolution.y, (float)m_resolution.z) );
-		m_voxelToWorld = m_worldToVoxel.inverse();
-	}
-
-	// converts given worldspace position to voxelspace
-	template<typename T>
-	math::V3f Field<T>::worldToVoxel( const math::V3f &wsP )const
-	{
-		return wsP * m_worldToVoxel;
-	}
-
-	// converts given voxelspace position to worldspace
-	template<typename T>
-	math::V3f Field<T>::voxelToWorld( const math::V3f &vsP )const
-	{
-		return vsP * m_voxelToWorld;
-	}
-
-
-	// converts given worldspace position to localspace
-	template<typename T>
-	math::V3f Field<T>::worldToLocal( const math::V3f &wsP )const
-	{
-		return wsP * m_worldToLocal;
-	}
-
-	// converts given localspace position to worldspace
-	template<typename T>
-	math::V3f Field<T>::localToWorld( const math::V3f &lsP )const
-	{
-		return lsP * m_localToWorld;
-	}
-
-	// converts given voxelspace position to localspace
-	template<typename T>
-	math::V3f Field<T>::voxelToLocal( const math::V3f &vsP )const
-	{
-		return vsP * math::M44f::ScaleMatrix( 1.0f/float(m_resolution.x), 1.0f/float(m_resolution.y), 1.0f/float(m_resolution.z) );
-	}
-
-	// converts given localspace position to voxelspace
-	template<typename T>
-	math::V3f Field<T>::localToVoxel( const math::V3f &lsP )const
-	{
-		return lsP * math::M44f::ScaleMatrix( float(m_resolution.x), float(m_resolution.y), float(m_resolution.z) );
-	}
-
-
-	// returns bounding box in worldspace
-	template<typename T>
-	math::Box3f Field<T>::bound()const
-	{
-		return m_bound;
-	}
-
-	// fills all voxels with the same value
-	template<typename T>
-	void Field<T>::fill( T value )
-	{
-		for( typename std::vector<T>::iterator it = m_data.begin(), end = m_data.end(); it != end; ++it )
-			*it = value;
-	}
-
-	template<typename T>
-	void Field<T>::fill( T value, const math::Box3f &wsBound )
-	{
-		for( int k=0;k<m_resolution.z;++k )
-			for( int j=0;j<m_resolution.y;++j )
-				for( int i=0;i<m_resolution.x;++i )
-				{
-					math::V3f vsP( i+0.5f, j+0.5f, k+0.5f );
-					math::V3f wsP = voxelToWorld( vsP );
-					if( wsBound.encloses(wsP) )
-						lvalue(i, j, k) = value;
-				}
-	}
-
-
-	// multiplies all voxelswith given value
-	template<typename T>
-	void Field<T>::multiply( T value )
-	{
-		for( typename std::vector<T>::iterator it = m_data.begin(), end = m_data.end(); it != end; ++it )
-			*it *= value;
-	}
-
-
-	// get maximum value
-	template<typename T>
-	T field_maximum( const Field<T> &field )
-	{
-		if( field.m_data.empty() )
-			throw std::invalid_argument( "field_maximum requires a non-empty field" );
-		return *std::max_element(field.m_data.begin(), field.m_data.end());
-	}
-
-	template<typename T>
-	void field_range( const Field<T> &field, T& min, T& max )
-	{
-		if( field.m_data.empty() )
-			throw std::invalid_argument( "field_range requires a non-empty field" );
-		const auto minmax = std::minmax_element(field.m_data.begin(), field.m_data.end());
-		min = *minmax.first;
-		max = *minmax.second;
-	}
-
-	template<typename T>
-	void field_writeplot( const Field<T> &field, math::V3f wsP0, math::V3f wsP1, int numSamples, std::ofstream &out )
-	{
-		math::Ray3f ray;
-		ray.o = wsP0;
-		ray.d = (wsP1-wsP0).normalized();
-		float d = (wsP1-wsP0).getLength()/float(numSamples);
-		for( int i=0;i<numSamples;++i )
-		{
-			float t = d*float(i);
-			math::V3f wsP = ray(t);
-			math::V3f vsP = field.worldToVoxel(wsP);
-			T value = field.evaluate( vsP );
-			out << t << " " << value << std::endl;
-		}
-	}
-
-	template<typename T>
-	void field_writeplot( const Field<math::Vec3<T>> &field, math::V3f wsP0, math::V3f wsP1, int numSamples, std::ofstream &out, int component )
-	{
-		math::Ray3f ray;
-		ray.o = wsP0;
-		ray.d = (wsP1-wsP0).normalized();
-		float d = (wsP1-wsP0).getLength()/float(numSamples);
-		for( int i=0;i<numSamples;++i )
-		{
-			float t = d*float(i);
-			math::V3f wsP = ray(t);
-			math::V3f vsP = field.worldToVoxel(wsP);
-			math::Vec3<T> value = field.evaluate( vsP );
-			out << t << " " << value[component] << std::endl;
-		}
-	}
-	// LinearFieldInterp =================
-
-	template<typename T,typename R = float>
-	struct LinearFieldInterp
-	{
-		// takes field and voxelspace position
-		static T eval( const Field<T> &field, const math::V3f &vsP )
-		{
-			typedef R real_t;
-			typedef math::Vec3<real_t> Vector;
-
-			Vector vs = vsP;
-
-			// voxels defined at cell centers
-			vs.x -= (real_t)(0.5);
-			vs.y -= (real_t)(0.5);
-			vs.z -= (real_t)(0.5);
-
-			real_t tx = vs.x - floor(vs.x);
-			real_t ty = vs.y - floor(vs.y);
-			real_t tz = vs.z - floor(vs.z);
-
-			// lower left corner
-			math::V3i c1;
-			c1.x = (int)floor(vs.x);
-			c1.y = (int)floor(vs.y);
-			c1.z = (int)floor(vs.z);
-
-			// upper right corner
-			math::V3i c2 = c1+math::V3i(1);
-			math::V3i res = field.getResolution();
-
-			// clamp the indexing coordinates
-			c1.x = std::max(0, std::min(c1.x, res.x-1));
-			c2.x = std::max(0, std::min(c2.x, res.x-1));
-			c1.y = std::max(0, std::min(c1.y, res.y-1));
-			c2.y = std::max(0, std::min(c2.y, res.y-1));
-			c1.z = std::max(0, std::min(c1.z, res.z-1));
-			c2.z = std::max(0, std::min(c2.z, res.z-1));
-
-			//lerp...
-			return math::lerp( math::lerp( math::lerp( field.sample( c1.x, c1.y, c1.z ), field.sample( c2.x, c1.y, c1.z ), (R)tx ), math::lerp( field.sample( c1.x, c2.y, c1.z ), field.sample( c2.x, c2.y, c1.z ), (R)tx ), (R)ty ), math::lerp( math::lerp( field.sample( c1.x, c1.y, c2.z ), field.sample( c2.x, c1.y, c2.z ), (R)tx ), math::lerp( field.sample( c1.x, c2.y, c2.z ), field.sample( c2.x, c2.y, c2.z ), (R)tx ), (R)ty ), (R)tz );
-		}
-	};
-
-	typedef Field<float> Fieldf;
-	typedef Field<float> ScalarField;
-	typedef Field<math::V3f> Field3f;
-	typedef Field<math::V3f> VectorField;
-	typedef Field<double> Fieldd;
-	typedef Field<math::V3d> Field3d;
-
-
+    namespace detail
+    {
+        template<typename Value>
+        bool readBinaryValue(std::istream& input, Value& value)
+        {
+            static_assert(std::is_trivially_copyable_v<Value>);
+            input.read(reinterpret_cast<char*>(&value), static_cast<std::streamsize>(sizeof(Value)));
+            return input.good();
+        }
+
+        template<typename Value>
+        void writeBinaryValue(std::ostream& output, const Value& value)
+        {
+            static_assert(std::is_trivially_copyable_v<Value>);
+            output.write(
+                reinterpret_cast<const char*>(&value),
+                static_cast<std::streamsize>(sizeof(Value)));
+        }
+    }
+
+    template<typename T>
+    class Field
+    {
+    public:
+        using ValueType = T;
+        using Ptr = std::shared_ptr<Field<T>>;
+        using CPtr = std::shared_ptr<const Field<T>>;
+
+        [[nodiscard]] static Ptr create(
+            math::V3i resolution = math::V3i(10),
+            math::M44f local_to_world = math::M44f());
+        [[nodiscard]] static Ptr create(
+            math::V3i resolution,
+            math::Box3f bound,
+            T initial_value = T());
+        template<typename Source>
+        [[nodiscard]] static Ptr create(const typename Field<Source>::Ptr& source);
+        [[nodiscard]] static Ptr load(const std::string& filename);
+
+        Field();
+
+        [[nodiscard]] T evaluate(const math::V3f& voxel_position) const;
+        [[nodiscard]] T sample(int x, int y, int z) const;
+        [[nodiscard]] T& lvalue(int x, int y, int z);
+
+        [[nodiscard]] math::V3i getResolution() const noexcept;
+        void resize(int x, int y, int z);
+        void resize(math::V3i resolution);
+
+        void setLocalToWorld(const math::M44f& local_to_world);
+        void setBound(const math::Box3f& bound);
+
+        [[nodiscard]] math::Box3f bound() const noexcept;
+        [[nodiscard]] math::V3f getVoxelSize() const;
+        [[nodiscard]] const math::M44f& localToWorldMatrix() const noexcept;
+
+        [[nodiscard]] math::V3f worldToLocal(const math::V3f& world_position) const;
+        [[nodiscard]] math::V3f localToWorld(const math::V3f& local_position) const;
+        [[nodiscard]] math::V3f worldToVoxel(const math::V3f& world_position) const;
+        [[nodiscard]] math::V3f voxelToWorld(const math::V3f& voxel_position) const;
+        [[nodiscard]] math::V3f localToVoxel(const math::V3f& local_position) const;
+        [[nodiscard]] math::V3f voxelToLocal(const math::V3f& voxel_position) const;
+
+        [[nodiscard]] T* getRawPointer() noexcept;
+        [[nodiscard]] const T* getRawPointer() const noexcept;
+        [[nodiscard]] std::span<T> values() noexcept;
+        [[nodiscard]] std::span<const T> values() const noexcept;
+
+        void fill(const T& value);
+        void fill(const T& value, const math::Box3f& world_bound);
+        void multiply(const T& value);
+        void store(const std::string& filename) const;
+        void storeWithoutBoundingBox(const std::string& filename) const;
+
+    private:
+        [[nodiscard]] std::size_t linearIndex(int x, int y, int z) const;
+        void updateVoxelTransforms();
+
+        math::M44f local_to_world_ = math::M44f::Identity();
+        math::M44f world_to_local_ = math::M44f::Identity();
+        math::M44f world_to_voxel_ = math::M44f::Identity();
+        math::M44f voxel_to_world_ = math::M44f::Identity();
+        math::V3f sample_location_ = math::V3f(0.5f);
+        math::V3i resolution_ = math::V3i(1);
+        math::Box3f bound_;
+        std::vector<T> data_;
+
+        static const int data_type_;
+    };
+
+    template<typename T>
+    typename Field<T>::Ptr Field<T>::create(math::V3i resolution, math::M44f local_to_world)
+    {
+        auto field = std::make_shared<Field<T>>();
+        field->resize(resolution);
+        field->setLocalToWorld(local_to_world);
+        return field;
+    }
+
+    template<typename T>
+    typename Field<T>::Ptr Field<T>::create(
+        math::V3i resolution,
+        math::Box3f bound,
+        T initial_value)
+    {
+        auto field = std::make_shared<Field<T>>();
+        field->resize(resolution);
+        field->setBound(bound);
+        field->fill(initial_value);
+        return field;
+    }
+
+    template<typename T>
+    template<typename Source>
+    typename Field<T>::Ptr Field<T>::create(const typename Field<Source>::Ptr& source)
+    {
+        if (!source)
+            throw std::invalid_argument("Field::create received a null source");
+
+        auto destination = Field<T>::create(source->getResolution(), source->bound());
+        const std::span<const Source> source_values = source->values();
+        std::span<T> destination_values = destination->values();
+        if (source_values.size() != destination_values.size())
+            throw std::runtime_error("Field conversion produced inconsistent storage sizes");
+
+        std::transform(
+            source_values.begin(),
+            source_values.end(),
+            destination_values.begin(),
+            [](const Source& value) { return static_cast<T>(value); });
+        return destination;
+    }
+
+    template<typename T>
+    Field<T>::Field()
+    {
+        resize(math::V3i(1));
+        setLocalToWorld(math::M44f::Identity());
+    }
+
+    template<typename T>
+    typename Field<T>::Ptr Field<T>::load(const std::string& filename)
+    {
+        std::ifstream input(filename, std::ios::binary);
+        if (!input)
+            return nullptr;
+
+        int resolution_x = 0;
+        int resolution_y = 0;
+        int resolution_z = 0;
+        float minimum_x = 0.0f;
+        float minimum_y = 0.0f;
+        float minimum_z = 0.0f;
+        float maximum_x = 0.0f;
+        float maximum_y = 0.0f;
+        float maximum_z = 0.0f;
+        int stored_data_type = 0;
+
+        if (!detail::readBinaryValue(input, resolution_x)
+            || !detail::readBinaryValue(input, resolution_y)
+            || !detail::readBinaryValue(input, resolution_z)
+            || !detail::readBinaryValue(input, minimum_x)
+            || !detail::readBinaryValue(input, minimum_y)
+            || !detail::readBinaryValue(input, minimum_z)
+            || !detail::readBinaryValue(input, maximum_x)
+            || !detail::readBinaryValue(input, maximum_y)
+            || !detail::readBinaryValue(input, maximum_z)
+            || !detail::readBinaryValue(input, stored_data_type)
+            || stored_data_type != data_type_)
+        {
+            return nullptr;
+        }
+
+        auto field = std::make_shared<Field<T>>();
+        try
+        {
+            field->resize(math::V3i(resolution_x, resolution_y, resolution_z));
+        }
+        catch (const std::exception&)
+        {
+            return nullptr;
+        }
+
+        const std::size_t byte_count = field->data_.size() * sizeof(T);
+        if (byte_count > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
+            return nullptr;
+        if (byte_count > 0)
+        {
+            input.read(
+                reinterpret_cast<char*>(field->data_.data()),
+                static_cast<std::streamsize>(byte_count));
+            if (input.gcount() != static_cast<std::streamsize>(byte_count))
+                return nullptr;
+        }
+
+        field->setBound(math::Box3f(
+            math::V3f(minimum_x, minimum_y, minimum_z),
+            math::V3f(maximum_x, maximum_y, maximum_z)));
+        return field;
+    }
+
+    template<typename T>
+    void Field<T>::store(const std::string& filename) const
+    {
+        std::ofstream output(filename, std::ios::binary | std::ios::trunc);
+        if (!output)
+            return;
+
+        detail::writeBinaryValue(output, resolution_.x);
+        detail::writeBinaryValue(output, resolution_.y);
+        detail::writeBinaryValue(output, resolution_.z);
+        detail::writeBinaryValue(output, bound_.minPoint.x);
+        detail::writeBinaryValue(output, bound_.minPoint.y);
+        detail::writeBinaryValue(output, bound_.minPoint.z);
+        detail::writeBinaryValue(output, bound_.maxPoint.x);
+        detail::writeBinaryValue(output, bound_.maxPoint.y);
+        detail::writeBinaryValue(output, bound_.maxPoint.z);
+        detail::writeBinaryValue(output, data_type_);
+
+        const std::size_t byte_count = data_.size() * sizeof(T);
+        if (byte_count > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
+            throw std::length_error("Field storage exceeds streamsize range");
+        if (byte_count > 0)
+            output.write(
+                reinterpret_cast<const char*>(data_.data()),
+                static_cast<std::streamsize>(byte_count));
+    }
+
+    template<typename T>
+    void Field<T>::storeWithoutBoundingBox(const std::string& filename) const
+    {
+        std::ofstream output(filename, std::ios::binary | std::ios::trunc);
+        if (!output)
+            return;
+
+        detail::writeBinaryValue(output, resolution_.x);
+        detail::writeBinaryValue(output, resolution_.y);
+        detail::writeBinaryValue(output, resolution_.z);
+        detail::writeBinaryValue(output, data_type_);
+
+        const std::size_t byte_count = data_.size() * sizeof(T);
+        if (byte_count > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
+            throw std::length_error("Field storage exceeds streamsize range");
+        if (byte_count > 0)
+            output.write(
+                reinterpret_cast<const char*>(data_.data()),
+                static_cast<std::streamsize>(byte_count));
+    }
+
+    template<typename T>
+    void Field<T>::resize(int x, int y, int z)
+    {
+        resize(math::V3i(x, y, z));
+    }
+
+    template<typename T>
+    void Field<T>::resize(math::V3i resolution)
+    {
+        if (resolution.x < 0 || resolution.y < 0 || resolution.z < 0)
+            throw std::invalid_argument("Field resolution cannot be negative");
+
+        const std::size_t x = static_cast<std::size_t>(resolution.x);
+        const std::size_t y = static_cast<std::size_t>(resolution.y);
+        const std::size_t z = static_cast<std::size_t>(resolution.z);
+        if (x != 0 && y > std::numeric_limits<std::size_t>::max() / x)
+            throw std::length_error("Field resolution exceeds addressable storage");
+        const std::size_t xy = x * y;
+        if (xy != 0 && z > std::numeric_limits<std::size_t>::max() / xy)
+            throw std::length_error("Field resolution exceeds addressable storage");
+
+        resolution_ = resolution;
+        data_.assign(xy * z, T());
+        updateVoxelTransforms();
+    }
+
+    template<typename T>
+    std::size_t Field<T>::linearIndex(int x, int y, int z) const
+    {
+        if (x < 0 || y < 0 || z < 0
+            || x >= resolution_.x || y >= resolution_.y || z >= resolution_.z)
+        {
+            throw std::out_of_range("Field voxel coordinate is out of range");
+        }
+        return static_cast<std::size_t>(z) * static_cast<std::size_t>(resolution_.x)
+                * static_cast<std::size_t>(resolution_.y)
+            + static_cast<std::size_t>(y) * static_cast<std::size_t>(resolution_.x)
+            + static_cast<std::size_t>(x);
+    }
+
+    template<typename T>
+    T Field<T>::sample(int x, int y, int z) const
+    {
+        return data_.at(linearIndex(x, y, z));
+    }
+
+    template<typename T>
+    T& Field<T>::lvalue(int x, int y, int z)
+    {
+        return data_.at(linearIndex(x, y, z));
+    }
+
+    template<typename T>
+    T Field<T>::evaluate(const math::V3f& voxel_position) const
+    {
+        if (data_.empty())
+            throw std::runtime_error("Field::evaluate requires non-empty storage");
+
+        using Real = float;
+        math::Vec3<Real> position = voxel_position - sample_location_;
+        const Real fraction_x = position.x - std::floor(position.x);
+        const Real fraction_y = position.y - std::floor(position.y);
+        const Real fraction_z = position.z - std::floor(position.z);
+
+        math::V3i lower(
+            static_cast<int>(std::floor(position.x)),
+            static_cast<int>(std::floor(position.y)),
+            static_cast<int>(std::floor(position.z)));
+        math::V3i upper = lower + math::V3i(1);
+
+        lower.x = std::clamp(lower.x, 0, resolution_.x - 1);
+        lower.y = std::clamp(lower.y, 0, resolution_.y - 1);
+        lower.z = std::clamp(lower.z, 0, resolution_.z - 1);
+        upper.x = std::clamp(upper.x, 0, resolution_.x - 1);
+        upper.y = std::clamp(upper.y, 0, resolution_.y - 1);
+        upper.z = std::clamp(upper.z, 0, resolution_.z - 1);
+
+        const T lower_plane = math::lerp(
+            math::lerp(
+                sample(lower.x, lower.y, lower.z),
+                sample(upper.x, lower.y, lower.z),
+                fraction_x),
+            math::lerp(
+                sample(lower.x, upper.y, lower.z),
+                sample(upper.x, upper.y, lower.z),
+                fraction_x),
+            fraction_y);
+        const T upper_plane = math::lerp(
+            math::lerp(
+                sample(lower.x, lower.y, upper.z),
+                sample(upper.x, lower.y, upper.z),
+                fraction_x),
+            math::lerp(
+                sample(lower.x, upper.y, upper.z),
+                sample(upper.x, upper.y, upper.z),
+                fraction_x),
+            fraction_y);
+        return math::lerp(lower_plane, upper_plane, fraction_z);
+    }
+
+    template<typename T>
+    math::V3i Field<T>::getResolution() const noexcept
+    {
+        return resolution_;
+    }
+
+    template<typename T>
+    math::V3f Field<T>::getVoxelSize() const
+    {
+        if (resolution_.x == 0 || resolution_.y == 0 || resolution_.z == 0)
+            return math::V3f(0.0f);
+        const math::V3f minimum = voxelToWorld(math::V3f(0.0f));
+        const math::V3f maximum = voxelToWorld(math::V3f(1.0f));
+        return maximum - minimum;
+    }
+
+    template<typename T>
+    const math::M44f& Field<T>::localToWorldMatrix() const noexcept
+    {
+        return local_to_world_;
+    }
+
+    template<typename T>
+    T* Field<T>::getRawPointer() noexcept
+    {
+        return data_.data();
+    }
+
+    template<typename T>
+    const T* Field<T>::getRawPointer() const noexcept
+    {
+        return data_.data();
+    }
+
+    template<typename T>
+    std::span<T> Field<T>::values() noexcept
+    {
+        return data_;
+    }
+
+    template<typename T>
+    std::span<const T> Field<T>::values() const noexcept
+    {
+        return data_;
+    }
+
+    template<typename T>
+    void Field<T>::updateVoxelTransforms()
+    {
+        if (resolution_.x == 0 || resolution_.y == 0 || resolution_.z == 0)
+        {
+            world_to_voxel_ = math::M44f::Identity();
+            voxel_to_world_ = math::M44f::Identity();
+            return;
+        }
+        world_to_voxel_ = world_to_local_ * math::M44f().scale(math::V3f(resolution_));
+        voxel_to_world_ = world_to_voxel_.inverse();
+    }
+
+    template<typename T>
+    void Field<T>::setLocalToWorld(const math::M44f& local_to_world)
+    {
+        local_to_world_ = local_to_world;
+        world_to_local_ = local_to_world_.inverse();
+        updateVoxelTransforms();
+
+        bound_.makeEmpty();
+        for (int z = 0; z <= 1; ++z)
+            for (int y = 0; y <= 1; ++y)
+                for (int x = 0; x <= 1; ++x)
+                    bound_.extendBy(math::V3f(float(x), float(y), float(z)) * local_to_world_);
+    }
+
+    template<typename T>
+    void Field<T>::setBound(const math::Box3f& bound)
+    {
+        bound_ = bound;
+        const math::V3f dimensions = bound_.size();
+        local_to_world_ = math::M44f().scale(dimensions)
+            * math::M44f().translate(bound_.minPoint);
+        world_to_local_ = local_to_world_.inverse();
+        updateVoxelTransforms();
+    }
+
+    template<typename T>
+    math::V3f Field<T>::worldToVoxel(const math::V3f& world_position) const
+    {
+        return world_position * world_to_voxel_;
+    }
+
+    template<typename T>
+    math::V3f Field<T>::voxelToWorld(const math::V3f& voxel_position) const
+    {
+        return voxel_position * voxel_to_world_;
+    }
+
+    template<typename T>
+    math::V3f Field<T>::worldToLocal(const math::V3f& world_position) const
+    {
+        return world_position * world_to_local_;
+    }
+
+    template<typename T>
+    math::V3f Field<T>::localToWorld(const math::V3f& local_position) const
+    {
+        return local_position * local_to_world_;
+    }
+
+    template<typename T>
+    math::V3f Field<T>::voxelToLocal(const math::V3f& voxel_position) const
+    {
+        if (resolution_.x == 0 || resolution_.y == 0 || resolution_.z == 0)
+            throw std::runtime_error("Field::voxelToLocal requires non-zero resolution");
+        return voxel_position * math::M44f::ScaleMatrix(
+            1.0f / float(resolution_.x),
+            1.0f / float(resolution_.y),
+            1.0f / float(resolution_.z));
+    }
+
+    template<typename T>
+    math::V3f Field<T>::localToVoxel(const math::V3f& local_position) const
+    {
+        return local_position * math::M44f::ScaleMatrix(
+            float(resolution_.x),
+            float(resolution_.y),
+            float(resolution_.z));
+    }
+
+    template<typename T>
+    math::Box3f Field<T>::bound() const noexcept
+    {
+        return bound_;
+    }
+
+    template<typename T>
+    void Field<T>::fill(const T& value)
+    {
+        std::fill(data_.begin(), data_.end(), value);
+    }
+
+    template<typename T>
+    void Field<T>::fill(const T& value, const math::Box3f& world_bound)
+    {
+        for (int z = 0; z < resolution_.z; ++z)
+            for (int y = 0; y < resolution_.y; ++y)
+                for (int x = 0; x < resolution_.x; ++x)
+                {
+                    const math::V3f voxel_position(
+                        float(x) + 0.5f,
+                        float(y) + 0.5f,
+                        float(z) + 0.5f);
+                    if (world_bound.encloses(voxelToWorld(voxel_position)))
+                        lvalue(x, y, z) = value;
+                }
+    }
+
+    template<typename T>
+    void Field<T>::multiply(const T& value)
+    {
+        for (T& voxel : data_)
+            voxel *= value;
+    }
+
+    template<typename T>
+    T field_maximum(const Field<T>& field)
+    {
+        const std::span<const T> field_values = field.values();
+        if (field_values.empty())
+            throw std::invalid_argument("field_maximum requires a non-empty field");
+        return *std::max_element(field_values.begin(), field_values.end());
+    }
+
+    template<typename T>
+    void field_range(const Field<T>& field, T& minimum, T& maximum)
+    {
+        const std::span<const T> field_values = field.values();
+        if (field_values.empty())
+            throw std::invalid_argument("field_range requires a non-empty field");
+        const auto [minimum_iterator, maximum_iterator] =
+            std::minmax_element(field_values.begin(), field_values.end());
+        minimum = *minimum_iterator;
+        maximum = *maximum_iterator;
+    }
+
+    template<typename T>
+    void field_writeplot(
+        const Field<T>& field,
+        math::V3f world_start,
+        math::V3f world_end,
+        int sample_count,
+        std::ofstream& output)
+    {
+        if (sample_count <= 0)
+            throw std::invalid_argument("field_writeplot requires a positive sample count");
+        math::Ray3f ray;
+        ray.o = world_start;
+        ray.d = (world_end - world_start).normalized();
+        const float step = (world_end - world_start).getLength() / float(sample_count);
+        for (int sample_index = 0; sample_index < sample_count; ++sample_index)
+        {
+            const float distance = step * float(sample_index);
+            const T value = field.evaluate(field.worldToVoxel(ray(distance)));
+            output << distance << ' ' << value << '\n';
+        }
+    }
+
+    template<typename T>
+    void field_writeplot(
+        const Field<math::Vec3<T>>& field,
+        math::V3f world_start,
+        math::V3f world_end,
+        int sample_count,
+        std::ofstream& output,
+        int component)
+    {
+        if (component < 0 || component >= 3)
+            throw std::out_of_range("field_writeplot vector component is out of range");
+        if (sample_count <= 0)
+            throw std::invalid_argument("field_writeplot requires a positive sample count");
+        math::Ray3f ray;
+        ray.o = world_start;
+        ray.d = (world_end - world_start).normalized();
+        const float step = (world_end - world_start).getLength() / float(sample_count);
+        for (int sample_index = 0; sample_index < sample_count; ++sample_index)
+        {
+            const float distance = step * float(sample_index);
+            const math::Vec3<T> value = field.evaluate(field.worldToVoxel(ray(distance)));
+            output << distance << ' ' << value[component] << '\n';
+        }
+    }
+
+    template<typename T, typename Real = float>
+    struct LinearFieldInterp
+    {
+        [[nodiscard]] static T eval(const Field<T>& field, const math::V3f& voxel_position)
+        {
+            return field.evaluate(voxel_position);
+        }
+    };
+
+    using Fieldf = Field<float>;
+    using ScalarField = Field<float>;
+    using Field3f = Field<math::V3f>;
+    using VectorField = Field<math::V3f>;
+    using Fieldd = Field<double>;
+    using Field3d = Field<math::V3d>;
 }
-
-
