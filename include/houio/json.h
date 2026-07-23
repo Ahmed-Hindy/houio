@@ -11,6 +11,7 @@
 #include <memory>
 #include <new>
 #include <sstream>
+#include <span>
 #include <stack>
 #include <stdexcept>
 #include <type_traits>
@@ -681,13 +682,15 @@ namespace houio
 		// Value -------------
 
 		struct Array;
-		typedef std::shared_ptr<Array> ArrayPtr;
+		using ArrayPtr = std::shared_ptr<Array>;
+		using ConstArrayPtr = std::shared_ptr<const Array>;
 		struct Object;
-		typedef std::shared_ptr<Object> ObjectPtr;
+		using ObjectPtr = std::shared_ptr<Object>;
+		using ConstObjectPtr = std::shared_ptr<const Object>;
 
-		struct Value
+		class Value
 		{
-
+		public:
 			using Variant = std::variant<
 				bool,
 				sint32,
@@ -697,412 +700,306 @@ namespace houio
 				ubyte,
 				sint64>;
 
-			Value();
+			Value() = default;
 
-			bool                           isNull()const;
-			bool                          isArray()const;
-			bool                         isObject()const;
-			bool                         isString()const;
-
-			template<typename T>
-			const T                           as() const;
-
-			void                 cpyTo( char *dst )const;
-
-			ArrayPtr                           asArray();
-			ObjectPtr                         asObject();
-
-			Variant                        &getVariant();
-
-			static Value                   createArray();
-			static Value     createArray(ArrayPtr array);
-			static Value                  createObject();
-			static Value   createObject( ObjectPtr obj );
+			[[nodiscard]] bool isNull() const noexcept;
+			[[nodiscard]] bool isArray() const noexcept;
+			[[nodiscard]] bool isObject() const noexcept;
+			[[nodiscard]] bool isString() const noexcept;
 
 			template<typename T>
-			static Value        create( const T &value );
+			[[nodiscard]] T as() const;
 
+			void copyTo(void* destination) const;
+			void cpyTo(char* destination) const
+			{
+				copyTo(destination);
+			}
+
+			[[nodiscard]] ArrayPtr asArray();
+			[[nodiscard]] ConstArrayPtr asArray() const;
+			[[nodiscard]] ObjectPtr asObject();
+			[[nodiscard]] ConstObjectPtr asObject() const;
+
+			[[nodiscard]] Variant& getVariant() noexcept;
+			[[nodiscard]] const Variant& getVariant() const noexcept;
+
+			[[nodiscard]] static Value createArray();
+			[[nodiscard]] static Value createArray(ArrayPtr array);
+			[[nodiscard]] static Value createObject();
+			[[nodiscard]] static Value createObject(ObjectPtr object);
+
+			template<typename T>
+			[[nodiscard]] static Value create(const T& value);
 
 		private:
-			enum Type
+			enum class Kind
 			{
-				TYPE_NULL,
-				TYPE_VALUE,
-				TYPE_OBJECT,
-				TYPE_ARRAY
+				null,
+				scalar,
+				object,
+				array,
 			};
-			Type                               m_type; // value, array or object?
-			Variant                           m_value;
-			ObjectPtr                        m_object;
-			ArrayPtr                          m_array;
 
-			friend                             Object;
-			friend                             Array;
+			Kind kind_ = Kind::null;
+			Variant scalar_ = false;
+			ObjectPtr object_;
+			ArrayPtr array_;
+
+			friend struct Object;
+			friend struct Array;
 		};
 
 
-		// VariantConverter ================================
-
-		// In order to conveniently extract data from variants we need to be able to convert between 
-		// all the different variant types. This is done by using the visitor pattern in the as function of
-		// the varient class. VariantConverter is the visitor which will its ()operator get called for all the different
-		// variant types. The Converter is a templated class which has the destination type as its template argument
-		// D. The operator is templated as well with the argument type (the type of the varient) as template argument.
-		// By default a simple cast is done. Now to handle special cases where such a cast fails we do the following steps:
-		// 1. create a specialized class template which has the destination type as template argument D
-		// 2. overload the () operator with the variant type which produces the conflict and resolve it in the
-		// definition of that overloaded function
-
-		template<typename D>
-		struct VariantConverter
+		template<typename Destination, typename Source>
+		[[nodiscard]] Destination convertScalarValue(const Source& source)
 		{
-			D &dest;
-			VariantConverter( D &_dest ) : dest(_dest){}
-			void operator()( const std::string &value )
+			using SourceType = std::remove_cvref_t<Source>;
+			if constexpr (std::is_same_v<Destination, std::string>)
 			{
-				dest = fromString<D>(value);
+				if constexpr (std::is_same_v<SourceType, std::string>)
+					return source;
+				else
+					return toString(source);
 			}
-			template< typename T >
-			void operator()( T d )
+			else if constexpr (std::is_same_v<SourceType, std::string>)
 			{
-				dest = static_cast<D>(d);
+				if constexpr (std::is_same_v<Destination, bool>)
+					return false;
+				else
+					return fromString<Destination>(source);
 			}
-		};
-
-		template<>
-		struct VariantConverter<bool>
-		{
-			typedef bool t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string /*x*/)
+			else
 			{
-				dest = false;
+				return static_cast<Destination>(source);
 			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				dest = (t_dest)d;
-			}
-		};
-
-		template<>
-		struct VariantConverter<float>
-		{
-			typedef float t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string /*x*/)
-			{
-				//dest = false;
-			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				dest = (t_dest)d;
-			}
-		};
-
-		template<>
-		struct VariantConverter<double>
-		{
-			typedef double t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string /*x*/)
-			{
-				// Keep the default destination value for incompatible string input.
-			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				dest = static_cast<t_dest>(d);
-			}
-		};
-
-		template<>
-		struct VariantConverter<int>
-		{
-			typedef int t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string /*x*/)
-			{
-				//dest = false;
-			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				dest = (t_dest)d;
-			}
-		};
-
-		template<>
-		struct VariantConverter<ubyte>
-		{
-			typedef ubyte t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string /*x*/)
-			{
-				//dest = false;
-			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				dest = (t_dest)d;
-			}
-		};
-
-		template<>
-		struct VariantConverter<std::string>
-		{
-			typedef std::string t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string x)
-			{
-				dest = x;
-			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				std::ostringstream stream;
-				stream << d;
-				dest = stream.str();
-			}
-		};
-
+		}
 
 		template<typename T>
-		const T Value::as()const
+		T Value::as() const
 		{
-			T dest = T();
-			VariantConverter<T> conv(dest);
-			std::visit(conv, m_value);
-			return dest;
+			if (kind_ != Kind::scalar)
+				throw std::logic_error("JSON Value does not contain a scalar");
+			return std::visit(
+				[](const auto& source) { return convertScalarValue<T>(source); },
+				scalar_);
+		}
+
+		template<typename T>
+		Value Value::create(const T& value)
+		{
+			Value result;
+			result.kind_ = Kind::scalar;
+			result.scalar_ = value;
+			return result;
 		}
 
 
-		template<typename T>
-		Value Value::create( const T &value )
-		{
-			Value v;
-			v.m_type = TYPE_VALUE;
-			v.m_value = value;
-			return v;
-		}
-
-
-		// Array -------------
 		struct Array
 		{
-			Array();
-			~Array();
+			using ValueList = std::vector<Value>;
 
-			static ArrayPtr               create();
-
-			template<typename T>
-			const T                  get( const int index );
-			ObjectPtr                getObject( int index );
-			ArrayPtr                  getArray( int index );
-
-			Value               getValue( const int index );
-
-			sint64                              size()const;
-			bool                           isUniform()const;
-
-
+			[[nodiscard]] static ArrayPtr create();
 
 			template<typename T>
-			void                     appendValue( T value );
-			//void                     append( Value &value );
-			void                     append( const Value &value );
-			void                     append(ObjectPtr &object );
-			void                     append(ArrayPtr &array );
+			[[nodiscard]] T get(int index) const;
+			[[nodiscard]] ObjectPtr getObject(int index) const;
+			[[nodiscard]] ArrayPtr getArray(int index) const;
+			[[nodiscard]] Value getValue(int index) const;
+			[[nodiscard]] sint64 size() const;
+			[[nodiscard]] bool isUniform() const noexcept;
+			[[nodiscard]] std::span<const Value> elements() const noexcept;
+			[[nodiscard]] std::span<const std::byte> uniformData() const noexcept;
+			[[nodiscard]] sint64 uniformElementCount() const noexcept;
+			[[nodiscard]] int uniformTypeIndex() const noexcept;
 
-		//private:
-			std::vector<Value> values;
-			bool uses_uniform_storage;
-			std::vector<std::byte> uniform_data;
-			sint64 uniform_element_count;
-			int uniform_type_index;
+			void setUniformStorage(
+				int type_index,
+				sint64 element_count,
+				std::span<const std::byte> data);
+
+			template<typename T>
+			void appendValue(const T& value);
+			void append(const Value& value);
+			void append(ObjectPtr object);
+			void append(ArrayPtr array);
+
+		private:
+			ValueList values_;
+			bool uses_uniform_storage_ = false;
+			std::vector<std::byte> uniform_data_;
+			sint64 uniform_element_count_ = 0;
+			int uniform_type_index_ = -1;
 		};
 
-
 		template<typename T>
-		const T Array::get( const int index )
+		T Array::get(int index) const
 		{
 			return getValue(index).as<T>();
 		}
 
 		template<typename T>
-		void Array::appendValue( T value )
+		void Array::appendValue(const T& value)
 		{
 			append(Value::create<T>(value));
 		}
 
-		// Object -------------
 		struct Object
 		{
-			static ObjectPtr                                           create();
-			bool                               hasKey( const std::string &key );
+			using EntryMap = std::map<std::string, Value>;
+
+			[[nodiscard]] static ObjectPtr create();
+			[[nodiscard]] bool hasKey(const std::string& key) const;
 
 			template<typename T>
-			T                        get( const std::string &key, T def = T() );
-			ObjectPtr                       getObject( const std::string &key );
-			ArrayPtr                         getArray( const std::string &key );
-
-
-			Value                            getValue( const std::string &key );
-			void                      getKeys( std::vector<std::string> &keys );
-			sint64                                                  size()const;
+			[[nodiscard]] T get(const std::string& key, T default_value = T()) const;
+			[[nodiscard]] ObjectPtr getObject(const std::string& key) const;
+			[[nodiscard]] ArrayPtr getArray(const std::string& key) const;
+			[[nodiscard]] Value getValue(const std::string& key) const;
+			void getKeys(std::vector<std::string>& keys) const;
+			[[nodiscard]] sint64 size() const;
+			[[nodiscard]] const EntryMap& entries() const noexcept;
 
 			template<typename T>
-			void appendValue( const std::string &key, const T& value );
-			void                 append( const std::string &key, const Value &value );
-			void             append( const std::string &key, ObjectPtr object );
-			void             append( const std::string &key, ArrayPtr array );
-		//private:
-			std::map<std::string, Value>                               m_values;
+			void appendValue(const std::string& key, const T& value);
+			void append(const std::string& key, const Value& value);
+			void append(const std::string& key, ObjectPtr object);
+			void append(const std::string& key, ArrayPtr array);
 
+		private:
+			EntryMap entries_;
 		};
 
-
 		template<typename T>
-		T Object::get( const std::string &key, T def )
+		T Object::get(const std::string& key, T default_value) const
 		{
-			T result = def;
-			std::map<std::string, Value>::iterator it = m_values.find( key );
-			if( it != m_values.end())
-				result = it->second.as<T>();
-			return result;
+			const auto entry = entries_.find(key);
+			return entry == entries_.end() ? default_value : entry->second.as<T>();
 		}
 
 		template<typename T>
-		void Object::appendValue( const std::string &key, const T& value )
+		void Object::appendValue(const std::string& key, const T& value)
 		{
 			append(key, Value::create<T>(value));
 		}
 
 		// JSONReader ========================================================
 		// this will read json into cpp json structures (Object,Array,Value)
-		struct JSONReader : public Handler
+		class JSONReader final : public Handler
 		{
-			JSONReader();
+		public:
+			using StackItem = std::pair<Value, std::string>;
 
-			Value                                                getRoot();
+			JSONReader() = default;
 
-			virtual void                                  jsonBeginArray();
-			virtual void                                    jsonEndArray();
-			virtual void                                    jsonBeginMap();
-			virtual void                                      jsonEndMap();
-			virtual void            jsonString( const std::string &value );
-			virtual void                 jsonKey( const std::string &key );
-			virtual void                     jsonBool( const bool &value );
-			virtual void                  jsonInt32( const sint32 &value );
-			virtual void                  jsonInt64( const sint64 &value );
-			virtual void                 jsonReal32( const real32 &value );
-			virtual void                 jsonReal64( const real64 &value );
-			virtual void      uaBool( sint64 numElements, Parser *parser );
-			virtual void    uaReal16( sint64 numElements, Parser *parser );
-			virtual void    uaReal32( sint64 numElements, Parser *parser );
-			virtual void    uaReal64( sint64 numElements, Parser *parser );
-			virtual void      uaInt8( sint64 numElements, Parser *parser );
-			virtual void     uaInt16( sint64 numElements, Parser *parser );
-			virtual void     uaInt32( sint64 numElements, Parser *parser );
-			virtual void     uaInt64( sint64 numElements, Parser *parser );
-			virtual void     uaUInt8( sint64 numElements, Parser *parser );
-			virtual void    uaString( sint64 numElements, Parser *parser );
+			[[nodiscard]] Value getRoot() const;
 
+			void jsonBeginArray() override;
+			void jsonEndArray() override;
+			void jsonBeginMap() override;
+			void jsonEndMap() override;
+			void jsonString(const std::string& value) override;
+			void jsonKey(const std::string& key) override;
+			void jsonBool(const bool& value) override;
+			void jsonInt32(const sint32& value) override;
+			void jsonInt64(const sint64& value) override;
+			void jsonReal32(const real32& value) override;
+			void jsonReal64(const real64& value) override;
+			void uaBool(sint64 element_count, Parser* parser) override;
+			void uaReal16(sint64 element_count, Parser* parser) override;
+			void uaReal32(sint64 element_count, Parser* parser) override;
+			void uaReal64(sint64 element_count, Parser* parser) override;
+			void uaInt8(sint64 element_count, Parser* parser) override;
+			void uaInt16(sint64 element_count, Parser* parser) override;
+			void uaInt32(sint64 element_count, Parser* parser) override;
+			void uaInt64(sint64 element_count, Parser* parser) override;
+			void uaUInt8(sint64 element_count, Parser* parser) override;
+			void uaString(sint64 element_count, Parser* parser) override;
 
 		private:
-			typedef std::pair<Value, std::string> StackItem; // holds value and nextKey
-
 			template<typename T>
-			void                               jsonValue( const T &value );
-			template<typename T, typename S>
-			void              jsonUA( sint64 numElements, Parser *parser );
+			void jsonValue(const T& value);
+			template<typename T, typename Source>
+			void jsonUniformArray(sint64 element_count, Parser* parser);
 
-			void                                                    push();
-			void                                                     pop();
-			Value                                                   m_root;
-			std::stack<StackItem>                                  m_stack; // used during sax parsing
-			std::string                                            nextKey; // used during sax parsing
+			void pushContainer();
+			void popContainer();
+			Value root_;
+			std::stack<StackItem> stack_;
+			std::string next_key_;
 		};
 
 		template<typename T>
-		void JSONReader::jsonValue( const T &value )
+		void JSONReader::jsonValue(const T& value)
 		{
-			if( m_root.isArray() )
-				m_root.asArray()->append(Value::create<T>(value));
+			if (root_.isArray())
+			{
+				root_.asArray()->append(Value::create<T>(value));
+			}
+			else if (root_.isObject())
+			{
+				root_.asObject()->append(next_key_, Value::create<T>(value));
+				next_key_.clear();
+			}
+			else if (root_.isNull() && stack_.empty())
+			{
+				root_ = Value::create<T>(value);
+			}
 			else
-			if( m_root.isObject() )
 			{
-				m_root.asObject()->append(nextKey, Value::create<T>(value));
-				nextKey = "JSONReader::jsonValue:invalid key";
-			}else if( m_root.isNull() && m_stack.empty() )
-			{
-				m_root = Value::create<T>(value);
-			}else
-			{
-				throw std::runtime_error("JSONReader::jsonValue: unknown container");
+				throw std::runtime_error("JSONReader::jsonValue has no active container");
 			}
 		}
 
-		template<typename T, typename S>
-		void JSONReader::jsonUA( sint64 numElements, Parser *parser )
+		template<typename T, typename Source>
+		void JSONReader::jsonUniformArray(sint64 element_count, Parser* parser)
 		{
-			if( numElements < 0 )
-				throw std::length_error( "JSONReader::jsonUA received a negative element count" );
-			const size_t elementCount = static_cast<size_t>(numElements);
-			if( elementCount > std::numeric_limits<size_t>::max() / sizeof(T)
-				|| elementCount > std::numeric_limits<size_t>::max() / sizeof(S) )
-				throw std::length_error( "JSONReader::jsonUA allocation size overflow" );
-
-			constexpr size_t uniformTypeIndex = variantIndex<T, Value::Variant>;
-			std::vector<T> convertedData;
-			sint64 elementsRemaining = numElements;
-			constexpr size_t chunkCapacity = 4096;
-			while( elementsRemaining > 0 )
+			if (!parser)
+				throw std::invalid_argument("JSONReader::jsonUniformArray received a null parser");
+			if (element_count < 0)
+				throw std::length_error("JSONReader::jsonUniformArray received a negative element count");
+			const size_t count = static_cast<size_t>(element_count);
+			if (count > std::numeric_limits<size_t>::max() / sizeof(T)
+				|| count > std::numeric_limits<size_t>::max() / sizeof(Source))
 			{
-				const size_t chunkSize = static_cast<size_t>(std::min<sint64>(elementsRemaining, chunkCapacity));
-				std::vector<S> sourceData(chunkSize);
-				parser->read<S>(sourceData.data(), static_cast<sint64>(chunkSize));
-				const size_t previousSize = convertedData.size();
-				convertedData.resize(previousSize + chunkSize);
-				for( size_t elementIndex=0;elementIndex<chunkSize;++elementIndex )
-					convertedData[previousSize + elementIndex] = static_cast<T>(sourceData[elementIndex]);
-				elementsRemaining -= static_cast<sint64>(chunkSize);
+				throw std::length_error("JSONReader::jsonUniformArray allocation size overflow");
 			}
 
-			Value v = Value::createArray();
-			ArrayPtr ua = v.asArray();
-			ua->uses_uniform_storage = true;
-			ua->uniform_element_count = numElements;
-			ua->uniform_type_index = static_cast<int>(uniformTypeIndex);
+			constexpr size_t uniform_type_index = variantIndex<T, Value::Variant>;
+			std::vector<T> converted_data;
+			converted_data.reserve(count);
+			sint64 elements_remaining = element_count;
+			constexpr size_t chunk_capacity = 4096;
+			while (elements_remaining > 0)
+			{
+				const size_t chunk_size = static_cast<size_t>(
+					std::min<sint64>(elements_remaining, chunk_capacity));
+				std::vector<Source> source_data(chunk_size);
+				parser->read<Source>(source_data.data(), static_cast<sint64>(chunk_size));
+				for (const Source& source_value : source_data)
+					converted_data.push_back(static_cast<T>(source_value));
+				elements_remaining -= static_cast<sint64>(chunk_size);
+			}
 
-			const size_t destinationBytes = elementCount * sizeof(T);
-			ua->uniform_data.resize(destinationBytes);
-			if( destinationBytes > 0 )
-				std::memcpy(ua->uniform_data.data(), convertedData.data(), destinationBytes);
+			Value uniform_array_value = Value::createArray();
+			ArrayPtr uniform_array = uniform_array_value.asArray();
+			const size_t destination_bytes = count * sizeof(T);
+			const auto bytes = std::span<const std::byte>(
+				reinterpret_cast<const std::byte*>(converted_data.data()),
+				destination_bytes);
+			uniform_array->setUniformStorage(
+				static_cast<int>(uniform_type_index),
+				element_count,
+				bytes);
 
-			if( m_root.isArray() )
-				m_root.asArray()->append(v);
-			else if( m_root.isObject() )
-				m_root.asObject()->append(nextKey, v);
+			if (root_.isArray())
+				root_.asArray()->append(uniform_array_value);
+			else if (root_.isObject())
+				root_.asObject()->append(next_key_, uniform_array_value);
+			else if (root_.isNull() && stack_.empty())
+				root_ = uniform_array_value;
+			else
+				throw std::runtime_error("JSONReader::jsonUniformArray has no active container");
 		}
 
 

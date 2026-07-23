@@ -410,7 +410,7 @@ int verifyArrayAndValueSafety()
     houio::json::ArrayPtr values = reader.getRoot().asArray()->getArray(0);
     try
     {
-        values->get<int>(-1);
+        static_cast<void>(values->get<int>(-1));
         return fail("negative array index was accepted");
     }
     catch (const std::out_of_range&)
@@ -418,7 +418,7 @@ int verifyArrayAndValueSafety()
     }
     try
     {
-        values->get<int>(2);
+        static_cast<void>(values->get<int>(2));
         return fail("past-end array index was accepted");
     }
     catch (const std::out_of_range&)

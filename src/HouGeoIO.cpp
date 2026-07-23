@@ -98,18 +98,20 @@ namespace houio
 		};
 
 		template<typename T>
-		std::vector<T> copyUniformValues( const json::ArrayPtr &array )
+		std::vector<T> copyUniformValues(const json::ArrayPtr& array)
 		{
-			if( array->uniform_element_count < 0 )
-				throw std::runtime_error( "Cannot export a uniform array with a negative element count" );
-			const size_t elementCount = static_cast<size_t>(array->uniform_element_count);
-			if( elementCount > std::numeric_limits<size_t>::max() / sizeof(T) )
-				throw std::length_error( "Uniform JSON array byte count overflow" );
-			if( elementCount * sizeof(T) != array->uniform_data.size() )
-				throw std::runtime_error( "Cannot export a uniform array with inconsistent storage" );
-			std::vector<T> values(elementCount);
-			if( elementCount > 0 )
-				std::memcpy(values.data(), array->uniform_data.data(), elementCount * sizeof(T));
+			const sint64 uniform_element_count = array->uniformElementCount();
+			if (uniform_element_count < 0)
+				throw std::runtime_error("Cannot export a uniform array with a negative element count");
+			const size_t element_count = static_cast<size_t>(uniform_element_count);
+			if (element_count > std::numeric_limits<size_t>::max() / sizeof(T))
+				throw std::length_error("Uniform JSON array byte count overflow");
+			const std::span<const std::byte> bytes = array->uniformData();
+			if (element_count * sizeof(T) != bytes.size())
+				throw std::runtime_error("Cannot export a uniform array with inconsistent storage");
+			std::vector<T> values(element_count);
+			if (element_count > 0)
+				std::memcpy(values.data(), bytes.data(), bytes.size());
 			return values;
 		}
 
@@ -121,7 +123,7 @@ namespace houio
 				throw std::runtime_error( "Cannot export a null JSON array" );
 			if( array->isUniform() )
 			{
-				switch( array->uniform_type_index )
+				switch (array->uniformTypeIndex())
 				{
 				case 1:
 					writer.jsonUniformArray(copyUniformValues<sint32>(array));
@@ -144,7 +146,7 @@ namespace houio
 			}
 
 			writer.jsonBeginArray();
-			for( const json::Value &item : array->values )
+			for (const json::Value& item : array->elements())
 				writeJsonValue(writer, item);
 			writer.jsonEndArray();
 		}
@@ -154,7 +156,7 @@ namespace houio
 			if( !object )
 				throw std::runtime_error( "Cannot export a null JSON object" );
 			writer.jsonBeginMap();
-			for( const auto &entry : object->m_values )
+			for (const auto& entry : object->entries())
 			{
 				writer.jsonKey(entry.first);
 				writeJsonValue(writer, entry.second);

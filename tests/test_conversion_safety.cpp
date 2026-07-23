@@ -115,7 +115,7 @@ int verifyNullAndCountGuards()
 
     try
     {
-        geometry->duplicatePoint(0);
+        static_cast<void>(geometry->duplicatePoint(0));
         return fail("Geometry duplicated a point from empty storage");
     }
     catch (const std::out_of_range&)
