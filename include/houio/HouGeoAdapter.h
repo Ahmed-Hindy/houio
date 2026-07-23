@@ -143,6 +143,14 @@ namespace houio
             using ConstPtr = std::shared_ptr<const Topology>;
 
             virtual ~Topology();
+
+            [[nodiscard]] std::vector<int> indexValues() const;
+            void appendIndices(std::span<const int> indices);
+            [[nodiscard]] sint64 indexCount() const;
+
+        protected:
+            friend class ::houio::HouGeoIO;
+
             virtual void getIndices(std::vector<int>& indices) const = 0;
             virtual void addIndices(const std::vector<int>& indices) = 0;
             [[nodiscard]] virtual sint64 getNumIndices() const = 0;
@@ -164,6 +172,11 @@ namespace houio
             static constexpr Type PRIM_POLY = Type::polygon;
 
             virtual ~Primitive() = default;
+
+            [[nodiscard]] int primitiveCount() const { return numPrimitives(); }
+
+        protected:
+            friend class ::houio::HouGeoIO;
             [[nodiscard]] virtual int numPrimitives() const { return 1; }
         };
 
@@ -172,6 +185,18 @@ namespace houio
         public:
             using Ptr = std::shared_ptr<VolumePrimitive>;
 
+            [[nodiscard]] math::M44f transform() const;
+            [[nodiscard]] int topologyVertex() const;
+            [[nodiscard]] math::Vec3i resolution() const;
+            [[nodiscard]] real32 voxelValue(int x, int y, int z) const;
+            [[nodiscard]] std::string visualizationMode() const;
+            [[nodiscard]] real32 visualizationIso() const;
+            [[nodiscard]] real32 visualizationDensity() const;
+            [[nodiscard]] virtual RawDataView rawData() const;
+
+        protected:
+            friend class ::houio::HouGeoIO;
+
             [[nodiscard]] virtual math::M44f getTransform() const = 0;
             [[nodiscard]] virtual int getVertex() const = 0;
             [[nodiscard]] virtual math::Vec3i getResolution() const;
@@ -179,13 +204,21 @@ namespace houio
             [[nodiscard]] virtual std::string getVisualizationMode() const;
             [[nodiscard]] virtual real32 getVisualizationIso() const;
             [[nodiscard]] virtual real32 getVisualizationDensity() const;
-            [[nodiscard]] virtual RawDataView rawData() const;
         };
 
         class PolyPrimitive : public Primitive
         {
         public:
             using Ptr = std::shared_ptr<PolyPrimitive>;
+
+            [[nodiscard]] int polygonCount() const;
+            [[nodiscard]] int polygonVertexCount(int polygon_index) const;
+            [[nodiscard]] std::span<const int> polygonVertexIndices(
+                int polygon_index = 0) const;
+            [[nodiscard]] bool isClosed() const;
+
+        protected:
+            friend class ::houio::HouGeoIO;
 
             [[nodiscard]] virtual int numPolys() const;
             [[nodiscard]] virtual int numVertices(int polygon_index) const;

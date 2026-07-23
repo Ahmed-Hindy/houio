@@ -139,6 +139,58 @@ namespace houio
 
     HouGeoAdapter::Topology::~Topology() = default;
 
+    std::vector<int> HouGeoAdapter::Topology::indexValues() const
+    {
+        std::vector<int> indices;
+        getIndices(indices);
+        return indices;
+    }
+
+    void HouGeoAdapter::Topology::appendIndices(std::span<const int> indices)
+    {
+        addIndices(std::vector<int>(indices.begin(), indices.end()));
+    }
+
+    sint64 HouGeoAdapter::Topology::indexCount() const
+    {
+        return getNumIndices();
+    }
+
+    math::M44f HouGeoAdapter::VolumePrimitive::transform() const
+    {
+        return getTransform();
+    }
+
+    int HouGeoAdapter::VolumePrimitive::topologyVertex() const
+    {
+        return getVertex();
+    }
+
+    math::Vec3i HouGeoAdapter::VolumePrimitive::resolution() const
+    {
+        return getResolution();
+    }
+
+    real32 HouGeoAdapter::VolumePrimitive::voxelValue(int x, int y, int z) const
+    {
+        return getVoxel(x, y, z);
+    }
+
+    std::string HouGeoAdapter::VolumePrimitive::visualizationMode() const
+    {
+        return getVisualizationMode();
+    }
+
+    real32 HouGeoAdapter::VolumePrimitive::visualizationIso() const
+    {
+        return getVisualizationIso();
+    }
+
+    real32 HouGeoAdapter::VolumePrimitive::visualizationDensity() const
+    {
+        return getVisualizationDensity();
+    }
+
     math::Vec3i HouGeoAdapter::VolumePrimitive::getResolution() const
     {
         return math::Vec3i(0);
@@ -162,6 +214,33 @@ namespace houio
     HouGeoAdapter::RawDataView HouGeoAdapter::VolumePrimitive::rawData() const
     {
         return {};
+    }
+
+    int HouGeoAdapter::PolyPrimitive::polygonCount() const
+    {
+        return numPolys();
+    }
+
+    int HouGeoAdapter::PolyPrimitive::polygonVertexCount(int polygon_index) const
+    {
+        return numVertices(polygon_index);
+    }
+
+    std::span<const int> HouGeoAdapter::PolyPrimitive::polygonVertexIndices(
+        int polygon_index) const
+    {
+        const int count = numVertices(polygon_index);
+        if (count < 0)
+            throw std::runtime_error("Polygon vertex count cannot be negative");
+        const int* data = vertices(polygon_index);
+        if (count > 0 && !data)
+            throw std::runtime_error("Polygon vertex storage is unavailable");
+        return std::span<const int>(data, static_cast<size_t>(count));
+    }
+
+    bool HouGeoAdapter::PolyPrimitive::isClosed() const
+    {
+        return closed();
     }
 
     int HouGeoAdapter::PolyPrimitive::numPolys() const

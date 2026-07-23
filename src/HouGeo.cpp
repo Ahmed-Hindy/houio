@@ -221,7 +221,7 @@ namespace houio
 		{
 			if( !primitive )
 				throw std::runtime_error( "HouGeo contains a null primitive" );
-			const sint64 storedPrimitiveCount = primitive->numPrimitives();
+			const sint64 storedPrimitiveCount = primitive->primitiveCount();
 			if( storedPrimitiveCount < 0
 				|| storedPrimitiveCount > std::numeric_limits<sint64>::max() - primitiveCount )
 				throw std::overflow_error( "HouGeo primitive count exceeds sint64 range" );
@@ -398,13 +398,13 @@ namespace houio
 			m_topology = std::make_shared<HouTopology>();
 
 		HouVolume::Ptr volumePrimitive = std::make_shared<HouVolume>();
-		volumePrimitive->field = field;
+		volumePrimitive->scalar_field_ = field;
 
 		std::vector<int> pointIndices{pointIndex};
 		const sint64 topologyVertex = m_topology->getNumIndices();
 		if( topologyVertex > static_cast<sint64>(std::numeric_limits<int>::max()) )
 			throw std::overflow_error( "HouGeo volume topology index exceeds int range" );
-		volumePrimitive->vertex = static_cast<int>(topologyVertex);
+		volumePrimitive->topology_vertex_ = static_cast<int>(topologyVertex);
 		m_topology->addIndices(pointIndices);
 
 		m_primitives.push_back( volumePrimitive );
@@ -1272,7 +1272,7 @@ namespace houio
 				"HouGeo::loadVolumePrimitive missing resolution", -1, "res"});
 
 		HouVolume::Ptr volumePrimitive = std::make_shared<HouVolume>();
-		volumePrimitive->field = std::make_shared<ScalarField>();
+		volumePrimitive->scalar_field_ = std::make_shared<ScalarField>();
 
 		withSchemaPath("res", [&]()
 		{
@@ -1282,7 +1282,7 @@ namespace houio
 			const math::V3i resolution(resolutionValues->get<int>(0), resolutionValues->get<int>(1),
 				resolutionValues->get<int>(2));
 			volumeVoxelCount(resolution);
-			volumePrimitive->field->resize(resolution);
+			volumePrimitive->scalar_field_->resize(resolution);
 		});
 
 		const bool hasVertex = volume->hasKey("vertex");
@@ -1314,7 +1314,7 @@ namespace houio
 				const int topologyVertex = volume->get<int>("vertex");
 				if( topologyVertex < 0 || static_cast<size_t>(topologyVertex) >= m_topology->indexBuffer.size() )
 					throw std::runtime_error( "HouGeo::loadVolumePrimitive vertex index is outside topology" );
-				volumePrimitive->vertex = topologyVertex;
+				volumePrimitive->topology_vertex_ = topologyVertex;
 
 				const int pointIndex = m_topology->indexBuffer[static_cast<size_t>(topologyVertex)];
 				HouAttribute::Ptr positionAttribute = std::dynamic_pointer_cast<HouAttribute>(getPointAttribute("P"));
@@ -1362,7 +1362,7 @@ namespace houio
 			const math::Matrix44d translation = math::Matrix44d::TranslationMatrix(position);
 			const math::Matrix44d localToWorld = math::Matrix44d::ScaleMatrix(2.0)
 				* math::Matrix44d::TranslationMatrix(-1.0, -1.0, -1.0) * rotationScale * translation;
-			volumePrimitive->field->setLocalToWorld(localToWorld);
+			volumePrimitive->scalar_field_->setLocalToWorld(localToWorld);
 		}
 
 		const bool hasSharedVoxels = volume->hasKey("sharedvoxels");
@@ -1379,16 +1379,16 @@ namespace houio
 				const auto sharedData = sharedPrimitiveData.sharedVoxelData.find(dataId);
 				if( sharedData == sharedPrimitiveData.sharedVoxelData.end() )
 					throw std::runtime_error( "HouGeo::loadVolumePrimitive shared voxel data was not found" );
-				loadVoxelData(sharedData->second, volumePrimitive->field->getResolution(),
-					volumePrimitive->field->values());
+				loadVoxelData(sharedData->second, volumePrimitive->scalar_field_->getResolution(),
+					volumePrimitive->scalar_field_->values());
 			});
 		}
 		else
 		{
 			withSchemaPath("voxels", [&]()
 			{
-				loadVoxelData(toObject(volume->getArray("voxels")), volumePrimitive->field->getResolution(),
-					volumePrimitive->field->values());
+				loadVoxelData(toObject(volume->getArray("voxels")), volumePrimitive->scalar_field_->getResolution(),
+					volumePrimitive->scalar_field_->values());
 			});
 		}
 
@@ -1399,11 +1399,11 @@ namespace houio
 				json::ObjectPtr visualization = volume->getObject("visualization");
 				if( !visualization )
 					throw std::runtime_error( "HouGeo::loadVolumePrimitive visualization must be an object" );
-				volumePrimitive->visualizationMode = visualization->get<std::string>("mode", "smoke");
-				if( volumePrimitive->visualizationMode.empty() )
-					volumePrimitive->visualizationMode = "smoke";
-				volumePrimitive->visualizationIso = visualization->get<real32>("iso", 0.0f);
-				volumePrimitive->visualizationDensity = visualization->get<real32>("density", 1.0f);
+				volumePrimitive->visualization_mode_ = visualization->get<std::string>("mode", "smoke");
+				if( volumePrimitive->visualization_mode_.empty() )
+					volumePrimitive->visualization_mode_ = "smoke";
+				volumePrimitive->visualization_iso_ = visualization->get<real32>("iso", 0.0f);
+				volumePrimitive->visualization_density_ = visualization->get<real32>("density", 1.0f);
 			});
 		}
 
@@ -1524,44 +1524,44 @@ namespace houio
 
 	int HouGeo::HouVolume::getVertex()const
 	{
-		return vertex;
+		return topology_vertex_;
 	}
 
 	real32 HouGeo::HouVolume::getVoxel( int i, int j, int k )const
 	{
-		return field->sample(i, j, k);
+		return scalar_field_->sample(i, j, k);
 	}
 
 	std::string HouGeo::HouVolume::getVisualizationMode()const
 	{
-		return visualizationMode;
+		return visualization_mode_;
 	}
 
 	real32 HouGeo::HouVolume::getVisualizationIso()const
 	{
-		return visualizationIso;
+		return visualization_iso_;
 	}
 
 	real32 HouGeo::HouVolume::getVisualizationDensity()const
 	{
-		return visualizationDensity;
+		return visualization_density_;
 	}
 	
 	math::Vec3i HouGeo::HouVolume::getResolution()const
 	{
-		return field->getResolution();
+		return scalar_field_->getResolution();
 	}
 
 	math::M44f HouGeo::HouVolume::getTransform()const
 	{
-		return field->localToWorldMatrix();
+		return scalar_field_->localToWorldMatrix();
 	}
 
 	HouGeoAdapter::RawDataView HouGeo::HouVolume::rawData() const
 	{
-		if (!field)
+		if (!scalar_field_)
 			return {};
-		return HouGeoAdapter::RawDataView::from<real32>(field->values());
+		return HouGeoAdapter::RawDataView::from<real32>(scalar_field_->values());
 	}
 
 

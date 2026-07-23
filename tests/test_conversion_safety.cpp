@@ -78,7 +78,7 @@ int verifyPolygonAccessorSafety()
 
     try
     {
-        static_cast<void>(polygon.numVertices(-1));
+        static_cast<void>(polygon.polygonVertexCount(-1));
         return fail("negative polygon index was accepted");
     }
     catch (const std::out_of_range&)
@@ -87,7 +87,7 @@ int verifyPolygonAccessorSafety()
 
     try
     {
-        static_cast<void>(polygon.vertices(0));
+        static_cast<void>(polygon.polygonVertexIndices(0));
         return fail("polygon range beyond stored vertices was accepted");
     }
     catch (const std::runtime_error&)

@@ -211,7 +211,7 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
     }
 
     const auto polygon = std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(primitives.front());
-    if (!polygon || polygon->numPolys() != 1 || polygon->numVertices(0) != 4)
+    if (!polygon || polygon->polygonCount() != 1 || polygon->polygonVertexCount(0) != 4)
     {
         return fail("Polygon_run was not expanded correctly");
     }

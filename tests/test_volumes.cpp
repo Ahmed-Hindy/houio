@@ -75,12 +75,12 @@ int verifyConstantArray()
     {
         return fail("constant volume did not import cleanly");
     }
-    const houio::math::V3i resolution = volume->getResolution();
+    const houio::math::V3i resolution = volume->resolution();
     if (resolution.x != 2 || resolution.y != 2 || resolution.z != 2)
     {
         return fail("constant volume resolution was not preserved");
     }
-    if (volume->getVertex() != 0)
+    if (volume->topologyVertex() != 0)
     {
         return fail("constant volume topology vertex was not preserved");
     }
@@ -90,7 +90,7 @@ int verifyConstantArray()
         {
             for (int x = 0; x < 2; ++x)
             {
-                if (std::abs(volume->getVoxel(x, y, z) - 3.25f) > 1.0e-6f)
+                if (std::abs(volume->voxelValue(x, y, z) - 3.25f) > 1.0e-6f)
                 {
                     return fail("constant volume value mismatch");
                 }
@@ -133,12 +133,12 @@ int verifyBoundaryTiles()
     }
     for (int x = 0; x < 16; ++x)
     {
-        if (std::abs(volume->getVoxel(x, 0, 0) - static_cast<float>(x)) > 1.0e-6f)
+        if (std::abs(volume->voxelValue(x, 0, 0) - static_cast<float>(x)) > 1.0e-6f)
         {
             return fail("raw boundary tile value mismatch");
         }
     }
-    if (std::abs(volume->getVoxel(16, 0, 0) - 42.0f) > 1.0e-6f)
+    if (std::abs(volume->voxelValue(16, 0, 0) - 42.0f) > 1.0e-6f)
     {
         return fail("constant boundary tile value mismatch");
     }
@@ -228,18 +228,18 @@ int verifyBinaryRoundTrip()
     houio::HouGeo::HouVolume::Ptr importedVolume = primitives.size() == 1
         ? std::dynamic_pointer_cast<houio::HouGeo::HouVolume>(primitives.front())
         : houio::HouGeo::HouVolume::Ptr();
-    if (!importedVolume || importedVolume->getVertex() != 0)
+    if (!importedVolume || importedVolume->topologyVertex() != 0)
     {
         return fail("volume binary round-trip lost primitive metadata");
     }
-    if (importedVolume->getVisualizationMode() != "iso"
-        || std::abs(importedVolume->getVisualizationIso() - 0.125f) > 1.0e-6f
-        || std::abs(importedVolume->getVisualizationDensity() - 0.75f) > 1.0e-6f)
+    if (importedVolume->visualizationMode() != "iso"
+        || std::abs(importedVolume->visualizationIso() - 0.125f) > 1.0e-6f
+        || std::abs(importedVolume->visualizationDensity() - 0.75f) > 1.0e-6f)
     {
         return fail("volume binary round-trip lost visualization metadata");
     }
 
-    const houio::math::V3i importedResolution = importedVolume->getResolution();
+    const houio::math::V3i importedResolution = importedVolume->resolution();
     if (importedResolution.x != resolution.x || importedResolution.y != resolution.y
         || importedResolution.z != resolution.z)
     {
@@ -251,7 +251,7 @@ int verifyBinaryRoundTrip()
         {
             for (int x = 0; x < resolution.x; ++x)
             {
-                if (std::abs(importedVolume->getVoxel(x, y, z) - sourceField->sample(x, y, z)) > 1.0e-6f)
+                if (std::abs(importedVolume->voxelValue(x, y, z) - sourceField->sample(x, y, z)) > 1.0e-6f)
                 {
                     return fail("volume binary round-trip lost voxel values");
                 }
@@ -259,7 +259,7 @@ int verifyBinaryRoundTrip()
         }
     }
 
-    const houio::math::M44f importedTransform = importedVolume->getTransform();
+    const houio::math::M44f importedTransform = importedVolume->transform();
     for (int component = 0; component < 16; ++component)
     {
         if (std::abs(importedTransform.ma[component] - sourceTransform.ma[component]) > 1.0e-5f)

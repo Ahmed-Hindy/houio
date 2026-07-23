@@ -150,24 +150,24 @@ int verifyPolygon(const houio::HouGeoAdapter::PolyPrimitive::Ptr& polygon, bool 
     {
         return fail("polygon primitive is null");
     }
-    if (polygon->closed() != expectedClosed)
+    if (polygon->isClosed() != expectedClosed)
     {
         return fail("polygon closed state was not preserved");
     }
-    if (polygon->numPolys() != static_cast<int>(expectedPointIndices.size()))
+    if (polygon->polygonCount() != static_cast<int>(expectedPointIndices.size()))
     {
         return fail("unexpected polygon count");
     }
 
-    for (int polygonIndex = 0; polygonIndex < polygon->numPolys(); ++polygonIndex)
+    for (int polygonIndex = 0; polygonIndex < polygon->polygonCount(); ++polygonIndex)
     {
         const std::vector<int>& expected = expectedPointIndices[static_cast<size_t>(polygonIndex)];
-        if (polygon->numVertices(polygonIndex) != static_cast<int>(expected.size()))
+        if (polygon->polygonVertexCount(polygonIndex) != static_cast<int>(expected.size()))
         {
             return fail("unexpected polygon vertex count");
         }
 
-        const int* actual = polygon->vertices(polygonIndex);
+        const std::span<const int> actual = polygon->polygonVertexIndices(polygonIndex);
         for (size_t vertexIndex = 0; vertexIndex < expected.size(); ++vertexIndex)
         {
             if (actual[vertexIndex] != expected[vertexIndex])

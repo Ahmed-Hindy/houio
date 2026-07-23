@@ -147,10 +147,12 @@ namespace houio
 
             HouTopology();
 
+        private:
             void getIndices(std::vector<int>& indices) const override;
             void addIndices(const std::vector<int>& indices) override;
             [[nodiscard]] sint64 getNumIndices() const override;
 
+        public:
             void reserve(std::size_t index_count)
             {
                 indexBuffer.reserve(index_count);
@@ -183,6 +185,7 @@ namespace houio
             using Ptr = std::shared_ptr<HouVolume>;
             using ConstPtr = std::shared_ptr<const HouVolume>;
 
+        private:
             [[nodiscard]] math::M44f getTransform() const override;
             [[nodiscard]] int getVertex() const override;
             [[nodiscard]] math::Vec3i getResolution() const override;
@@ -192,26 +195,27 @@ namespace houio
             [[nodiscard]] real32 getVisualizationIso() const override;
             [[nodiscard]] real32 getVisualizationDensity() const override;
 
+        public:
             void setField(ScalarField::Ptr scalar_field)
             {
                 if (!scalar_field)
                     throw std::invalid_argument("HouVolume field cannot be null");
-                field = std::move(scalar_field);
+                scalar_field_ = std::move(scalar_field);
             }
 
             [[nodiscard]] ScalarField::Ptr scalarField() noexcept
             {
-                return field;
+                return scalar_field_;
             }
 
             [[nodiscard]] std::shared_ptr<const ScalarField> scalarField() const noexcept
             {
-                return field;
+                return scalar_field_;
             }
 
             void setTopologyVertex(int topology_vertex) noexcept
             {
-                vertex = topology_vertex;
+                topology_vertex_ = topology_vertex;
             }
 
             void setVisualization(
@@ -219,17 +223,17 @@ namespace houio
                 real32 iso_value,
                 real32 density)
             {
-                visualizationMode = mode.empty() ? "smoke" : std::move(mode);
-                visualizationIso = iso_value;
-                visualizationDensity = density;
+                visualization_mode_ = mode.empty() ? "smoke" : std::move(mode);
+                visualization_iso_ = iso_value;
+                visualization_density_ = density;
             }
 
         private:
-            ScalarField::Ptr field;
-            int vertex = -1;
-            std::string visualizationMode = "smoke";
-            real32 visualizationIso = 0.0f;
-            real32 visualizationDensity = 1.0f;
+            ScalarField::Ptr scalar_field_;
+            int topology_vertex_ = -1;
+            std::string visualization_mode_ = "smoke";
+            real32 visualization_iso_ = 0.0f;
+            real32 visualization_density_ = 1.0f;
 
             friend class HouGeo;
         };
@@ -240,11 +244,13 @@ namespace houio
             using Ptr = std::shared_ptr<HouPoly>;
             using ConstPtr = std::shared_ptr<const HouPoly>;
 
+        private:
             [[nodiscard]] int numPolys() const override;
             [[nodiscard]] int numVertices(int polygon_index) const override;
             [[nodiscard]] const int* vertices(int polygon_index = 0) const override;
             [[nodiscard]] bool closed() const override;
 
+        public:
             void setPolygonData(
                 int polygon_count,
                 std::vector<int> vertex_counts,

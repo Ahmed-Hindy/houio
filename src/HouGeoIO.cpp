@@ -350,16 +350,16 @@ namespace houio
 			if( !poly )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 					"HouGeoIO::convertToGeometry supports only polygon primitives", -1, "conversion.primitive"});
-			const int numPolys = poly->numPolys();
+			const int numPolys = poly->polygonCount();
 			if( numPolys < 0 )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry polygon count cannot be negative", -1, "conversion.primitive"});
 
 			size_t observedVertexCount = 0;
-			numVerticesPerPoly = numPolys > 0 ? poly->numVertices(0) : 0;
+			numVerticesPerPoly = numPolys > 0 ? poly->polygonVertexCount(0) : 0;
 			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
 			{
-				const int polygonVertexCount = poly->numVertices(polygonIndex);
+				const int polygonVertexCount = poly->polygonVertexCount(polygonIndex);
 				if( polygonVertexCount != numVerticesPerPoly )
 					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 						"HouGeoIO::convertToGeometry requires a constant polygon vertex count", -1,
@@ -368,7 +368,7 @@ namespace houio
 					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 						"HouGeoIO::convertToGeometry polygon vertices exceed the vertex domain", -1,
 						"conversion.primitive"});
-				static_cast<void>(poly->vertices(polygonIndex));
+				static_cast<void>(poly->polygonVertexIndices(polygonIndex));
 				observedVertexCount += static_cast<size_t>(polygonVertexCount);
 			}
 			if( observedVertexCount != vertexCount )
@@ -636,7 +636,7 @@ namespace houio
 			if( !poly )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 					"HouGeoIO::convertToGeometry expected a polygon primitive", -1, "conversion.primitive"});
-			const int numPolys = poly->numPolys();
+			const int numPolys = poly->polygonCount();
 
 			// Geometry has no face-varying domain, so points are split when vertex values differ.
 			std::vector<bool> pointsToSplit(pointCount, false);
@@ -646,8 +646,8 @@ namespace houio
 			size_t globalVertexIndex = 0;
 			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
 			{
-				const int polygonVertexCount = poly->numVertices(polygonIndex);
-				const int *polygonVertices = poly->vertices(polygonIndex);
+				const int polygonVertexCount = poly->polygonVertexCount(polygonIndex);
+				const std::span<const int> polygonVertices = poly->polygonVertexIndices(polygonIndex);
 				for( int localVertexIndex=0;localVertexIndex<polygonVertexCount;++localVertexIndex, ++globalVertexIndex )
 				{
 					if( globalVertexIndex >= vertexCount )
@@ -690,8 +690,8 @@ namespace houio
 			globalVertexIndex = 0;
 			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
 			{
-				const int polygonVertexCount = poly->numVertices(polygonIndex);
-				const int *polygonVertices = poly->vertices(polygonIndex);
+				const int polygonVertexCount = poly->polygonVertexCount(polygonIndex);
+				const std::span<const int> polygonVertices = poly->polygonVertexIndices(polygonIndex);
 				std::vector<unsigned int> vertices;
 				vertices.reserve(static_cast<size_t>(polygonVertexCount));
 
@@ -985,8 +985,8 @@ namespace houio
 				else if( auto polygonRun = std::dynamic_pointer_cast<HouGeoAdapter::PolyPrimitive>(primitive) )
 				{
 					exportPrimitive(context, polygonRun, topologyVertexOffset);
-					for( int polygonIndex=0;polygonIndex<polygonRun->numPolys();++polygonIndex )
-						topologyVertexOffset += polygonRun->numVertices(polygonIndex);
+					for( int polygonIndex=0;polygonIndex<polygonRun->polygonCount();++polygonIndex )
+						topologyVertexOffset += polygonRun->polygonVertexCount(polygonIndex);
 				}
 			}
 			writer.jsonEndArray();
@@ -1270,8 +1270,8 @@ namespace houio
 			return false;
 		json::BinaryWriter &writer = context.writer;
 
-		std::vector<sint32> indices;
-		topology->getIndices(indices);
+		const std::vector<int> topology_indices = topology->indexValues();
+		std::vector<sint32> indices(topology_indices.begin(), topology_indices.end());
 
 		bool requires32BitIndices = false;
 		for( const sint32 index : indices )
@@ -1339,7 +1339,7 @@ namespace houio
 		if( !volume )
 			return false;
 		json::BinaryWriter &writer = context.writer;
-		const math::V3i resolution = volume->getResolution();
+		const math::V3i resolution = volume->resolution();
 
 		writer.jsonBeginArray();
 
@@ -1350,13 +1350,15 @@ namespace houio
 
 		writer.jsonBeginArray();
 		writer.jsonString("vertex");
-		writer.jsonInt32(volume->getVertex());
+		writer.jsonInt32(volume->topologyVertex());
 
 		writer.jsonString("transform");
-		const math::M44f translation = math::M44f::TranslationMatrix(volume->getTransform().getTranslation());
+		const math::M44f volume_transform = volume->transform();
+		const math::M44f translation =
+			math::M44f::TranslationMatrix(volume_transform.getTranslation());
 		const math::M44f rotationScale = math::M44f::ScaleMatrix(0.5f)
 			* math::M44f::TranslationMatrix(1.0, 1.0, 1.0)
-			* volume->getTransform() * translation.inverted();
+			* volume_transform * translation.inverted();
 		const math::M33f transform( rotationScale.ma[0], rotationScale.ma[1], rotationScale.ma[2],
 			rotationScale.ma[4], rotationScale.ma[5], rotationScale.ma[6],
 			rotationScale.ma[8], rotationScale.ma[9], rotationScale.ma[10]);
@@ -1435,7 +1437,7 @@ namespace houio
 					for( int voxelZ=voxelOffset.z;voxelZ<voxelEnd.z;++voxelZ )
 						for( int voxelY=voxelOffset.y;voxelY<voxelEnd.y;++voxelY )
 							for( int voxelX=voxelOffset.x;voxelX<voxelEnd.x;++voxelX )
-								tileValues.push_back(volume->getVoxel(voxelX, voxelY, voxelZ));
+								tileValues.push_back(volume->voxelValue(voxelX, voxelY, voxelZ));
 					writer.jsonUniformArray(tileValues);
 					writer.jsonEndArray();
 				}
@@ -1449,11 +1451,11 @@ namespace houio
 		writer.jsonString("visualization");
 		writer.jsonBeginMap();
 		writer.jsonKey("mode");
-		writer.jsonString(volume->getVisualizationMode());
+		writer.jsonString(volume->visualizationMode());
 		writer.jsonKey("iso");
-		writer.jsonReal32(volume->getVisualizationIso());
+		writer.jsonReal32(volume->visualizationIso());
 		writer.jsonKey("density");
-		writer.jsonReal32(volume->getVisualizationDensity());
+		writer.jsonReal32(volume->visualizationDensity());
 		writer.jsonEndMap();
 
 		writer.jsonString("taperx");
@@ -1469,15 +1471,15 @@ namespace houio
 	bool HouGeoIO::exportPrimitive( ExportContext &context,
 		HouGeoAdapter::PolyPrimitive::Ptr polygonRun, int startVertex )
 	{
-		if( !polygonRun || startVertex < 0 || polygonRun->numPolys() <= 0 )
+		if( !polygonRun || startVertex < 0 || polygonRun->polygonCount() <= 0 )
 			return false;
 		json::BinaryWriter &writer = context.writer;
 
 		std::vector<sint32> vertexCounts;
-		vertexCounts.reserve(static_cast<size_t>(polygonRun->numPolys()));
-		for( int polygonIndex=0;polygonIndex<polygonRun->numPolys();++polygonIndex )
+		vertexCounts.reserve(static_cast<size_t>(polygonRun->polygonCount()));
+		for( int polygonIndex=0;polygonIndex<polygonRun->polygonCount();++polygonIndex )
 		{
-			const int vertexCount = polygonRun->numVertices(polygonIndex);
+			const int vertexCount = polygonRun->polygonVertexCount(polygonIndex);
 			if( vertexCount <= 0 )
 				throw std::runtime_error( "HouGeoIO::exportPrimitive: polygon has no vertices" );
 			vertexCounts.push_back(vertexCount);
@@ -1486,14 +1488,14 @@ namespace houio
 		writer.jsonBeginArray();
 		writer.jsonBeginArray();
 		writer.jsonString("type");
-		writer.jsonString(polygonRun->closed() ? "Polygon_run" : "PolygonCurve_run");
+		writer.jsonString(polygonRun->isClosed() ? "Polygon_run" : "PolygonCurve_run");
 		writer.jsonEndArray();
 
 		writer.jsonBeginArray();
 		writer.jsonString("startvertex");
 		writer.jsonInt32(startVertex);
 		writer.jsonString("nprimitives");
-		writer.jsonInt32(polygonRun->numPolys());
+		writer.jsonInt32(polygonRun->polygonCount());
 		writer.jsonString("nvertices");
 		writer.jsonUniformArray(vertexCounts);
 		writer.jsonEndArray();
