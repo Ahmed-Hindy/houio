@@ -16,8 +16,6 @@
 
 namespace houio
 {
-    class HouGeoIO;
-
     namespace json
     {
         struct Object;
@@ -107,33 +105,32 @@ namespace houio
             static constexpr Storage ATTR_STORAGE_INT64 = Storage::int64;
             static constexpr Storage ATTR_STORAGE_FPREAL16 = Storage::float16;
 
-            virtual ~AttributeAdapter();
+            virtual ~AttributeAdapter() = default;
 
-            [[nodiscard]] std::string name() const;
-            [[nodiscard]] Type type() const;
-            [[nodiscard]] int tupleSize() const;
-            [[nodiscard]] Storage storage() const;
-            [[nodiscard]] std::vector<int> packing() const;
-            [[nodiscard]] int elementCount() const;
-            [[nodiscard]] std::string stringValue(int index) const;
-            [[nodiscard]] std::shared_ptr<json::Object> dictionaryValue(int index) const;
+            [[nodiscard]] virtual std::string name() const;
+            [[nodiscard]] virtual Type type() const;
+            [[nodiscard]] virtual int tupleSize() const;
+            [[nodiscard]] virtual Storage storage() const;
+            [[nodiscard]] virtual std::vector<int> packing() const;
+            [[nodiscard]] virtual int elementCount() const;
+            [[nodiscard]] virtual std::string stringValue(int index) const = 0;
+            [[nodiscard]] virtual std::shared_ptr<json::Object> dictionaryValue(int index) const;
             [[nodiscard]] virtual RawDataView rawData() const;
+
+            [[nodiscard]] std::string getName() const { return name(); }
+            [[nodiscard]] Type getType() const { return type(); }
+            [[nodiscard]] int getTupleSize() const { return tupleSize(); }
+            [[nodiscard]] Storage getStorage() const { return storage(); }
+            [[nodiscard]] int getNumElements() const { return elementCount(); }
+            [[nodiscard]] std::string getString(int index) const { return stringValue(index); }
+            [[nodiscard]] std::shared_ptr<json::Object> getDictionary(int index) const
+            {
+                return dictionaryValue(index);
+            }
 
             [[nodiscard]] static Type parseType(const std::string& type_name);
             [[nodiscard]] static Storage parseStorage(const std::string& storage_name);
             [[nodiscard]] static int storageSize(Storage storage_type);
-
-        protected:
-            friend class ::houio::HouGeoIO;
-
-            [[nodiscard]] virtual std::string getName() const;
-            [[nodiscard]] virtual Type getType() const;
-            [[nodiscard]] virtual int getTupleSize() const;
-            [[nodiscard]] virtual Storage getStorage() const;
-            virtual void getPacking(std::vector<int>& packing) const;
-            [[nodiscard]] virtual int getNumElements() const;
-            [[nodiscard]] virtual std::string getString(int index) const = 0;
-            [[nodiscard]] virtual std::shared_ptr<json::Object> getDictionary(int index) const;
         };
 
         class Topology
@@ -142,18 +139,11 @@ namespace houio
             using Ptr = std::shared_ptr<Topology>;
             using ConstPtr = std::shared_ptr<const Topology>;
 
-            virtual ~Topology();
+            virtual ~Topology() = default;
 
-            [[nodiscard]] std::vector<int> indexValues() const;
-            void appendIndices(std::span<const int> indices);
-            [[nodiscard]] sint64 indexCount() const;
-
-        protected:
-            friend class ::houio::HouGeoIO;
-
-            virtual void getIndices(std::vector<int>& indices) const = 0;
-            virtual void addIndices(const std::vector<int>& indices) = 0;
-            [[nodiscard]] virtual sint64 getNumIndices() const = 0;
+            [[nodiscard]] virtual std::vector<int> indexValues() const = 0;
+            virtual void appendIndices(std::span<const int> indices) = 0;
+            [[nodiscard]] virtual sint64 indexCount() const = 0;
         };
 
         class Primitive
@@ -172,114 +162,63 @@ namespace houio
             static constexpr Type PRIM_POLY = Type::polygon;
 
             virtual ~Primitive() = default;
-
-            [[nodiscard]] int primitiveCount() const { return numPrimitives(); }
-
-        protected:
-            friend class ::houio::HouGeoIO;
-            [[nodiscard]] virtual int numPrimitives() const { return 1; }
+            [[nodiscard]] virtual int primitiveCount() const { return 1; }
         };
 
         class VolumePrimitive : public Primitive
         {
         public:
             using Ptr = std::shared_ptr<VolumePrimitive>;
+            using ConstPtr = std::shared_ptr<const VolumePrimitive>;
 
-            [[nodiscard]] math::M44f transform() const;
-            [[nodiscard]] int topologyVertex() const;
-            [[nodiscard]] math::Vec3i resolution() const;
-            [[nodiscard]] real32 voxelValue(int x, int y, int z) const;
-            [[nodiscard]] std::string visualizationMode() const;
-            [[nodiscard]] real32 visualizationIso() const;
-            [[nodiscard]] real32 visualizationDensity() const;
+            [[nodiscard]] virtual math::M44f transform() const = 0;
+            [[nodiscard]] virtual int topologyVertex() const = 0;
+            [[nodiscard]] virtual math::Vec3i resolution() const;
+            [[nodiscard]] virtual real32 voxelValue(int x, int y, int z) const = 0;
+            [[nodiscard]] virtual std::string visualizationMode() const;
+            [[nodiscard]] virtual real32 visualizationIso() const;
+            [[nodiscard]] virtual real32 visualizationDensity() const;
             [[nodiscard]] virtual RawDataView rawData() const;
-
-        protected:
-            friend class ::houio::HouGeoIO;
-
-            [[nodiscard]] virtual math::M44f getTransform() const = 0;
-            [[nodiscard]] virtual int getVertex() const = 0;
-            [[nodiscard]] virtual math::Vec3i getResolution() const;
-            [[nodiscard]] virtual real32 getVoxel(int x, int y, int z) const = 0;
-            [[nodiscard]] virtual std::string getVisualizationMode() const;
-            [[nodiscard]] virtual real32 getVisualizationIso() const;
-            [[nodiscard]] virtual real32 getVisualizationDensity() const;
         };
 
         class PolyPrimitive : public Primitive
         {
         public:
             using Ptr = std::shared_ptr<PolyPrimitive>;
+            using ConstPtr = std::shared_ptr<const PolyPrimitive>;
 
-            [[nodiscard]] int polygonCount() const;
-            [[nodiscard]] int polygonVertexCount(int polygon_index) const;
-            [[nodiscard]] std::span<const int> polygonVertexIndices(
+            [[nodiscard]] virtual int polygonCount() const;
+            [[nodiscard]] virtual int polygonVertexCount(int polygon_index) const;
+            [[nodiscard]] virtual std::span<const int> polygonVertexIndices(
                 int polygon_index = 0) const;
-            [[nodiscard]] bool isClosed() const;
-
-        protected:
-            friend class ::houio::HouGeoIO;
-
-            [[nodiscard]] virtual int numPolys() const;
-            [[nodiscard]] virtual int numVertices(int polygon_index) const;
-            [[nodiscard]] virtual const int* vertices(int polygon_index = 0) const;
-            [[nodiscard]] int numPrimitives() const override { return numPolys(); }
-            [[nodiscard]] virtual bool closed() const;
+            [[nodiscard]] virtual bool isClosed() const;
+            [[nodiscard]] int primitiveCount() const override { return polygonCount(); }
         };
 
         virtual ~HouGeoAdapter() = default;
 
-        [[nodiscard]] sint64 pointCount() const;
-        [[nodiscard]] sint64 vertexCount() const;
-        [[nodiscard]] sint64 primitiveCount() const;
-        [[nodiscard]] std::vector<std::string> pointAttributeNames() const;
-        [[nodiscard]] AttributeAdapter::Ptr pointAttribute(const std::string& name);
-        [[nodiscard]] std::vector<std::string> vertexAttributeNames() const;
-        [[nodiscard]] AttributeAdapter::Ptr vertexAttribute(const std::string& name);
-        [[nodiscard]] std::vector<std::string> globalAttributeNames() const;
-        [[nodiscard]] AttributeAdapter::Ptr globalAttribute(const std::string& name);
-        [[nodiscard]] std::vector<std::string> primitiveAttributeNames() const;
-        [[nodiscard]] AttributeAdapter::Ptr primitiveAttribute(const std::string& name);
-        [[nodiscard]] std::vector<std::string> pointGroupNames() const;
-        [[nodiscard]] std::optional<std::vector<bool>> pointGroupMembership(
+        [[nodiscard]] virtual sint64 pointCount() const;
+        [[nodiscard]] virtual sint64 vertexCount() const;
+        [[nodiscard]] virtual sint64 primitiveCount() const;
+        [[nodiscard]] virtual std::vector<std::string> pointAttributeNames() const;
+        [[nodiscard]] virtual AttributeAdapter::Ptr pointAttribute(const std::string& name);
+        [[nodiscard]] virtual std::vector<std::string> vertexAttributeNames() const;
+        [[nodiscard]] virtual AttributeAdapter::Ptr vertexAttribute(const std::string& name);
+        [[nodiscard]] virtual std::vector<std::string> globalAttributeNames() const;
+        [[nodiscard]] virtual AttributeAdapter::Ptr globalAttribute(const std::string& name);
+        [[nodiscard]] virtual std::vector<std::string> primitiveAttributeNames() const = 0;
+        [[nodiscard]] virtual AttributeAdapter::Ptr primitiveAttribute(const std::string& name) = 0;
+        [[nodiscard]] virtual std::vector<std::string> pointGroupNames() const;
+        [[nodiscard]] virtual std::optional<std::vector<bool>> pointGroupMembership(
             const std::string& name) const;
-        [[nodiscard]] std::vector<std::string> vertexGroupNames() const;
-        [[nodiscard]] std::optional<std::vector<bool>> vertexGroupMembership(
+        [[nodiscard]] virtual std::vector<std::string> vertexGroupNames() const;
+        [[nodiscard]] virtual std::optional<std::vector<bool>> vertexGroupMembership(
             const std::string& name) const;
-        [[nodiscard]] std::vector<std::string> primitiveGroupNames() const;
-        [[nodiscard]] std::optional<std::vector<bool>> primitiveGroupMembership(
+        [[nodiscard]] virtual std::vector<std::string> primitiveGroupNames() const;
+        [[nodiscard]] virtual std::optional<std::vector<bool>> primitiveGroupMembership(
             const std::string& name) const;
-        [[nodiscard]] bool hasPrimitiveAttribute(const std::string& name) const;
-        [[nodiscard]] std::vector<Primitive::Ptr> primitives();
-        [[nodiscard]] Topology::Ptr topology();
-
-    protected:
-        [[nodiscard]] virtual sint64 pointcount() const;
-        [[nodiscard]] virtual sint64 vertexcount() const;
-        [[nodiscard]] virtual sint64 primitivecount() const;
-        virtual void getPointAttributeNames(std::vector<std::string>& names) const;
-        [[nodiscard]] virtual AttributeAdapter::Ptr getPointAttribute(const std::string& name);
-        virtual void getVertexAttributeNames(std::vector<std::string>& names) const;
-        [[nodiscard]] virtual AttributeAdapter::Ptr getVertexAttribute(const std::string& name);
-        virtual void getGlobalAttributeNames(std::vector<std::string>& names) const;
-        [[nodiscard]] virtual AttributeAdapter::Ptr getGlobalAttribute(const std::string& name);
-        virtual void getPointGroupNames(std::vector<std::string>& names) const;
-        [[nodiscard]] virtual bool getPointGroupMembership(
-            const std::string& name,
-            std::vector<bool>& membership) const;
-        virtual void getVertexGroupNames(std::vector<std::string>& names) const;
-        [[nodiscard]] virtual bool getVertexGroupMembership(
-            const std::string& name,
-            std::vector<bool>& membership) const;
-        virtual void getPrimitiveGroupNames(std::vector<std::string>& names) const;
-        [[nodiscard]] virtual bool getPrimitiveGroupMembership(
-            const std::string& name,
-            std::vector<bool>& membership) const;
-        [[nodiscard]] virtual bool hasPrimitiveAttributeLegacy(const std::string& name) const;
-        virtual void getPrimitiveAttributeNames(std::vector<std::string>& names) const = 0;
-        [[nodiscard]] virtual AttributeAdapter::Ptr getPrimitiveAttribute(
-            const std::string& name) = 0;
-        virtual void getPrimitives(std::vector<Primitive::Ptr>& primitives);
-        [[nodiscard]] virtual Topology::Ptr getTopology();
+        [[nodiscard]] virtual bool hasPrimitiveAttribute(const std::string& name) const;
+        [[nodiscard]] virtual std::vector<Primitive::Ptr> primitives();
+        [[nodiscard]] virtual Topology::Ptr topology();
     };
 }

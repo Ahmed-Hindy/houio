@@ -4,77 +4,32 @@
 
 namespace houio
 {
-    HouGeoAdapter::AttributeAdapter::~AttributeAdapter() = default;
-
     std::string HouGeoAdapter::AttributeAdapter::name() const
-    {
-        return getName();
-    }
-
-    HouGeoAdapter::AttributeAdapter::Type HouGeoAdapter::AttributeAdapter::type() const
-    {
-        return getType();
-    }
-
-    int HouGeoAdapter::AttributeAdapter::tupleSize() const
-    {
-        return getTupleSize();
-    }
-
-    HouGeoAdapter::AttributeAdapter::Storage HouGeoAdapter::AttributeAdapter::storage() const
-    {
-        return getStorage();
-    }
-
-    std::vector<int> HouGeoAdapter::AttributeAdapter::packing() const
-    {
-        std::vector<int> result;
-        getPacking(result);
-        return result;
-    }
-
-    int HouGeoAdapter::AttributeAdapter::elementCount() const
-    {
-        return getNumElements();
-    }
-
-    std::string HouGeoAdapter::AttributeAdapter::stringValue(int index) const
-    {
-        return getString(index);
-    }
-
-    std::shared_ptr<json::Object> HouGeoAdapter::AttributeAdapter::dictionaryValue(
-        int index) const
-    {
-        return getDictionary(index);
-    }
-
-    std::string HouGeoAdapter::AttributeAdapter::getName() const
     {
         return {};
     }
 
-    HouGeoAdapter::AttributeAdapter::Type HouGeoAdapter::AttributeAdapter::getType() const
+    HouGeoAdapter::AttributeAdapter::Type HouGeoAdapter::AttributeAdapter::type() const
     {
         return Type::invalid;
     }
 
-    int HouGeoAdapter::AttributeAdapter::getTupleSize() const
+    int HouGeoAdapter::AttributeAdapter::tupleSize() const
     {
         return 0;
     }
 
-    HouGeoAdapter::AttributeAdapter::Storage HouGeoAdapter::AttributeAdapter::getStorage() const
+    HouGeoAdapter::AttributeAdapter::Storage HouGeoAdapter::AttributeAdapter::storage() const
     {
         return Storage::invalid;
     }
 
-    void HouGeoAdapter::AttributeAdapter::getPacking(std::vector<int>& packing) const
+    std::vector<int> HouGeoAdapter::AttributeAdapter::packing() const
     {
-        packing.clear();
+        return {};
     }
 
-    int HouGeoAdapter::AttributeAdapter::getNumElements() const
+    int HouGeoAdapter::AttributeAdapter::elementCount() const
     {
         return 0;
     }
@@ -84,7 +39,7 @@ namespace houio
         return {};
     }
 
-    std::shared_ptr<json::Object> HouGeoAdapter::AttributeAdapter::getDictionary(int) const
+    std::shared_ptr<json::Object> HouGeoAdapter::AttributeAdapter::dictionaryValue(int) const
     {
         return nullptr;
     }
@@ -137,76 +92,22 @@ namespace houio
         return 0;
     }
 
-    HouGeoAdapter::Topology::~Topology() = default;
-
-    std::vector<int> HouGeoAdapter::Topology::indexValues() const
-    {
-        std::vector<int> indices;
-        getIndices(indices);
-        return indices;
-    }
-
-    void HouGeoAdapter::Topology::appendIndices(std::span<const int> indices)
-    {
-        addIndices(std::vector<int>(indices.begin(), indices.end()));
-    }
-
-    sint64 HouGeoAdapter::Topology::indexCount() const
-    {
-        return getNumIndices();
-    }
-
-    math::M44f HouGeoAdapter::VolumePrimitive::transform() const
-    {
-        return getTransform();
-    }
-
-    int HouGeoAdapter::VolumePrimitive::topologyVertex() const
-    {
-        return getVertex();
-    }
-
     math::Vec3i HouGeoAdapter::VolumePrimitive::resolution() const
-    {
-        return getResolution();
-    }
-
-    real32 HouGeoAdapter::VolumePrimitive::voxelValue(int x, int y, int z) const
-    {
-        return getVoxel(x, y, z);
-    }
-
-    std::string HouGeoAdapter::VolumePrimitive::visualizationMode() const
-    {
-        return getVisualizationMode();
-    }
-
-    real32 HouGeoAdapter::VolumePrimitive::visualizationIso() const
-    {
-        return getVisualizationIso();
-    }
-
-    real32 HouGeoAdapter::VolumePrimitive::visualizationDensity() const
-    {
-        return getVisualizationDensity();
-    }
-
-    math::Vec3i HouGeoAdapter::VolumePrimitive::getResolution() const
     {
         return math::Vec3i(0);
     }
 
-    std::string HouGeoAdapter::VolumePrimitive::getVisualizationMode() const
+    std::string HouGeoAdapter::VolumePrimitive::visualizationMode() const
     {
         return "smoke";
     }
 
-    real32 HouGeoAdapter::VolumePrimitive::getVisualizationIso() const
+    real32 HouGeoAdapter::VolumePrimitive::visualizationIso() const
     {
         return 0.0f;
     }
 
-    real32 HouGeoAdapter::VolumePrimitive::getVisualizationDensity() const
+    real32 HouGeoAdapter::VolumePrimitive::visualizationDensity() const
     {
         return 1.0f;
     }
@@ -218,275 +119,113 @@ namespace houio
 
     int HouGeoAdapter::PolyPrimitive::polygonCount() const
     {
-        return numPolys();
+        return 0;
     }
 
-    int HouGeoAdapter::PolyPrimitive::polygonVertexCount(int polygon_index) const
+    int HouGeoAdapter::PolyPrimitive::polygonVertexCount(int) const
     {
-        return numVertices(polygon_index);
+        return 0;
     }
 
-    std::span<const int> HouGeoAdapter::PolyPrimitive::polygonVertexIndices(
-        int polygon_index) const
+    std::span<const int> HouGeoAdapter::PolyPrimitive::polygonVertexIndices(int) const
     {
-        const int count = numVertices(polygon_index);
-        if (count < 0)
-            throw std::runtime_error("Polygon vertex count cannot be negative");
-        const int* data = vertices(polygon_index);
-        if (count > 0 && !data)
-            throw std::runtime_error("Polygon vertex storage is unavailable");
-        return std::span<const int>(data, static_cast<size_t>(count));
+        return {};
     }
 
     bool HouGeoAdapter::PolyPrimitive::isClosed() const
-    {
-        return closed();
-    }
-
-    int HouGeoAdapter::PolyPrimitive::numPolys() const
-    {
-        return 0;
-    }
-
-    int HouGeoAdapter::PolyPrimitive::numVertices(int) const
-    {
-        return 0;
-    }
-
-    const int* HouGeoAdapter::PolyPrimitive::vertices(int) const
-    {
-        return nullptr;
-    }
-
-    bool HouGeoAdapter::PolyPrimitive::closed() const
     {
         return false;
     }
 
     sint64 HouGeoAdapter::pointCount() const
     {
-        return pointcount();
+        return 0;
     }
 
     sint64 HouGeoAdapter::vertexCount() const
     {
-        return vertexcount();
+        return 0;
     }
 
     sint64 HouGeoAdapter::primitiveCount() const
     {
-        return primitivecount();
+        return 0;
     }
 
     std::vector<std::string> HouGeoAdapter::pointAttributeNames() const
     {
-        std::vector<std::string> names;
-        getPointAttributeNames(names);
-        return names;
+        return {};
     }
 
-    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::pointAttribute(const std::string& name)
+    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::pointAttribute(const std::string&)
     {
-        return getPointAttribute(name);
+        return nullptr;
     }
 
     std::vector<std::string> HouGeoAdapter::vertexAttributeNames() const
     {
-        std::vector<std::string> names;
-        getVertexAttributeNames(names);
-        return names;
+        return {};
     }
 
-    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::vertexAttribute(const std::string& name)
+    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::vertexAttribute(const std::string&)
     {
-        return getVertexAttribute(name);
+        return nullptr;
     }
 
     std::vector<std::string> HouGeoAdapter::globalAttributeNames() const
     {
-        std::vector<std::string> names;
-        getGlobalAttributeNames(names);
-        return names;
+        return {};
     }
 
-    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::globalAttribute(const std::string& name)
+    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::globalAttribute(const std::string&)
     {
-        return getGlobalAttribute(name);
-    }
-
-    std::vector<std::string> HouGeoAdapter::primitiveAttributeNames() const
-    {
-        std::vector<std::string> names;
-        getPrimitiveAttributeNames(names);
-        return names;
-    }
-
-    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::primitiveAttribute(
-        const std::string& name)
-    {
-        return getPrimitiveAttribute(name);
+        return nullptr;
     }
 
     std::vector<std::string> HouGeoAdapter::pointGroupNames() const
     {
-        std::vector<std::string> names;
-        getPointGroupNames(names);
-        return names;
+        return {};
     }
 
     std::optional<std::vector<bool>> HouGeoAdapter::pointGroupMembership(
-        const std::string& name) const
+        const std::string&) const
     {
-        std::vector<bool> membership;
-        if (!getPointGroupMembership(name, membership))
-            return std::nullopt;
-        return membership;
+        return std::nullopt;
     }
 
     std::vector<std::string> HouGeoAdapter::vertexGroupNames() const
     {
-        std::vector<std::string> names;
-        getVertexGroupNames(names);
-        return names;
+        return {};
     }
 
     std::optional<std::vector<bool>> HouGeoAdapter::vertexGroupMembership(
-        const std::string& name) const
+        const std::string&) const
     {
-        std::vector<bool> membership;
-        if (!getVertexGroupMembership(name, membership))
-            return std::nullopt;
-        return membership;
+        return std::nullopt;
     }
 
     std::vector<std::string> HouGeoAdapter::primitiveGroupNames() const
     {
-        std::vector<std::string> names;
-        getPrimitiveGroupNames(names);
-        return names;
+        return {};
     }
 
     std::optional<std::vector<bool>> HouGeoAdapter::primitiveGroupMembership(
-        const std::string& name) const
+        const std::string&) const
     {
-        std::vector<bool> membership;
-        if (!getPrimitiveGroupMembership(name, membership))
-            return std::nullopt;
-        return membership;
+        return std::nullopt;
     }
 
-    bool HouGeoAdapter::hasPrimitiveAttribute(const std::string& name) const
+    bool HouGeoAdapter::hasPrimitiveAttribute(const std::string&) const
     {
-        return hasPrimitiveAttributeLegacy(name);
+        return false;
     }
 
     std::vector<HouGeoAdapter::Primitive::Ptr> HouGeoAdapter::primitives()
     {
-        std::vector<Primitive::Ptr> result;
-        getPrimitives(result);
-        return result;
+        return {};
     }
 
     HouGeoAdapter::Topology::Ptr HouGeoAdapter::topology()
-    {
-        return getTopology();
-    }
-
-    sint64 HouGeoAdapter::pointcount() const
-    {
-        return 0;
-    }
-
-    sint64 HouGeoAdapter::vertexcount() const
-    {
-        return 0;
-    }
-
-    sint64 HouGeoAdapter::primitivecount() const
-    {
-        return 0;
-    }
-
-    void HouGeoAdapter::getPointAttributeNames(std::vector<std::string>& names) const
-    {
-        names.clear();
-    }
-
-    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::getPointAttribute(const std::string&)
-    {
-        return nullptr;
-    }
-
-    void HouGeoAdapter::getVertexAttributeNames(std::vector<std::string>& names) const
-    {
-        names.clear();
-    }
-
-    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::getVertexAttribute(const std::string&)
-    {
-        return nullptr;
-    }
-
-    void HouGeoAdapter::getGlobalAttributeNames(std::vector<std::string>& names) const
-    {
-        names.clear();
-    }
-
-    HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::getGlobalAttribute(const std::string&)
-    {
-        return nullptr;
-    }
-
-    void HouGeoAdapter::getPointGroupNames(std::vector<std::string>& names) const
-    {
-        names.clear();
-    }
-
-    bool HouGeoAdapter::getPointGroupMembership(
-        const std::string&,
-        std::vector<bool>& membership) const
-    {
-        membership.clear();
-        return false;
-    }
-
-    void HouGeoAdapter::getVertexGroupNames(std::vector<std::string>& names) const
-    {
-        names.clear();
-    }
-
-    bool HouGeoAdapter::getVertexGroupMembership(
-        const std::string&,
-        std::vector<bool>& membership) const
-    {
-        membership.clear();
-        return false;
-    }
-
-    void HouGeoAdapter::getPrimitiveGroupNames(std::vector<std::string>& names) const
-    {
-        names.clear();
-    }
-
-    bool HouGeoAdapter::getPrimitiveGroupMembership(
-        const std::string&,
-        std::vector<bool>& membership) const
-    {
-        membership.clear();
-        return false;
-    }
-
-    bool HouGeoAdapter::hasPrimitiveAttributeLegacy(const std::string&) const
-    {
-        return false;
-    }
-
-    void HouGeoAdapter::getPrimitives(std::vector<Primitive::Ptr>& primitives)
-    {
-        primitives.clear();
-    }
-
-    HouGeoAdapter::Topology::Ptr HouGeoAdapter::getTopology()
     {
         return nullptr;
     }

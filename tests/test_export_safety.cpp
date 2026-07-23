@@ -21,37 +21,37 @@ public:
         dictionary_->append("label", label);
     }
 
-    std::string getName() const override
+    std::string name() const override
     {
         return "settings";
     }
 
-    Type getType() const override
+    Type type() const override
     {
         return ATTR_TYPE_DICT;
     }
 
-    int getTupleSize() const override
+    int tupleSize() const override
     {
         return 1;
     }
 
-    Storage getStorage() const override
+    Storage storage() const override
     {
         return ATTR_STORAGE_INT32;
     }
 
-    int getNumElements() const override
+    int elementCount() const override
     {
         return 1;
     }
 
-    std::string getString(int) const override
+    std::string stringValue(int) const override
     {
         return "";
     }
 
-    std::shared_ptr<houio::json::Object> getDictionary(int index) const override
+    std::shared_ptr<houio::json::Object> dictionaryValue(int index) const override
     {
         return index == 0 ? dictionary_ : std::shared_ptr<houio::json::Object>();
     }
@@ -68,22 +68,22 @@ public:
     {
     }
 
-    void getPrimitiveAttributeNames(std::vector<std::string>& names) const override
+    std::vector<std::string> primitiveAttributeNames() const override
     {
-        names.clear();
+        return {};
     }
 
-    AttributeAdapter::Ptr getPrimitiveAttribute(const std::string&) override
+    AttributeAdapter::Ptr primitiveAttribute(const std::string&) override
     {
-        return AttributeAdapter::Ptr();
+        return nullptr;
     }
 
-    void getGlobalAttributeNames(std::vector<std::string>& names) const override
+    std::vector<std::string> globalAttributeNames() const override
     {
-        names = {"settings"};
+        return {"settings"};
     }
 
-    AttributeAdapter::Ptr getGlobalAttribute(const std::string& name) override
+    AttributeAdapter::Ptr globalAttribute(const std::string& name) override
     {
         return name == "settings" ? attribute_ : AttributeAdapter::Ptr();
     }

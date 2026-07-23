@@ -29,112 +29,108 @@ namespace houio
             HouAttribute();
             HouAttribute(const std::string& name, Attribute::Ptr attribute);
 
-        private:
-            friend class HouGeo;
-
-            [[nodiscard]] std::string getName() const override;
-            [[nodiscard]] Type getType() const override;
-            [[nodiscard]] int getTupleSize() const override;
-            [[nodiscard]] Storage getStorage() const override;
-            void getPacking(std::vector<int>& packing) const override;
-            [[nodiscard]] int getNumElements() const override;
-            [[nodiscard]] std::string getString(int index) const override;
-            [[nodiscard]] std::shared_ptr<json::Object> getDictionary(int index) const override;
+            [[nodiscard]] std::string name() const override;
+            [[nodiscard]] Type type() const override;
+            [[nodiscard]] int tupleSize() const override;
+            [[nodiscard]] Storage storage() const override;
+            [[nodiscard]] std::vector<int> packing() const override;
+            [[nodiscard]] int elementCount() const override;
+            [[nodiscard]] std::string stringValue(int index) const override;
+            [[nodiscard]] std::shared_ptr<json::Object> dictionaryValue(int index) const override;
             [[nodiscard]] RawDataView rawData() const override;
 
-        public:
             int addString(const std::string& value);
 
             void setName(std::string name)
             {
-                m_name = std::move(name);
+                name_ = std::move(name);
             }
 
             void setTupleSize(int tuple_size)
             {
                 if (tuple_size <= 0)
                     throw std::invalid_argument("HouAttribute tuple size must be positive");
-                tupleSize = tuple_size;
+                tuple_size_ = tuple_size;
             }
 
             void setStorage(Storage storage) noexcept
             {
-                m_storage = storage;
+                storage_ = storage;
             }
 
             void setType(Type type) noexcept
             {
-                m_type = type;
+                type_ = type;
             }
 
             void setElementCount(int element_count)
             {
                 if (element_count < 0)
                     throw std::invalid_argument("HouAttribute element count cannot be negative");
-                numElements = element_count;
+                element_count_ = element_count;
             }
 
             void setNumericAttribute(Attribute::Ptr attribute)
             {
                 if (!attribute)
                     throw std::invalid_argument("HouAttribute numeric storage cannot be null");
-                m_attr = std::move(attribute);
-                tupleSize = m_attr->numComponents();
-                numElements = m_attr->numElements();
-                m_type = ATTR_TYPE_NUMERIC;
+                numeric_attribute_ = std::move(attribute);
+                tuple_size_ = numeric_attribute_->numComponents();
+                element_count_ = numeric_attribute_->numElements();
+                type_ = ATTR_TYPE_NUMERIC;
             }
 
             [[nodiscard]] Attribute::Ptr numericAttribute() noexcept
             {
-                return m_attr;
+                return numeric_attribute_;
             }
 
             [[nodiscard]] Attribute::CPtr numericAttribute() const noexcept
             {
-                return m_attr;
+                return numeric_attribute_;
             }
 
             void setStringValues(std::vector<std::string> values)
             {
-                strings = std::move(values);
-                dictionaries.clear();
-                m_attr.reset();
-                m_type = ATTR_TYPE_STRING;
-                m_storage = ATTR_STORAGE_INT32;
-                tupleSize = 1;
-                numElements = static_cast<int>(strings.size());
+                string_values_ = std::move(values);
+                dictionary_values_.clear();
+                numeric_attribute_.reset();
+                type_ = ATTR_TYPE_STRING;
+                storage_ = ATTR_STORAGE_INT32;
+                tuple_size_ = 1;
+                element_count_ = static_cast<int>(string_values_.size());
             }
 
             [[nodiscard]] const std::vector<std::string>& stringValues() const noexcept
             {
-                return strings;
+                return string_values_;
             }
 
             void setDictionaryValues(std::vector<json::ObjectPtr> values)
             {
-                dictionaries = std::move(values);
-                strings.clear();
-                m_attr.reset();
-                m_type = ATTR_TYPE_DICT;
-                m_storage = ATTR_STORAGE_INT32;
-                tupleSize = 1;
-                numElements = static_cast<int>(dictionaries.size());
+                dictionary_values_ = std::move(values);
+                string_values_.clear();
+                numeric_attribute_.reset();
+                type_ = ATTR_TYPE_DICT;
+                storage_ = ATTR_STORAGE_INT32;
+                tuple_size_ = 1;
+                element_count_ = static_cast<int>(dictionary_values_.size());
             }
 
             [[nodiscard]] const std::vector<json::ObjectPtr>& dictionaryValues() const noexcept
             {
-                return dictionaries;
+                return dictionary_values_;
             }
 
         private:
-            std::string m_name;
-            int tupleSize = 1;
-            Storage m_storage = ATTR_STORAGE_INVALID;
-            Type m_type = ATTR_TYPE_NUMERIC;
-            std::vector<std::string> strings;
-            std::vector<json::ObjectPtr> dictionaries;
-            int numElements = 0;
-            Attribute::Ptr m_attr;
+            std::string name_;
+            int tuple_size_ = 1;
+            Storage storage_ = ATTR_STORAGE_INVALID;
+            Type type_ = ATTR_TYPE_NUMERIC;
+            std::vector<std::string> string_values_;
+            std::vector<json::ObjectPtr> dictionary_values_;
+            int element_count_ = 0;
+            Attribute::Ptr numeric_attribute_;
 
             friend class HouGeo;
         };
@@ -147,12 +143,10 @@ namespace houio
 
             HouTopology();
 
-        private:
-            void getIndices(std::vector<int>& indices) const override;
-            void addIndices(const std::vector<int>& indices) override;
-            [[nodiscard]] sint64 getNumIndices() const override;
+            [[nodiscard]] std::vector<int> indexValues() const override;
+            void appendIndices(std::span<const int> indices) override;
+            [[nodiscard]] sint64 indexCount() const override;
 
-        public:
             void reserve(std::size_t index_count)
             {
                 indexBuffer.reserve(index_count);
@@ -185,17 +179,15 @@ namespace houio
             using Ptr = std::shared_ptr<HouVolume>;
             using ConstPtr = std::shared_ptr<const HouVolume>;
 
-        private:
-            [[nodiscard]] math::M44f getTransform() const override;
-            [[nodiscard]] int getVertex() const override;
-            [[nodiscard]] math::Vec3i getResolution() const override;
+            [[nodiscard]] math::M44f transform() const override;
+            [[nodiscard]] int topologyVertex() const override;
+            [[nodiscard]] math::Vec3i resolution() const override;
             [[nodiscard]] RawDataView rawData() const override;
-            [[nodiscard]] real32 getVoxel(int x, int y, int z) const override;
-            [[nodiscard]] std::string getVisualizationMode() const override;
-            [[nodiscard]] real32 getVisualizationIso() const override;
-            [[nodiscard]] real32 getVisualizationDensity() const override;
+            [[nodiscard]] real32 voxelValue(int x, int y, int z) const override;
+            [[nodiscard]] std::string visualizationMode() const override;
+            [[nodiscard]] real32 visualizationIso() const override;
+            [[nodiscard]] real32 visualizationDensity() const override;
 
-        public:
             void setField(ScalarField::Ptr scalar_field)
             {
                 if (!scalar_field)
@@ -244,13 +236,12 @@ namespace houio
             using Ptr = std::shared_ptr<HouPoly>;
             using ConstPtr = std::shared_ptr<const HouPoly>;
 
-        private:
-            [[nodiscard]] int numPolys() const override;
-            [[nodiscard]] int numVertices(int polygon_index) const override;
-            [[nodiscard]] const int* vertices(int polygon_index = 0) const override;
-            [[nodiscard]] bool closed() const override;
+            [[nodiscard]] int polygonCount() const override;
+            [[nodiscard]] int polygonVertexCount(int polygon_index) const override;
+            [[nodiscard]] std::span<const int> polygonVertexIndices(
+                int polygon_index = 0) const override;
+            [[nodiscard]] bool isClosed() const override;
 
-        public:
             void setPolygonData(
                 int polygon_count,
                 std::vector<int> vertex_counts,
@@ -305,35 +296,30 @@ namespace houio
         void addPrimitive(PolyPrimitive::Ptr polygon);
         void setTopology(HouTopology::Ptr topology);
 
-    private:
-        [[nodiscard]] sint64 pointcount() const override;
-        [[nodiscard]] sint64 vertexcount() const override;
-        [[nodiscard]] sint64 primitivecount() const override;
-        void getPointAttributeNames(std::vector<std::string>& names) const override;
-        [[nodiscard]] AttributeAdapter::Ptr getPointAttribute(const std::string& name) override;
-        void getVertexAttributeNames(std::vector<std::string>& names) const override;
-        [[nodiscard]] AttributeAdapter::Ptr getVertexAttribute(const std::string& name) override;
-        [[nodiscard]] bool hasPrimitiveAttributeLegacy(const std::string& name) const override;
-        void getPrimitiveAttributeNames(std::vector<std::string>& names) const override;
-        [[nodiscard]] AttributeAdapter::Ptr getPrimitiveAttribute(const std::string& name) override;
-        void getPrimitives(std::vector<Primitive::Ptr>& primitives) override;
-        void getGlobalAttributeNames(std::vector<std::string>& names) const override;
-        [[nodiscard]] AttributeAdapter::Ptr getGlobalAttribute(const std::string& name) override;
-        void getPointGroupNames(std::vector<std::string>& names) const override;
-        [[nodiscard]] bool getPointGroupMembership(
-            const std::string& name,
-            std::vector<bool>& membership) const override;
-        void getVertexGroupNames(std::vector<std::string>& names) const override;
-        [[nodiscard]] bool getVertexGroupMembership(
-            const std::string& name,
-            std::vector<bool>& membership) const override;
-        void getPrimitiveGroupNames(std::vector<std::string>& names) const override;
-        [[nodiscard]] bool getPrimitiveGroupMembership(
-            const std::string& name,
-            std::vector<bool>& membership) const override;
-        [[nodiscard]] Topology::Ptr getTopology() override;
+        [[nodiscard]] sint64 pointCount() const override;
+        [[nodiscard]] sint64 vertexCount() const override;
+        [[nodiscard]] sint64 primitiveCount() const override;
+        [[nodiscard]] std::vector<std::string> pointAttributeNames() const override;
+        [[nodiscard]] AttributeAdapter::Ptr pointAttribute(const std::string& name) override;
+        [[nodiscard]] std::vector<std::string> vertexAttributeNames() const override;
+        [[nodiscard]] AttributeAdapter::Ptr vertexAttribute(const std::string& name) override;
+        [[nodiscard]] bool hasPrimitiveAttribute(const std::string& name) const override;
+        [[nodiscard]] std::vector<std::string> primitiveAttributeNames() const override;
+        [[nodiscard]] AttributeAdapter::Ptr primitiveAttribute(const std::string& name) override;
+        [[nodiscard]] std::vector<Primitive::Ptr> primitives() override;
+        [[nodiscard]] std::vector<std::string> globalAttributeNames() const override;
+        [[nodiscard]] AttributeAdapter::Ptr globalAttribute(const std::string& name) override;
+        [[nodiscard]] std::vector<std::string> pointGroupNames() const override;
+        [[nodiscard]] std::optional<std::vector<bool>> pointGroupMembership(
+            const std::string& name) const override;
+        [[nodiscard]] std::vector<std::string> vertexGroupNames() const override;
+        [[nodiscard]] std::optional<std::vector<bool>> vertexGroupMembership(
+            const std::string& name) const override;
+        [[nodiscard]] std::vector<std::string> primitiveGroupNames() const override;
+        [[nodiscard]] std::optional<std::vector<bool>> primitiveGroupMembership(
+            const std::string& name) const override;
+        [[nodiscard]] Topology::Ptr topology() override;
 
-    public:
         struct SharedPrimitiveData
         {
             std::map<std::string, json::ObjectPtr> sharedVoxelData;
