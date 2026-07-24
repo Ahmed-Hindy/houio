@@ -65,11 +65,26 @@ namespace houio
 				case Token::JID_REAL32:
 				case Token::JID_REAL64:
 				case Token::JID_UINT8:
+				case Token::JID_UINT16:
 				case Token::JID_STRING:
 					return true;
 				default:
 					return false;
 				}
+			}
+
+			template<typename ValueAt>
+			std::vector<uint32> packBoolWords(size_t element_count, ValueAt value_at)
+			{
+				const size_t word_count = element_count / 32u
+					+ static_cast<size_t>(element_count % 32u != 0u);
+				std::vector<uint32> words(word_count, uint32{});
+				for (size_t index = 0; index < element_count; ++index)
+				{
+					if (value_at(index))
+						words[index / 32u] |= uint32{1} << (index % 32u);
+				}
+				return words;
 			}
 		}
 
@@ -88,6 +103,8 @@ namespace houio
 				parser.handler->jsonBeginMap();
 			else if (type == JID_MAP_END)
 				parser.handler->jsonEndMap();
+			else if (type == JID_NULL)
+				parser.handler->jsonNull();
 			else if (type == JID_STRING)
 			{
 				if (key)
@@ -129,6 +146,7 @@ namespace houio
 				case Token::JID_REAL32: parser.handler->uaReal32(element_count, parser); break;
 				case Token::JID_REAL64: parser.handler->uaReal64(element_count, parser); break;
 				case Token::JID_UINT8: parser.handler->uaUInt8(element_count, parser); break;
+				case Token::JID_UINT16: parser.handler->uaUInt16(element_count, parser); break;
 				case Token::JID_STRING: parser.handler->uaString(element_count, parser); break;
 				case Token::JID_NULL:
 				case Token::JID_MAP_BEGIN:
@@ -144,7 +162,6 @@ namespace houio
 				case Token::JID_KEY_SEPARATOR:
 				case Token::JID_VALUE_SEPARATOR:
 				case Token::JID_MAGIC:
-				case Token::JID_UINT16:
 				default:
 					parser.fail(
 						DiagnosticCategory::unsupported_input,
@@ -358,6 +375,7 @@ namespace houio
 				payloadBytes = count;
 				break;
 			case Token::JID_INT16:
+			case Token::JID_UINT16:
 			case Token::JID_REAL16:
 				payloadBytes = checkedPayloadSize(sizeof(uword));
 				break;
@@ -580,6 +598,7 @@ namespace houio
 
 			switch( t.type )
 			{
+			case Token::JID_NULL:
 			case Token::JID_ARRAY_BEGIN:
 			case Token::JID_ARRAY_END:
 			case Token::JID_MAP_BEGIN:
@@ -972,6 +991,11 @@ namespace houio
 			writeId( Token::JID_MAP_END);
 		}
 
+		void BinaryWriter::jsonNull()
+		{
+			writeId(Token::JID_NULL);
+		}
+
 		void BinaryWriter::jsonString( const std::string &value )
 		{
 			if( value.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
@@ -1051,6 +1075,34 @@ namespace houio
 			write<real64>(value );
 		}
 
+		bool BinaryWriter::writeBoolUniformArray(std::span<const bool> data)
+		{
+			if (data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
+				throw std::length_error("BinaryWriter::jsonUniformArray element count exceeds sint64 range");
+			const sint64 element_count = static_cast<sint64>(data.size());
+			const std::vector<uint32> words = packBoolWords(
+				data.size(),
+				[&data](size_t index) { return data[index]; });
+			return writeId(Token::JID_UNIFORM_ARRAY)
+				&& write<ubyte>(static_cast<ubyte>(Token::JID_BOOL))
+				&& writeLength(element_count)
+				&& write(std::span<const uint32>(words));
+		}
+
+		bool BinaryWriter::jsonUniformArray(const std::vector<bool>& data)
+		{
+			if (data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
+				throw std::length_error("BinaryWriter::jsonUniformArray element count exceeds sint64 range");
+			const sint64 element_count = static_cast<sint64>(data.size());
+			const std::vector<uint32> words = packBoolWords(
+				data.size(),
+				[&data](size_t index) { return data[index]; });
+			return writeId(Token::JID_UNIFORM_ARRAY)
+				&& write<ubyte>(static_cast<ubyte>(Token::JID_BOOL))
+				&& writeLength(element_count)
+				&& write(std::span<const uint32>(words));
+		}
+
 		bool BinaryWriter::jsonUniformArrayReal16(std::span<const uword> data)
 		{
 			if (data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
@@ -1124,6 +1176,12 @@ namespace houio
 			write( "}" );
 		}
 
+		void ASCIIWriter::jsonNull()
+		{
+			writePrefix();
+			write("null");
+		}
+
 		void ASCIIWriter::jsonString( const std::string &value )
 		{
 			writePrefix();
@@ -1146,13 +1204,13 @@ namespace houio
 		void ASCIIWriter::jsonUInt8( const ubyte &value )
 		{
 			writePrefix();
-			write( toString<ubyte>(value) );
+			write(toString<unsigned int>(value));
 		}
 
 		void ASCIIWriter::jsonInt8( const sbyte &value )
 		{
 			writePrefix();
-			write( toString<sbyte>(value) );
+			write(toString<int>(value));
 		}
 
 		void ASCIIWriter::jsonInt32( const sint32 &value )
@@ -1587,6 +1645,24 @@ namespace houio
 			popContainer();
 		}
 
+		void JSONReader::jsonNull()
+		{
+			const Value null_value;
+			if (root_.isArray())
+			{
+				root_.asArray()->append(null_value);
+			}
+			else if (root_.isObject())
+			{
+				root_.asObject()->append(next_key_, null_value);
+				next_key_.clear();
+			}
+			else if (!(root_.isNull() && stack_.empty()))
+			{
+				throw std::runtime_error("JSONReader::jsonNull has no active container");
+			}
+		}
+
 		void JSONReader::jsonKey(const std::string& key)
 		{
 			if (!root_.isObject())
@@ -1686,6 +1762,11 @@ namespace houio
 			jsonUniformArray<ubyte, ubyte>(element_count, parser);
 		}
 
+		void JSONReader::uaUInt16(sint64 element_count, Parser& parser)
+		{
+			jsonUniformArray<sint32, uword>(element_count, parser);
+		}
+
 		void JSONReader::uaString(sint64 element_count, Parser& parser)
 		{
 			if (element_count < 0)
@@ -1719,28 +1800,42 @@ namespace houio
 			if (!array)
 				throw std::invalid_argument("JSONWriter::write received a null array");
 			writer_->jsonBeginArray();
-			for (const Value& value : array->elements())
+			if (array->isUniform())
 			{
-				Value writable_value = value;
-				write(writable_value);
+				const sint64 element_count = array->size();
+				if (element_count > static_cast<sint64>(std::numeric_limits<int>::max()))
+					throw std::length_error("JSONWriter uniform-array index exceeds int range");
+				for (int index = 0; index < static_cast<int>(element_count); ++index)
+				{
+					Value writable_value = array->value(index);
+					write(writable_value);
+				}
+			}
+			else
+			{
+				for (const Value& value : array->elements())
+				{
+					Value writable_value = value;
+					write(writable_value);
+				}
 			}
 			writer_->jsonEndArray();
 			return true;
 		}
 
-		bool JSONWriter::write( Value &value )
+		bool JSONWriter::write(Value& value)
 		{
-			if( value.isArray() )
-				return write( value.asArray() );
-			else
-			if( value.isObject() )
-				return write( value.asObject() );
-			else
-			if( !value.isNull() )
+			if (value.isArray())
+				return write(value.asArray());
+			if (value.isObject())
+				return write(value.asObject());
+			if (value.isNull())
 			{
-				std::visit(*this, value.variant());
+				writer_->jsonNull();
+				return true;
 			}
-			return false;
+			std::visit(*this, value.variant());
+			return true;
 		}
 
 	}
