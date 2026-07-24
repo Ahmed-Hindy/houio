@@ -150,24 +150,24 @@ int verifyPolygon(const houio::HouGeoAdapter::PolyPrimitive::Ptr& polygon, bool 
     {
         return fail("polygon primitive is null");
     }
-    if (polygon->closed() != expectedClosed)
+    if (polygon->isClosed() != expectedClosed)
     {
         return fail("polygon closed state was not preserved");
     }
-    if (polygon->numPolys() != static_cast<int>(expectedPointIndices.size()))
+    if (polygon->polygonCount() != static_cast<int>(expectedPointIndices.size()))
     {
         return fail("unexpected polygon count");
     }
 
-    for (int polygonIndex = 0; polygonIndex < polygon->numPolys(); ++polygonIndex)
+    for (int polygonIndex = 0; polygonIndex < polygon->polygonCount(); ++polygonIndex)
     {
         const std::vector<int>& expected = expectedPointIndices[static_cast<size_t>(polygonIndex)];
-        if (polygon->numVertices(polygonIndex) != static_cast<int>(expected.size()))
+        if (polygon->polygonVertexCount(polygonIndex) != static_cast<int>(expected.size()))
         {
             return fail("unexpected polygon vertex count");
         }
 
-        const int* actual = polygon->vertices(polygonIndex);
+        const std::span<const int> actual = polygon->polygonVertexIndices(polygonIndex);
         for (size_t vertexIndex = 0; vertexIndex < expected.size(); ++vertexIndex)
         {
             if (actual[vertexIndex] != expected[vertexIndex])
@@ -183,14 +183,13 @@ int verifyPolygon(const houio::HouGeoAdapter::PolyPrimitive::Ptr& polygon, bool 
 
 int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
 {
-    if (!geometry || geometry->pointcount() != 4 || geometry->vertexcount() != 6
-        || geometry->primitivecount() != 2)
+    if (!geometry || geometry->pointCount() != 4 || geometry->vertexCount() != 6
+        || geometry->primitiveCount() != 2)
     {
         return fail("mixed polygon counts are incorrect");
     }
 
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
-    geometry->getPrimitives(primitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
     if (primitives.size() != 1)
     {
         return fail("mixed polygon run was not grouped into one primitive adapter");
@@ -202,46 +201,45 @@ int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
         return result;
     }
 
-    const auto fixture = geometry->getGlobalAttribute("fixture");
-    if (!fixture || fixture->getString(0) != "polygon_runs")
+    const auto fixture = geometry->globalAttribute("fixture");
+    if (!fixture || fixture->stringValue(0) != "polygon_runs")
     {
         return fail("global string attribute was not preserved");
     }
 
-    const auto version = geometry->getGlobalAttribute("version");
-    if (!version || version->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32)
+    const auto version = geometry->globalAttribute("version");
+    if (!version || version->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::int32)
     {
         return fail("global integer attribute metadata was not preserved");
     }
-    const houio::HouGeoAdapter::RawPointer::Ptr versionPointer = version->getRawPointer();
-    if (!versionPointer || !versionPointer->ptr)
+    const houio::HouGeoAdapter::RawDataView version_data = version->rawData();
+    if (!version_data.available())
     {
         return fail("global integer attribute data is unavailable");
     }
-    const auto* versionData = static_cast<const houio::sint32*>(versionPointer->ptr);
-    if (versionData[0] != 22)
+    if (version_data.read<houio::sint32>(0) != 22)
     {
         return fail("global integer attribute value was not preserved");
     }
 
-    const auto emptyValue = geometry->getGlobalAttribute("empty_value");
-    if (!emptyValue || emptyValue->getString(0) != "")
+    const auto emptyValue = geometry->globalAttribute("empty_value");
+    if (!emptyValue || emptyValue->stringValue(0) != "")
     {
         return fail("empty global string attribute was not preserved");
     }
 
     const auto settings = std::dynamic_pointer_cast<houio::HouGeo::HouAttribute>(
-        geometry->getGlobalAttribute("settings"));
-    if (!settings || settings->getType() != houio::HouGeoAdapter::AttributeAdapter::ATTR_TYPE_DICT
-        || settings->dictionaries.size() != 1)
+        geometry->globalAttribute("settings"));
+    if (!settings || settings->type() != houio::HouGeoAdapter::AttributeAdapter::Type::dictionary
+        || settings->dictionaryValues().size() != 1)
     {
         return fail("global dictionary attribute metadata was not preserved");
     }
-    const auto dictionary = settings->dictionaries.front();
-    const auto emptySetting = dictionary->getObject("empty");
-    const auto countSetting = dictionary->getObject("count");
-    const auto rangeSetting = dictionary->getObject("range");
-    const auto rangeValues = rangeSetting ? rangeSetting->getArray("value") : houio::json::ArrayPtr();
+    const auto dictionary = settings->dictionaryValues().front();
+    const auto emptySetting = dictionary->object("empty");
+    const auto countSetting = dictionary->object("count");
+    const auto rangeSetting = dictionary->object("range");
+    const auto rangeValues = rangeSetting ? rangeSetting->array("value") : houio::json::ArrayPtr();
     if (!emptySetting || emptySetting->get<std::string>("value") != ""
         || !countSetting || countSetting->get<int>("value") != 3
         || !rangeValues || rangeValues->size() != 2
@@ -254,14 +252,13 @@ int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
 
 int verifyOpenGeometry(const houio::HouGeo::Ptr& geometry)
 {
-    if (!geometry || geometry->pointcount() != 4 || geometry->vertexcount() != 4
-        || geometry->primitivecount() != 1)
+    if (!geometry || geometry->pointCount() != 4 || geometry->vertexCount() != 4
+        || geometry->primitiveCount() != 1)
     {
         return fail("open polygon counts are incorrect");
     }
 
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
-    geometry->getPrimitives(primitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
     if (primitives.size() != 1)
     {
         return fail("open polygon run was not imported");
@@ -275,20 +272,20 @@ template <typename Verifier>
 int verifyRoundtrip(const char* sourceText, Verifier verifier)
 {
     std::istringstream source(sourceText);
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&source);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(source);
     if (const int result = verifier(geometry); result != 0)
     {
         return result;
     }
 
     std::ostringstream binaryOutput(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::xport(&binaryOutput, geometry, true))
+    if (!houio::HouGeoIO::exportGeometry(binaryOutput, geometry, true))
     {
         return fail("failed to export polygon-run geometry");
     }
 
     std::istringstream binaryInput(binaryOutput.str(), std::ios::in | std::ios::binary);
-    return verifier(houio::HouGeoIO::import(&binaryInput));
+    return verifier(houio::HouGeoIO::import(binaryInput));
 }
 }
 

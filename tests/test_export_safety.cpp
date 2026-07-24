@@ -21,37 +21,37 @@ public:
         dictionary_->append("label", label);
     }
 
-    std::string getName() const override
+    std::string name() const override
     {
         return "settings";
     }
 
-    Type getType() const override
+    Type type() const override
     {
-        return ATTR_TYPE_DICT;
+        return Type::dictionary;
     }
 
-    int getTupleSize() const override
-    {
-        return 1;
-    }
-
-    Storage getStorage() const override
-    {
-        return ATTR_STORAGE_INT32;
-    }
-
-    int getNumElements() const override
+    int tupleSize() const override
     {
         return 1;
     }
 
-    std::string getString(int) const override
+    Storage storage() const override
+    {
+        return Storage::int32;
+    }
+
+    int elementCount() const override
+    {
+        return 1;
+    }
+
+    std::string stringValue(int) const override
     {
         return "";
     }
 
-    std::shared_ptr<houio::json::Object> getDictionary(int index) const override
+    std::shared_ptr<houio::json::Object> dictionaryValue(int index) const override
     {
         return index == 0 ? dictionary_ : std::shared_ptr<houio::json::Object>();
     }
@@ -68,22 +68,22 @@ public:
     {
     }
 
-    void getPrimitiveAttributeNames(std::vector<std::string>& names) const override
+    std::vector<std::string> primitiveAttributeNames() const override
     {
-        names.clear();
+        return {};
     }
 
-    AttributeAdapter::Ptr getPrimitiveAttribute(const std::string&) override
+    AttributeAdapter::Ptr primitiveAttribute(const std::string&) override
     {
-        return AttributeAdapter::Ptr();
+        return nullptr;
     }
 
-    void getGlobalAttributeNames(std::vector<std::string>& names) const override
+    std::vector<std::string> globalAttributeNames() const override
     {
-        names = {"settings"};
+        return {"settings"};
     }
 
-    AttributeAdapter::Ptr getGlobalAttribute(const std::string& name) override
+    AttributeAdapter::Ptr globalAttribute(const std::string& name) override
     {
         return name == "settings" ? attribute_ : AttributeAdapter::Ptr();
     }
@@ -140,54 +140,44 @@ houio::HouGeo::Ptr createInvalidPointGeometry()
 bool roundtripOnce(const houio::HouGeoAdapter::Ptr& source)
 {
     std::ostringstream output(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::exportGeometry(&output, source, true))
-    {
+    if (!houio::HouGeoIO::exportGeometry(output, source, true))
         return false;
-    }
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
-    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(&input);
-    return imported && imported->pointcount() == 4 && imported->vertexcount() == 0
-           && imported->primitivecount() == 0;
+    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
+    return imported && imported->pointCount() == 4 && imported->vertexCount() == 0
+           && imported->primitiveCount() == 0;
 }
 
 int verifyAdapterDictionaryExport()
 {
     auto source = std::make_shared<DictionaryGeometryAdapter>();
     std::ostringstream output(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::exportGeometry(&output, source, true))
+    if (!houio::HouGeoIO::exportGeometry(output, source, true))
         return fail("abstract adapter dictionary export failed");
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
-    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(&input);
-    auto attribute = imported ? imported->getGlobalAttribute("settings")
+    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
+    auto attribute = imported ? imported->globalAttribute("settings")
                               : houio::HouGeoAdapter::AttributeAdapter::Ptr();
-    auto dictionary = attribute ? attribute->getDictionary(0)
+    auto dictionary = attribute ? attribute->dictionaryValue(0)
                                 : std::shared_ptr<houio::json::Object>();
-    auto label = dictionary ? dictionary->getObject("label")
+    auto label = dictionary ? dictionary->object("label")
                             : std::shared_ptr<houio::json::Object>();
     if (!label || label->get<std::string>("value") != "adapter")
         return fail("abstract adapter dictionary value changed during export");
     return 0;
 }
 
-int verifyCompatibilityWrapper(const houio::HouGeoAdapter::Ptr& validGeometry)
+int verifyReferenceStreamApi(const houio::HouGeoAdapter::Ptr& validGeometry)
 {
-    std::ostringstream preferredOutput(std::ios::out | std::ios::binary);
-    std::ostringstream compatibilityOutput(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::exportGeometry(&preferredOutput, validGeometry, true)
-        || !houio::HouGeoIO::xport(&compatibilityOutput, validGeometry, true))
+    std::ostringstream output(std::ios::out | std::ios::binary);
+    if (!houio::HouGeoIO::exportGeometry(output, validGeometry, true))
+        return fail("reference-based export API failed");
+    if (houio::HouGeoIO::exportGeometry(
+            output, houio::HouGeoAdapter::Ptr(), true))
     {
-        return fail("preferred or compatibility export API failed");
-    }
-    if (preferredOutput.str() != compatibilityOutput.str())
-    {
-        return fail("xport compatibility wrapper changed the exported bytes");
-    }
-    if (houio::HouGeoIO::exportGeometry(nullptr, validGeometry, true)
-        || houio::HouGeoIO::exportGeometry(&preferredOutput, houio::HouGeoAdapter::Ptr(), true))
-    {
-        return fail("exportGeometry accepted a null stream or geometry");
+        return fail("exportGeometry accepted a null geometry");
     }
     return 0;
 }
@@ -197,7 +187,8 @@ int verifyExceptionRecovery(const houio::HouGeoAdapter::Ptr& validGeometry)
     std::ostringstream invalidOutput(std::ios::out | std::ios::binary);
     try
     {
-        houio::HouGeoIO::xport(&invalidOutput, createInvalidPointGeometry(), true);
+        static_cast<void>(houio::HouGeoIO::exportGeometry(
+            invalidOutput, createInvalidPointGeometry(), true));
         return fail("invalid P attribute did not raise an exception");
     }
     catch (const std::runtime_error&)
@@ -214,7 +205,7 @@ int verifyExceptionRecovery(const houio::HouGeoAdapter::Ptr& validGeometry)
 int verifyAsciiRejection(const houio::HouGeoAdapter::Ptr& validGeometry)
 {
     std::ostringstream output;
-    if (houio::HouGeoIO::xport(&output, validGeometry, false))
+    if (houio::HouGeoIO::exportGeometry(output, validGeometry, false))
     {
         return fail("ASCII geometry export unexpectedly succeeded");
     }
@@ -229,7 +220,7 @@ int verifyOutputFailure(const houio::HouGeoAdapter::Ptr& validGeometry)
 {
     RejectingStreamBuffer streamBuffer;
     std::ostream output(&streamBuffer);
-    if (houio::HouGeoIO::xport(&output, validGeometry, true))
+    if (houio::HouGeoIO::exportGeometry(output, validGeometry, true))
     {
         return fail("export did not report a failed output stream");
     }
@@ -244,13 +235,13 @@ int verifyNegativeTopologyRejection(const houio::HouGeoAdapter::Ptr& validGeomet
 {
     houio::HouGeo::Ptr geometry = createPointGeometry();
     houio::HouGeo::HouTopology::Ptr topology = std::make_shared<houio::HouGeo::HouTopology>();
-    topology->indexBuffer.push_back(-1);
+    topology->appendIndex(-1);
     geometry->setTopology(topology);
 
     std::ostringstream output(std::ios::out | std::ios::binary);
     try
     {
-        houio::HouGeoIO::xport(&output, geometry, true);
+        static_cast<void>(houio::HouGeoIO::exportGeometry(output, geometry, true));
         return fail("export accepted a negative topology index");
     }
     catch (const std::runtime_error&)
@@ -313,7 +304,7 @@ int main()
     {
         return result;
     }
-    if (const int result = verifyCompatibilityWrapper(validGeometry); result != 0)
+    if (const int result = verifyReferenceStreamApi(validGeometry); result != 0)
     {
         return result;
     }

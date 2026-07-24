@@ -1,208 +1,156 @@
-/*---------------------------------------------------------------------
-
-simple vector class
-
-----------------------------------------------------------------------*/
 #pragma once
 
 #include <cmath>
-#include <iostream>
+#include <cstddef>
+#include <ostream>
+#include <stdexcept>
 #include <type_traits>
 
-namespace houio
+namespace houio::math
 {
-
-namespace math
-{
-	///
-	/// \brief simple vector class
-	///
-	template<typename T>
-	struct Vec2
-	{
-        Vec2( );
-        Vec2( const T &x, const T &y );
-		Vec2( const T &xy );
-		~Vec2( );
-
-		T                                    getLength( void )const; ///< returns the cartesian length of the vector
-		T                             getSquaredLength( void )const; ///< returns the un-square-rooted length of the vector 
-		void                          setLength( const T &fLength ); ///< scales the vector to the specified length
-		void                                      normalize( void ); ///< normalizes the vector
-		Vec2<T>                            normalized( void ) const; ///< returnes normalized version if this the vector
-		void                                         negate( void ); ///< negates the vector
-
-		//void                       reflect( const Vec2<T> &normal ); ///< reflects the vector at the given normal
-
-
-
-		bool                       operator==( const Vec2<T> &rhs ) const;
-		bool                       operator!=( const Vec2<T> &rhs ) const;
-		
-		bool                       operator+=( const Vec2<T> &rhs );
-		bool                       operator-=( const Vec2<T> &rhs );
-
-		bool                             operator+=( const T &rhs );
-		bool                             operator-=( const T &rhs );
-		bool                             operator*=( const T &rhs );
-		bool                             operator/=( const T &rhs );
-
-		const T&                          operator[]( int i ) const;
-		T&                                      operator[]( int i );
-
-		union
-		{
-			struct
-			{
-				T x, y;
-			};
-			T v[2];
-		};
-	};
-
-
-	template<typename T>
-	Vec2<T>::Vec2()
-	{
-        x=(T)0.0; y=(T)0.0;
-    }
-
-	template<typename T>
-	Vec2<T>::Vec2( const T &x, const T &y )
+    template<typename T>
+    struct Vec2
     {
-        this->x=x; this->y=y;
+        T x{};
+        T y{};
+
+        constexpr Vec2() noexcept = default;
+        constexpr Vec2(const T& x_value, const T& y_value) noexcept
+            : x(x_value), y(y_value)
+        {
+        }
+        explicit constexpr Vec2(const T& value) noexcept
+            : x(value), y(value)
+        {
+        }
+
+        [[nodiscard]] T length() const
+        {
+            using std::sqrt;
+            return static_cast<T>(sqrt(x * x + y * y));
+        }
+
+        [[nodiscard]] constexpr T squaredLength() const noexcept
+        {
+            return x * x + y * y;
+        }
+
+        void setLength(const T& length)
+        {
+            normalize();
+            x *= length;
+            y *= length;
+        }
+
+        void normalize()
+        {
+            const T length = this->length();
+            if (length != T{})
+            {
+                x /= length;
+                y /= length;
+            }
+        }
+
+        [[nodiscard]] Vec2 normalized() const
+        {
+            const T length = this->length();
+            return length == T{} ? Vec2{} : Vec2(x / length, y / length);
+        }
+
+        constexpr void negate() noexcept
+        {
+            x = -x;
+            y = -y;
+        }
+
+        [[nodiscard]] constexpr bool operator==(const Vec2& rhs) const noexcept
+        {
+            if constexpr (std::is_floating_point_v<T>)
+            {
+                constexpr T tolerance = static_cast<T>(0.00001);
+                return std::abs(x - rhs.x) < tolerance
+                    && std::abs(y - rhs.y) < tolerance;
+            }
+            return x == rhs.x && y == rhs.y;
+        }
+
+        [[nodiscard]] constexpr bool operator!=(const Vec2& rhs) const noexcept
+        {
+            return !(*this == rhs);
+        }
+
+        constexpr Vec2& operator+=(const Vec2& rhs) noexcept
+        {
+            x += rhs.x;
+            y += rhs.y;
+            return *this;
+        }
+
+        constexpr Vec2& operator-=(const Vec2& rhs) noexcept
+        {
+            x -= rhs.x;
+            y -= rhs.y;
+            return *this;
+        }
+
+        constexpr Vec2& operator+=(const T& rhs) noexcept
+        {
+            x += rhs;
+            y += rhs;
+            return *this;
+        }
+
+        constexpr Vec2& operator-=(const T& rhs) noexcept
+        {
+            x -= rhs;
+            y -= rhs;
+            return *this;
+        }
+
+        constexpr Vec2& operator*=(const T& rhs) noexcept
+        {
+            x *= rhs;
+            y *= rhs;
+            return *this;
+        }
+
+        constexpr Vec2& operator/=(const T& rhs)
+        {
+            x /= rhs;
+            y /= rhs;
+            return *this;
+        }
+
+        [[nodiscard]] constexpr const T& operator[](std::size_t index) const
+        {
+            if (index == 0)
+                return x;
+            if (index == 1)
+                return y;
+            throw std::out_of_range("Vec2 index is out of range");
+        }
+
+        [[nodiscard]] constexpr T& operator[](std::size_t index)
+        {
+            if (index == 0)
+                return x;
+            if (index == 1)
+                return y;
+            throw std::out_of_range("Vec2 index is out of range");
+        }
+    };
+
+    template<typename T>
+    std::ostream& operator<<(std::ostream& stream, const Vec2<T>& value)
+    {
+        return stream << '(' << value.x << ' ' << value.y << ')';
     }
 
-	template<typename T>
-	Vec2<T>::Vec2( const T &xyz ) : x(xyz), y(xyz)
-	{
-	}
-
-	template<typename T>
-	Vec2<T>::~Vec2( )
-	{
-	}
-	
-	///< returnes normalized version if this the vector
-	template<typename T>
-	Vec2<T> Vec2<T>::normalized( void ) const
-	{
-		T length = getLength();
-
-		if( length != (T)0.0 )
-			return Vec2<T>(x/length, y/length);
-		else
-			return Vec2<T>((T)0.0, (T)0.0);
-	}
-
-	template<typename T>
-	void Vec2<T>::negate( void )
-	{
-		x=-x; y=-y;
-	}
-	template<typename T>
-	bool Vec2<T>::operator==( const Vec2<T> &rhs ) const
-	{
-		if constexpr( std::is_floating_point_v<T> )
-		{
-			constexpr T tolerance = static_cast<T>(0.00001);
-			return std::abs(x - rhs.x) < tolerance && std::abs(y - rhs.y) < tolerance;
-		}
-		return x == rhs.x && y == rhs.y;
-	}
-
-	template<typename T>
-	bool Vec2<T>::operator!=( const Vec2<T> &rhs ) const
-	{
-		return !((*this)==rhs);
-	}
-	
-	template<typename T>
-	bool Vec2<T>::operator+=( const Vec2<T> &rhs )
-	{
-		x+=rhs.x;
-		y+=rhs.y;
-
-		return true;
-	}
-
-	template<typename T>
-	bool Vec2<T>::operator-=( const Vec2<T> &rhs )
-	{
-		x-=rhs.x;
-		y-=rhs.y;
-
-		return true;
-	}
-
-	template<typename T>
-	bool Vec2<T>::operator+=( const T &rhs )
-	{
-		x+=rhs;
-		y+=rhs;
-
-		return true;
-	}
-
-	template<typename T>
-	bool Vec2<T>::operator-=( const T &rhs )
-	{
-		x-=rhs;
-		y-=rhs;
-
-		return true; 
-	}
-
-	template<typename T>
-	bool Vec2<T>::operator*=( const T &rhs )
-	{
-		x*=rhs;
-		y*=rhs;
-
-		return true;
-	}
-
-	template<typename T>
-	bool Vec2<T>::operator/=( const T &rhs )
-	{
-		x/=rhs;
-		y/=rhs;
-
-		return true; 
-	}
-
-	template<typename T>
-	const T& Vec2<T>::operator[]( int i ) const
-	{
-		return v[i];
-	}
-
-	template<typename T>
-	T& Vec2<T>::operator[]( int i )
-	{
-		return v[i];
-	}
-
-
-	// stream output
-	template <class T>
-	std::ostream &
-	operator << (std::ostream &s, const Vec2<T> &v)
-	{
-		return s << '(' << v.x << ' ' << v.y << ')';
-	}
-
-
-
-
-	// shortcuts
-	typedef Vec2<float> Vec2f;
-	typedef Vec2<double> Vec2d;
-	typedef Vec2<int> Vec2i;
-	typedef Vec2<float> V2f;
-	typedef Vec2<double> V2d;
-	typedef Vec2<int> V2i;
-	
+    using Vec2f = Vec2<float>;
+    using Vec2d = Vec2<double>;
+    using Vec2i = Vec2<int>;
+    using V2f = Vec2<float>;
+    using V2d = Vec2<double>;
+    using V2i = Vec2<int>;
 }
-
-} // namespace houio

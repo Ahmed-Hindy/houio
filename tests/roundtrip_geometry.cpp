@@ -43,9 +43,9 @@ int runRoundtrip(const std::string &inputPath, const std::string &outputPath)
         return fail("HouIO failed to write output file: " + outputPath);
     }
 
-    std::cout << "points=" << readResult.value->pointcount() << '\n';
-    std::cout << "vertices=" << readResult.value->vertexcount() << '\n';
-    std::cout << "primitives=" << readResult.value->primitivecount() << '\n';
+    std::cout << "points=" << readResult.value->pointCount() << '\n';
+    std::cout << "vertices=" << readResult.value->vertexCount() << '\n';
+    std::cout << "primitives=" << readResult.value->primitiveCount() << '\n';
     return 0;
 }
 }

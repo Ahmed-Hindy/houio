@@ -261,7 +261,7 @@ namespace houio
         std::istringstream input(parserStorage, std::ios::in | std::ios::binary);
         try
         {
-            result.value = HouGeoIO::import(&input, options.parserLimits, &result.diagnostics);
+            result.value = HouGeoIO::import(input, options.parserLimits, &result.diagnostics);
             result.succeeded = static_cast<bool>(result.value);
         }
         catch( const DiagnosticException &exception )
@@ -285,8 +285,8 @@ namespace houio
         if( !houGeoResult.value )
             return result;
 
-        std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
-        houGeoResult.value->getPrimitives(primitives);
+        const std::vector<HouGeoAdapter::Primitive::Ptr> primitives =
+            houGeoResult.value->primitives();
         if( primitives.empty() )
         {
             result.value = HouGeoIO::convertToGeometry(
@@ -335,8 +335,8 @@ namespace houio
         if( !houGeoResult )
             return result;
 
-        std::vector<HouGeoAdapter::Primitive::Ptr> primitives;
-        houGeoResult.value->getPrimitives(primitives);
+        const std::vector<HouGeoAdapter::Primitive::Ptr> primitives =
+            houGeoResult.value->primitives();
         if( primitives.empty() )
         {
             appendResultError(result.diagnostics, DiagnosticCategory::schema,
@@ -357,7 +357,7 @@ namespace houio
                 result.value.clear();
                 return result;
             }
-            result.value.push_back(volume->field);
+            result.value.push_back(volume->scalarField());
         }
         result.succeeded = true;
         return result;
@@ -397,7 +397,7 @@ namespace houio
         try
         {
             std::ostringstream rawOutput(std::ios::out | std::ios::binary);
-            if( !HouGeoIO::exportGeometry(&rawOutput, geometry, true) )
+            if( !HouGeoIO::exportGeometry(rawOutput, geometry, true) )
             {
                 appendResultError(result.diagnostics, DiagnosticCategory::io,
                     "HouIO failed to serialize geometry");

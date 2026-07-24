@@ -50,14 +50,13 @@ std::string identityTransform()
 houio::HouGeo::HouVolume::Ptr importVolume(const std::string& source, houio::DiagnosticList* diagnostics)
 {
     std::istringstream input(source);
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input, diagnostics);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(input, diagnostics);
     if (!geometry)
     {
         return houio::HouGeo::HouVolume::Ptr();
     }
 
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
-    geometry->getPrimitives(primitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
     if (primitives.size() != 1)
     {
         return houio::HouGeo::HouVolume::Ptr();
@@ -76,12 +75,12 @@ int verifyConstantArray()
     {
         return fail("constant volume did not import cleanly");
     }
-    const houio::math::V3i resolution = volume->getResolution();
+    const houio::math::V3i resolution = volume->resolution();
     if (resolution.x != 2 || resolution.y != 2 || resolution.z != 2)
     {
         return fail("constant volume resolution was not preserved");
     }
-    if (volume->getVertex() != 0)
+    if (volume->topologyVertex() != 0)
     {
         return fail("constant volume topology vertex was not preserved");
     }
@@ -91,7 +90,7 @@ int verifyConstantArray()
         {
             for (int x = 0; x < 2; ++x)
             {
-                if (std::abs(volume->getVoxel(x, y, z) - 3.25f) > 1.0e-6f)
+                if (std::abs(volume->voxelValue(x, y, z) - 3.25f) > 1.0e-6f)
                 {
                     return fail("constant volume value mismatch");
                 }
@@ -134,12 +133,12 @@ int verifyBoundaryTiles()
     }
     for (int x = 0; x < 16; ++x)
     {
-        if (std::abs(volume->getVoxel(x, 0, 0) - static_cast<float>(x)) > 1.0e-6f)
+        if (std::abs(volume->voxelValue(x, 0, 0) - static_cast<float>(x)) > 1.0e-6f)
         {
             return fail("raw boundary tile value mismatch");
         }
     }
-    if (std::abs(volume->getVoxel(16, 0, 0) - 42.0f) > 1.0e-6f)
+    if (std::abs(volume->voxelValue(16, 0, 0) - 42.0f) > 1.0e-6f)
     {
         return fail("constant boundary tile value mismatch");
     }
@@ -180,19 +179,19 @@ int verifyBinaryRoundTrip()
         {
             for (int x = 0; x < resolution.x; ++x)
             {
-                sourceField->lvalue(x, y, z) = static_cast<float>(x + y * 100 + z * 1000);
+                sourceField->voxel(x, y, z) = static_cast<float>(x + y * 100 + z * 1000);
             }
         }
     }
 
-    const houio::math::M44f sourceTransform = houio::math::M44f::ScaleMatrix(2.0f, 3.0f, 4.0f)
-        * houio::math::M44f::TranslationMatrix(5.0f, 6.0f, 7.0f);
+    const houio::math::M44f sourceTransform = houio::math::M44f::scaleMatrix(2.0f, 3.0f, 4.0f)
+        * houio::math::M44f::translationMatrix(5.0f, 6.0f, 7.0f);
     sourceField->setLocalToWorld(sourceTransform);
 
     houio::HouGeo::Ptr sourceGeometry = houio::HouGeo::create();
     sourceGeometry->addPrimitive(sourceField);
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> sourcePrimitives;
-    sourceGeometry->getPrimitives(sourcePrimitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> sourcePrimitives =
+        sourceGeometry->primitives();
     houio::HouGeo::HouVolume::Ptr sourceVolume = sourcePrimitives.size() == 1
         ? std::dynamic_pointer_cast<houio::HouGeo::HouVolume>(sourcePrimitives.front())
         : houio::HouGeo::HouVolume::Ptr();
@@ -200,12 +199,10 @@ int verifyBinaryRoundTrip()
     {
         return fail("volume source primitive was not created");
     }
-    sourceVolume->visualizationMode = "iso";
-    sourceVolume->visualizationIso = 0.125f;
-    sourceVolume->visualizationDensity = 0.75f;
+    sourceVolume->setVisualization("iso", 0.125f, 0.75f);
 
     std::ostringstream output(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::xport(&output, sourceGeometry))
+    if (!houio::HouGeoIO::exportGeometry(output, sourceGeometry))
     {
         return fail("volume binary export failed");
     }
@@ -220,29 +217,29 @@ int verifyBinaryRoundTrip()
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
     houio::DiagnosticList diagnostics;
-    houio::HouGeo::Ptr importedGeometry = houio::HouGeoIO::import(&input, &diagnostics);
+    houio::HouGeo::Ptr importedGeometry = houio::HouGeoIO::import(input, &diagnostics);
     if (!importedGeometry || !diagnostics.empty())
     {
         return fail("volume binary re-import failed");
     }
 
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
-    importedGeometry->getPrimitives(primitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives =
+        importedGeometry->primitives();
     houio::HouGeo::HouVolume::Ptr importedVolume = primitives.size() == 1
         ? std::dynamic_pointer_cast<houio::HouGeo::HouVolume>(primitives.front())
         : houio::HouGeo::HouVolume::Ptr();
-    if (!importedVolume || importedVolume->getVertex() != 0)
+    if (!importedVolume || importedVolume->topologyVertex() != 0)
     {
         return fail("volume binary round-trip lost primitive metadata");
     }
-    if (importedVolume->getVisualizationMode() != "iso"
-        || std::abs(importedVolume->getVisualizationIso() - 0.125f) > 1.0e-6f
-        || std::abs(importedVolume->getVisualizationDensity() - 0.75f) > 1.0e-6f)
+    if (importedVolume->visualizationMode() != "iso"
+        || std::abs(importedVolume->visualizationIso() - 0.125f) > 1.0e-6f
+        || std::abs(importedVolume->visualizationDensity() - 0.75f) > 1.0e-6f)
     {
         return fail("volume binary round-trip lost visualization metadata");
     }
 
-    const houio::math::V3i importedResolution = importedVolume->getResolution();
+    const houio::math::V3i importedResolution = importedVolume->resolution();
     if (importedResolution.x != resolution.x || importedResolution.y != resolution.y
         || importedResolution.z != resolution.z)
     {
@@ -254,7 +251,7 @@ int verifyBinaryRoundTrip()
         {
             for (int x = 0; x < resolution.x; ++x)
             {
-                if (std::abs(importedVolume->getVoxel(x, y, z) - sourceField->sample(x, y, z)) > 1.0e-6f)
+                if (std::abs(importedVolume->voxelValue(x, y, z) - sourceField->voxel(x, y, z)) > 1.0e-6f)
                 {
                     return fail("volume binary round-trip lost voxel values");
                 }
@@ -262,7 +259,7 @@ int verifyBinaryRoundTrip()
         }
     }
 
-    const houio::math::M44f importedTransform = importedVolume->getTransform();
+    const houio::math::M44f importedTransform = importedVolume->transform();
     for (int component = 0; component < 16; ++component)
     {
         if (std::abs(importedTransform.ma[component] - sourceTransform.ma[component]) > 1.0e-5f)
@@ -356,15 +353,15 @@ int verifyFieldStorage()
 
     houio::ScalarField source;
     source.resize(2, 2, 1);
-    source.lvalue(0, 0, 0) = 1.0f;
-    source.lvalue(1, 0, 0) = 2.0f;
-    source.lvalue(0, 1, 0) = 3.0f;
-    source.lvalue(1, 1, 0) = 4.0f;
+    source.voxel(0, 0, 0) = 1.0f;
+    source.voxel(1, 0, 0) = 2.0f;
+    source.voxel(0, 1, 0) = 3.0f;
+    source.voxel(1, 1, 0) = 4.0f;
     source.store(storagePath.string());
 
     houio::ScalarField::Ptr loaded = houio::ScalarField::load(storagePath.string());
     std::filesystem::remove(storagePath);
-    if (!loaded || std::abs(loaded->sample(1, 1, 0) - 4.0f) > 1.0e-6f)
+    if (!loaded || std::abs(loaded->voxel(1, 1, 0) - 4.0f) > 1.0e-6f)
     {
         return fail("field storage round-trip failed");
     }
@@ -410,7 +407,7 @@ int verifyFieldResizeSafety()
 {
     houio::ScalarField field;
     field.resize(0, 2, 2);
-    const houio::math::V3i emptyResolution = field.getResolution();
+    const houio::math::V3i emptyResolution = field.resolution();
     if (emptyResolution.x != 0 || emptyResolution.y != 2 || emptyResolution.z != 2)
     {
         return fail("empty field resolution was not retained");

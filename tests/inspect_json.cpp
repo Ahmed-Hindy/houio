@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
 
     try
     {
-        houio::HouGeoIO::makeLog(argv[1], &std::cout);
+        houio::HouGeoIO::makeLog(argv[1], std::cout);
     }
     catch (const std::exception& error)
     {

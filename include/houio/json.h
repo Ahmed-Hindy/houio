@@ -3,22 +3,25 @@
 // Houdini ASCII and binary JSON parser, event handlers, value tree, and writers.
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstring>
-#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <map>
 #include <memory>
 #include <new>
 #include <sstream>
+#include <span>
 #include <stack>
 #include <stdexcept>
+#include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <houio/Diagnostic.h>
 #include <houio/HalfFloat.h>
 #include <houio/types.h>
-#include <ttl/var/variant.hpp>
 
 
 
@@ -32,27 +35,29 @@ namespace houio
 		// Scalar handlers preserve 32-bit and 64-bit integer and floating-point widths.
 		struct Handler
 		{
-			virtual void                               jsonBeginArray() = 0;
-			virtual void                                 jsonEndArray() = 0;
-			virtual void                                 jsonBeginMap() = 0;
-			virtual void                                   jsonEndMap() = 0;
-			virtual void         jsonString( const std::string &value ) = 0;
-			virtual void              jsonKey( const std::string &key ) = 0;
-			virtual void                  jsonBool( const bool &value ) = 0;
-			virtual void               jsonInt32( const sint32 &value ) = 0;
-			virtual void               jsonInt64( const sint64 &value ) = 0;
-			virtual void              jsonReal32( const real32 &value ) = 0;
-			virtual void              jsonReal64( const real64 &value ) = 0;
-			virtual void   uaBool( sint64 numElements, Parser *parser ) = 0;
-			virtual void uaReal16( sint64 numElements, Parser *parser ) = 0;
-			virtual void uaReal32( sint64 numElements, Parser *parser ) = 0;
-			virtual void uaReal64( sint64 numElements, Parser *parser ) = 0;
-			virtual void   uaInt8( sint64 numElements, Parser *parser ) = 0;
-			virtual void  uaInt16( sint64 numElements, Parser *parser ) = 0;
-			virtual void  uaInt32( sint64 numElements, Parser *parser ) = 0;
-			virtual void  uaInt64( sint64 numElements, Parser *parser ) = 0;
-			virtual void  uaUInt8( sint64 numElements, Parser *parser ) = 0;
-			virtual void uaString( sint64 numElements, Parser *parser ) = 0;
+			virtual ~Handler() = default;
+
+			virtual void jsonBeginArray() = 0;
+			virtual void jsonEndArray() = 0;
+			virtual void jsonBeginMap() = 0;
+			virtual void jsonEndMap() = 0;
+			virtual void jsonString(const std::string& value) = 0;
+			virtual void jsonKey(const std::string& key) = 0;
+			virtual void jsonBool(const bool& value) = 0;
+			virtual void jsonInt32(const sint32& value) = 0;
+			virtual void jsonInt64(const sint64& value) = 0;
+			virtual void jsonReal32(const real32& value) = 0;
+			virtual void jsonReal64(const real64& value) = 0;
+			virtual void uaBool(sint64 element_count, Parser& parser) = 0;
+			virtual void uaReal16(sint64 element_count, Parser& parser) = 0;
+			virtual void uaReal32(sint64 element_count, Parser& parser) = 0;
+			virtual void uaReal64(sint64 element_count, Parser& parser) = 0;
+			virtual void uaInt8(sint64 element_count, Parser& parser) = 0;
+			virtual void uaInt16(sint64 element_count, Parser& parser) = 0;
+			virtual void uaInt32(sint64 element_count, Parser& parser) = 0;
+			virtual void uaInt64(sint64 element_count, Parser& parser) = 0;
+			virtual void uaUInt8(sint64 element_count, Parser& parser) = 0;
+			virtual void uaString(sint64 element_count, Parser& parser) = 0;
 		};
 
 
@@ -88,20 +93,22 @@ namespace houio
 				JID_MAGIC               = 0x7f
 			};
 
-			typedef ttl::var::variant<bool,           // bool
-									  sbyte,          // int8
-									  sword,          // int16
-									  sint32,         // int32
-									  sint64,         // int64
-									  real32,         // real16 values are widened to real32
-									  real64,         // real64
-									  ubyte,          // uint8
-									  uword,          // uint16
-									  std::string    // string
-									  > Value;
+			using Value = std::variant<
+				bool,
+				sbyte,
+				sword,
+				sint32,
+				sint64,
+				real32,
+				real64,
+				ubyte,
+				uword,
+				std::string>;
 			Token();
-			void event( Parser *p, int key = false );
+			void event(Parser& parser, bool key = false);
 
+		private:
+			friend struct Parser;
 
 			Type                                type; // also encodes value type
 			Value                              value;
@@ -110,6 +117,52 @@ namespace houio
 
 
 		// UTILITY FUNCTIONS ======================================
+
+		template<typename T, typename Variant>
+		struct VariantIndex;
+
+		template<typename T, typename... Rest>
+		struct VariantIndex<T, std::variant<T, Rest...>> : std::integral_constant<size_t, 0>
+		{
+		};
+
+		template<typename T, typename First, typename... Rest>
+		struct VariantIndex<T, std::variant<First, Rest...>>
+			: std::integral_constant<size_t, 1 + VariantIndex<T, std::variant<Rest...>>::value>
+		{
+		};
+
+		template<typename T, typename Variant>
+		inline constexpr size_t variantIndex = VariantIndex<T, Variant>::value;
+
+		template<typename>
+		inline constexpr bool alwaysFalse = false;
+
+		template<typename T>
+		[[nodiscard]] constexpr Token::Type uniformArrayToken()
+		{
+			using ValueType = std::remove_cv_t<T>;
+			if constexpr (std::is_same_v<ValueType, real32>)
+				return Token::JID_REAL32;
+			else if constexpr (std::is_same_v<ValueType, real64>)
+				return Token::JID_REAL64;
+			else if constexpr (std::is_same_v<ValueType, bool>)
+				return Token::JID_BOOL;
+			else if constexpr (std::is_same_v<ValueType, sbyte>)
+				return Token::JID_INT8;
+			else if constexpr (std::is_same_v<ValueType, sword>)
+				return Token::JID_INT16;
+			else if constexpr (std::is_same_v<ValueType, sint32>)
+				return Token::JID_INT32;
+			else if constexpr (std::is_same_v<ValueType, sint64>)
+				return Token::JID_INT64;
+			else if constexpr (std::is_same_v<ValueType, ubyte>)
+				return Token::JID_UINT8;
+			else if constexpr (std::is_same_v<ValueType, uword>)
+				return Token::JID_UINT16;
+			else
+				static_assert(alwaysFalse<ValueType>, "Unsupported uniform JSON array type");
+		}
 
 		template<typename T>
 		T fromString(const std::string& value)
@@ -169,8 +222,12 @@ namespace houio
 			Parser();
 			explicit Parser( const ParserLimits &limits );
 
-			bool parse( std::istream *in, Handler *h );
-			bool parse( std::istream *in, Handler *h, DiagnosticList *diagnostics );
+			[[nodiscard]] bool parse(std::istream& input, Handler& handler);
+			[[nodiscard]] bool parse(
+				std::istream& input,
+				Handler& handler,
+				DiagnosticList& diagnostics);
+
 			bool                          parseStream();
 			void             validateSeekableInputSize();
 			void                 validateTrailingInput();
@@ -187,16 +244,23 @@ namespace houio
 
 
 			template<typename T>
-			T                                    read();
+			[[nodiscard]] T read();
 			template<typename T>
-			void     read( T *dst, sint64 numElements );
+			void read(std::span<T> destination);
 			sint64                         readLength();
 			std::string              readBinaryString();
 			std::string               readASCIIString();
 			bool                  tryReadASCIIChar( char &value );
 
 
-			// 
+		private:
+			friend struct Token;
+
+			[[nodiscard]] bool parseInternal(
+				std::istream& input,
+				Handler& event_handler,
+				DiagnosticList* diagnostics);
+
 			State                                 state;
 			std::stack<State>                stateStack;
 			Handler                            *handler;
@@ -215,46 +279,50 @@ namespace houio
 		template<typename T>
 		T Parser::read()
 		{
-			T value{};
-			read(&value, 1);
-			return value;
+			std::array<T, 1> value{};
+			read(std::span<T>(value));
+			return value.front();
 		}
+
 		template<typename T>
-		void Parser::read( T *dst, sint64 numElements )
+		void Parser::read(std::span<T> destination)
 		{
-			if( !stream )
-				throw std::runtime_error( "Parser::read has no input stream" );
-			if( numElements < 0 )
-				throw std::length_error( "Parser::read received a negative element count" );
-			if( numElements == 0 )
+			static_assert(std::is_trivially_copyable_v<T>);
+			if (!stream)
+				throw std::runtime_error("Parser::read has no input stream");
+			if (destination.empty())
 				return;
-			if( !dst )
-				throw std::invalid_argument( "Parser::read received a null destination" );
+			const uint64 element_count = static_cast<uint64>(destination.size());
+			const uint64 maximum_bytes = static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
+			if (element_count > maximum_bytes / sizeof(T))
+				throw std::length_error("Parser::read byte count exceeds streamsize range");
 
-			const uint64 elementCount = static_cast<uint64>(numElements);
-			const uint64 maximumBytes = static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
-			if( elementCount > maximumBytes / sizeof(T) )
-				throw std::length_error( "Parser::read byte count exceeds streamsize range" );
-
-			const std::streamsize byteCount = static_cast<std::streamsize>(elementCount * sizeof(T));
-			if( byteOffset < 0 || byteOffset > limits.maxInputBytes
-				|| byteCount > limits.maxInputBytes - byteOffset )
+			const std::streamsize byte_count =
+				static_cast<std::streamsize>(element_count * sizeof(T));
+			if (byteOffset < 0 || byteOffset > limits.maxInputBytes
+				|| byte_count > limits.maxInputBytes - byteOffset)
+			{
 				fail(DiagnosticCategory::malformed_input, "Parser input byte limit exceeded", byteOffset);
-			if( knownInputBytes >= 0 && (byteOffset > knownInputBytes
-				|| byteCount > knownInputBytes - byteOffset) )
-				fail(DiagnosticCategory::malformed_input, "Parser::read encountered truncated input", knownInputBytes);
-			stream->read(reinterpret_cast<char*>(dst), byteCount);
-			const std::streamsize bytesRead = stream->gcount();
-			byteOffset += static_cast<sint64>(bytesRead);
-			if( bytesRead != byteCount )
-				fail(DiagnosticCategory::malformed_input, "Parser::read encountered truncated input", byteOffset);
+			}
+			if (knownInputBytes >= 0 && (byteOffset > knownInputBytes
+				|| byte_count > knownInputBytes - byteOffset))
+			{
+				fail(DiagnosticCategory::malformed_input,
+					"Parser::read encountered truncated input", knownInputBytes);
+			}
+			stream->read(reinterpret_cast<char*>(destination.data()), byte_count);
+			const std::streamsize bytes_read = stream->gcount();
+			byteOffset += static_cast<sint64>(bytes_read);
+			if (bytes_read != byte_count)
+				fail(DiagnosticCategory::malformed_input,
+					"Parser::read encountered truncated input", byteOffset);
 		}
 
 
 		// Writer ==================================================
 		struct Writer
 		{
-			virtual                                   ~Writer(){};
+			virtual ~Writer() = default;
 			virtual void                       jsonBeginArray() = 0;
 			virtual void                         jsonEndArray() = 0;
 			virtual void                         jsonBeginMap() = 0;
@@ -271,9 +339,10 @@ namespace houio
 			virtual void      jsonReal64( const real64 &value ) = 0;
 		};
 
-		struct BinaryWriter : public Writer
+		class BinaryWriter final : public Writer
 		{
-			BinaryWriter( std::ostream *out );
+		public:
+			explicit BinaryWriter(std::ostream& output);
 
 			bool jsonMagic();
 			virtual void                               jsonBeginArray()override;
@@ -294,134 +363,75 @@ namespace houio
 
 
 			template<typename T>
-			bool                 jsonUniformArray( const std::vector<T> &data );
+			bool jsonUniformArray(std::span<const T> data);
 			template<typename T>
-			bool          jsonUniformArray( const T *data, sint64 numElements );
-			bool       jsonUniformArrayReal16( const uword *data, sint64 numElements );
+			bool jsonUniformArray(const std::vector<T>& data);
+			bool jsonUniformArrayReal16(std::span<const uword> data);
 
 			bool                                      writeId( Token::Type id );
 			bool                            writeLength( const sint64 &length );
 
 
 			template<typename T>
-			bool                                            write( const T &v );
+			bool write(const T& value);
 			template<typename T>
-			bool                      write( const T *dst, sint64 numElements );
+			bool write(std::span<const T> values);
 
 
 
-			// 
-			std::ostream                                                *stream;
+		private:
+			std::ostream& stream;
 		};
 
 		template<typename T>
-		bool BinaryWriter::write( const T &v )
+		bool BinaryWriter::write(const T& value)
 		{
-			if( !stream )
-				return false;
-			stream->write(reinterpret_cast<const char*>(&v), static_cast<std::streamsize>(sizeof(T)));
-			return stream->good();
-		}
-		template<typename T>
-		bool BinaryWriter::write( const T *dst, sint64 numElements )
-		{
-			if( !stream )
-				return false;
-			if( numElements < 0 )
-				throw std::length_error( "BinaryWriter::write received a negative element count" );
-			if( numElements == 0 )
-				return stream->good();
-			if( !dst )
-				throw std::invalid_argument( "BinaryWriter::write received a null source" );
-
-			const uint64 elementCount = static_cast<uint64>(numElements);
-			const uint64 maximumBytes = static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
-			if( elementCount > maximumBytes / sizeof(T) )
-				throw std::length_error( "BinaryWriter::write byte count exceeds streamsize range" );
-
-			const std::streamsize byteCount = static_cast<std::streamsize>(elementCount * sizeof(T));
-			stream->write(reinterpret_cast<const char*>(dst), byteCount);
-			return stream->good();
+			static_assert(std::is_trivially_copyable_v<T>);
+			return write(std::span<const T>(&value, 1));
 		}
 
 		template<typename T>
-		bool BinaryWriter::jsonUniformArray( const std::vector<T> &data )
+		bool BinaryWriter::write(std::span<const T> values)
 		{
-			Token::Type type = Token::JID_NULL;
-			if( typeid(T) == typeid(real32) )
-				type = Token::JID_REAL32;
-			else if( typeid(T) == typeid(real64) )
-				type = Token::JID_REAL64;
-			else if( typeid(T) == typeid(bool) )
-				type = Token::JID_BOOL;
-			else if( typeid(T) == typeid(sbyte) )
-				type = Token::JID_INT8;
-			else if( typeid(T) == typeid(sword) )
-				type = Token::JID_INT16;
-			else if( typeid(T) == typeid(sint32) )
-				type = Token::JID_INT32;
-			else if( typeid(T) == typeid(sint64) )
-				type = Token::JID_INT64;
-			else if( typeid(T) == typeid(ubyte) )
-				type = Token::JID_UINT8;
-			else if( typeid(T) == typeid(uword) )
-				type = Token::JID_UINT16;
-			else
-				throw std::runtime_error("BinaryWriter::jsonUniformArray: unable to handle type");
-			
-			if( data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
-				throw std::length_error( "BinaryWriter::jsonUniformArray element count exceeds sint64 range" );
-			const sint64 elementCount = static_cast<sint64>(data.size());
-			writeId( Token::JID_UNIFORM_ARRAY );
-			write<sbyte>( static_cast<sbyte>(type) );
-			writeLength(elementCount);
-			if( !data.empty() )
-				write<T>(data.data(), elementCount);
-
-			return true;
+			static_assert(std::is_trivially_copyable_v<T>);
+			if (values.empty())
+				return stream.good();
+			const uint64 element_count = static_cast<uint64>(values.size());
+			const uint64 maximum_bytes =
+				static_cast<uint64>(std::numeric_limits<std::streamsize>::max());
+			if (element_count > maximum_bytes / sizeof(T))
+				throw std::length_error("BinaryWriter::write byte count exceeds streamsize range");
+			const std::streamsize byte_count =
+				static_cast<std::streamsize>(element_count * sizeof(T));
+			stream.write(reinterpret_cast<const char*>(values.data()), byte_count);
+			return stream.good();
 		}
-		template<typename T>
-		bool BinaryWriter::jsonUniformArray( const T *data, sint64 numElements )
-		{
-			Token::Type type = Token::JID_NULL;
-			if( typeid(T) == typeid(real32) )
-				type = Token::JID_REAL32;
-			else if( typeid(T) == typeid(real64) )
-				type = Token::JID_REAL64;
-			else if( typeid(T) == typeid(bool) )
-				type = Token::JID_BOOL;
-			else if( typeid(T) == typeid(sbyte) )
-				type = Token::JID_INT8;
-			else if( typeid(T) == typeid(sword) )
-				type = Token::JID_INT16;
-			else if( typeid(T) == typeid(sint32) )
-				type = Token::JID_INT32;
-			else if( typeid(T) == typeid(sint64) )
-				type = Token::JID_INT64;
-			else if( typeid(T) == typeid(ubyte) )
-				type = Token::JID_UINT8;
-			else if( typeid(T) == typeid(uword) )
-				type = Token::JID_UINT16;
-			else
-				throw std::runtime_error("BinaryWriter::jsonUniformArray: unable to handle type");
-			
-			if( numElements < 0 )
-				throw std::length_error( "BinaryWriter::jsonUniformArray received a negative element count" );
-			if( numElements > 0 && !data )
-				throw std::invalid_argument( "BinaryWriter::jsonUniformArray received null data" );
-			writeId( Token::JID_UNIFORM_ARRAY );
-			write<sbyte>( static_cast<sbyte>(type) );
-			writeLength(numElements);
-			write<T>(data, numElements);
 
-			return true;
+		template<typename T>
+		bool BinaryWriter::jsonUniformArray(std::span<const T> data)
+		{
+			if (data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
+				throw std::length_error("BinaryWriter::jsonUniformArray element count exceeds sint64 range");
+			const sint64 element_count = static_cast<sint64>(data.size());
+			const Token::Type type = uniformArrayToken<T>();
+			return writeId(Token::JID_UNIFORM_ARRAY)
+				&& write<ubyte>(static_cast<ubyte>(type))
+				&& writeLength(element_count)
+				&& write(data);
+		}
+
+		template<typename T>
+		bool BinaryWriter::jsonUniformArray(const std::vector<T>& data)
+		{
+			return jsonUniformArray(std::span<const T>(data));
 		}
 
 
 		// ASCIIWriter ==================================================
-		struct ASCIIWriter : public Writer
+		class ASCIIWriter final : public Writer
 		{
-			ASCIIWriter( std::ostream *out );
+		public:
+			explicit ASCIIWriter(std::ostream& output);
 
 			virtual void                               jsonBeginArray()override;
 			virtual void                                 jsonEndArray()override;
@@ -445,24 +455,25 @@ namespace houio
 			void                                                 writeNewline();
 			void                                                  writePrefix();
 
-			int                                                     indentLevel;
-			bool                                                      firstItem;
-			bool                                                         gotKey;
-			std::stack<Token::Type>                                       stack;
-			std::string                                                  prefix;
-			// 
-			std::ostream                                                *stream;
+		private:
+			int indentLevel = 0;
+			bool firstItem = false;
+			bool gotKey = false;
+			std::stack<Token::Type> stack;
+			std::string prefix;
+			std::ostream& stream;
 		};
 
 
 
 		// JSONLogger ==================================================
-		struct JSONLogger : public Handler
+		class JSONLogger final : public Handler
 		{
+		public:
 			JSONLogger() : out(std::cout), indentLevel(0)
 			{
 			}
-			JSONLogger( std::ostream &outputStream ) : out(outputStream), indentLevel(0)
+			explicit JSONLogger(std::ostream& outputStream) : out(outputStream), indentLevel(0)
 			{
 			}
 
@@ -542,120 +553,121 @@ namespace houio
 				out << "jsonEndMap\n";std::flush(out);
 			}
 
-			virtual void uaBool( sint64 numElements, Parser *parser )
+			void uaBool(sint64 element_count, Parser& parser) override
 			{
 				indent();
-				if( numElements < 0 )
-					throw std::length_error( "JSONLogger::uaBool received a negative element count" );
-				sint64 elementsRemaining = numElements;
+				if (element_count < 0)
+					throw std::length_error("JSONLogger::uaBool received a negative element count");
+				sint64 elements_remaining = element_count;
 				out << "jsonArray [";
-				while( elementsRemaining > 0 )
+				while (elements_remaining > 0)
 				{
-					const uint32 bits = parser->read<uint32>();
-					const int bitCount = static_cast<int>(std::min<sint64>(elementsRemaining, 32));
-					for( int bitIndex=0;bitIndex<bitCount;++bitIndex )
-						out << ((bits & (uint32(1) << bitIndex)) != 0 ? 1 : 0) << " ";
-					elementsRemaining -= bitCount;
+					const uint32 bits = parser.read<uint32>();
+					const int bit_count = static_cast<int>(std::min<sint64>(elements_remaining, 32));
+					for (int bit_index = 0; bit_index < bit_count; ++bit_index)
+						out << ((bits & (uint32(1) << bit_index)) != 0 ? 1 : 0) << " ";
+					elements_remaining -= bit_count;
 				}
 				out << "]\n";
 				std::flush(out);
 			}
 
-			virtual void uaReal16( sint64 numElements, Parser *parser )
+			void uaReal16(sint64 element_count, Parser& parser) override
 			{
 				indent();
-				out << "jsonArray<real16> (" << numElements << ") [";
-				for( sint64 elementIndex=0;elementIndex<numElements;++elementIndex )
-					out << halfBitsToFloat(parser->read<uword>()) << " ";
+				out << "jsonArray<real16> (" << element_count << ") [";
+				for (sint64 element_index = 0; element_index < element_count; ++element_index)
+					out << halfBitsToFloat(parser.read<uword>()) << " ";
 				out << "]---\n";
 				std::flush(out);
 			}
 
-			virtual void uaReal32( sint64 numElements, Parser *parser )
+			void uaReal32(sint64 element_count, Parser& parser) override
 			{
-				ua<real32>( numElements, parser, "<real32>" );
+				uniformArray<real32>(element_count, parser, "<real32>");
 			}
 
-			virtual void uaReal64( sint64 numElements, Parser *parser )
+			void uaReal64(sint64 element_count, Parser& parser) override
 			{
-				ua<real64>( numElements, parser, "<real64>" );
+				uniformArray<real64>(element_count, parser, "<real64>");
 			}
 
-			virtual void uaInt8( sint64 numElements, Parser *parser )
+			void uaInt8(sint64 element_count, Parser& parser) override
 			{
-				ua<sbyte>( numElements, parser, "<int8>" );
+				uniformArray<sbyte>(element_count, parser, "<int8>");
 			}
 
-			virtual void uaInt16( sint64 numElements, Parser *parser )
+			void uaInt16(sint64 element_count, Parser& parser) override
 			{
-				ua<sword>( numElements, parser, "<int16>" );
+				uniformArray<sword>(element_count, parser, "<int16>");
 			}
 
-			virtual void uaInt32( sint64 numElements, Parser *parser )
+			void uaInt32(sint64 element_count, Parser& parser) override
 			{
-				ua<sint32>( numElements, parser, "<int32>" );
+				uniformArray<sint32>(element_count, parser, "<int32>");
 			}
 
-			virtual void uaInt64( sint64 numElements, Parser *parser )
+			void uaInt64(sint64 element_count, Parser& parser) override
 			{
-				ua<sint64>( numElements, parser, "<sint64>" );
+				uniformArray<sint64>(element_count, parser, "<sint64>");
 			}
 
-			virtual void uaUInt8( sint64 numElements, Parser *parser )
+			void uaUInt8(sint64 element_count, Parser& parser) override
 			{
 				indent();
-				if( numElements < 0 )
-					throw std::length_error( "JSONLogger::uaUInt8 received a negative element count" );
+				if (element_count < 0)
+					throw std::length_error("JSONLogger::uaUInt8 received a negative element count");
 				out << "jsonArray<uint8> [";
-				sint64 elementsRemaining = numElements;
-				while( elementsRemaining > 0 )
+				sint64 elements_remaining = element_count;
+				while (elements_remaining > 0)
 				{
-					const size_t chunkSize = static_cast<size_t>(std::min<sint64>(elementsRemaining, 4096));
-					std::vector<ubyte> data(chunkSize);
-					parser->read<ubyte>(data.data(), static_cast<sint64>(chunkSize));
-					for( ubyte value : data )
+					const size_t chunk_size = static_cast<size_t>(std::min<sint64>(elements_remaining, 4096));
+					std::vector<ubyte> data(chunk_size);
+					parser.read(std::span<ubyte>(data));
+					for (ubyte value : data)
 						out << static_cast<int>(value) << " ";
-					elementsRemaining -= static_cast<sint64>(chunkSize);
+					elements_remaining -= static_cast<sint64>(chunk_size);
 				}
 				out << "]\n";
 				std::flush(out);
 			}
 
-			virtual void uaString( sint64 numElements, Parser *parser )
+			void uaString(sint64 element_count, Parser& parser) override
 			{
 				indent();
-				if( numElements < 0 )
-					throw std::length_error( "JSONLogger::uaString received a negative element count" );
+				if (element_count < 0)
+					throw std::length_error("JSONLogger::uaString received a negative element count");
 				out << "jsonArray<string> [";
-				for(sint64 i=0;i<numElements;++i)
-					out << parser->readBinaryString() << " ";
+				for (sint64 element_index = 0; element_index < element_count; ++element_index)
+					out << parser.readBinaryString() << " ";
 				out << "]\n";
 				std::flush(out);
 			}
 
 			template<typename T>
-			void ua( sint64 numElements, Parser *parser, std::string type = "" )
+			void uniformArray(sint64 element_count, Parser& parser, const std::string& type_name = {})
 			{
 				indent();
-				if( numElements < 0 )
-					throw std::length_error( "JSONLogger uniform array received a negative element count" );
-				out << "jsonArray"<<type<<" ("<< numElements << ") [";
-				sint64 elementsRemaining = numElements;
-				while( elementsRemaining > 0 )
+				if (element_count < 0)
+					throw std::length_error("JSONLogger uniform array received a negative element count");
+				out << "jsonArray" << type_name << " (" << element_count << ") [";
+				sint64 elements_remaining = element_count;
+				while (elements_remaining > 0)
 				{
-					const size_t chunkSize = static_cast<size_t>(std::min<sint64>(elementsRemaining, 4096));
-					std::vector<T> data(chunkSize);
-					parser->read<T>(data.data(), static_cast<sint64>(chunkSize));
-					for( const T &value : data )
+					const size_t chunk_size = static_cast<size_t>(std::min<sint64>(elements_remaining, 4096));
+					std::vector<T> data(chunk_size);
+					parser.read(std::span<T>(data));
+					for (const T& value : data)
 						out << value << " ";
-					elementsRemaining -= static_cast<sint64>(chunkSize);
+					elements_remaining -= static_cast<sint64>(chunk_size);
 				}
 				out << "]---\n";
 				std::flush(out);
 			}
 
-			std::ostream &out;
-			int indentLevel;
+		private:
+			std::ostream& out;
+			int indentLevel = 0;
 		};
 
 		// JSONCPP ==================================================
@@ -663,464 +675,348 @@ namespace houio
 		// Value -------------
 
 		struct Array;
-		typedef std::shared_ptr<Array> ArrayPtr;
+		using ArrayPtr = std::shared_ptr<Array>;
+		using ConstArrayPtr = std::shared_ptr<const Array>;
 		struct Object;
-		typedef std::shared_ptr<Object> ObjectPtr;
+		using ObjectPtr = std::shared_ptr<Object>;
+		using ConstObjectPtr = std::shared_ptr<const Object>;
 
-		struct Value
+		class Value
 		{
+		public:
+			using Variant = std::variant<
+				bool,
+				sint32,
+				real32,
+				real64,
+				std::string,
+				ubyte,
+				sint64>;
 
-			typedef ttl::var::variant<bool,           // order
-									  sint32,         // must
-									  real32,         // not
-									  real64,         // change
-									  std::string,    // !!!!!! - because index is used in is* methods
-									  ubyte,          // also: if you add something here you need to update Value::cpyTo, JSONWriter::operators
-									  sint64
-									  > Variant;
+			Value() = default;
 
-			Value();
-
-			bool                           isNull()const;
-			bool                          isArray()const;
-			bool                         isObject()const;
-			bool                         isString()const;
-
-			template<typename T>
-			const T                           as() const;
-
-			void                 cpyTo( char *dst )const;
-
-			ArrayPtr                           asArray();
-			ObjectPtr                         asObject();
-
-			Variant                        &getVariant();
-
-			static Value                   createArray();
-			static Value     createArray(ArrayPtr array);
-			static Value                  createObject();
-			static Value   createObject( ObjectPtr obj );
+			[[nodiscard]] bool isNull() const noexcept;
+			[[nodiscard]] bool isArray() const noexcept;
+			[[nodiscard]] bool isObject() const noexcept;
+			[[nodiscard]] bool isString() const noexcept;
 
 			template<typename T>
-			static Value        create( const T &value );
+			[[nodiscard]] T as() const;
 
+			[[nodiscard]] ArrayPtr asArray();
+			[[nodiscard]] ConstArrayPtr asArray() const;
+			[[nodiscard]] ObjectPtr asObject();
+			[[nodiscard]] ConstObjectPtr asObject() const;
+
+			[[nodiscard]] Variant& variant() noexcept;
+			[[nodiscard]] const Variant& variant() const noexcept;
+
+			[[nodiscard]] static Value createArray();
+			[[nodiscard]] static Value createArray(ArrayPtr array);
+			[[nodiscard]] static Value createObject();
+			[[nodiscard]] static Value createObject(ObjectPtr object);
+
+			template<typename T>
+			[[nodiscard]] static Value create(const T& value);
 
 		private:
-			enum Type
+			enum class Kind
 			{
-				TYPE_NULL,
-				TYPE_VALUE,
-				TYPE_OBJECT,
-				TYPE_ARRAY
+				null,
+				scalar,
+				object,
+				array,
 			};
-			Type                               m_type; // value, array or object?
-			Variant                           m_value;
-			ObjectPtr                        m_object;
-			ArrayPtr                          m_array;
 
-			friend                             Object;
-			friend                             Array;
+			Kind kind_ = Kind::null;
+			Variant scalar_ = false;
+			ObjectPtr object_;
+			ArrayPtr array_;
+
+			friend struct Object;
+			friend struct Array;
 		};
 
 
-		// VariantConverter ================================
-
-		// In order to conveniently extract data from variants we need to be able to convert between 
-		// all the different variant types. This is done by using the visitor pattern in the as function of
-		// the varient class. VariantConverter is the visitor which will its ()operator get called for all the different
-		// variant types. The Converter is a templated class which has the destination type as its template argument
-		// D. The operator is templated as well with the argument type (the type of the varient) as template argument.
-		// By default a simple cast is done. Now to handle special cases where such a cast fails we do the following steps:
-		// 1. create a specialized class template which has the destination type as template argument D
-		// 2. overload the () operator with the variant type which produces the conflict and resolve it in the
-		// definition of that overloaded function
-
-		template<typename D>
-		struct VariantConverter
+		template<typename Destination, typename Source>
+		[[nodiscard]] Destination convertScalarValue(const Source& source)
 		{
-			D &dest;
-			VariantConverter( D &_dest ) : dest(_dest){}
-			void operator()( const std::string &value )
+			using SourceType = std::remove_cvref_t<Source>;
+			if constexpr (std::is_same_v<Destination, std::string>)
 			{
-				dest = fromString<D>(value);
+				if constexpr (std::is_same_v<SourceType, std::string>)
+					return source;
+				else
+					return toString(source);
 			}
-			template< typename T >
-			void operator()( T d )
+			else if constexpr (std::is_same_v<SourceType, std::string>)
 			{
-				dest = static_cast<D>(d);
+				if constexpr (std::is_same_v<Destination, bool>)
+					return false;
+				else
+					return fromString<Destination>(source);
 			}
-		};
-
-		template<>
-		struct VariantConverter<bool>
-		{
-			typedef bool t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string /*x*/)
+			else
 			{
-				dest = false;
+				return static_cast<Destination>(source);
 			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				dest = (t_dest)d;
-			}
-		};
-
-		template<>
-		struct VariantConverter<float>
-		{
-			typedef float t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string /*x*/)
-			{
-				//dest = false;
-			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				dest = (t_dest)d;
-			}
-		};
-
-		template<>
-		struct VariantConverter<double>
-		{
-			typedef double t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string /*x*/)
-			{
-				// Keep the default destination value for incompatible string input.
-			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				dest = static_cast<t_dest>(d);
-			}
-		};
-
-		template<>
-		struct VariantConverter<int>
-		{
-			typedef int t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string /*x*/)
-			{
-				//dest = false;
-			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				dest = (t_dest)d;
-			}
-		};
-
-		template<>
-		struct VariantConverter<ubyte>
-		{
-			typedef ubyte t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string /*x*/)
-			{
-				//dest = false;
-			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				dest = (t_dest)d;
-			}
-		};
-
-		template<>
-		struct VariantConverter<std::string>
-		{
-			typedef std::string t_dest;
-			t_dest &dest;
-			VariantConverter( t_dest &_dest ) : dest(_dest){}
-
-			void operator()(std::string x)
-			{
-				dest = x;
-			}
-
-			template< typename T >
-			void operator()( T d )
-			{
-				std::ostringstream stream;
-				stream << d;
-				dest = stream.str();
-			}
-		};
-
+		}
 
 		template<typename T>
-		const T Value::as()const
+		T Value::as() const
 		{
-			T dest = T();
-			VariantConverter<T> conv(dest);
-			ttl::var::apply_visitor(conv, m_value);
-			return dest;
+			if (kind_ != Kind::scalar)
+				throw std::logic_error("JSON Value does not contain a scalar");
+			return std::visit(
+				[](const auto& source) { return convertScalarValue<T>(source); },
+				scalar_);
+		}
+
+		template<typename T>
+		Value Value::create(const T& value)
+		{
+			Value result;
+			result.kind_ = Kind::scalar;
+			result.scalar_ = value;
+			return result;
 		}
 
 
-		template<typename T>
-		Value Value::create( const T &value )
-		{
-			Value v;
-			v.m_type = TYPE_VALUE;
-			v.m_value = value;
-			return v;
-		}
-
-
-		// Array -------------
 		struct Array
 		{
-			Array();
-			~Array();
+			using ValueList = std::vector<Value>;
 
-			static ArrayPtr               create();
-
-			template<typename T>
-			const T                  get( const int index );
-			ObjectPtr                getObject( int index );
-			ArrayPtr                  getArray( int index );
-
-			Value               getValue( const int index );
-
-			sint64                              size()const;
-			bool                           isUniform()const;
-
-
+			[[nodiscard]] static ArrayPtr create();
 
 			template<typename T>
-			void                     appendValue( T value );
-			//void                     append( Value &value );
-			void                     append( const Value &value );
-			void                     append(ObjectPtr &object );
-			void                     append(ArrayPtr &array );
+			[[nodiscard]] T get(int index) const;
+			[[nodiscard]] ObjectPtr object(int index) const;
+			[[nodiscard]] ArrayPtr array(int index) const;
+			[[nodiscard]] Value value(int index) const;
+			[[nodiscard]] sint64 size() const;
+			[[nodiscard]] bool isUniform() const noexcept;
+			[[nodiscard]] std::span<const Value> elements() const noexcept;
+			[[nodiscard]] std::span<const std::byte> uniformData() const noexcept;
+			[[nodiscard]] sint64 uniformElementCount() const noexcept;
+			[[nodiscard]] int uniformTypeIndex() const noexcept;
 
-		//private:
-			std::vector<Value>                     m_values;
-			bool                                m_isUniform;
-			unsigned char*                    m_uniformdata;
-			sint64                     m_numUniformElements;
-			int                               m_uniformType; // integer which equals Variant::which()
+			void setUniformStorage(
+				int type_index,
+				sint64 element_count,
+				std::span<const std::byte> data);
+
+			template<typename T>
+			void appendValue(const T& value);
+			void append(const Value& value);
+			void append(ObjectPtr object);
+			void append(ArrayPtr array);
+
+		private:
+			ValueList values_;
+			bool uses_uniform_storage_ = false;
+			std::vector<std::byte> uniform_data_;
+			sint64 uniform_element_count_ = 0;
+			int uniform_type_index_ = -1;
 		};
 
-
 		template<typename T>
-		const T Array::get( const int index )
+		T Array::get(int index) const
 		{
-			return getValue(index).as<T>();
+			return value(index).as<T>();
 		}
 
 		template<typename T>
-		void Array::appendValue( T value )
+		void Array::appendValue(const T& value)
 		{
 			append(Value::create<T>(value));
 		}
 
-		// Object -------------
 		struct Object
 		{
-			static ObjectPtr                                           create();
-			bool                               hasKey( const std::string &key );
+			using EntryMap = std::map<std::string, Value>;
+
+			[[nodiscard]] static ObjectPtr create();
+			[[nodiscard]] bool contains(const std::string& key) const;
 
 			template<typename T>
-			T                        get( const std::string &key, T def = T() );
-			ObjectPtr                       getObject( const std::string &key );
-			ArrayPtr                         getArray( const std::string &key );
-
-
-			Value                            getValue( const std::string &key );
-			void                      getKeys( std::vector<std::string> &keys );
-			sint64                                                  size()const;
+			[[nodiscard]] T get(const std::string& key, T default_value = T()) const;
+			[[nodiscard]] ObjectPtr object(const std::string& key) const;
+			[[nodiscard]] ArrayPtr array(const std::string& key) const;
+			[[nodiscard]] Value value(const std::string& key) const;
+			[[nodiscard]] std::vector<std::string> keys() const;
+			[[nodiscard]] sint64 size() const;
+			[[nodiscard]] const EntryMap& entries() const noexcept;
 
 			template<typename T>
-			void appendValue( const std::string &key, const T& value );
-			void                 append( const std::string &key, const Value &value );
-			void             append( const std::string &key, ObjectPtr object );
-			void             append( const std::string &key, ArrayPtr array );
-		//private:
-			std::map<std::string, Value>                               m_values;
+			void appendValue(const std::string& key, const T& value);
+			void append(const std::string& key, const Value& value);
+			void append(const std::string& key, ObjectPtr object);
+			void append(const std::string& key, ArrayPtr array);
 
+		private:
+			EntryMap entries_;
 		};
 
-
 		template<typename T>
-		T Object::get( const std::string &key, T def )
+		T Object::get(const std::string& key, T default_value) const
 		{
-			T result = def;
-			std::map<std::string, Value>::iterator it = m_values.find( key );
-			if( it != m_values.end())
-				result = it->second.as<T>();
-			return result;
+			const auto entry = entries_.find(key);
+			return entry == entries_.end() ? default_value : entry->second.as<T>();
 		}
 
 		template<typename T>
-		void Object::appendValue( const std::string &key, const T& value )
+		void Object::appendValue(const std::string& key, const T& value)
 		{
 			append(key, Value::create<T>(value));
 		}
 
 		// JSONReader ========================================================
 		// this will read json into cpp json structures (Object,Array,Value)
-		struct JSONReader : public Handler
+		class JSONReader final : public Handler
 		{
-			JSONReader();
+		public:
+			using StackItem = std::pair<Value, std::string>;
 
-			Value                                                getRoot();
+			JSONReader() = default;
 
-			virtual void                                  jsonBeginArray();
-			virtual void                                    jsonEndArray();
-			virtual void                                    jsonBeginMap();
-			virtual void                                      jsonEndMap();
-			virtual void            jsonString( const std::string &value );
-			virtual void                 jsonKey( const std::string &key );
-			virtual void                     jsonBool( const bool &value );
-			virtual void                  jsonInt32( const sint32 &value );
-			virtual void                  jsonInt64( const sint64 &value );
-			virtual void                 jsonReal32( const real32 &value );
-			virtual void                 jsonReal64( const real64 &value );
-			virtual void      uaBool( sint64 numElements, Parser *parser );
-			virtual void    uaReal16( sint64 numElements, Parser *parser );
-			virtual void    uaReal32( sint64 numElements, Parser *parser );
-			virtual void    uaReal64( sint64 numElements, Parser *parser );
-			virtual void      uaInt8( sint64 numElements, Parser *parser );
-			virtual void     uaInt16( sint64 numElements, Parser *parser );
-			virtual void     uaInt32( sint64 numElements, Parser *parser );
-			virtual void     uaInt64( sint64 numElements, Parser *parser );
-			virtual void     uaUInt8( sint64 numElements, Parser *parser );
-			virtual void    uaString( sint64 numElements, Parser *parser );
+			[[nodiscard]] Value root() const;
 
+			void jsonBeginArray() override;
+			void jsonEndArray() override;
+			void jsonBeginMap() override;
+			void jsonEndMap() override;
+			void jsonString(const std::string& value) override;
+			void jsonKey(const std::string& key) override;
+			void jsonBool(const bool& value) override;
+			void jsonInt32(const sint32& value) override;
+			void jsonInt64(const sint64& value) override;
+			void jsonReal32(const real32& value) override;
+			void jsonReal64(const real64& value) override;
+			void uaBool(sint64 element_count, Parser& parser) override;
+			void uaReal16(sint64 element_count, Parser& parser) override;
+			void uaReal32(sint64 element_count, Parser& parser) override;
+			void uaReal64(sint64 element_count, Parser& parser) override;
+			void uaInt8(sint64 element_count, Parser& parser) override;
+			void uaInt16(sint64 element_count, Parser& parser) override;
+			void uaInt32(sint64 element_count, Parser& parser) override;
+			void uaInt64(sint64 element_count, Parser& parser) override;
+			void uaUInt8(sint64 element_count, Parser& parser) override;
+			void uaString(sint64 element_count, Parser& parser) override;
 
 		private:
-			typedef std::pair<Value, std::string> StackItem; // holds value and nextKey
-
 			template<typename T>
-			void                               jsonValue( const T &value );
-			template<typename T, typename S>
-			void              jsonUA( sint64 numElements, Parser *parser );
+			void jsonValue(const T& value);
+			template<typename T, typename Source>
+			void jsonUniformArray(sint64 element_count, Parser& parser);
 
-			void                                                    push();
-			void                                                     pop();
-			Value                                                   m_root;
-			std::stack<StackItem>                                  m_stack; // used during sax parsing
-			std::string                                            nextKey; // used during sax parsing
+			void pushContainer();
+			void popContainer();
+			Value root_;
+			std::stack<StackItem> stack_;
+			std::string next_key_;
 		};
 
 		template<typename T>
-		void JSONReader::jsonValue( const T &value )
+		void JSONReader::jsonValue(const T& value)
 		{
-			if( m_root.isArray() )
-				m_root.asArray()->append(Value::create<T>(value));
+			if (root_.isArray())
+			{
+				root_.asArray()->append(Value::create<T>(value));
+			}
+			else if (root_.isObject())
+			{
+				root_.asObject()->append(next_key_, Value::create<T>(value));
+				next_key_.clear();
+			}
+			else if (root_.isNull() && stack_.empty())
+			{
+				root_ = Value::create<T>(value);
+			}
 			else
-			if( m_root.isObject() )
 			{
-				m_root.asObject()->append(nextKey, Value::create<T>(value));
-				nextKey = "JSONReader::jsonValue:invalid key";
-			}else if( m_root.isNull() && m_stack.empty() )
-			{
-				m_root = Value::create<T>(value);
-			}else
-			{
-				throw std::runtime_error("JSONReader::jsonValue: unknown container");
+				throw std::runtime_error("JSONReader::jsonValue has no active container");
 			}
 		}
 
-		template<typename T, typename S>
-		void JSONReader::jsonUA( sint64 numElements, Parser *parser )
+		template<typename T, typename Source>
+		void JSONReader::jsonUniformArray(sint64 element_count, Parser& parser)
 		{
-			if( numElements < 0 )
-				throw std::length_error( "JSONReader::jsonUA received a negative element count" );
-			const size_t elementCount = static_cast<size_t>(numElements);
-			if( elementCount > std::numeric_limits<size_t>::max() / sizeof(T)
-				|| elementCount > std::numeric_limits<size_t>::max() / sizeof(S) )
-				throw std::length_error( "JSONReader::jsonUA allocation size overflow" );
-
-			typedef ttl::meta::find_equivalent_type<const T&, Value::Variant::list> found;
-			std::vector<T> convertedData;
-			sint64 elementsRemaining = numElements;
-			constexpr size_t chunkCapacity = 4096;
-			while( elementsRemaining > 0 )
+			if (element_count < 0)
+				throw std::length_error("JSONReader::jsonUniformArray received a negative element count");
+			const size_t count = static_cast<size_t>(element_count);
+			if (count > std::numeric_limits<size_t>::max() / sizeof(T)
+				|| count > std::numeric_limits<size_t>::max() / sizeof(Source))
 			{
-				const size_t chunkSize = static_cast<size_t>(std::min<sint64>(elementsRemaining, chunkCapacity));
-				std::vector<S> sourceData(chunkSize);
-				parser->read<S>(sourceData.data(), static_cast<sint64>(chunkSize));
-				const size_t previousSize = convertedData.size();
-				convertedData.resize(previousSize + chunkSize);
-				for( size_t elementIndex=0;elementIndex<chunkSize;++elementIndex )
-					convertedData[previousSize + elementIndex] = static_cast<T>(sourceData[elementIndex]);
-				elementsRemaining -= static_cast<sint64>(chunkSize);
+				throw std::length_error("JSONReader::jsonUniformArray allocation size overflow");
 			}
 
-			Value v = Value::createArray();
-			ArrayPtr ua = v.asArray();
-			ua->m_isUniform = true;
-			ua->m_numUniformElements = numElements;
-			ua->m_uniformType = found::index;
+			constexpr size_t uniform_type_index = variantIndex<T, Value::Variant>;
+			std::vector<T> converted_data;
+			converted_data.reserve(count);
+			sint64 elements_remaining = element_count;
+			constexpr size_t chunk_capacity = 4096;
+			while (elements_remaining > 0)
+			{
+				const size_t chunk_size = static_cast<size_t>(
+					std::min<sint64>(elements_remaining, chunk_capacity));
+				std::vector<Source> source_data(chunk_size);
+				parser.read(std::span<Source>(source_data));
+				for (const Source& source_value : source_data)
+					converted_data.push_back(static_cast<T>(source_value));
+				elements_remaining -= static_cast<sint64>(chunk_size);
+			}
 
-			const size_t destinationBytes = elementCount * sizeof(T);
-			ua->m_uniformdata = static_cast<unsigned char*>(std::malloc(destinationBytes));
-			if( destinationBytes > 0 && !ua->m_uniformdata )
-				throw std::bad_alloc();
-			if( destinationBytes > 0 )
-				std::memcpy(ua->m_uniformdata, convertedData.data(), destinationBytes);
+			Value uniform_array_value = Value::createArray();
+			ArrayPtr uniform_array = uniform_array_value.asArray();
+			const size_t destination_bytes = count * sizeof(T);
+			const auto bytes = std::span<const std::byte>(
+				reinterpret_cast<const std::byte*>(converted_data.data()),
+				destination_bytes);
+			uniform_array->setUniformStorage(
+				static_cast<int>(uniform_type_index),
+				element_count,
+				bytes);
 
-			if( m_root.isArray() )
-				m_root.asArray()->append(v);
-			else if( m_root.isObject() )
-				m_root.asObject()->append(nextKey, v);
+			if (root_.isArray())
+				root_.asArray()->append(uniform_array_value);
+			else if (root_.isObject())
+				root_.asObject()->append(next_key_, uniform_array_value);
+			else if (root_.isNull() && stack_.empty())
+				root_ = uniform_array_value;
+			else
+				throw std::runtime_error("JSONReader::jsonUniformArray has no active container");
 		}
 
 
 		// JSONWriter =========================================
-		struct JSONWriter
+		class JSONWriter final
 		{
-			JSONWriter( std::ostream *out, bool binary = false )
+		public:
+			explicit JSONWriter(std::ostream& output, bool binary = false)
 			{
-				if(binary)
-					m_writer = new BinaryWriter(out);
+				if (binary)
+					writer_ = std::make_unique<BinaryWriter>(output);
 				else
-					m_writer = new ASCIIWriter(out);
+					writer_ = std::make_unique<ASCIIWriter>(output);
 			}
 
-			~JSONWriter()
-			{
-				delete m_writer;
-			}
+			~JSONWriter() = default;
 
 			bool                    write( ObjectPtr object );
 			bool                        write( ArrayPtr arr );
 			bool                        write( Value &value );
 
 			//used in combination with visitor pattern
-			void operator()( bool value ){m_writer->jsonBool(value);}
-			void operator()( ubyte value ){m_writer->jsonUInt8(value);}
-			void operator()( sbyte value ){m_writer->jsonInt8(value);}
-			void operator()( sint32 value ){m_writer->jsonInt32(value);}
-			void operator()( sint64 value ){m_writer->jsonInt64(value);}
-			void operator()( real32 value ){m_writer->jsonReal32(value);}
-			void operator()( real64 value ){m_writer->jsonReal64(value);}
-			void operator()( const std::string &value ){m_writer->jsonString(value);}
+			void operator()( bool value ){writer_->jsonBool(value);}
+			void operator()( ubyte value ){writer_->jsonUInt8(value);}
+			void operator()( sbyte value ){writer_->jsonInt8(value);}
+			void operator()( sint32 value ){writer_->jsonInt32(value);}
+			void operator()( sint64 value ){writer_->jsonInt64(value);}
+			void operator()( real32 value ){writer_->jsonReal32(value);}
+			void operator()( real64 value ){writer_->jsonReal64(value);}
+			void operator()( const std::string &value ){writer_->jsonString(value);}
 		private:
-			Writer                                  *m_writer;
+			std::unique_ptr<Writer> writer_;
 		};
 
 	}

@@ -25,7 +25,7 @@ std::string geometryDocument(const std::string& valuesObject)
 houio::HouGeo::Ptr importPagedAttribute(const std::string& valuesObject)
 {
     std::istringstream input(geometryDocument(valuesObject));
-    return houio::HouGeoIO::import(&input);
+    return houio::HouGeoIO::import(input);
 }
 
 std::vector<houio::sint32> attributeValues(const houio::HouGeo::Ptr& geometry)
@@ -34,19 +34,20 @@ std::vector<houio::sint32> attributeValues(const houio::HouGeo::Ptr& geometry)
     {
         throw std::runtime_error("Paged geometry did not import");
     }
-    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->getPointAttribute("paged");
-    if (!attribute || attribute->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32
-        || attribute->getTupleSize() != 3 || attribute->getNumElements() != 5)
+    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->pointAttribute("paged");
+    if (!attribute || attribute->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::int32
+        || attribute->tupleSize() != 3 || attribute->elementCount() != 5)
     {
         throw std::runtime_error("Paged attribute metadata was not preserved");
     }
-    houio::HouGeoAdapter::RawPointer::Ptr rawPointer = attribute->getRawPointer();
-    if (!rawPointer || !rawPointer->ptr)
-    {
-        throw std::runtime_error("Paged attribute has no data");
-    }
+    const houio::HouGeoAdapter::RawDataView raw_data = attribute->rawData();
     std::vector<houio::sint32> values(15);
-    std::memcpy(values.data(), rawPointer->ptr, values.size() * sizeof(values.front()));
+    const std::size_t expected_bytes = values.size() * sizeof(values.front());
+    if (!raw_data.available() || raw_data.sizeBytes() != expected_bytes)
+    {
+        throw std::runtime_error("Paged attribute has inconsistent data");
+    }
+    std::memcpy(values.data(), raw_data.bytes().data(), expected_bytes);
     return values;
 }
 
@@ -109,7 +110,7 @@ bool importRejected(const std::string& valuesObject)
 {
     std::istringstream input(geometryDocument(valuesObject));
     houio::DiagnosticList diagnostics;
-    return !houio::HouGeoIO::import(&input, &diagnostics) && diagnostics.size() == 1
+    return !houio::HouGeoIO::import(input, &diagnostics) && diagnostics.size() == 1
         && diagnostics.front().severity == houio::DiagnosticSeverity::error
         && diagnostics.front().path == "attributes.pointattributes[0]";
 }

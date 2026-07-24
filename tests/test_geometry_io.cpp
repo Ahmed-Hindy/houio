@@ -72,7 +72,7 @@ int verifyRawRoundtrip(const std::filesystem::path &directory)
         return fail("raw bgeo format detection failed");
 
     const houio::GeometryReadResult<houio::HouGeo::Ptr> readResult = houio::GeometryIO::readHouGeo(path);
-    if( !readResult || readResult.value->pointcount() != 2 || readResult.value->primitivecount() != 0 )
+    if( !readResult || readResult.value->pointCount() != 2 || readResult.value->primitiveCount() != 0 )
         return fail("raw bgeo round-trip failed");
     return 0;
 }
@@ -98,7 +98,7 @@ int verifyScfRoundtrip(const std::filesystem::path &directory)
         return fail("SCF format detection failed");
 
     const houio::GeometryReadResult<houio::HouGeo::Ptr> readResult = houio::GeometryIO::readHouGeo(path);
-    if( !readResult || readResult.value->pointcount() != 2 || readResult.value->primitivecount() != 0 )
+    if( !readResult || readResult.value->pointCount() != 2 || readResult.value->primitiveCount() != 0 )
         return fail("SCF round-trip failed");
 
     std::vector<char> scfBytes = readBytes(path);
@@ -138,10 +138,10 @@ int verifyMultipleVolumes(const std::filesystem::path &directory)
 {
     houio::ScalarField::Ptr first = houio::ScalarField::create(houio::math::V3i(2, 1, 1));
     houio::ScalarField::Ptr second = houio::ScalarField::create(houio::math::V3i(2, 1, 1));
-    first->lvalue(0, 0, 0) = 1.0f;
-    first->lvalue(1, 0, 0) = 2.0f;
-    second->lvalue(0, 0, 0) = 3.0f;
-    second->lvalue(1, 0, 0) = 4.0f;
+    first->voxel(0, 0, 0) = 1.0f;
+    first->voxel(1, 0, 0) = 2.0f;
+    second->voxel(0, 0, 0) = 3.0f;
+    second->voxel(1, 0, 0) = 4.0f;
 
     houio::HouGeo::Ptr geometry = houio::HouGeo::create();
     geometry->addPrimitive(first);
@@ -152,14 +152,14 @@ int verifyMultipleVolumes(const std::filesystem::path &directory)
 
     const auto volumesResult = houio::GeometryIO::readVolumes(path);
     if( !volumesResult || volumesResult.value.size() != 2
-        || volumesResult.value[0]->sample(1, 0, 0) != 2.0f
-        || volumesResult.value[1]->sample(0, 0, 0) != 3.0f )
+        || volumesResult.value[0]->voxel(1, 0, 0) != 2.0f
+        || volumesResult.value[1]->voxel(0, 0, 0) != 3.0f )
     {
         return fail("readVolumes did not preserve both fields");
     }
 
     const auto firstVolumeResult = houio::GeometryIO::readVolume(path);
-    if( !firstVolumeResult || firstVolumeResult.value->sample(1, 0, 0) != 2.0f
+    if( !firstVolumeResult || firstVolumeResult.value->voxel(1, 0, 0) != 2.0f
         || !containsCategory(firstVolumeResult.diagnostics, houio::DiagnosticCategory::conversion) )
     {
         return fail("readVolume did not report first-volume conversion loss");

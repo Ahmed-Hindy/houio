@@ -1,6 +1,44 @@
-# Roadmap
+# Roadmap and Current Work
 
-This roadmap contains current work only. Completed migration history is intentionally omitted.
+The long-term roadmap remains below. The active modernization program is summarized first so completed work, validation state, and the immediate execution order are visible in one place. Detailed implementation steps are maintained in `implementation-plan.md`.
+
+## Active branch
+
+- Branch: `refactor/modernize-legacy-core`
+- Baseline commit: `16c485a`
+- Current exact source: MSVC warnings-as-errors suite passes **19/19**.
+- Current exact source: full Release/Houdini matrix passes **47/47**.
+- Current exact source: Windows AddressSanitizer matrix passes **19/19**.
+- Documentation audit contains no retired API references.
+- CI run `30082459984` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
+- CI reports non-failing Node.js deprecation annotations for `ilammy/msvc-dev-cmd@v1`.
+
+## Modernization completed
+
+- [x] Modernize `Field<T>` access, storage, transforms, and call sites.
+- [x] Modernize `Geometry` attribute access and remove legacy forwarding methods.
+- [x] Add checked generator arithmetic and overflow tests.
+- [x] Modernize the JSON tree API and remove all legacy JSON compatibility methods.
+- [x] Make parser token dispatch non-null by construction.
+- [x] Restrict adapter compatibility aliases from public consumers.
+- [x] Modernize vector lengths, compound operators, and complete `Vec4` arithmetic.
+- [x] Replace legacy vector algorithm headers and correct reflection/basis behavior.
+- [x] Modernize bounding boxes, rays, color packing, angle conversion, and spherical conversion.
+- [x] Replace the legacy point-to-triangle algorithm and harden line/plane/range interpolation utilities.
+- [x] Add source-level guards for retired APIs and broaden math regression coverage.
+
+## Modernization next
+
+- [x] Complete `Matrix22`, `Matrix33`, and `Matrix44` core and algorithm modernization.
+- [x] Replace output-pointer matrix basis helpers with value-returning APIs.
+- [x] Migrate `HouGeoIO` off private adapter getter shims and remove adapter compatibility aliases.
+- [x] Replace the quadratic output-pointer API and audit `smoothstep`, RNG, and interpolation edge cases.
+- [x] Audit typed `Attribute` access for alignment and strict-aliasing safety.
+- [x] Add remaining container copy, resize, duplicate-point, and immutable-view tests.
+- [x] Rerun strict, Release/Houdini, and AddressSanitizer matrices locally.
+- [x] Update README examples and audit documentation for retired API names.
+- [x] Create and push checkpoint commit `da14f8f`.
+- [x] Verify Linux GCC/UBSan and Clang/fuzzing CI matrices.
 
 Priority levels:
 
@@ -31,31 +69,32 @@ Priority levels:
 ### Tests
 
 - [ ] Add exact dense-volume boundary and interpolation tests.
-- [ ] Add matrix, scalar, copy, resize, and duplicate-point tests for `Attribute` and `Geometry`.
+- [x] Add matrix, scalar, copy, resize, and duplicate-point tests for `Attribute` and `Geometry`.
 - [ ] Unit-test every supported binary token type.
 - [ ] Unit-test binary integer length encodings.
 - [ ] Unit-test string definition and reference handling.
 - [ ] Unit-test every supported uniform numeric array type.
 - [ ] Unit-test direct polygon and polygon-run loading independently.
 - [ ] Introduce a small assertion harness or lightweight maintained C++ test framework.
-- [ ] Keep all tests runnable through CTest and directly from IDEs.
+- [x] Keep all tests runnable through CTest and directly from IDEs.
 
 ### Compiler quality
 
-- [ ] Resolve remaining anonymous-union, parser, and dense-field warnings where API compatibility permits.
-- [ ] Remove unreachable code warnings in the JSON implementation.
-- [ ] Add a strict warnings-as-errors CI job after the warning baseline is clean.
+- [x] Resolve remaining anonymous-union, parser, and dense-field warnings where API compatibility permits.
+- [x] Remove unreachable code warnings in the JSON implementation.
+- [x] Add a strict warnings-as-errors CI job after the warning baseline is clean.
+- [ ] Replace or update `ilammy/msvc-dev-cmd@v1` before GitHub removes forced Node.js 24 compatibility.
 - [ ] Add static-analysis configuration.
 
 ### Public API
 
 - [ ] Add const-correct accessors across geometry and field types.
 - [ ] Replace remaining raw owning pointers with RAII types.
-- [ ] Replace unsafe typed attribute access with validated views or `memcpy`-based operations.
-- [ ] Resolve alignment and strict-aliasing risks in typed `get()` and `set()` methods.
-- [ ] Add immutable attribute views for adapter export.
+- [x] Replace unsafe typed attribute access with validated views or `memcpy`-based operations.
+- [x] Resolve alignment and strict-aliasing risks in typed `get()` and `set()` methods.
+- [x] Add immutable attribute views for adapter export.
 - [ ] Represent tuple size and storage type with stronger types.
-- [ ] Reject appended values that do not match declared component metadata.
+- [x] Reject appended values that do not match declared component metadata.
 
 ## P2 — Format compatibility
 

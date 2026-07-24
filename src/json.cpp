@@ -78,58 +78,58 @@ namespace houio
 		{
 		}
 
-		void Token::event( Parser *p, int key )
+		void Token::event(Parser& parser, bool key)
 		{
 			if (type == JID_ARRAY_BEGIN)
-				p->handler->jsonBeginArray();
+				parser.handler->jsonBeginArray();
 			else if (type == JID_ARRAY_END)
-				p->handler->jsonEndArray();
+				parser.handler->jsonEndArray();
 			if (type == JID_MAP_BEGIN)
-				p->handler->jsonBeginMap();
+				parser.handler->jsonBeginMap();
 			else if (type == JID_MAP_END)
-				p->handler->jsonEndMap();
+				parser.handler->jsonEndMap();
 			else if (type == JID_STRING)
 			{
-				if( key )
-					p->handler->jsonKey( ttl::var::get<std::string>( value ) );
+				if (key)
+					parser.handler->jsonKey(std::get<std::string>(value));
 				else
-					p->handler->jsonString( ttl::var::get<std::string>( value ) );
+					parser.handler->jsonString(std::get<std::string>(value));
 			}
 			else if (type == JID_BOOL)
-				p->handler->jsonBool( ttl::var::get<bool>( value ) );
+				parser.handler->jsonBool(std::get<bool>(value));
 			else if (type == JID_INT8)
-				p->handler->jsonInt32( ttl::var::get<sbyte>( value ) );
+				parser.handler->jsonInt32(std::get<sbyte>(value));
 			else if (type == JID_INT16)
-				p->handler->jsonInt32( ttl::var::get<sword>( value ) );
+				parser.handler->jsonInt32(std::get<sword>(value));
 			else if (type == JID_INT32)
-				p->handler->jsonInt32( ttl::var::get<sint32>( value ) );
+				parser.handler->jsonInt32(std::get<sint32>(value));
 			else if (type == JID_INT64)
-				p->handler->jsonInt64( ttl::var::get<sint64>( value ) );
+				parser.handler->jsonInt64(std::get<sint64>(value));
 			else if (type == JID_REAL16)
-				p->handler->jsonReal32( ttl::var::get<real32>( value ) );
+				parser.handler->jsonReal32(std::get<real32>(value));
 			else if (type == JID_REAL32)
-				p->handler->jsonReal32( ttl::var::get<real32>( value ) );
+				parser.handler->jsonReal32(std::get<real32>(value));
 			else if (type == JID_REAL64)
-				p->handler->jsonReal64( ttl::var::get<real64>( value ) );
+				parser.handler->jsonReal64(std::get<real64>(value));
 			else if (type == JID_UINT8)
-				p->handler->jsonInt32( ttl::var::get<ubyte>( value ) );
+				parser.handler->jsonInt32(std::get<ubyte>(value));
 			else if (type == JID_UINT16)
-				p->handler->jsonInt32( ttl::var::get<uword>( value ) );
+				parser.handler->jsonInt32(std::get<uword>(value));
 			else if (type == JID_UNIFORM_ARRAY)
 			{
-				sint64 numElements = ttl::var::get<sint64>( value );
-				switch( uaType )
+				const sint64 element_count = std::get<sint64>(value);
+				switch (uaType)
 				{
-				case Token::JID_BOOL:p->handler->uaBool( numElements, p );break;
-				case Token::JID_INT8:p->handler->uaInt8( numElements, p );break;
-				case Token::JID_INT16:p->handler->uaInt16( numElements, p );break;
-				case Token::JID_INT32:p->handler->uaInt32( numElements, p );break;
-				case Token::JID_INT64:p->handler->uaInt64( numElements, p );break;
-				case Token::JID_REAL16:p->handler->uaReal16( numElements, p );break;
-				case Token::JID_REAL32:p->handler->uaReal32( numElements, p );break;
-				case Token::JID_REAL64:p->handler->uaReal64( numElements, p );break;
-				case Token::JID_UINT8:p->handler->uaUInt8( numElements, p );break;
-				case Token::JID_STRING:p->handler->uaString( numElements, p );break;
+				case Token::JID_BOOL: parser.handler->uaBool(element_count, parser); break;
+				case Token::JID_INT8: parser.handler->uaInt8(element_count, parser); break;
+				case Token::JID_INT16: parser.handler->uaInt16(element_count, parser); break;
+				case Token::JID_INT32: parser.handler->uaInt32(element_count, parser); break;
+				case Token::JID_INT64: parser.handler->uaInt64(element_count, parser); break;
+				case Token::JID_REAL16: parser.handler->uaReal16(element_count, parser); break;
+				case Token::JID_REAL32: parser.handler->uaReal32(element_count, parser); break;
+				case Token::JID_REAL64: parser.handler->uaReal64(element_count, parser); break;
+				case Token::JID_UINT8: parser.handler->uaUInt8(element_count, parser); break;
+				case Token::JID_STRING: parser.handler->uaString(element_count, parser); break;
 				case Token::JID_NULL:
 				case Token::JID_MAP_BEGIN:
 				case Token::JID_MAP_END:
@@ -146,14 +146,11 @@ namespace houio
 				case Token::JID_MAGIC:
 				case Token::JID_UINT16:
 				default:
-					p->fail(DiagnosticCategory::unsupported_input,
+					parser.fail(
+						DiagnosticCategory::unsupported_input,
 						"Token::event encountered an unsupported uniform-array type");
-				};
+				}
 			}
-
-
-
-
 		}
 
 
@@ -182,14 +179,25 @@ namespace houio
 				throw std::invalid_argument( "Parser nesting depth must be greater than zero" );
 		}
 
-		bool Parser::parse( std::istream *in, Handler *h )
+		bool Parser::parse(std::istream& input, Handler& event_handler)
 		{
-			return parse(in, h, nullptr);
+			return parseInternal(input, event_handler, nullptr);
 		}
 
-		bool Parser::parse( std::istream *in, Handler *h, DiagnosticList *outputDiagnostics )
+		bool Parser::parse(
+			std::istream& input,
+			Handler& event_handler,
+			DiagnosticList& output_diagnostics)
 		{
-			if( !in || !h || !in->good() )
+			return parseInternal(input, event_handler, &output_diagnostics);
+		}
+
+		bool Parser::parseInternal(
+			std::istream& input,
+			Handler& event_handler,
+			DiagnosticList* outputDiagnostics)
+		{
+			if (!input.good())
 			{
 				Diagnostic diagnostic{DiagnosticSeverity::error, DiagnosticCategory::io,
 					"Parser requires a readable input stream and a valid handler", 0, ""};
@@ -205,8 +213,8 @@ namespace houio
 			byteOffset = 0;
 			tokenOffset = -1;
 			knownInputBytes = -1;
-			handler = h;
-			stream = in;
+			handler = &event_handler;
+			stream = &input;
 
 			try
 			{
@@ -444,7 +452,7 @@ namespace houio
 					}
 
 					// call event handler for current token
-					t.event( this );
+					t.event(*this);
 					if( topLevelScalar )
 					{
 						state = STATE_COMPLETE;
@@ -460,14 +468,14 @@ namespace houio
 					{
 						// we will expect a key value seperator next
 						setState( STATE_MAP_SEPERATOR );
-						t.event( this, 1 );
+						t.event(*this, true);
 					}else
 					if( t.type == Token::JID_MAP_END )
 					{
 						if( !binary && state == STATE_MAP_NEED_KEY )
 							fail(DiagnosticCategory::malformed_input, "Parser encountered a map end after a trailing separator", tokenOffset);
 						popState();
-						t.event( this );
+						t.event(*this);
 						if( stateStack.empty() )
 							return true;
 					}else
@@ -487,7 +495,7 @@ namespace houio
 					if( t.type == Token::JID_MAP_END )
 					{
 						popState();
-						t.event( this );
+						t.event(*this);
 						if( stateStack.empty() )
 							return true;
 					}else
@@ -501,7 +509,7 @@ namespace houio
 					if( t.type == Token::JID_ARRAY_END )
 					{
 						popState();
-						t.event( this );
+						t.event(*this);
 						if( stateStack.empty() )
 							return true;
 					}else
@@ -737,10 +745,12 @@ namespace houio
 			if( stateStack.empty() )
 				fail(DiagnosticCategory::malformed_input, "Parser state stack underflow", tokenOffset);
 
-			int n = (int)stateStack.size();
+			if (stateStack.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
+				fail(DiagnosticCategory::malformed_input, "Parser state depth exceeds int range", tokenOffset);
+			const int previous_depth = static_cast<int>(stateStack.size());
 			stateStack.pop();
 
-			if( n == 1 )
+			if (previous_depth == 1)
 				state = STATE_COMPLETE;
 			else
 				state = stateStack.top();
@@ -834,8 +844,8 @@ namespace houio
 				fail(DiagnosticCategory::malformed_input, "Parser binary-string byte limit exceeded");
 
 			std::string value(static_cast<size_t>(length), '\0');
-			if( length > 0 )
-				read(value.data(), length);
+			if (length > 0)
+				read(std::span<char>(value.data(), value.size()));
 			return value;
 		}
 
@@ -909,17 +919,15 @@ namespace houio
 		// Writer ==================================================
 
 
-		BinaryWriter::BinaryWriter( std::ostream *out )
+		BinaryWriter::BinaryWriter(std::ostream& output)
+			: stream(output)
 		{
-			if( !out )
-				throw std::invalid_argument( "BinaryWriter requires a valid output stream" );
-			stream = out;
 			jsonMagic();
 		}
 
-		bool BinaryWriter::writeId( Token::Type id )
+		bool BinaryWriter::writeId(Token::Type id)
 		{
-			return write<ubyte>( (ubyte)id );
+			return write<ubyte>(static_cast<ubyte>(id));
 		}
 
 		bool BinaryWriter::writeLength( const sint64 &length )
@@ -971,8 +979,8 @@ namespace houio
 			const sint64 length = static_cast<sint64>(value.size());
 			writeId(Token::JID_STRING);
 			writeLength(length);
-			if( !value.empty() )
-				write<char>(value.data(), length);
+			if (!value.empty())
+				write(std::span<const char>(value.data(), value.size()));
 		}
 
 		void BinaryWriter::jsonKey( const std::string &key )
@@ -980,43 +988,49 @@ namespace houio
 			jsonString(key);
 		}
 
-		void BinaryWriter::jsonInt( const sint64 &value )
+		void BinaryWriter::jsonInt(const sint64& value)
 		{
-			if( (value >= -0x80) && (value < 0x80) )
+			if (value >= std::numeric_limits<sbyte>::min()
+				&& value <= std::numeric_limits<sbyte>::max())
 			{
-				writeId( Token::JID_INT8 );
-				write<sbyte>( (sbyte)value );
-			}else if( (value >= -0x8000) && (value < 0x8000) )
+				writeId(Token::JID_INT8);
+				write<sbyte>(static_cast<sbyte>(value));
+			}
+			else if (value >= std::numeric_limits<sword>::min()
+				&& value <= std::numeric_limits<sword>::max())
 			{
-				writeId( Token::JID_INT16 );
-				write<sword>( (sword)value );
-			}else if( (value >= -(sint64)0x80000000) && (value < (sint64)0x80000000) )
+				writeId(Token::JID_INT16);
+				write<sword>(static_cast<sword>(value));
+			}
+			else if (value >= std::numeric_limits<sint32>::min()
+				&& value <= std::numeric_limits<sint32>::max())
 			{
-				writeId( Token::JID_INT32 );
-				write<sint32>( (sint32)value );
-			}else
+				writeId(Token::JID_INT32);
+				write<sint32>(static_cast<sint32>(value));
+			}
+			else
 			{
-				writeId( Token::JID_INT64 );
-				write<sint64>( value );
+				writeId(Token::JID_INT64);
+				write<sint64>(value);
 			}
 		}
 
-		void BinaryWriter::jsonUInt8( const ubyte &value )
+		void BinaryWriter::jsonUInt8(const ubyte& value)
 		{
-			writeId( Token::JID_UINT8 );
-			write<sbyte>( (ubyte)value );
+			writeId(Token::JID_UINT8);
+			write<ubyte>(value);
 		}
 
-		void BinaryWriter::jsonInt8( const sbyte &value )
+		void BinaryWriter::jsonInt8(const sbyte& value)
 		{
-			writeId( Token::JID_INT8 );
-			write<sbyte>( (sbyte)value );
+			writeId(Token::JID_INT8);
+			write<sbyte>(value);
 		}
 
-		void BinaryWriter::jsonInt32( const sint32 &value )
+		void BinaryWriter::jsonInt32(const sint32& value)
 		{
-			writeId( Token::JID_INT32 );
-			write<sint32>( (sint32)value );
+			writeId(Token::JID_INT32);
+			write<sint32>(value);
 		}
 
 		void BinaryWriter::jsonInt64( const sint64 &value )
@@ -1037,16 +1051,15 @@ namespace houio
 			write<real64>(value );
 		}
 
-		bool BinaryWriter::jsonUniformArrayReal16( const uword *data, sint64 numElements )
+		bool BinaryWriter::jsonUniformArrayReal16(std::span<const uword> data)
 		{
-			if( numElements < 0 )
-				throw std::length_error( "BinaryWriter::jsonUniformArrayReal16 received a negative element count" );
-			if( numElements > 0 && !data )
-				throw std::invalid_argument( "BinaryWriter::jsonUniformArrayReal16 received null data" );
+			if (data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
+				throw std::length_error("BinaryWriter::jsonUniformArrayReal16 element count exceeds sint64 range");
+			const sint64 element_count = static_cast<sint64>(data.size());
 			return writeId(Token::JID_UNIFORM_ARRAY)
 				&& write<sbyte>(static_cast<sbyte>(Token::JID_REAL16))
-				&& writeLength(numElements)
-				&& write<uword>(data, numElements);
+				&& writeLength(element_count)
+				&& write(data);
 		}
 
 		void BinaryWriter::jsonBool( const bool &value )
@@ -1061,17 +1074,14 @@ namespace houio
 
 		// ASCIIWriter =============================================
 
-		ASCIIWriter::ASCIIWriter( std::ostream *out )
+		ASCIIWriter::ASCIIWriter(std::ostream& output)
+			: stream(output)
 		{
-			stream = out;
-			gotKey = false;
-			firstItem = false;
-			indentLevel = 0;
 		}
 
 		void ASCIIWriter::write( const std::string &text )
 		{
-			stream->write( text.c_str(), text.size() );
+			stream.write(text.c_str(), static_cast<std::streamsize>(text.size()));
 		}
 
 		void ASCIIWriter::jsonBeginArray()
@@ -1222,179 +1232,195 @@ namespace houio
 
 		
 		// Value ----
-		Value::Value() : m_type(Value::TYPE_NULL)
-		{
-		}
-
-		void Value::cpyTo( char *dst )const
-		{
-			if( !dst )
-				throw std::invalid_argument( "Value::cpyTo received a null destination" );
-			switch( m_value.which() )
-			{
-			case 0: std::memcpy(dst, &ttl::var::get<bool>(m_value), sizeof(bool));break;
-			case 1: std::memcpy(dst, &ttl::var::get<sint32>(m_value), sizeof(sint32));break;
-			case 2: std::memcpy(dst, &ttl::var::get<real32>(m_value), sizeof(real32));break;
-			case 3: std::memcpy(dst, &ttl::var::get<real64>(m_value), sizeof(real64));break;
-			case 4: throw std::invalid_argument( "Value::cpyTo does not support strings" );
-			case 5: std::memcpy(dst, &ttl::var::get<ubyte>(m_value), sizeof(ubyte));break;
-			case 6: std::memcpy(dst, &ttl::var::get<sint64>(m_value), sizeof(sint64));break;
-			default: throw std::runtime_error( "Value::cpyTo encountered an invalid variant type" );
-			}
-		}
-
 		ArrayPtr Value::asArray()
 		{
-			return m_array;
+			return array_;
+		}
+
+		ConstArrayPtr Value::asArray() const
+		{
+			return array_;
 		}
 
 		ObjectPtr Value::asObject()
 		{
-			return m_object;
+			return object_;
 		}
 
-		Value::Variant &Value::getVariant()
+		ConstObjectPtr Value::asObject() const
 		{
-			return m_value;
+			return object_;
 		}
 
-		bool Value::isNull()const
+		Value::Variant& Value::variant() noexcept
 		{
-			return m_type==TYPE_NULL;
+			return scalar_;
 		}
 
-		bool Value::isArray()const
+		const Value::Variant& Value::variant() const noexcept
 		{
-			return m_type==TYPE_ARRAY;
+			return scalar_;
 		}
 
-		bool Value::isObject()const
+		bool Value::isNull() const noexcept
 		{
-			return m_type==TYPE_OBJECT;
+			return kind_ == Kind::null;
 		}
 
-		bool Value::isString()const
+		bool Value::isArray() const noexcept
 		{
-			return m_value.which()==4;
+			return kind_ == Kind::array;
+		}
+
+		bool Value::isObject() const noexcept
+		{
+			return kind_ == Kind::object;
+		}
+
+		bool Value::isString() const noexcept
+		{
+			return kind_ == Kind::scalar && std::holds_alternative<std::string>(scalar_);
 		}
 
 		Value Value::createArray()
 		{
-			Value v;
-			v.m_type = TYPE_ARRAY;
-			v.m_array = ArrayPtr( new Array() );
-			return v;
+			return createArray(Array::create());
 		}
+
 		Value Value::createArray(ArrayPtr array)
 		{
-			Value v;
-			v.m_type = TYPE_ARRAY;
-			v.m_array = array;
-			return v;
+			if (!array)
+				throw std::invalid_argument("Value::createArray received a null array");
+			Value result;
+			result.kind_ = Kind::array;
+			result.array_ = std::move(array);
+			return result;
 		}
 
 		Value Value::createObject()
 		{
-			Value v;
-			v.m_type = TYPE_OBJECT;
-			v.m_object = Object::create();
-			return v;
+			return createObject(Object::create());
 		}
 
-		Value Value::createObject(ObjectPtr obj)
+		Value Value::createObject(ObjectPtr object)
 		{
-			Value v;
-			v.m_type = TYPE_OBJECT;
-			v.m_object = obj;
-			return v;
+			if (!object)
+				throw std::invalid_argument("Value::createObject received a null object");
+			Value result;
+			result.kind_ = Kind::object;
+			result.object_ = std::move(object);
+			return result;
 		}
 
 		// Array ----
-		Array::Array() : m_isUniform(false), m_uniformdata(nullptr), m_numUniformElements(0), m_uniformType(-1)
-		{
-		}
-
-		Array::~Array()
-		{
-			if( m_isUniform && m_uniformdata )
-				free(m_uniformdata);
-		}
-
 		ArrayPtr Array::create()
 		{
 			return std::make_shared<Array>();
 		}
 
-		bool Array::isUniform()const
+		bool Array::isUniform() const noexcept
 		{
-			return m_isUniform;
+			return uses_uniform_storage_;
 		}
 
-		void Array::append( const Value &value )
+		std::span<const Value> Array::elements() const noexcept
 		{
-			m_values.push_back( value );
+			return values_;
 		}
 
-		void Array::append(ObjectPtr &object)
+		std::span<const std::byte> Array::uniformData() const noexcept
 		{
-			Value v;
-			v.m_type = Value::TYPE_OBJECT;
-			v.m_object = object;
-			append(v);
+			return uniform_data_;
 		}
 
-		void Array::append(ArrayPtr &array)
+		sint64 Array::uniformElementCount() const noexcept
 		{
-			Value v;
-			v.m_type = Value::TYPE_ARRAY;
-			v.m_array = array;
-			append(v);
+			return uniform_element_count_;
 		}
 
-		sint64 Array::size()const
+		int Array::uniformTypeIndex() const noexcept
 		{
-			if( m_isUniform )
-				return m_numUniformElements;
-			if( m_values.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
-				throw std::length_error( "Array size exceeds sint64 range" );
-			return static_cast<sint64>(m_values.size());
+			return uniform_type_index_;
 		}
 
-		Value Array::getValue( const int index )
+		void Array::setUniformStorage(
+			int type_index,
+			sint64 element_count,
+			std::span<const std::byte> data)
 		{
-			const sint64 elementCount = size();
-			if( index < 0 || static_cast<sint64>(index) >= elementCount )
-				throw std::out_of_range( "Array index is out of range" );
-			if( !m_isUniform )
-				return m_values[static_cast<size_t>(index)];
-			if( !m_uniformdata )
-				throw std::runtime_error( "Uniform array has no storage" );
+			if (type_index < 0)
+				throw std::invalid_argument("Uniform array type index cannot be negative");
+			if (element_count < 0)
+				throw std::invalid_argument("Uniform array element count cannot be negative");
+			if (!values_.empty())
+				throw std::logic_error("Uniform storage cannot replace expanded array values");
+			uses_uniform_storage_ = true;
+			uniform_type_index_ = type_index;
+			uniform_element_count_ = element_count;
+			uniform_data_.assign(data.begin(), data.end());
+		}
 
-			const size_t elementIndex = static_cast<size_t>(index);
-			switch( m_uniformType )
+		void Array::append(const Value& value)
+		{
+			if (uses_uniform_storage_)
+				throw std::logic_error("Expanded values cannot be appended to a uniform array");
+			values_.push_back(value);
+		}
+
+		void Array::append(ObjectPtr object)
+		{
+			append(Value::createObject(std::move(object)));
+		}
+
+		void Array::append(ArrayPtr array)
+		{
+			append(Value::createArray(std::move(array)));
+		}
+
+		sint64 Array::size() const
+		{
+			if (uses_uniform_storage_)
+				return uniform_element_count_;
+			if (values_.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
+				throw std::length_error("Array size exceeds sint64 range");
+			return static_cast<sint64>(values_.size());
+		}
+
+		Value Array::value(int index) const
+		{
+			const sint64 element_count = size();
+			if (index < 0 || static_cast<sint64>(index) >= element_count)
+				throw std::out_of_range("Array index is out of range");
+			if (!uses_uniform_storage_)
+				return values_[static_cast<size_t>(index)];
+			if (uniform_element_count_ > 0 && uniform_data_.empty())
+				throw std::runtime_error("Uniform array has no storage");
+
+			const size_t element_index = static_cast<size_t>(index);
+			switch (uniform_type_index_)
 			{
 			case 0:
 			{
 				bool value = false;
-				std::memcpy(&value, m_uniformdata + sizeof(bool) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data_.data() + sizeof(bool) * element_index, sizeof(value));
 				return Value::create<bool>(value);
 			}
 			case 1:
 			{
 				sint32 value = 0;
-				std::memcpy(&value, m_uniformdata + sizeof(sint32) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data_.data() + sizeof(sint32) * element_index, sizeof(value));
 				return Value::create<sint32>(value);
 			}
 			case 2:
 			{
 				real32 value = 0.0f;
-				std::memcpy(&value, m_uniformdata + sizeof(real32) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data_.data() + sizeof(real32) * element_index, sizeof(value));
 				return Value::create<real32>(value);
 			}
 			case 3:
 			{
 				real64 value = 0.0;
-				std::memcpy(&value, m_uniformdata + sizeof(real64) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data_.data() + sizeof(real64) * element_index, sizeof(value));
 				return Value::create<real64>(value);
 			}
 			case 4:
@@ -1402,13 +1428,13 @@ namespace houio
 			case 5:
 			{
 				ubyte value = 0;
-				std::memcpy(&value, m_uniformdata + sizeof(ubyte) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data_.data() + sizeof(ubyte) * element_index, sizeof(value));
 				return Value::create<ubyte>(value);
 			}
 			case 6:
 			{
 				sint64 value = 0;
-				std::memcpy(&value, m_uniformdata + sizeof(sint64) * elementIndex, sizeof(value));
+				std::memcpy(&value, uniform_data_.data() + sizeof(sint64) * element_index, sizeof(value));
 				return Value::create<sint64>(value);
 			}
 			default:
@@ -1417,22 +1443,20 @@ namespace houio
 		}
 
 
-		ObjectPtr                getObject( int index );
-		ObjectPtr Array::getObject( int index )
+		ObjectPtr Array::object(int index) const
 		{
-			Value v = getValue(index);
-			if(v.isObject())
-				return v.asObject();
-			return ObjectPtr();
+			const Value value = this->value(index);
+			return value.isObject()
+				? std::const_pointer_cast<Object>(value.asObject())
+				: nullptr;
 		}
 
-
-		ArrayPtr Array::getArray( int index )
+		ArrayPtr Array::array(int index) const
 		{
-			Value v = getValue(index);
-			if(v.isArray())
-				return v.asArray();
-			return ArrayPtr();
+			const Value value = this->value(index);
+			return value.isArray()
+				? std::const_pointer_cast<Array>(value.asArray())
+				: nullptr;
 		}
 
 		// Object ----
@@ -1441,256 +1465,266 @@ namespace houio
 			return std::make_shared<Object>();
 		}
 
-		bool Object::hasKey( const std::string &key )
+		bool Object::contains(const std::string& key) const
 		{
-			return m_values.find(key) != m_values.end();
+			return entries_.contains(key);
 		}
 
-		Value Object::getValue( const std::string &key )
+		Value Object::value(const std::string& key) const
 		{
-			std::map<std::string, Value>::iterator it = m_values.find( key );
-			if( it != m_values.end())
-				return it->second;
-			return Value();
+			const auto entry = entries_.find(key);
+			return entry == entries_.end() ? Value() : entry->second;
 		}
 
-		void Object::getKeys( std::vector<std::string> &keys )
+		std::vector<std::string> Object::keys() const
 		{
-			keys.clear();
-			for( std::map<std::string, Value>::iterator it = m_values.begin(), end = m_values.end(); it != end; ++it )
-				keys.push_back(it->first);
+			std::vector<std::string> result;
+			result.reserve(entries_.size());
+			for (const auto& [key, value] : entries_)
+			{
+				static_cast<void>(value);
+				result.push_back(key);
+			}
+			return result;
 		}
 
-		ObjectPtr Object::getObject( const std::string &key )
+		ObjectPtr Object::object(const std::string& key) const
 		{
-			Value v = getValue(key);
-			if(v.isObject())
-				return v.asObject();
-			return ObjectPtr();
+			const Value value = this->value(key);
+			return value.isObject()
+				? std::const_pointer_cast<Object>(value.asObject())
+				: nullptr;
 		}
 
-		ArrayPtr Object::getArray( const std::string &key )
+		ArrayPtr Object::array(const std::string& key) const
 		{
-			Value v = getValue(key);
-			if(v.isArray())
-				return v.asArray();
-			return ArrayPtr();
-		}
-		
-		sint64 Object::size()const
-		{
-			if( m_values.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()) )
-				throw std::length_error( "Object size exceeds sint64 range" );
-			return static_cast<sint64>(m_values.size());
+			const Value value = this->value(key);
+			return value.isArray()
+				? std::const_pointer_cast<Array>(value.asArray())
+				: nullptr;
 		}
 
-		void Object::append( const std::string &key, const Value &value )
+		sint64 Object::size() const
 		{
-			if( !m_values.emplace(key, value).second )
-				throw std::runtime_error( "Object contains duplicate key " + key );
+			if (entries_.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
+				throw std::length_error("Object size exceeds sint64 range");
+			return static_cast<sint64>(entries_.size());
 		}
 
-		void Object::append( const std::string &key, ObjectPtr object )
+		const Object::EntryMap& Object::entries() const noexcept
 		{
-			Value v;
-			v.m_type = Value::TYPE_OBJECT;
-			v.m_object = object;
-			append(key, v);
+			return entries_;
 		}
 
-		void Object::append(const std::string &key, ArrayPtr array)
+		void Object::append(const std::string& key, const Value& value)
 		{
-			Value v;
-			v.m_type = Value::TYPE_ARRAY;
-			v.m_array = array;
-			append(key, v);
+			if (!entries_.emplace(key, value).second)
+				throw std::runtime_error("Object contains duplicate key " + key);
+		}
+
+		void Object::append(const std::string& key, ObjectPtr object)
+		{
+			append(key, Value::createObject(std::move(object)));
+		}
+
+		void Object::append(const std::string& key, ArrayPtr array)
+		{
+			append(key, Value::createArray(std::move(array)));
 		}
 
 		// JSONReader ===============================================
 
-		JSONReader::JSONReader()
+		Value JSONReader::root() const
 		{
-
+			return root_;
 		}
 
-		Value JSONReader::getRoot()
+		void JSONReader::pushContainer()
 		{
-			return m_root;
+			if (!root_.isNull())
+				stack_.emplace(root_, next_key_);
 		}
 
-		void JSONReader::push()
+		void JSONReader::popContainer()
 		{
-			if( !m_root.isNull() )
-				m_stack.push( std::make_pair(m_root, nextKey) );
-		}
-
-		void JSONReader::pop()
-		{
-			if( !m_stack.empty() )
-			{
-				Value v = m_root;
-				StackItem si = m_stack.top();
-				m_root = si.first;
-				m_stack.pop();
-				if( m_root.isArray() )
-					m_root.asArray()->append(v);
-				else
-				if( m_root.isObject() )
-					m_root.asObject()->append(si.second, v);
-			}
+			if (stack_.empty())
+				return;
+			Value completed_container = root_;
+			StackItem parent = stack_.top();
+			stack_.pop();
+			root_ = std::move(parent.first);
+			if (root_.isArray())
+				root_.asArray()->append(completed_container);
+			else if (root_.isObject())
+				root_.asObject()->append(parent.second, completed_container);
+			else
+				throw std::runtime_error("JSONReader parent is not a container");
 		}
 
 		void JSONReader::jsonBeginArray()
 		{
-			push();
-			m_root = Value::createArray();
+			pushContainer();
+			root_ = Value::createArray();
 		}
 
 		void JSONReader::jsonEndArray()
 		{
-			pop();
+			if (!root_.isArray())
+				throw std::runtime_error("JSONReader received an array end without an array");
+			popContainer();
 		}
 
 		void JSONReader::jsonBeginMap()
 		{
-			push();
-			m_root = Value::createObject();
+			pushContainer();
+			root_ = Value::createObject();
 		}
 
 		void JSONReader::jsonEndMap()
 		{
-			pop();
+			if (!root_.isObject())
+				throw std::runtime_error("JSONReader received a map end without a map");
+			popContainer();
 		}
 
-		void JSONReader::jsonKey( const std::string &key )
+		void JSONReader::jsonKey(const std::string& key)
 		{
-			nextKey = key;
+			if (!root_.isObject())
+				throw std::runtime_error("JSONReader received a key outside an object");
+			next_key_ = key;
 		}
 
-		void JSONReader::jsonString( const std::string &value )
+		void JSONReader::jsonString(const std::string& value)
 		{
 			jsonValue<std::string>(value);
 		}
 
-		void JSONReader::jsonBool( const bool &value )
+		void JSONReader::jsonBool(const bool& value)
 		{
 			jsonValue<bool>(value);
 		}
 
-		void JSONReader::jsonInt32( const sint32 &value )
+		void JSONReader::jsonInt32(const sint32& value)
 		{
 			jsonValue<sint32>(value);
 		}
 
-		void JSONReader::jsonInt64( const sint64 &value )
+		void JSONReader::jsonInt64(const sint64& value)
 		{
 			jsonValue<sint64>(value);
 		}
 
-		void JSONReader::jsonReal32( const real32 &value )
+		void JSONReader::jsonReal32(const real32& value)
 		{
 			jsonValue<real32>(value);
 		}
 
-		void JSONReader::jsonReal64( const real64 &value )
+		void JSONReader::jsonReal64(const real64& value)
 		{
 			jsonValue<real64>(value);
 		}
 
-
-		void JSONReader::uaBool( sint64 numElements, Parser *parser )
+		void JSONReader::uaBool(sint64 element_count, Parser& parser)
 		{
-			if( numElements < 0 )
-				throw std::length_error( "JSONReader::uaBool received a negative element count" );
-
+			if (element_count < 0)
+				throw std::length_error("JSONReader::uaBool received a negative element count");
 			jsonBeginArray();
-			sint64 elementsRemaining = numElements;
-			while( elementsRemaining > 0 )
+			sint64 elements_remaining = element_count;
+			while (elements_remaining > 0)
 			{
-				const uint32 bits = parser->read<uint32>();
-				const int bitCount = static_cast<int>(std::min<sint64>(elementsRemaining, 32));
-				elementsRemaining -= bitCount;
-				for( int bitIndex=0;bitIndex<bitCount;++bitIndex )
-					jsonBool( (bits & (uint32(1) << bitIndex)) != 0 );
+				const uint32 bits = parser.read<uint32>();
+				const int bit_count = static_cast<int>(std::min<sint64>(elements_remaining, 32));
+				elements_remaining -= bit_count;
+				for (int bit_index = 0; bit_index < bit_count; ++bit_index)
+					jsonBool((bits & (uint32{1} << bit_index)) != 0);
 			}
 			jsonEndArray();
 		}
 
-		void JSONReader::uaReal16( sint64 numElements, Parser *parser )
+		void JSONReader::uaReal16(sint64 element_count, Parser& parser)
 		{
-			if( numElements < 0 )
-				throw std::length_error( "JSONReader::uaReal16 received a negative element count" );
+			if (element_count < 0)
+				throw std::length_error("JSONReader::uaReal16 received a negative element count");
 			jsonBeginArray();
-			for( sint64 elementIndex=0;elementIndex<numElements;++elementIndex )
-				jsonReal32(halfBitsToFloat(parser->read<uword>()));
+			for (sint64 element_index = 0; element_index < element_count; ++element_index)
+				jsonReal32(halfBitsToFloat(parser.read<uword>()));
 			jsonEndArray();
 		}
 
-		void JSONReader::uaReal32( sint64 numElements, Parser *parser )
+		void JSONReader::uaReal32(sint64 element_count, Parser& parser)
 		{
-			jsonUA<real32, real32>(numElements, parser);
+			jsonUniformArray<real32, real32>(element_count, parser);
 		}
 
-		void JSONReader::uaReal64( sint64 numElements, Parser *parser )
+		void JSONReader::uaReal64(sint64 element_count, Parser& parser)
 		{
-			jsonUA<real64, real64>(numElements, parser);
+			jsonUniformArray<real64, real64>(element_count, parser);
 		}
 
-		void JSONReader::uaInt8( sint64 numElements, Parser *parser )
+		void JSONReader::uaInt8(sint64 element_count, Parser& parser)
 		{
-			jsonUA<sint32, sbyte>(numElements, parser);
+			jsonUniformArray<sint32, sbyte>(element_count, parser);
 		}
 
-		void JSONReader::uaInt16( sint64 numElements, Parser *parser )
+		void JSONReader::uaInt16(sint64 element_count, Parser& parser)
 		{
-			jsonUA<sint32, sword>(numElements, parser);
+			jsonUniformArray<sint32, sword>(element_count, parser);
 		}
 
-		void JSONReader::uaInt32( sint64 numElements, Parser *parser )
+		void JSONReader::uaInt32(sint64 element_count, Parser& parser)
 		{
-			jsonUA<sint32, sint32>(numElements, parser);
+			jsonUniformArray<sint32, sint32>(element_count, parser);
 		}
 
-		void JSONReader::uaInt64( sint64 numElements, Parser *parser )
+		void JSONReader::uaInt64(sint64 element_count, Parser& parser)
 		{
-			jsonUA<sint64, sint64>(numElements, parser);
+			jsonUniformArray<sint64, sint64>(element_count, parser);
 		}
 
-		void JSONReader::uaUInt8( sint64 numElements, Parser *parser )
+		void JSONReader::uaUInt8(sint64 element_count, Parser& parser)
 		{
-			jsonUA<ubyte, ubyte>(numElements, parser);
+			jsonUniformArray<ubyte, ubyte>(element_count, parser);
 		}
 
-		
-		void JSONReader::uaString( sint64 numElements, Parser *parser )
+		void JSONReader::uaString(sint64 element_count, Parser& parser)
 		{
+			if (element_count < 0)
+				throw std::length_error("JSONReader::uaString received a negative element count");
 			jsonBeginArray();
-			for(sint64 i=0;i<numElements;++i)
-				jsonString( parser->readBinaryString() );
+			for (sint64 element_index = 0; element_index < element_count; ++element_index)
+				jsonString(parser.readBinaryString());
 			jsonEndArray();
 		}
 
 
 		// JSONWriter =========================================
 
-		bool JSONWriter::write( ObjectPtr object )
+		bool JSONWriter::write(ObjectPtr object)
 		{
-			m_writer->jsonBeginMap();
-			for( std::map<std::string, Value>::iterator it = object->m_values.begin(), end = object->m_values.end(); it != end; ++it )
+			if (!object)
+				throw std::invalid_argument("JSONWriter::write received a null object");
+			writer_->jsonBeginMap();
+			for (const auto& [key, value] : object->entries())
 			{
-				m_writer->jsonKey( it->first );
-				write( it->second );
+				writer_->jsonKey(key);
+				Value writable_value = value;
+				write(writable_value);
 			}
-			m_writer->jsonEndMap();
+			writer_->jsonEndMap();
 			return true;
 		}
 
-		bool JSONWriter::write( ArrayPtr array )
+		bool JSONWriter::write(ArrayPtr array)
 		{
-			m_writer->jsonBeginArray();
-			for( std::vector<Value>::iterator it = array->m_values.begin(), end = array->m_values.end(); it != end; ++it )
-				write( *it );
-			m_writer->jsonEndArray();
+			if (!array)
+				throw std::invalid_argument("JSONWriter::write received a null array");
+			writer_->jsonBeginArray();
+			for (const Value& value : array->elements())
+			{
+				Value writable_value = value;
+				write(writable_value);
+			}
+			writer_->jsonEndArray();
 			return true;
 		}
 
@@ -1704,7 +1738,7 @@ namespace houio
 			else
 			if( !value.isNull() )
 			{
-				ttl::var::apply_visitor( *this, value.getVariant() );
+				std::visit(*this, value.variant());
 			}
 			return false;
 		}

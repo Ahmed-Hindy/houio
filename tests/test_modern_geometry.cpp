@@ -147,82 +147,83 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
     {
         return fail("geometry is null");
     }
-    if (geometry->pointcount() != 4 || geometry->vertexcount() != 4 || geometry->primitivecount() != 1)
+    if (geometry->pointCount() != 4 || geometry->vertexCount() != 4 || geometry->primitiveCount() != 1)
     {
         return fail("unexpected geometry counts");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr position = geometry->getPointAttribute("P");
+    houio::HouGeoAdapter::AttributeAdapter::Ptr position = geometry->pointAttribute("P");
     if (!position)
     {
         return fail("modern tuple-based P attribute is missing");
     }
-    if (position->getTupleSize() != expectedPositionTupleSize || position->getNumElements() != 4)
+    if (position->tupleSize() != expectedPositionTupleSize || position->elementCount() != 4)
     {
         return fail(
-            "unexpected P metadata: tuple_size=" + std::to_string(position->getTupleSize())
-            + ", elements=" + std::to_string(position->getNumElements()));
+            "unexpected P metadata: tuple_size=" + std::to_string(position->tupleSize())
+            + ", elements=" + std::to_string(position->elementCount()));
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr normals = geometry->getVertexAttribute("N");
-    if (!normals || normals->getTupleSize() != 3 || normals->getNumElements() != 4)
+    houio::HouGeoAdapter::AttributeAdapter::Ptr normals = geometry->vertexAttribute("N");
+    if (!normals || normals->tupleSize() != 3 || normals->elementCount() != 4)
     {
         return fail("vertex N attribute was not preserved");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr uv = geometry->getVertexAttribute("uv");
-    if (!uv || uv->getTupleSize() != 2 || uv->getNumElements() != 4)
+    houio::HouGeoAdapter::AttributeAdapter::Ptr uv = geometry->vertexAttribute("uv");
+    if (!uv || uv->tupleSize() != 2 || uv->elementCount() != 4)
     {
         return fail("vertex uv attribute was not preserved");
     }
 
-    const auto* normalData = static_cast<const houio::real32*>(normals->getRawPointer()->ptr);
-    const auto* uvData = static_cast<const houio::real32*>(uv->getRawPointer()->ptr);
-    if (!normalData || normalData[2] != 1.0f || !uvData || uvData[4] != 1.0f || uvData[5] != 1.0f)
+    const auto normal_data = normals->rawData();
+    const auto uv_data = uv->rawData();
+    if (!normal_data.available() || normal_data.read<houio::real32>(2) != 1.0f
+        || !uv_data.available() || uv_data.read<houio::real32>(4) != 1.0f
+        || uv_data.read<houio::real32>(5) != 1.0f)
     {
         return fail("representative vertex attribute values were not preserved");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr name = geometry->getPrimitiveAttribute("name");
-    if (!name || name->getType() != houio::HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING
-        || name->getNumElements() != 1 || name->getString(0) != "prop")
+    houio::HouGeoAdapter::AttributeAdapter::Ptr name = geometry->primitiveAttribute("name");
+    if (!name || name->type() != houio::HouGeoAdapter::AttributeAdapter::Type::string
+        || name->elementCount() != 1 || name->stringValue(0) != "prop")
     {
         return fail("indexed primitive string attribute was not preserved");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr piece = geometry->getPrimitiveAttribute("piece");
-    if (!piece || piece->getStorage() != houio::HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32
-        || piece->getTupleSize() != 1 || piece->getNumElements() != 1)
+    houio::HouGeoAdapter::AttributeAdapter::Ptr piece = geometry->primitiveAttribute("piece");
+    if (!piece || piece->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::int32
+        || piece->tupleSize() != 1 || piece->elementCount() != 1)
     {
         return fail("primitive integer attribute metadata was not preserved");
     }
-    const auto* pieceData = static_cast<const houio::sint32*>(piece->getRawPointer()->ptr);
-    if (!pieceData || pieceData[0] != 7)
+    const auto piece_data = piece->rawData();
+    if (!piece_data.available() || piece_data.read<houio::sint32>(0) != 7)
     {
         return fail("primitive integer attribute value was not preserved");
     }
 
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
-    geometry->getPrimitives(primitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
     if (primitives.size() != 1)
     {
         return fail("unexpected primitive container count");
     }
 
     const auto polygon = std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(primitives.front());
-    if (!polygon || polygon->numPolys() != 1 || polygon->numVertices(0) != 4)
+    if (!polygon || polygon->polygonCount() != 1 || polygon->polygonVertexCount(0) != 4)
     {
         return fail("Polygon_run was not expanded correctly");
     }
 
     houio::Geometry::Ptr converted = houio::HouGeoIO::convertToGeometry(geometry, primitives.front());
-    if (!converted || converted->numPrimitives() != 1)
+    if (!converted || converted->primitiveCount() != 1)
     {
         return fail("failed to convert modern geometry to the simplified mesh model");
     }
 
-    houio::Attribute::Ptr convertedPositions = converted->getAttr("P");
-    houio::Attribute::Ptr convertedUv = converted->getAttr("UV");
+    houio::Attribute::Ptr convertedPositions = converted->attribute("P");
+    houio::Attribute::Ptr convertedUv = converted->attribute("UV");
     if (!convertedPositions || convertedPositions->numElements() != 4 || !convertedUv
         || convertedUv->numElements() != 4)
     {
@@ -244,19 +245,19 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
 int main()
 {
     std::istringstream source(modernQuadGeometry());
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&source);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(source);
     if (const int result = verifyGeometry(geometry, 3); result != 0)
     {
         return result;
     }
 
     std::ostringstream binaryOutput(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::xport(&binaryOutput, geometry, true))
+    if (!houio::HouGeoIO::exportGeometry(binaryOutput, geometry, true))
     {
         return fail("failed to export modern quad geometry");
     }
 
     std::istringstream binaryInput(binaryOutput.str(), std::ios::in | std::ios::binary);
-    houio::HouGeo::Ptr roundtripGeometry = houio::HouGeoIO::import(&binaryInput);
+    houio::HouGeo::Ptr roundtripGeometry = houio::HouGeoIO::import(binaryInput);
     return verifyGeometry(roundtripGeometry, 4);
 }

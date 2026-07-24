@@ -23,7 +23,7 @@ int main()
     houio::json::Parser parser;
     houio::DiagnosticList diagnostics;
 
-    if (!parser.parse(&input, &logger, &diagnostics))
+    if (!parser.parse(input, logger, diagnostics))
     {
         return fail("JSON logger rejected a valid modern geometry header");
     }

@@ -1,207 +1,173 @@
-/*---------------------------------------------------------------------
-
-
-
-----------------------------------------------------------------------*/
 #pragma once
-#include "Vec3.h"
-#include "Vec3Algo.h"
-#include "Matrix33.h"
-#include "BoundingBox3.h"
-#include <limits>
+
 #include <algorithm>
-#include <cassert>
+#include <cmath>
+#include <limits>
 
+#include <houio/math/BoundingBox3.h>
+#include <houio/math/Matrix33.h>
+#include <houio/math/Vec3.h>
+#include <houio/math/Vec3Algo.h>
 
-namespace houio
+namespace houio::math
 {
+    template<typename T>
+    class Ray3
+    {
+    public:
+        Vec3<T> origin;
+        Vec3<T> direction;
+        T minimumDistance = T{};
+        T maximumDistance = std::numeric_limits<T>::max();
 
-namespace math
-{
-	/// \brief a class which holds an origin and a target and is used by intersection routines
-	template<typename T>
-	class Ray3
-	{
-	public:
-		Ray3();                                                                                   // constructor
-		Ray3( const math::Vec3<T> &origin, const math::Vec3<T> &direction, const T &_tmin, const T &_tmax = std::numeric_limits<T>::max());       // constructor
+        constexpr Ray3() noexcept = default;
 
-		math::Vec3<T>                                                    getPosition( T t )const; // returns origin+direction*t
-		math::Vec3<T>                                                     operator()( T t )const; // returns origin+direction*t
+        constexpr Ray3(
+            const Vec3<T>& ray_origin,
+            const Vec3<T>& ray_direction,
+            T minimum_distance = T{},
+            T maximum_distance = std::numeric_limits<T>::max()) noexcept
+            : origin(ray_origin),
+              direction(ray_direction),
+              minimumDistance(minimum_distance),
+              maximumDistance(maximum_distance)
+        {
+        }
 
-		math::Vec3<T>                                                                          o; // point in space where the ray originates from
-		math::Vec3<T>                                                                          d; // normalized direction of the ray
-		T                                                                             tmin, tmax; // valid ray segment
-	};
+        [[nodiscard]] constexpr Vec3<T> position(T distance) const noexcept
+        {
+            return origin + direction * distance;
+        }
 
-	
+        [[nodiscard]] constexpr Vec3<T> operator()(T distance) const noexcept
+        {
+            return position(distance);
+        }
 
-	// constructor
-	template<typename T>
-	Ray3<T>::Ray3() : tmin(0.0f), tmax(std::numeric_limits<T>::max())
-	{
-	}
+        [[nodiscard]] constexpr bool contains(T distance) const noexcept
+        {
+            return distance >= minimumDistance && distance <= maximumDistance;
+        }
+    };
 
-	// constructor
-	template<typename T>
-	Ray3<T>::Ray3( const math::Vec3<T> &origin, const math::Vec3<T> &direction, const T &_tmin, const T &_tmax ) : o(origin), d(direction), tmin(_tmin), tmax(_tmax)
-	{
-	}
+    template<typename T>
+    [[nodiscard]] bool intersectionRayPlane(
+        const Ray3<T>& ray,
+        const Vec3<T>& normal,
+        T plane_distance,
+        Vec3<T>& hit_point)
+    {
+        const T denominator = dot(ray.direction, normal);
+        if (denominator == T{})
+            return false;
 
+        const T hit_distance = -(dot(normal, ray.origin) + plane_distance) / denominator;
+        if (hit_distance <= ray.minimumDistance || hit_distance >= ray.maximumDistance)
+            return false;
 
-	// returns origin+direction*t
-	template<typename T>
-	math::Vec3<T> Ray3<T>::getPosition( T t )const
-	{
-		return o + d*t;
-	}
+        hit_point = ray.position(hit_distance);
+        return true;
+    }
 
-	template<typename T>
-	math::Vec3<T> Ray3<T>::operator()( T t )const // returns origin+direction*t
-	{
-		return o + d*t;
-	}
-	
+    template<typename T>
+    [[nodiscard]] bool intersectionRayRay(
+        const Ray3<T>& first_ray,
+        const Ray3<T>& second_ray,
+        Vec3<T>& hit_point)
+    {
+        const Vec3<T> cross_direction = cross(first_ray.direction, second_ray.direction);
+        const T denominator = cross_direction.squaredLength();
+        if (denominator == T{})
+            return false;
 
+        const Vec3<T> origin_delta = second_ray.origin - first_ray.origin;
+        const T first_distance = Matrix33<T>(
+            origin_delta.x, second_ray.direction.x, cross_direction.x,
+            origin_delta.y, second_ray.direction.y, cross_direction.y,
+            origin_delta.z, second_ray.direction.z, cross_direction.z).determinant() / denominator;
+        const T second_distance = Matrix33<T>(
+            origin_delta.x, first_ray.direction.x, cross_direction.x,
+            origin_delta.y, first_ray.direction.y, cross_direction.y,
+            origin_delta.z, first_ray.direction.z, cross_direction.z).determinant() / denominator;
 
+        if (!first_ray.contains(first_distance) || !second_ray.contains(second_distance))
+            return false;
 
+        hit_point = second_ray.position(second_distance);
+        return true;
+    }
 
+    template<typename T>
+    [[nodiscard]] bool intersectionRaySphere(
+        const Ray3<T>& ray,
+        T radius,
+        T& near_distance,
+        T& far_distance)
+    {
+        if (radius < T{})
+            return false;
 
-	//
-	// ray related functions
-	//
+        const T direction_length_squared = dot(ray.direction, ray.direction);
+        if (direction_length_squared == T{})
+            return false;
 
-	//bool RayHitSphere( const Vector &vSpherePosition, const float &fSphereRadius, CRay &oRay );
-	//bool RayHitSphereValues( const Vector &vSpherePosition, const float &fSphereRadius, CRay &oRay, float &fHitNear, float &fHitFar, Vector *pHitPointNear, Vector *pHitPointFar );
+        const T half_linear = dot(ray.direction, ray.origin);
+        const T constant = dot(ray.origin, ray.origin) - radius * radius;
+        const T discriminant = half_linear * half_linear
+            - direction_length_squared * constant;
+        if (discriminant < T{})
+            return false;
 
-	//bool RayHitPlane( const Vector &vPlaneNormal, const float &fD, CRay &oRay );
-	//bool rayHitPlaneValues( const Vec3f &planeNormal, const float &planeDistance, Ray &ray, float &hitDistance, Vec3f *hitPoint );
+        using std::sqrt;
+        const T square_root = static_cast<T>(sqrt(discriminant));
+        near_distance = (-half_linear - square_root) / direction_length_squared;
+        far_distance = (-half_linear + square_root) / direction_length_squared;
+        if (near_distance > far_distance)
+            std::swap(near_distance, far_distance);
+        return true;
+    }
 
+    template<typename T>
+    [[nodiscard]] bool intersectionRayBox(
+        const Ray3<T>& ray,
+        const BoundingBox3<T>& bounds,
+        T& near_distance,
+        T& far_distance)
+    {
+        T interval_minimum = ray.minimumDistance;
+        T interval_maximum = ray.maximumDistance;
 
+        for (std::size_t axis = 0; axis < 3; ++axis)
+        {
+            const T direction = ray.direction[axis];
+            const T origin = ray.origin[axis];
+            const T slab_minimum = bounds.minPoint[axis];
+            const T slab_maximum = bounds.maxPoint[axis];
 
-	// computes a intersection between a ray and a plane
-	//
-	// returns true if an intersection occured, false otherwise
-	template<typename T>
-	bool intersectionRayPlane( const Ray3<T> &ray, const Vec3<T> &normal, const T &distance, Vec3<T> &hitPoint )
-	{
-		// project the ray direction onto the plane normal
-		T temp = dot( ray.d, normal );
+            if (direction == T{})
+            {
+                if (origin < slab_minimum || origin > slab_maximum)
+                    return false;
+                continue;
+            }
 
-		// if result is zero, then the direction is parallel to the plane -> no intersection
-		if( !temp )
-			return false;
+            const T inverse_direction = T{1} / direction;
+            T axis_minimum = (slab_minimum - origin) * inverse_direction;
+            T axis_maximum = (slab_maximum - origin) * inverse_direction;
+            if (axis_minimum > axis_maximum)
+                std::swap(axis_minimum, axis_maximum);
 
-		float hitDistance = -(dot( normal, ray.o ) + distance) / temp;
+            interval_minimum = std::max(interval_minimum, axis_minimum);
+            interval_maximum = std::min(interval_maximum, axis_maximum);
+            if (interval_minimum > interval_maximum)
+                return false;
+        }
 
-		// the point must lie on the raysegment between origin and target to pass the test
-		if( (hitDistance >= ray.tmax) || (hitDistance <= ray.tmin) )
-			return false;
+        near_distance = interval_minimum;
+        far_distance = interval_maximum;
+        return true;
+    }
 
-		hitPoint = ray.origin + hitDistance*ray.direction;
-
-		return true;
-	}
-
-
-	// computes a intersection between a ray and another ray
-	// algorithm based on Graphics Gems I page 304
-	//
-	// note: the 2 rays must be coplanar
-	//
-	// returns true if an intersection occured, false otherwise
-	template<typename T>
-	bool intersectionRayRay( const Ray3<T> &ray1, const Ray3<T> &ray2, Vec3<T> &hitPoint )
-	{
-		math::Vec3<T> cp = math::cross( ray1.d, ray2.d );
-		T denom = cp.getSquaredLength();
-
-		if( denom == (T)0.0 )
-			// lines are parallel
-			return false;
-
-		// we need to compute s and t to test the line segments
-		math::Vec3<T> c1 = ray2.o - ray1.o;
-
-		T t = math::Matrix33<T>( c1.x, ray2.d.x, cp.x, c1.y, ray2.d.y, cp.y, c1.z, ray2.d.z, cp.z ).getDeterminant() / denom;
-		T s = math::Matrix33<T>( c1.x, ray1.d.x, cp.x, c1.y, ray1.d.y, cp.y, c1.z, ray1.d.z, cp.z ).getDeterminant() / denom;
-
-
-		// check line segments
-		if( (t < ray1.tmin) || (s < ray2.tmin) || (t > ray1.tmax) || (s > ray2.tmax) )
-			return false;
-
-		// compute intersection point
-		hitPoint = ray2.o + ray2.d*s;
-
-		// check for coplanarity
-		//if( hitPoint != (ray1.origin + ray1.direction*t) )
-		//	return false;
-
-		// done
-		return true;
-	}
-
-
-	// sphere is assumed to be at origin, r is radius
-	template<typename T>
-	bool intersectionRaySphere( const Ray3<T> &ray, T radius, T &t0, T &t1 )
-	{
-		math::Vec3<T> vec = ray.o;
-		T a = ray.d.x * ray.d.x + ray.d.y * ray.d.y + ray.d.z * ray.d.z;
-		T b = 2 * (ray.d.x * vec.x +  ray.d.y * vec.y + ray.d.z * vec.z);
-		T c = vec.x * vec.x + vec.y * vec.y + vec.z * vec.z - radius * radius;
-
-		if (b == 0)
-		{
-			// handle special case where the the two vector ray.dir and V are perpendicular
-			// with V = ray.orig - sphere.centre
-			if (a == 0) return false;
-			t0 = 0; t1 = sqrt(-c/a);
-		}else
-		{
-			T discr = b * b - 4 * a * c;
-			if (discr < 0) return false;
-			T q = (b < 0) ? (T)-0.5 * (b - sqrt(discr)) : (T)-0.5 * (b + sqrt(discr));
-			t0 = q / a;
-			t1 = c / q;
-		}
-
-
-		if (t0 > t1) std::swap(t0, t1);
-		return true;
-	}
-
-	template<typename T>
-	bool intersectionRayBox( const Ray3<T> &ray, const BoundingBox3<T> &box, T &hitt0, T &hitt1 )
-	{
-		T t0 = ray.tmin, t1 = ray.tmax;
-		for (int i = 0; i < 3; ++i)
-		{
-			// Update interval for _i_th bounding box slab
-			T invRayDir = 1.f / ray.d[i];
-			T tNear = (box.minPoint[i] - ray.o[i]) * invRayDir;
-			T tFar  = (box.maxPoint[i] - ray.o[i]) * invRayDir;
-
-			// Update parametric interval from slab intersection $t$s
-			if (tNear > tFar) std::swap(tNear, tFar);
-			t0 = tNear > t0 ? tNear : t0;
-			t1 = tFar  < t1 ? tFar  : t1;
-			if (t0 > t1) return false;
-		}
-		hitt0 = t0;
-		hitt1 = t1;
-		return true;
-	}
-
-
-
-
-	//bool RayHitTriangle( const Vector &vPoint1, const Vector &vPoint2, const Vector &vPoint3, CRay &oRay );
-	//bool RayHitTriangleValues( const Vector &vPoint1, const Vector &vPoint2, const Vector &vPoint3, CRay &oRay, float &fHit, Vector *pHitPoint, float *pU, float *pV );
-
-	typedef Ray3<float> Ray3f;
-	typedef Ray3<double> Ray3d;
+    using Ray3f = Ray3<float>;
+    using Ray3d = Ray3<double>;
 }
-
-} // namespace houio

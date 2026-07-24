@@ -1,231 +1,181 @@
-/*---------------------------------------------------------------------
-
-Vec3 related routines
-
-----------------------------------------------------------------------*/
 #pragma once
 
-#include <math.h>
-#include "Vec3.h"
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <stdexcept>
+#include <utility>
 
-namespace houio
+#include <houio/math/Vec3.h>
+
+namespace houio::math
 {
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator-(const Vec3<T>& value) noexcept
+    {
+        return Vec3<T>(-value.x, -value.y, -value.z);
+    }
 
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator+(Vec3<T> lhs, const Vec3<T>& rhs) noexcept
+    {
+        return lhs += rhs;
+    }
 
-namespace math
-{
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator-(Vec3<T> lhs, const Vec3<T>& rhs) noexcept
+    {
+        return lhs -= rhs;
+    }
 
-	template<typename T>
-	inline Vec3<T> operator-( const Vec3<T> &rhs )
-	{
-		return Vec3<T>( -rhs.x, -rhs.y, -rhs.z );
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator*(
+        const Vec3<T>& lhs,
+        const Vec3<T>& rhs) noexcept
+    {
+        return Vec3<T>(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z);
+    }
 
-	template<typename T>
-	inline Vec3<T> operator+( const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		return Vec3<T>( lhs.x+rhs.x, lhs.y+rhs.y, lhs.z+rhs.z );
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator/(
+        const Vec3<T>& lhs,
+        const Vec3<T>& rhs)
+    {
+        return Vec3<T>(lhs.x / rhs.x, lhs.y / rhs.y, lhs.z / rhs.z);
+    }
 
-	template<typename T>
-	inline Vec3<T> operator-( const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		return Vec3<T>( lhs.x-rhs.x, lhs.y-rhs.y, lhs.z-rhs.z );
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator+(Vec3<T> lhs, T rhs) noexcept
+    {
+        return lhs += rhs;
+    }
 
-	template<typename T>
-	inline Vec3<T> operator/( const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		return Vec3<T>( lhs.x/rhs.x, lhs.y/rhs.y, lhs.z/rhs.z );
-	}		
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator-(Vec3<T> lhs, T rhs) noexcept
+    {
+        return lhs -= rhs;
+    }
 
-	template<typename T>
-	inline Vec3<T> operator+( const Vec3<T> &lhs, const T &rhs )
-	{
-		return Vec3<T>( lhs.x+rhs, lhs.y+rhs, lhs.z+rhs );
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator*(Vec3<T> lhs, T rhs) noexcept
+    {
+        return lhs *= rhs;
+    }
 
-	template<typename T>
-	inline Vec3<T> operator-( const Vec3<T> &lhs, const T &rhs )
-	{
-		return Vec3<T>( lhs.x-rhs, lhs.y-rhs, lhs.z-rhs );
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator/(Vec3<T> lhs, T rhs)
+    {
+        return lhs /= rhs;
+    }
 
-	template<typename T>
-	inline Vec3<T> operator*( const Vec3<T> &lhs, const T &rhs )
-	{
-		return Vec3<T>( lhs.x*rhs, lhs.y*rhs, lhs.z*rhs );
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator+(T lhs, Vec3<T> rhs) noexcept
+    {
+        return rhs += lhs;
+    }
 
-	template<typename T>
-	inline Vec3<T> operator/( const Vec3<T> &lhs, const T &rhs )
-	{
-		return Vec3<T>( lhs.x/rhs, lhs.y/rhs, lhs.z/rhs );
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator-(T lhs, const Vec3<T>& rhs) noexcept
+    {
+        return Vec3<T>(lhs - rhs.x, lhs - rhs.y, lhs - rhs.z);
+    }
 
-	template<typename T>
-	inline Vec3<T> operator+( const T &lhs, const Vec3<T> &rhs )
-	{
-		return (rhs+lhs);
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator*(T lhs, Vec3<T> rhs) noexcept
+    {
+        return rhs *= lhs;
+    }
 
-	template<typename T>
-	inline Vec3<T> operator-( const T &lhs, const Vec3<T> &rhs )
-	{
-		return Vec3<T>( lhs-rhs.x, lhs-rhs.y, lhs-rhs.z );
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> operator/(T lhs, const Vec3<T>& rhs)
+    {
+        return Vec3<T>(lhs / rhs.x, lhs / rhs.y, lhs / rhs.z);
+    }
 
-	template<typename T>
-	inline Vec3<T> operator*( const T &lhs, const Vec3<T> &rhs )
-	{
-		return (rhs*lhs);
-	}
+    template<typename T>
+    [[nodiscard]] constexpr T dot(const Vec3<T>& lhs, const Vec3<T>& rhs) noexcept
+    {
+        return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
+    }
 
-	template<typename T>
-	inline Vec3<T> operator*( const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		return Vec3<T>(rhs.x*lhs.x, rhs.y*lhs.y, rhs.z*lhs.z);
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> cross(
+        const Vec3<T>& lhs,
+        const Vec3<T>& rhs) noexcept
+    {
+        return Vec3<T>(
+            lhs.y * rhs.z - lhs.z * rhs.y,
+            lhs.z * rhs.x - lhs.x * rhs.z,
+            lhs.x * rhs.y - lhs.y * rhs.x);
+    }
 
-	template<typename T>
-	inline Vec3<T> operator/( const T &lhs, const Vec3<T> &rhs )
-	{
-		return (rhs/lhs);
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> reflected(
+        const Vec3<T>& incident,
+        const Vec3<T>& normal) noexcept
+    {
+        return incident - normal * (static_cast<T>(2) * dot(incident, normal));
+    }
 
-	template<typename T>
-	inline Vec3<T> normalize( const Vec3<T> &vector )
-	{
-		Vec3<T> result = vector;
-		result.normalize();
-		return result;
-	}
+    template<typename T>
+    [[nodiscard]] std::size_t leastAbsoluteAxis(const Vec3<T>& value) noexcept
+    {
+        using std::abs;
+        const T absolute_x = abs(value.x);
+        const T absolute_y = abs(value.y);
+        const T absolute_z = abs(value.z);
+        if (absolute_x <= absolute_y && absolute_x <= absolute_z)
+            return 0;
+        return absolute_y <= absolute_z ? 1u : 2u;
+    }
 
-	template<typename T>
-	inline T dotProduct( const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		return (lhs.x*rhs.x + lhs.y*rhs.y + lhs.z*rhs.z);
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> unitAxis3(std::size_t axis)
+    {
+        if (axis == 0)
+            return Vec3<T>(T{1}, T{}, T{});
+        if (axis == 1)
+            return Vec3<T>(T{}, T{1}, T{});
+        if (axis == 2)
+            return Vec3<T>(T{}, T{}, T{1});
+        throw std::out_of_range("Vec3 basis axis is out of range");
+    }
 
-	template<typename T>
-	inline T dot( const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		return (lhs.x*rhs.x + lhs.y*rhs.y + lhs.z*rhs.z);
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> componentMin(
+        const Vec3<T>& lhs,
+        const Vec3<T>& rhs) noexcept
+    {
+        return Vec3<T>(
+            std::min(lhs.x, rhs.x),
+            std::min(lhs.y, rhs.y),
+            std::min(lhs.z, rhs.z));
+    }
 
-	template<typename T>
-	inline void dotProduct( T &result, const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		result = (lhs.x*rhs.x + lhs.y*rhs.y + lhs.z*rhs.z);
-	}
+    template<typename T>
+    [[nodiscard]] constexpr Vec3<T> componentMax(
+        const Vec3<T>& lhs,
+        const Vec3<T>& rhs) noexcept
+    {
+        return Vec3<T>(
+            std::max(lhs.x, rhs.x),
+            std::max(lhs.y, rhs.y),
+            std::max(lhs.z, rhs.z));
+    }
 
+    template<typename T>
+    [[nodiscard]] std::pair<Vec3<T>, Vec3<T>> orthonormalBasis(
+        const Vec3<T>& direction)
+    {
+        if (direction.squaredLength() == T{})
+            throw std::invalid_argument("orthonormalBasis requires a non-zero direction");
 
-	template<typename T>
-	inline Vec3<T> crossProduct( const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		return Vec3<T>( lhs.y*rhs.z - lhs.z*rhs.y,
-					  lhs.z*rhs.x - lhs.x*rhs.z,
-					  lhs.x*rhs.y - lhs.y*rhs.x );
-	}
-
-	template<typename T>
-	inline void crossProduct( Vec3<T> &result, const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		result.x = lhs.y*rhs.z - lhs.z*rhs.y;
-		result.y = lhs.z*rhs.x - lhs.x*rhs.z;
-		result.z = lhs.x*rhs.y - lhs.y*rhs.x;
-	}
-
-
-	template<typename T>
-	inline Vec3<T> cross( const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		return Vec3<T>( lhs.y*rhs.z - lhs.z*rhs.y,
-					  lhs.z*rhs.x - lhs.x*rhs.z,
-					  lhs.x*rhs.y - lhs.y*rhs.x );
-	}
-
-	template<typename T>
-	inline void cross( Vec3<T> &result, const Vec3<T> &lhs, const Vec3<T> &rhs )
-	{
-		result.x = lhs.y*rhs.z - lhs.z*rhs.y;
-		result.y = lhs.z*rhs.x - lhs.x*rhs.z;
-		result.z = lhs.x*rhs.y - lhs.y*rhs.x;
-	}
-
-	// For a given incident vector I and surface normal N reflect returns the reflection direction calculated as I - 2.0 * dot(N, I) * N. N should be normalized in order to achieve the desired result.
-	template<typename T>
-	inline Vec3<T> reflect( const math::Vec3<T> &i, const math::Vec3<T> &n )
-	{
-		return -i + 2.0f*dotProduct(n,i)*n;
-	}
-
-
-	// returns index of the component with the smallest value
-	template<typename T>
-	int nondominantAxis( const math::Vec3<T> &v )
-	{
-		if( abs(v.x) <= abs(v.y) )
-		{
-			if( abs(v.z) <= abs(v.x) )
-				return 2;
-			else
-				return 0;
-		}else
-		{
-			if( abs(v.z) <= abs(v.y) )
-				return 2;
-			else
-				return 1;
-		}
-	}
-
-	template<typename T>
-	Vec3<T> baseVec3( int i )
-	{
-		switch(i)
-		{
-		case 0:return Vec3<T>((T)(1.0), (T)(0.0), (T)(0.0));
-		case 1:return Vec3<T>((T)(0.0), (T)(1.0), (T)(0.0));
-		default:
-		case 2:return Vec3<T>((T)(0.0), (T)(0.0), (T)(1.0));
-		};
-	}
-
-	template<typename T>
-	inline T length( Vec3<T> &v )
-	{
-		return v.getLength();
-	}
-
-
-	template<typename T>
-	inline Vec3<T> min( Vec3<T> &v0, Vec3<T> &v1 )
-	{
-		return Vec3<T>( v0.x < v1.x ? v0.x : v1.x, v0.y < v1.y ? v0.y : v1.y, v0.z < v1.z ? v0.z : v1.z );
-	}
-
-	template<typename T>
-	inline Vec3<T> max( Vec3<T> &v0, Vec3<T> &v1 )
-	{
-		return Vec3<T>( v0.x > v1.x ? v0.x : v1.x, v0.y > v1.y ? v0.y : v1.y, v0.z > v1.z ? v0.z : v1.z );
-	}
-
-	template<typename T>
-	inline void coordinateSystem(const math::Vec3<T> &v1, math::Vec3<T> *v2, math::Vec3<T> *v3)
-	{
-		if (abs(v1.x) > abs(v1.y))
-		{
-			T invLen = T(1.0) / sqrt(v1.x*v1.x + v1.z*v1.z);
-			*v2 = math::Vec3<T>(-v1.z * invLen, T(0.0), v1.x * invLen);
-		}
-		else
-		{
-			T invLen = T(1.0) / sqrt(v1.y*v1.y + v1.z*v1.z);
-			*v2 = math::Vec3<T>(T(0.0), v1.z * invLen, -v1.y * invLen);
-		}
-		*v3 = math::cross(v1, *v2);
-	}
+        const Vec3<T> normal = direction.normalized();
+        using std::abs;
+        Vec3<T> tangent = abs(normal.x) > abs(normal.y)
+            ? Vec3<T>(-normal.z, T{}, normal.x)
+            : Vec3<T>(T{}, normal.z, -normal.y);
+        tangent.normalize();
+        return {tangent, cross(normal, tangent)};
+    }
 }
-
-} // namespace houio

@@ -52,7 +52,8 @@ int expectParseFailure(const std::string& binaryData, const houio::json::ParserL
     houio::json::Parser parser(limits);
     try
     {
-        parser.parse(&input, &reader);
+        if (parser.parse(input, reader))
+            return fail(description + " was unexpectedly accepted");
     }
     catch (const std::exception&)
     {
@@ -68,7 +69,7 @@ int expectDiagnosticFailure(const std::string& binaryData, houio::DiagnosticCate
     houio::json::JSONReader reader;
     houio::json::Parser parser;
     houio::DiagnosticList diagnostics;
-    if (parser.parse(&input, &reader, &diagnostics))
+    if (parser.parse(input, reader, diagnostics))
     {
         return fail(description + " unexpectedly parsed");
     }
@@ -97,18 +98,18 @@ int verifyUniformInt8()
     std::istringstream input(binaryData, std::ios::in | std::ios::binary);
     houio::json::JSONReader reader;
     houio::json::Parser parser;
-    if (!parser.parse(&input, &reader))
+    if (!parser.parse(input, reader))
     {
         return fail("failed to parse uniform int8 binary JSON");
     }
 
-    houio::json::ArrayPtr root = reader.getRoot().asArray();
+    houio::json::ArrayPtr root = reader.root().asArray();
     if (!root || root->size() != 1)
     {
         return fail("unexpected root array");
     }
 
-    houio::json::ArrayPtr values = root->getArray(0);
+    houio::json::ArrayPtr values = root->array(0);
     if (!values || values->size() != 2 || values->get<int>(0) != 4 || values->get<int>(1) != 6)
     {
         return fail("uniform int8 values were not widened correctly");
@@ -129,13 +130,13 @@ int verifyUniformBoolAcrossWords()
     std::istringstream input(binaryData, std::ios::in | std::ios::binary);
     houio::json::JSONReader reader;
     houio::json::Parser parser;
-    if (!parser.parse(&input, &reader))
+    if (!parser.parse(input, reader))
     {
         return fail("failed to parse multiword uniform bool array");
     }
 
-    houio::json::ArrayPtr root = reader.getRoot().asArray();
-    houio::json::ArrayPtr values = root ? root->getArray(0) : houio::json::ArrayPtr();
+    houio::json::ArrayPtr root = reader.root().asArray();
+    houio::json::ArrayPtr values = root ? root->array(0) : houio::json::ArrayPtr();
     if (!values || values->size() != 40 || !values->get<bool>(0) || values->get<bool>(1)
         || !values->get<bool>(31) || !values->get<bool>(32) || !values->get<bool>(39))
     {
@@ -204,8 +205,8 @@ int verifyFloat16Tokens()
     std::istringstream scalarInput(scalarData, std::ios::in | std::ios::binary);
     houio::json::JSONReader scalarReader;
     houio::json::Parser parser;
-    if (!parser.parse(&scalarInput, &scalarReader)
-        || scalarReader.getRoot().asArray()->get<houio::real32>(0) != 1.0f)
+    if (!parser.parse(scalarInput, scalarReader)
+        || scalarReader.root().asArray()->get<houio::real32>(0) != 1.0f)
     {
         return fail("standalone Float16 token was not decoded");
     }
@@ -216,19 +217,20 @@ int verifyFloat16Tokens()
         houio::floatToHalfBits(3.25f),
     };
     std::ostringstream output(std::ios::out | std::ios::binary);
-    houio::json::BinaryWriter writer(&output);
+    houio::json::BinaryWriter writer(output);
     writer.jsonMagic();
     writer.jsonBeginArray();
-    writer.jsonUniformArrayReal16(halfValues, 3);
+    if (!writer.jsonUniformArrayReal16(std::span<const houio::uword>(halfValues)))
+        return fail("failed to write Float16 uniform array");
     writer.jsonEndArray();
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
     houio::json::JSONReader reader;
-    if (!parser.parse(&input, &reader))
+    if (!parser.parse(input, reader))
     {
         return fail("failed to parse Float16 uniform array");
     }
-    houio::json::ArrayPtr values = reader.getRoot().asArray()->getArray(0);
+    houio::json::ArrayPtr values = reader.root().asArray()->array(0);
     if (!values || values->size() != 3 || values->get<houio::real32>(0) != 0.5f
         || values->get<houio::real32>(1) != -2.0f || values->get<houio::real32>(2) != 3.25f)
     {
@@ -240,7 +242,7 @@ int verifyFloat16Tokens()
 int verifyWideScalarFidelity()
 {
     std::ostringstream output(std::ios::out | std::ios::binary);
-    houio::json::BinaryWriter writer(&output);
+    houio::json::BinaryWriter writer(output);
     writer.jsonMagic();
     writer.jsonBeginArray();
     writer.jsonInt64(1099511627779LL);
@@ -250,11 +252,11 @@ int verifyWideScalarFidelity()
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
     houio::json::JSONReader reader;
     houio::json::Parser parser;
-    if (!parser.parse(&input, &reader))
+    if (!parser.parse(input, reader))
     {
         return fail("failed to parse wide scalar fixture");
     }
-    houio::json::ArrayPtr values = reader.getRoot().asArray();
+    houio::json::ArrayPtr values = reader.root().asArray();
     if (!values || values->size() != 2 || values->get<houio::sint64>(0) != 1099511627779LL
         || values->get<houio::real64>(1) != 1.0 / 3.0)
     {
@@ -279,7 +281,7 @@ int verifyRootAndClosingStateSafety()
         std::istringstream input(document);
         houio::json::JSONReader reader;
         houio::json::Parser parser;
-        if (!parser.parse(&input, &reader))
+        if (!parser.parse(input, reader))
         {
             return fail("valid scalar root at exact EOF was rejected");
         }
@@ -289,8 +291,8 @@ int verifyRootAndClosingStateSafety()
     std::istringstream binaryScalarInput(binaryScalar, std::ios::in | std::ios::binary);
     houio::json::JSONReader binaryScalarReader;
     houio::json::Parser binaryScalarParser;
-    if (!binaryScalarParser.parse(&binaryScalarInput, &binaryScalarReader)
-        || binaryScalarReader.getRoot().as<houio::sint32>() != 5)
+    if (!binaryScalarParser.parse(binaryScalarInput, binaryScalarReader)
+        || binaryScalarReader.root().as<houio::sint32>() != 5)
     {
         return fail("valid binary scalar root was rejected");
     }
@@ -299,8 +301,8 @@ int verifyRootAndClosingStateSafety()
     std::istream nonSeekableScalarInput(&scalarBuffer);
     houio::json::JSONReader scalarReader;
     houio::json::Parser scalarParser;
-    if (!scalarParser.parse(&nonSeekableScalarInput, &scalarReader)
-        || scalarReader.getRoot().as<houio::sint64>() != 1)
+    if (!scalarParser.parse(nonSeekableScalarInput, scalarReader)
+        || scalarReader.root().as<houio::sint64>() != 1)
     {
         return fail("non-seekable scalar root at exact EOF was rejected");
     }
@@ -325,7 +327,7 @@ int verifyRootAndClosingStateSafety()
         houio::json::JSONReader reader;
         houio::json::Parser parser;
         houio::DiagnosticList diagnostics;
-        if (parser.parse(&input, &reader, &diagnostics) || diagnostics.empty()
+        if (parser.parse(input, reader, diagnostics) || diagnostics.empty()
             || diagnostics.front().category != houio::DiagnosticCategory::malformed_input)
         {
             return fail("invalid root, separator, or closing token was not rejected safely");
@@ -350,8 +352,8 @@ int verifyInputBudgetAndTrailingData()
     houio::json::Parser streamingParser(limits);
     try
     {
-        streamingParser.parse(&nonSeekableInput, &reader);
-        return fail("streaming input byte limit was not rejected");
+        if (streamingParser.parse(nonSeekableInput, reader))
+            return fail("streaming input byte limit was not rejected");
     }
     catch (const std::exception&)
     {
@@ -368,7 +370,7 @@ int verifyInputBudgetAndTrailingData()
     std::istringstream asciiInput("[1]  \n// trailing comment\n");
     houio::json::JSONReader asciiReader;
     houio::json::Parser asciiParser;
-    if (!asciiParser.parse(&asciiInput, &asciiReader))
+    if (!asciiParser.parse(asciiInput, asciiReader))
     {
         return fail("valid trailing ASCII whitespace and comments were rejected");
     }
@@ -376,7 +378,8 @@ int verifyInputBudgetAndTrailingData()
     std::istringstream invalidAsciiInput("[1] 2");
     houio::json::JSONReader invalidAsciiReader;
     houio::DiagnosticList diagnostics;
-    if (asciiParser.parse(&invalidAsciiInput, &invalidAsciiReader, &diagnostics) || diagnostics.empty())
+    if (asciiParser.parse(invalidAsciiInput, invalidAsciiReader, diagnostics)
+        || diagnostics.empty())
     {
         return fail("trailing ASCII value was not rejected");
     }
@@ -403,14 +406,14 @@ int verifyArrayAndValueSafety()
     std::istringstream input(binaryData, std::ios::in | std::ios::binary);
     houio::json::JSONReader reader;
     houio::json::Parser parser;
-    if (!parser.parse(&input, &reader))
+    if (!parser.parse(input, reader))
     {
         return fail("failed to parse array safety fixture");
     }
-    houio::json::ArrayPtr values = reader.getRoot().asArray()->getArray(0);
+    houio::json::ArrayPtr values = reader.root().asArray()->array(0);
     try
     {
-        values->get<int>(-1);
+        static_cast<void>(values->get<int>(-1));
         return fail("negative array index was accepted");
     }
     catch (const std::out_of_range&)
@@ -418,37 +421,52 @@ int verifyArrayAndValueSafety()
     }
     try
     {
-        values->get<int>(2);
+        static_cast<void>(values->get<int>(2));
         return fail("past-end array index was accepted");
     }
     catch (const std::out_of_range&)
     {
     }
 
-    houio::sint64 integerValue = 0x102030405060708LL;
-    char integerBytes[sizeof(integerValue)]{};
-    houio::json::Value::create<houio::sint64>(integerValue).cpyTo(integerBytes);
-    houio::sint64 integerCopy = 0;
-    std::memcpy(&integerCopy, integerBytes, sizeof(integerCopy));
-    if (integerCopy != integerValue)
+    const houio::sint64 integer_value = 0x102030405060708LL;
+    const houio::json::Value typed_value =
+        houio::json::Value::create<houio::sint64>(integer_value);
+    if (typed_value.as<houio::sint64>() != integer_value
+        || std::get<houio::sint64>(typed_value.variant()) != integer_value)
     {
-        return fail("int64 Value::cpyTo changed the value");
+        return fail("int64 Value access changed the value");
+    }
+
+    houio::json::ArrayPtr nested_array = houio::json::Array::create();
+    nested_array->appendValue<houio::sint32>(7);
+    houio::json::ObjectPtr child = houio::json::Object::create();
+    child->appendValue("name", std::string("child"));
+    houio::json::ObjectPtr object = houio::json::Object::create();
+    object->append("items", nested_array);
+    object->append("child", child);
+    if (!object->contains("items") || object->contains("missing")
+        || object->keys() != std::vector<std::string>({"child", "items"})
+        || !object->array("items") || object->array("items")->get<houio::sint32>(0) != 7
+        || !object->object("child")
+        || object->object("child")->get<std::string>("name") != "child"
+        || !object->value("missing").isNull())
+    {
+        return fail("modern JSON tree accessors are inconsistent");
     }
 
     try
     {
-        char destination = 0;
-        houio::json::Value::create<std::string>("text").cpyTo(&destination);
-        return fail("string Value::cpyTo was accepted");
+        static_cast<void>(houio::json::Value::createArray().as<houio::sint64>());
+        return fail("non-scalar Value::as was accepted");
     }
-    catch (const std::invalid_argument&)
+    catch (const std::logic_error&)
     {
     }
 
     std::istringstream duplicateMap("{\"a\":1,\"a\":2}");
     houio::json::JSONReader duplicateReader;
     houio::DiagnosticList diagnostics;
-    if (parser.parse(&duplicateMap, &duplicateReader, &diagnostics) || diagnostics.empty())
+    if (parser.parse(duplicateMap, duplicateReader, diagnostics) || diagnostics.empty())
     {
         return fail("duplicate native map key was not rejected");
     }
@@ -514,11 +532,11 @@ int verifyParserReuse()
     {
         std::istringstream input(binaryData, std::ios::in | std::ios::binary);
         houio::json::JSONReader reader;
-        if (!parser.parse(&input, &reader))
+        if (!parser.parse(input, reader))
         {
             return fail("parser reuse failed");
         }
-        houio::json::ArrayPtr root = reader.getRoot().asArray();
+        houio::json::ArrayPtr root = reader.root().asArray();
         if (!root || root->size() != 1 || root->get<int>(0) != 5)
         {
             return fail("parser reuse retained invalid document state");
@@ -530,7 +548,7 @@ int verifyParserReuse()
 int verifyWriterValidation()
 {
     std::ostringstream output(std::ios::out | std::ios::binary);
-    houio::json::BinaryWriter writer(&output);
+    houio::json::BinaryWriter writer(output);
     try
     {
         writer.writeLength(-1);
@@ -540,14 +558,15 @@ int verifyWriterValidation()
     {
     }
 
-    try
-    {
-        writer.jsonUniformArray<houio::sint32>(nullptr, 1);
-        return fail("writer accepted null uniform-array data");
-    }
-    catch (const std::invalid_argument&)
-    {
-    }
+    const std::array<houio::sint32, 2> values = {3, 7};
+    if (!writer.jsonUniformArray(std::span<const houio::sint32>(values)))
+        return fail("writer rejected a valid span-based uniform array");
+
+    std::ostringstream failed_output(std::ios::out | std::ios::binary);
+    failed_output.setstate(std::ios::badbit);
+    houio::json::BinaryWriter failed_writer(failed_output);
+    if (failed_writer.writeLength(1))
+        return fail("writer reported success for a failed output stream");
     return 0;
 }
 }

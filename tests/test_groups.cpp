@@ -56,15 +56,15 @@ const char* groupedGeometry()
     ])JSON";
 }
 
-using GroupNamesGetter = void (houio::HouGeoAdapter::*)(std::vector<std::string>&) const;
-using GroupMembershipGetter = bool (houio::HouGeoAdapter::*)(const std::string&, std::vector<bool>&) const;
+using GroupNamesGetter = std::vector<std::string> (houio::HouGeoAdapter::*)() const;
+using GroupMembershipGetter = std::optional<std::vector<bool>>
+    (houio::HouGeoAdapter::*)(const std::string&) const;
 
 int verifyGroupDomain(const houio::HouGeo::Ptr& geometry, GroupNamesGetter namesGetter,
                       GroupMembershipGetter membershipGetter, const std::vector<std::string>& expectedNames,
                       const std::vector<std::vector<bool>>& expectedMemberships)
 {
-    std::vector<std::string> names;
-    (geometry.get()->*namesGetter)(names);
+    const std::vector<std::string> names = (geometry.get()->*namesGetter)();
     if (names != expectedNames)
     {
         return fail("group names were not preserved");
@@ -72,12 +72,11 @@ int verifyGroupDomain(const houio::HouGeo::Ptr& geometry, GroupNamesGetter names
 
     for (size_t groupIndex = 0; groupIndex < expectedNames.size(); ++groupIndex)
     {
-        std::vector<bool> membership;
-        if (!(geometry.get()->*membershipGetter)(expectedNames[groupIndex], membership))
-        {
+        const auto membership =
+            (geometry.get()->*membershipGetter)(expectedNames[groupIndex]);
+        if (!membership)
             return fail("group membership lookup failed for " + expectedNames[groupIndex]);
-        }
-        if (membership != expectedMemberships[groupIndex])
+        if (*membership != expectedMemberships[groupIndex])
         {
             return fail("group membership changed for " + expectedNames[groupIndex]);
         }
@@ -87,15 +86,15 @@ int verifyGroupDomain(const houio::HouGeo::Ptr& geometry, GroupNamesGetter names
 
 int verifyGroups(const houio::HouGeo::Ptr& geometry)
 {
-    if (!geometry || geometry->pointcount() != 4 || geometry->vertexcount() != 6
-        || geometry->primitivecount() != 2)
+    if (!geometry || geometry->pointCount() != 4 || geometry->vertexCount() != 6
+        || geometry->primitiveCount() != 2)
     {
         return fail("group fixture counts are incorrect");
     }
 
     if (const int result = verifyGroupDomain(
-            geometry, &houio::HouGeoAdapter::getPointGroupNames,
-            &houio::HouGeoAdapter::getPointGroupMembership,
+            geometry, &houio::HouGeoAdapter::pointGroupNames,
+            &houio::HouGeoAdapter::pointGroupMembership,
             {"left_points", "shared_points"}, {{true, false, false, true}, {true, false, true, false}});
         result != 0)
     {
@@ -103,8 +102,8 @@ int verifyGroups(const houio::HouGeo::Ptr& geometry)
     }
 
     if (const int result = verifyGroupDomain(
-            geometry, &houio::HouGeoAdapter::getVertexGroupNames,
-            &houio::HouGeoAdapter::getVertexGroupMembership,
+            geometry, &houio::HouGeoAdapter::vertexGroupNames,
+            &houio::HouGeoAdapter::vertexGroupMembership,
             {"first_face_vertices", "shared_point_vertices"},
             {{true, true, true, false, false, false}, {true, false, true, true, true, false}});
         result != 0)
@@ -113,8 +112,8 @@ int verifyGroups(const houio::HouGeo::Ptr& geometry)
     }
 
     return verifyGroupDomain(
-        geometry, &houio::HouGeoAdapter::getPrimitiveGroupNames,
-        &houio::HouGeoAdapter::getPrimitiveGroupMembership,
+        geometry, &houio::HouGeoAdapter::primitiveGroupNames,
+        &houio::HouGeoAdapter::primitiveGroupMembership,
         {"left", "right"}, {{true, false}, {false, true}});
 }
 }
@@ -122,18 +121,18 @@ int verifyGroups(const houio::HouGeo::Ptr& geometry)
 int main()
 {
     std::istringstream source(groupedGeometry());
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&source);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(source);
     if (const int result = verifyGroups(geometry); result != 0)
     {
         return result;
     }
 
     std::ostringstream binaryOutput(std::ios::out | std::ios::binary);
-    if (!houio::HouGeoIO::xport(&binaryOutput, geometry, true))
+    if (!houio::HouGeoIO::exportGeometry(binaryOutput, geometry, true))
     {
         return fail("failed to export grouped geometry");
     }
 
     std::istringstream binaryInput(binaryOutput.str(), std::ios::in | std::ios::binary);
-    return verifyGroups(houio::HouGeoIO::import(&binaryInput));
+    return verifyGroups(houio::HouGeoIO::import(binaryInput));
 }

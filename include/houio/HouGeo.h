@@ -1,177 +1,367 @@
 #pragma once
 
-
 #include <map>
+#include <memory>
+#include <span>
 #include <string>
+#include <utility>
+#include <vector>
 
-#include <houio/Field.h>
 #include <houio/Attribute.h>
-
-#include <houio/json.h>
+#include <houio/Field.h>
 #include <houio/HouGeoAdapter.h>
-
+#include <houio/json.h>
 
 namespace houio
 {
+    class HouGeo : public HouGeoAdapter
+    {
+    public:
+        using Ptr = std::shared_ptr<HouGeo>;
+        using ConstPtr = std::shared_ptr<const HouGeo>;
 
+        class HouAttribute final : public AttributeAdapter
+        {
+        public:
+            using Ptr = std::shared_ptr<HouAttribute>;
+            using ConstPtr = std::shared_ptr<const HouAttribute>;
 
-	// HouGeo ============================================================
-	struct HouGeo : public HouGeoAdapter
-	{
-		typedef std::shared_ptr<HouGeo> Ptr;
+            HouAttribute();
+            HouAttribute(const std::string& name, Attribute::Ptr attribute);
 
-		struct HouAttribute : public AttributeAdapter
-		{
-			typedef std::shared_ptr<HouAttribute> Ptr;
+            [[nodiscard]] std::string name() const override;
+            [[nodiscard]] Type type() const override;
+            [[nodiscard]] int tupleSize() const override;
+            [[nodiscard]] Storage storage() const override;
+            [[nodiscard]] std::vector<int> packing() const override;
+            [[nodiscard]] int elementCount() const override;
+            [[nodiscard]] std::string stringValue(int index) const override;
+            [[nodiscard]] std::shared_ptr<json::Object> dictionaryValue(int index) const override;
+            [[nodiscard]] RawDataView rawData() const override;
 
-			HouAttribute();
-			HouAttribute( const std::string &name, Attribute::Ptr attr );
+            int addString(const std::string& value);
 
-			virtual std::string                   getName()const;
-			virtual Type                          getType()const;
-			virtual int                           getTupleSize()const;
-			virtual Storage                       getStorage()const;
-			virtual void                          getPacking( std::vector<int> &packing )const;
-			virtual int                           getNumElements()const;
-			virtual std::string                   getString( int index )const;
-			virtual std::shared_ptr<json::Object>  getDictionary( int index )const override;
-			virtual RawPointer::Ptr               getRawPointer();
+            void setName(std::string name)
+            {
+                name_ = std::move(name);
+            }
 
-			//int                                   addV4f(math::V4f value);
-			int                                   addString(const std::string &value);
+            void setTupleSize(int tuple_size)
+            {
+                if (tuple_size <= 0)
+                    throw std::invalid_argument("HouAttribute tuple size must be positive");
+                tuple_size_ = tuple_size;
+            }
 
-			std::string                           m_name;
-			int                                   tupleSize;
-			Storage                               m_storage;
-			Type                                  m_type;
-			//std::vector<char>                     data;
-			std::vector<std::string>              strings; // used in case of type==string
-			std::vector<json::ObjectPtr>          dictionaries; // used in case of type==dict
-			int                                   numElements;
+            void setStorage(Storage storage) noexcept
+            {
+                storage_ = storage;
+            }
 
-			Attribute::Ptr                        m_attr; // primitives::Attribute
-		};
+            void setType(Type type) noexcept
+            {
+                type_ = type;
+            }
 
-		struct HouTopology : public Topology
-		{
-			HouTopology();
-			typedef std::shared_ptr<HouTopology> Ptr;
-			virtual void                          getIndices( std::vector<int> &indices )const override;
-			virtual void                          addIndices( std::vector<int> &indices );
-			virtual sint64                        getNumIndices()const;
+            void setElementCount(int element_count)
+            {
+                if (element_count < 0)
+                    throw std::invalid_argument("HouAttribute element count cannot be negative");
+                element_count_ = element_count;
+            }
 
-			std::vector<int>                      indexBuffer;
-		};
+            void setNumericAttribute(Attribute::Ptr attribute)
+            {
+                if (!attribute)
+                    throw std::invalid_argument("HouAttribute numeric storage cannot be null");
+                numeric_attribute_ = std::move(attribute);
+                tuple_size_ = numeric_attribute_->numComponents();
+                element_count_ = numeric_attribute_->numElements();
+                type_ = Type::numeric;
+            }
 
+            [[nodiscard]] Attribute::Ptr numericAttribute() noexcept
+            {
+                return numeric_attribute_;
+            }
 
-		struct HouVolume : public VolumePrimitive
-		{
-			typedef std::shared_ptr<HouVolume> Ptr;
-			virtual math::M44f                                getTransform()const;
-			virtual int                                       getVertex()const;
-			virtual math::Vec3i                               getResolution()const;
-			virtual RawPointer::Ptr                           getRawPointer(); // returns raw pointer to the data
-			virtual real32                                    getVoxel( int i, int j, int k )const;
-			virtual std::string                               getVisualizationMode()const;
-			virtual real32                                    getVisualizationIso()const;
-			virtual real32                                    getVisualizationDensity()const;
+            [[nodiscard]] Attribute::CPtr numericAttribute() const noexcept
+            {
+                return numeric_attribute_;
+            }
 
-			ScalarField::Ptr                                  field;
-			int                                               vertex = -1; // hougeo uses topology vertex indices to encode translation
-			std::string                                       visualizationMode = "smoke";
-			real32                                           visualizationIso = 0.0f;
-			real32                                           visualizationDensity = 1.0f;
-		};
+            void setStringValues(std::vector<std::string> values)
+            {
+                string_values_ = std::move(values);
+                dictionary_values_.clear();
+                numeric_attribute_.reset();
+                type_ = Type::string;
+                storage_ = Storage::int32;
+                tuple_size_ = 1;
+                element_count_ = static_cast<int>(string_values_.size());
+            }
 
-		struct HouPoly : public PolyPrimitive
-		{
-			typedef std::shared_ptr<HouPoly> Ptr;
-			virtual int                                       numPolys()const override;
-			virtual int                                       numVertices( int poly )const override;
-			virtual int const*                                vertices(int poly=0)const override;
-			virtual bool                                      closed()const override;
-			int                                               m_numPolys = 0;
-			std::vector<int>                                  m_perPolyVertexCount; // holds number of vertices for each polygon
-			std::vector<int>                                  m_perPolyVertexListOffset; // holds offset into m_vertices per poly
-			std::vector<int>                                  m_vertices; // Point indices for each polygon vertex.
-			bool                                              m_closed = true;
-		};
+            [[nodiscard]] const std::vector<std::string>& stringValues() const noexcept
+            {
+                return string_values_;
+            }
 
+            void setDictionaryValues(std::vector<json::ObjectPtr> values)
+            {
+                dictionary_values_ = std::move(values);
+                string_values_.clear();
+                numeric_attribute_.reset();
+                type_ = Type::dictionary;
+                storage_ = Storage::int32;
+                tuple_size_ = 1;
+                element_count_ = static_cast<int>(dictionary_values_.size());
+            }
 
+            [[nodiscard]] const std::vector<json::ObjectPtr>& dictionaryValues() const noexcept
+            {
+                return dictionary_values_;
+            }
 
+        private:
+            std::string name_;
+            int tuple_size_ = 1;
+            Storage storage_ = Storage::invalid;
+            Type type_ = Type::numeric;
+            std::vector<std::string> string_values_;
+            std::vector<json::ObjectPtr> dictionary_values_;
+            int element_count_ = 0;
+            Attribute::Ptr numeric_attribute_;
 
-		HouGeo();
+            friend class HouGeo;
+        };
 
-		static HouGeo::Ptr                                   create();
+        class HouTopology final : public Topology
+        {
+        public:
+            using Ptr = std::shared_ptr<HouTopology>;
+            using ConstPtr = std::shared_ptr<const HouTopology>;
 
-		void                                                 setPointAttribute( HouAttribute::Ptr attr );
-		void                                                 setPrimitiveAttribute( const std::string &name, HouAttribute::Ptr attr );
-		void                                                 setPointGroup( const std::string &name, const std::vector<bool> &membership );
-		void                                                 setVertexGroup( const std::string &name, const std::vector<bool> &membership );
-		void                                                 setPrimitiveGroup( const std::string &name, const std::vector<bool> &membership );
-		void                                                 addPrimitive( ScalarField::Ptr field );
-		void                                                 addPrimitive( PolyPrimitive::Ptr poly );
-		void                                                 setTopology( HouTopology::Ptr topo );
+            HouTopology();
 
+            [[nodiscard]] std::vector<int> indexValues() const override;
+            void appendIndices(std::span<const int> indices) override;
+            [[nodiscard]] sint64 indexCount() const override;
 
-		// inherited from HouGeoAdapter
-		virtual sint64                                       pointcount()const override;
-		virtual sint64                                       vertexcount()const override;
-		virtual sint64                                       primitivecount()const override;
-		virtual void                                         getPointAttributeNames( std::vector<std::string> &names )const override;
-		virtual AttributeAdapter::Ptr                        getPointAttribute( const std::string &name ) override;
-		virtual void                                         getVertexAttributeNames( std::vector<std::string> &names )const override;
-		virtual AttributeAdapter::Ptr                        getVertexAttribute( const std::string &name ) override;
-		virtual bool                                         hasPrimitiveAttribute( const std::string &name )const override;
-		virtual void                                         getPrimitiveAttributeNames( std::vector<std::string> &names )const override;
-		virtual AttributeAdapter::Ptr                        getPrimitiveAttribute( const std::string &name ) override;
-		virtual void                                         getPrimitives( std::vector<HouGeoAdapter::Primitive::Ptr>& primitives )override;
-		virtual void                                         getGlobalAttributeNames( std::vector<std::string> &names )const override;
-		virtual AttributeAdapter::Ptr                        getGlobalAttribute( const std::string &name ) override;
-		virtual void                                         getPointGroupNames( std::vector<std::string> &names )const override;
-		virtual bool                                         getPointGroupMembership( const std::string &name, std::vector<bool> &membership )const override;
-		virtual void                                         getVertexGroupNames( std::vector<std::string> &names )const override;
-		virtual bool                                         getVertexGroupMembership( const std::string &name, std::vector<bool> &membership )const override;
-		virtual void                                         getPrimitiveGroupNames( std::vector<std::string> &names )const override;
-		virtual bool                                         getPrimitiveGroupMembership( const std::string &name, std::vector<bool> &membership )const override;
-		virtual Topology::Ptr                                getTopology() override;
+            void reserve(std::size_t index_count)
+            {
+                indexBuffer.reserve(index_count);
+            }
 
+            void appendIndex(int point_index)
+            {
+                indexBuffer.push_back(point_index);
+            }
 
+            void setIndices(std::vector<int> indices)
+            {
+                indexBuffer = std::move(indices);
+            }
 
+            [[nodiscard]] std::span<const int> indices() const noexcept
+            {
+                return indexBuffer;
+            }
 
-		// Temporary document-level data shared while primitive records are loaded.
-		struct SharedPrimitiveData
-		{
-			std::map<std::string, json::ObjectPtr> sharedVoxelData;
-		};
+        private:
+            std::vector<int> indexBuffer;
 
-		void                                                 load( json::ObjectPtr rootObject );
-		HouAttribute::Ptr                                    loadAttribute( json::ArrayPtr attribute, sint64 elementCount );
-		void                                                 loadTopology( json::ObjectPtr topologyObject, sint64 pointCount );
-		void                                                 loadPrimitive( json::ArrayPtr primitive, SharedPrimitiveData& sharedPrimitiveData );
-		void                                                 loadVolumePrimitive( json::ObjectPtr volume, SharedPrimitiveData& sharedPrimitiveData );
-		void                                                 loadPolyPrimitive( json::ObjectPtr polygonObject );
-		void                                                 loadPolyPrimitiveRun( json::ObjectPtr definition, json::ArrayPtr runEntries );
-		void                                                 loadPolygonRun( json::ObjectPtr polygonRun, bool closed=true );
-		void                                                 loadGroups( json::ArrayPtr groups, sint64 elementCount, std::map<std::string, std::vector<bool>> &destination );
+            friend class HouGeo;
+        };
 
-		void                                                 loadVoxelData( json::ObjectPtr voxelObject, const math::V3i& resolution, float* voxelData );
+        class HouVolume final : public VolumePrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouVolume>;
+            using ConstPtr = std::shared_ptr<const HouVolume>;
 
+            [[nodiscard]] math::M44f transform() const override;
+            [[nodiscard]] int topologyVertex() const override;
+            [[nodiscard]] math::Vec3i resolution() const override;
+            [[nodiscard]] RawDataView rawData() const override;
+            [[nodiscard]] real32 voxelValue(int x, int y, int z) const override;
+            [[nodiscard]] std::string visualizationMode() const override;
+            [[nodiscard]] real32 visualizationIso() const override;
+            [[nodiscard]] real32 visualizationDensity() const override;
 
-		static json::ObjectPtr                               toObject( json::ArrayPtr flattenedArray );
+            void setField(ScalarField::Ptr scalar_field)
+            {
+                if (!scalar_field)
+                    throw std::invalid_argument("HouVolume field cannot be null");
+                scalar_field_ = std::move(scalar_field);
+            }
 
-	private:
-		std::vector<Primitive::Ptr>                                              m_primitives;
-		std::map<std::string, HouAttribute::Ptr>                            m_pointAttributes;
-		std::map<std::string, HouAttribute::Ptr>                           m_vertexAttributes;
-		std::map<std::string, HouAttribute::Ptr>                        m_primitiveAttributes;
-		std::map<std::string, HouAttribute::Ptr>                           m_globalAttributes;
-		std::map<std::string, std::vector<bool>>                                  m_pointGroups;
-		std::map<std::string, std::vector<bool>>                                  m_vertexGroups;
-		std::map<std::string, std::vector<bool>>                                  m_primitiveGroups;
-		HouTopology::Ptr                                                           m_topology;
-		sint64                                                               m_pointCount = -1;
-	};
+            [[nodiscard]] ScalarField::Ptr scalarField() noexcept
+            {
+                return scalar_field_;
+            }
 
+            [[nodiscard]] std::shared_ptr<const ScalarField> scalarField() const noexcept
+            {
+                return scalar_field_;
+            }
 
-}  // namespace houio
+            void setTopologyVertex(int topology_vertex) noexcept
+            {
+                topology_vertex_ = topology_vertex;
+            }
+
+            void setVisualization(
+                std::string mode,
+                real32 iso_value,
+                real32 density)
+            {
+                visualization_mode_ = mode.empty() ? "smoke" : std::move(mode);
+                visualization_iso_ = iso_value;
+                visualization_density_ = density;
+            }
+
+        private:
+            ScalarField::Ptr scalar_field_;
+            int topology_vertex_ = -1;
+            std::string visualization_mode_ = "smoke";
+            real32 visualization_iso_ = 0.0f;
+            real32 visualization_density_ = 1.0f;
+
+            friend class HouGeo;
+        };
+
+        class HouPoly final : public PolyPrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouPoly>;
+            using ConstPtr = std::shared_ptr<const HouPoly>;
+
+            [[nodiscard]] int polygonCount() const override;
+            [[nodiscard]] int polygonVertexCount(int polygon_index) const override;
+            [[nodiscard]] std::span<const int> polygonVertexIndices(
+                int polygon_index = 0) const override;
+            [[nodiscard]] bool isClosed() const override;
+
+            void setPolygonData(
+                int polygon_count,
+                std::vector<int> vertex_counts,
+                std::vector<int> vertex_offsets,
+                std::vector<int> point_indices,
+                bool is_closed)
+            {
+                if (polygon_count < 0)
+                    throw std::invalid_argument("HouPoly polygon count cannot be negative");
+                m_numPolys = polygon_count;
+                m_perPolyVertexCount = std::move(vertex_counts);
+                m_perPolyVertexListOffset = std::move(vertex_offsets);
+                m_vertices = std::move(point_indices);
+                m_closed = is_closed;
+            }
+
+            [[nodiscard]] std::span<const int> vertexCounts() const noexcept
+            {
+                return m_perPolyVertexCount;
+            }
+
+            [[nodiscard]] std::span<const int> vertexOffsets() const noexcept
+            {
+                return m_perPolyVertexListOffset;
+            }
+
+            [[nodiscard]] std::span<const int> pointIndices() const noexcept
+            {
+                return m_vertices;
+            }
+
+        private:
+            int m_numPolys = 0;
+            std::vector<int> m_perPolyVertexCount;
+            std::vector<int> m_perPolyVertexListOffset;
+            std::vector<int> m_vertices;
+            bool m_closed = true;
+
+            friend class HouGeo;
+        };
+
+        HouGeo();
+
+        [[nodiscard]] static Ptr create();
+
+        void setPointAttribute(HouAttribute::Ptr attribute);
+        void setPrimitiveAttribute(const std::string& name, HouAttribute::Ptr attribute);
+        void setPointGroup(const std::string& name, const std::vector<bool>& membership);
+        void setVertexGroup(const std::string& name, const std::vector<bool>& membership);
+        void setPrimitiveGroup(const std::string& name, const std::vector<bool>& membership);
+        void addPrimitive(ScalarField::Ptr field);
+        void addPrimitive(PolyPrimitive::Ptr polygon);
+        void setTopology(HouTopology::Ptr topology);
+
+        [[nodiscard]] sint64 pointCount() const override;
+        [[nodiscard]] sint64 vertexCount() const override;
+        [[nodiscard]] sint64 primitiveCount() const override;
+        [[nodiscard]] std::vector<std::string> pointAttributeNames() const override;
+        [[nodiscard]] AttributeAdapter::Ptr pointAttribute(const std::string& name) override;
+        [[nodiscard]] std::vector<std::string> vertexAttributeNames() const override;
+        [[nodiscard]] AttributeAdapter::Ptr vertexAttribute(const std::string& name) override;
+        [[nodiscard]] bool hasPrimitiveAttribute(const std::string& name) const override;
+        [[nodiscard]] std::vector<std::string> primitiveAttributeNames() const override;
+        [[nodiscard]] AttributeAdapter::Ptr primitiveAttribute(const std::string& name) override;
+        [[nodiscard]] std::vector<Primitive::Ptr> primitives() override;
+        [[nodiscard]] std::vector<std::string> globalAttributeNames() const override;
+        [[nodiscard]] AttributeAdapter::Ptr globalAttribute(const std::string& name) override;
+        [[nodiscard]] std::vector<std::string> pointGroupNames() const override;
+        [[nodiscard]] std::optional<std::vector<bool>> pointGroupMembership(
+            const std::string& name) const override;
+        [[nodiscard]] std::vector<std::string> vertexGroupNames() const override;
+        [[nodiscard]] std::optional<std::vector<bool>> vertexGroupMembership(
+            const std::string& name) const override;
+        [[nodiscard]] std::vector<std::string> primitiveGroupNames() const override;
+        [[nodiscard]] std::optional<std::vector<bool>> primitiveGroupMembership(
+            const std::string& name) const override;
+        [[nodiscard]] Topology::Ptr topology() override;
+
+        struct SharedPrimitiveData
+        {
+            std::map<std::string, json::ObjectPtr> sharedVoxelData;
+        };
+
+        void load(json::ObjectPtr root_object);
+        [[nodiscard]] static json::ObjectPtr toObject(json::ArrayPtr flattened_array);
+
+    private:
+        [[nodiscard]] HouAttribute::Ptr loadAttribute(
+            json::ArrayPtr attribute,
+            sint64 element_count);
+        void loadTopology(json::ObjectPtr topology_object, sint64 point_count);
+        void loadPrimitive(
+            json::ArrayPtr primitive,
+            SharedPrimitiveData& shared_primitive_data);
+        void loadVolumePrimitive(
+            json::ObjectPtr volume,
+            SharedPrimitiveData& shared_primitive_data);
+        void loadPolyPrimitive(json::ObjectPtr polygon_object);
+        void loadPolyPrimitiveRun(
+            json::ObjectPtr definition,
+            json::ArrayPtr run_entries);
+        void loadPolygonRun(json::ObjectPtr polygon_run, bool closed = true);
+        void loadGroups(
+            json::ArrayPtr groups,
+            sint64 element_count,
+            std::map<std::string, std::vector<bool>>& destination);
+        void loadVoxelData(
+            json::ObjectPtr voxel_object,
+            const math::V3i& resolution,
+            std::span<float> voxel_data);
+
+        std::vector<Primitive::Ptr> m_primitives;
+        std::map<std::string, HouAttribute::Ptr> m_pointAttributes;
+        std::map<std::string, HouAttribute::Ptr> m_vertexAttributes;
+        std::map<std::string, HouAttribute::Ptr> m_primitiveAttributes;
+        std::map<std::string, HouAttribute::Ptr> m_globalAttributes;
+        std::map<std::string, std::vector<bool>> m_pointGroups;
+        std::map<std::string, std::vector<bool>> m_vertexGroups;
+        std::map<std::string, std::vector<bool>> m_primitiveGroups;
+        HouTopology::Ptr m_topology;
+        sint64 m_pointCount = -1;
+    };
+}

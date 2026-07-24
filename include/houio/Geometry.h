@@ -1,110 +1,133 @@
 #pragma once
-#include <memory>
-#include <string>
+
 #include <map>
+#include <memory>
+#include <span>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <houio/Attribute.h>
 #include <houio/math/Math.h>
 
-
-
 namespace houio
 {
+    class Geometry final
+    {
+    public:
+        using Ptr = std::shared_ptr<Geometry>;
+        using ConstPtr = std::shared_ptr<const Geometry>;
+        using AttributeMap = std::map<std::string, Attribute::Ptr>;
+        using Index = unsigned int;
 
-	class Geometry
-	{
-	public:
-		typedef std::shared_ptr<Geometry> Ptr;
+        enum class PrimitiveType
+        {
+            point,
+            line,
+            triangle,
+            quad,
+            polygon,
+        };
 
-		enum PrimitiveType
-		{
-			POINT = 0, // GL_POINTS
-			LINE = 1,
-			TRIANGLE = 4,
-			QUAD = 7,
-			POLYGON = 9
-		};
+        static constexpr PrimitiveType POINT = PrimitiveType::point;
+        static constexpr PrimitiveType LINE = PrimitiveType::line;
+        static constexpr PrimitiveType TRIANGLE = PrimitiveType::triangle;
+        static constexpr PrimitiveType QUAD = PrimitiveType::quad;
+        static constexpr PrimitiveType POLYGON = PrimitiveType::polygon;
 
-		Geometry( PrimitiveType pt = TRIANGLE );
+        explicit Geometry(PrimitiveType primitive_type = PrimitiveType::triangle);
 
+        void clear();
+        void reverse();
+        [[nodiscard]] Index duplicatePoint(Index point_index);
+        void transform(const math::M44f& transform_matrix);
+        void addNormals();
 
-		void                                                        clear(); // removes all attributes and primitives
-		//Geometry                                                  *copy();
+        [[nodiscard]] math::BoundingBox3f bounds() const;
 
+        [[nodiscard]] Attribute::Ptr attribute(const std::string& name);
+        [[nodiscard]] Attribute::CPtr attribute(const std::string& name) const;
+        void setAttribute(const std::string& name, Attribute::Ptr attribute);
+        [[nodiscard]] bool hasAttribute(const std::string& name) const;
+        [[nodiscard]] std::vector<std::string> attributeNames() const;
+        void removeAttribute(const std::string& name);
 
+        [[nodiscard]] const AttributeMap& attributes() const noexcept
+        {
+            return attributes_;
+        }
 
+        [[nodiscard]] PrimitiveType primitiveType() const noexcept
+        {
+            return primitive_type_;
+        }
 
-		//
-		// manipulation
-		//
-		void                                                        reverse(); // reverses the order of vertices for each primitive (CW polys become CCW)
-		unsigned int                                                duplicatePoint( unsigned int index ); // duplicates point and returns index of duplicate (all attributes are copied etc.)
-		void                                                        transform( const math::M44f& tm );
-		void                                                        addNormals();
+        [[nodiscard]] unsigned int primitiveCount() const noexcept
+        {
+            return primitive_count_;
+        }
 
-		//
-		// info
-		//
-		math::BoundingBox3f                                         getBound();
+        [[nodiscard]] unsigned int verticesPerPrimitive() const noexcept
+        {
+            return vertices_per_primitive_;
+        }
 
+        [[nodiscard]] std::span<const Index> indexBuffer() const noexcept
+        {
+            return indices_;
+        }
 
+        unsigned int addPoint(Index point_index);
+        unsigned int addLine(Index point_index0, Index point_index1);
+        unsigned int addTriangle(
+            Index point_index0,
+            Index point_index1,
+            Index point_index2);
+        unsigned int addQuad(
+            Index point_index0,
+            Index point_index1,
+            Index point_index2,
+            Index point_index3);
+        unsigned int addPolygonVertex(Index point_index);
 
-		//
-		// Attribute management
-		//
-		Attribute::Ptr                                              getAttr( const std::string &name );
-		void                                                        setAttr( const std::string &name, Attribute::Ptr attr );
-		bool                                                        hasAttr( const std::string &name );
-		void                                                        getAttrNames( std::vector<std::string>& attrNames )const;
-		void                                                        removeAttr( const std::string &name );
-		void                                                        getAttrNames(std::vector<std::string>& names);
+        [[nodiscard]] static Ptr createPointGeometry();
+        [[nodiscard]] static Ptr createLineGeometry();
+        [[nodiscard]] static Ptr createTriangleGeometry();
+        [[nodiscard]] static Ptr createQuadGeometry();
+        [[nodiscard]] static Ptr createPolyGeometry();
+        [[nodiscard]] static Ptr createQuad(
+            PrimitiveType primitive_type = PrimitiveType::triangle);
+        [[nodiscard]] static Ptr createGrid(
+            int x_resolution,
+            int z_resolution,
+            PrimitiveType primitive_type = PrimitiveType::triangle);
+        [[nodiscard]] static Ptr createGrid(
+            int x_resolution,
+            int y_resolution,
+            int z_resolution,
+            PrimitiveType primitive_type = PrimitiveType::point);
+        [[nodiscard]] static Ptr createSphere(
+            int u_subdivisions,
+            int v_subdivisions,
+            float radius,
+            math::Vec3f center = math::V3f(0.0f),
+            PrimitiveType primitive_type = PrimitiveType::triangle);
+        [[nodiscard]] static Ptr createBox(
+            const math::BoundingBox3f& bound,
+            PrimitiveType primitive_type = PrimitiveType::triangle);
+        [[nodiscard]] static Ptr createLine(
+            const math::V3f& point0,
+            const math::V3f& point1);
+        [[nodiscard]] static Ptr merge(const std::vector<Ptr>& geometries);
 
-		std::map< std::string, Attribute::Ptr >                     m_attributes;
+    private:
+        [[nodiscard]] static unsigned int fixedVertexCount(PrimitiveType primitive_type);
+        void appendFixedPrimitive(std::span<const Index> point_indices);
 
-
-		//
-		// primitive management
-		//
-		PrimitiveType                                               primitiveType();
-		unsigned int                                                numPrimitives();
-		unsigned int                                                numPrimitiveVertices(); // Point=1; Line=2; Triangle=3; Quad=4
-		unsigned int                                                addPoint( unsigned int vId );
-		unsigned int                                                addLine( unsigned int vId0, unsigned int vId1 );
-		unsigned int                                                addTriangle( unsigned int vId0, unsigned int vId1, unsigned int vId2 );
-		unsigned int                                                addQuad( unsigned int vId0, unsigned int vId1, unsigned int vId2, unsigned int vId3 );
-		unsigned int                                                addPolygonVertex( unsigned int v );
-
-
-		PrimitiveType                                               m_primitiveType; // determines the primitive type indexBuffer is pointing to...
-		std::vector<unsigned int>                                   m_indexBuffer;
-		bool                                                        m_indexBufferIsDirty;
-		unsigned int                                                m_numPrimitives;
-		unsigned int                                                m_numPrimitiveVertices; // Point=1; Line=2; Triangle=3; Quad=4; polygon:*
-
-		//
-		// OpenGL specific
-		//
-		unsigned int                                                m_indexBufferId;
-
-
-		//
-		// static creators
-		//
-		static Ptr                                                  createPointGeometry();
-		static Ptr                                                  createLineGeometry();
-		static Ptr                                                  createTriangleGeometry();
-		static Ptr                                                  createQuadGeometry();
-		static Ptr                                                  createPolyGeometry();
-		//static GeometryPtr                                                           createReferenceMesh();
-
-		static Ptr                                                  createQuad(Geometry::PrimitiveType primType = Geometry::TRIANGLE);
-		static Ptr                                                  createGrid( int xres, int zres, Geometry::PrimitiveType primType = Geometry::TRIANGLE );
-		static Ptr                                                  createGrid( int xres, int yres, int zres, Geometry::PrimitiveType primType = Geometry::TRIANGLE);
-		static Ptr                                                  createSphere( int uSubdivisions, int vSubdivisions, float radius, math::Vec3f center = math::V3f(0.0f), Geometry::PrimitiveType primType = Geometry::TRIANGLE );
-		static Ptr                                                  createBox(const math::BoundingBox3f &bound, Geometry::PrimitiveType primType = Geometry::TRIANGLE);
-		static Ptr                                                  createLine(const math::V3f &p0, const math::V3f &p1);
-
-		static Ptr                                                  merge(const std::vector<Geometry::Ptr>& geo_list);
-	};
-
+        AttributeMap attributes_;
+        PrimitiveType primitive_type_;
+        std::vector<Index> indices_;
+        unsigned int primitive_count_ = 0;
+        unsigned int vertices_per_primitive_ = 0;
+    };
 }

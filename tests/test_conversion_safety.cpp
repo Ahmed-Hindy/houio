@@ -1,5 +1,6 @@
 #include <houio/HouGeoIO.h>
 
+#include <array>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -21,13 +22,13 @@ houio::HouGeo::Ptr importPointOnlyGeometry(int pointCount)
     document << "[\"pointcount\"," << pointCount
              << ",\"vertexcount\",0,\"primitivecount\",0]";
     std::istringstream input(document.str());
-    return houio::HouGeoIO::import(&input);
+    return houio::HouGeoIO::import(input);
 }
 
 int verifyDeclaredPointCount()
 {
     houio::HouGeo::Ptr geometry = importPointOnlyGeometry(3);
-    if (!geometry || geometry->pointcount() != 3)
+    if (!geometry || geometry->pointCount() != 3)
     {
         return fail("declared pointcount was lost when no point attributes existed");
     }
@@ -53,14 +54,11 @@ int verifyInvalidPolygonPointReference()
     geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("P", positions));
 
     auto topology = std::make_shared<houio::HouGeo::HouTopology>();
-    topology->indexBuffer = {0, 1, 2};
+    topology->setIndices({0, 1, 2});
     geometry->setTopology(topology);
 
     auto polygon = std::make_shared<houio::HouGeo::HouPoly>();
-    polygon->m_numPolys = 1;
-    polygon->m_perPolyVertexCount = {3};
-    polygon->m_perPolyVertexListOffset = {0};
-    polygon->m_vertices = {0, 1, 2};
+    polygon->setPolygonData(1, {3}, {0}, {0, 1, 2}, true);
     geometry->addPrimitive(polygon);
 
     houio::DiagnosticList diagnostics;
@@ -76,14 +74,11 @@ int verifyInvalidPolygonPointReference()
 int verifyPolygonAccessorSafety()
 {
     houio::HouGeo::HouPoly polygon;
-    polygon.m_numPolys = 1;
-    polygon.m_perPolyVertexCount = {3};
-    polygon.m_perPolyVertexListOffset = {1};
-    polygon.m_vertices = {0, 1, 2};
+    polygon.setPolygonData(1, {3}, {1}, {0, 1, 2}, true);
 
     try
     {
-        polygon.numVertices(-1);
+        static_cast<void>(polygon.polygonVertexCount(-1));
         return fail("negative polygon index was accepted");
     }
     catch (const std::out_of_range&)
@@ -92,7 +87,7 @@ int verifyPolygonAccessorSafety()
 
     try
     {
-        polygon.vertices(0);
+        static_cast<void>(polygon.polygonVertexIndices(0));
         return fail("polygon range beyond stored vertices was accepted");
     }
     catch (const std::runtime_error&)
@@ -106,7 +101,7 @@ int verifyNullAndCountGuards()
     houio::Geometry::Ptr geometry = houio::Geometry::createPointGeometry();
     try
     {
-        geometry->setAttr("invalid", houio::Attribute::Ptr());
+        geometry->setAttribute("invalid", houio::Attribute::Ptr());
         return fail("Geometry accepted a null attribute");
     }
     catch (const std::invalid_argument&)
@@ -115,7 +110,7 @@ int verifyNullAndCountGuards()
 
     try
     {
-        geometry->duplicatePoint(0);
+        static_cast<void>(geometry->duplicatePoint(0));
         return fail("Geometry duplicated a point from empty storage");
     }
     catch (const std::out_of_range&)
@@ -198,12 +193,11 @@ int verifyNonNumericAttributesAreSkipped()
     ])JSON";
 
     std::istringstream input(document);
-    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(&input);
+    houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(input);
     if (!geometry)
         return fail("dictionary-attribute conversion fixture did not import");
 
-    std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives;
-    geometry->getPrimitives(primitives);
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
     if (primitives.size() != 1)
         return fail("dictionary-attribute conversion fixture lost its polygon");
 
@@ -232,9 +226,42 @@ int verifyNonNumericAttributesAreSkipped()
     return 0;
 }
 
+int verifyRawDataViewBounds()
+{
+    const houio::HouGeoAdapter::RawDataView unavailable;
+    if (unavailable.available())
+        return fail("default RawDataView unexpectedly reports available data");
+    try
+    {
+        static_cast<void>(unavailable.read<houio::sint32>(0));
+        return fail("unavailable RawDataView allowed a scalar read");
+    }
+    catch (const std::logic_error&)
+    {
+    }
+
+    const std::array<houio::sint32, 2> values = {7, 11};
+    const auto view = houio::HouGeoAdapter::RawDataView::from<houio::sint32>(values);
+    if (!view.available() || view.sizeBytes() != sizeof(values)
+        || view.read<houio::sint32>(0) != 7 || view.read<houio::sint32>(1) != 11)
+    {
+        return fail("RawDataView did not preserve bounded scalar data");
+    }
+    try
+    {
+        static_cast<void>(view.read<houio::sint32>(2));
+        return fail("RawDataView allowed an out-of-range scalar read");
+    }
+    catch (const std::out_of_range&)
+    {
+    }
+    return 0;
+}
+
 int verifyAttributeAndStringBounds()
 {
-    houio::Attribute oversized(4, houio::Attribute::FLOAT);
+    houio::Attribute oversized(
+        4, houio::Attribute::ComponentType::float32);
     try
     {
         oversized.resize(std::numeric_limits<size_t>::max());
@@ -245,10 +272,10 @@ int verifyAttributeAndStringBounds()
     }
 
     houio::HouGeo::HouAttribute strings;
-    strings.strings = {"first"};
+    strings.setStringValues({"first"});
     try
     {
-        strings.getString(1);
+        static_cast<void>(strings.stringValue(1));
         return fail("HouAttribute accepted an out-of-range string index");
     }
     catch (const std::out_of_range&)
@@ -277,6 +304,10 @@ int main()
         return result;
     }
     if (const int result = verifyNonNumericAttributesAreSkipped(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyRawDataViewBounds(); result != 0)
     {
         return result;
     }

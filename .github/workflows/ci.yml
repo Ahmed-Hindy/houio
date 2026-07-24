@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - "experiment/**"
+      - "refactor/**"
   pull_request:
 
 permissions:
@@ -17,6 +18,7 @@ jobs:
       matrix:
         preset:
           - windows-msvc-release
+          - windows-msvc-werror
           - windows-msvc-asan
 
     steps:
