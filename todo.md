@@ -4,13 +4,12 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `refactor/modernize-legacy-core`
-- Baseline commit: `16c485a`
+- Branch: `test/complete-binary-json-coverage`
+- Baseline commit: `7d09bdb`
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
-- Documentation audit contains no retired API references.
-- CI run `30082459984` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
+- Branch CI run `30087208906` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
 - CI reports non-failing Node.js deprecation annotations for `ilammy/msvc-dev-cmd@v1`.
 
 ## Modernization completed
@@ -26,6 +25,11 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Modernize bounding boxes, rays, color packing, angle conversion, and spherical conversion.
 - [x] Replace the legacy point-to-triangle algorithm and harden line/plane/range interpolation utilities.
 - [x] Add source-level guards for retired APIs and broaden math regression coverage.
+- [x] Complete binary JSON scalar-token, length-width, string-token, uniform-array, and null round-trip coverage.
+- [x] Add packed-bool and UInt16 uniform-array writer/reader support.
+- [x] Preserve parsed uniform arrays when serializing JSON trees.
+- [x] Serialize signed and unsigned 8-bit ASCII values numerically.
+- [x] Preserve null values in exported adapter dictionaries.
 
 ## Modernization next
 
@@ -70,10 +74,10 @@ Priority levels:
 
 - [ ] Add exact dense-volume boundary and interpolation tests.
 - [x] Add matrix, scalar, copy, resize, and duplicate-point tests for `Attribute` and `Geometry`.
-- [ ] Unit-test every supported binary token type.
-- [ ] Unit-test binary integer length encodings.
-- [ ] Unit-test string definition and reference handling.
-- [ ] Unit-test every supported uniform numeric array type.
+- [x] Unit-test every supported binary token type.
+- [x] Unit-test binary integer length encodings.
+- [x] Unit-test string definition and reference handling.
+- [x] Unit-test every supported uniform numeric array type.
 - [ ] Unit-test direct polygon and polygon-run loading independently.
 - [ ] Introduce a small assertion harness or lightweight maintained C++ test framework.
 - [x] Keep all tests runnable through CTest and directly from IDEs.

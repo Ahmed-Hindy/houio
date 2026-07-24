@@ -214,7 +214,7 @@ namespace houio
 			else if( value.isObject() )
 				writeJsonObject(writer, value.asObject());
 			else if( value.isNull() )
-				throw std::runtime_error( "Cannot export a null JSON value" );
+				writer.jsonNull();
 			else
 			{
 				JsonScalarWriter scalarWriter{writer};

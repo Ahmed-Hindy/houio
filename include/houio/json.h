@@ -41,6 +41,7 @@ namespace houio
 			virtual void jsonEndArray() = 0;
 			virtual void jsonBeginMap() = 0;
 			virtual void jsonEndMap() = 0;
+			virtual void jsonNull() = 0;
 			virtual void jsonString(const std::string& value) = 0;
 			virtual void jsonKey(const std::string& key) = 0;
 			virtual void jsonBool(const bool& value) = 0;
@@ -57,6 +58,7 @@ namespace houio
 			virtual void uaInt32(sint64 element_count, Parser& parser) = 0;
 			virtual void uaInt64(sint64 element_count, Parser& parser) = 0;
 			virtual void uaUInt8(sint64 element_count, Parser& parser) = 0;
+			virtual void uaUInt16(sint64 element_count, Parser& parser) = 0;
 			virtual void uaString(sint64 element_count, Parser& parser) = 0;
 		};
 
@@ -327,6 +329,7 @@ namespace houio
 			virtual void                         jsonEndArray() = 0;
 			virtual void                         jsonBeginMap() = 0;
 			virtual void                           jsonEndMap() = 0;
+			virtual void                           jsonNull() = 0;
 			virtual void jsonString( const std::string &value ) = 0;
 			virtual void      jsonKey( const std::string &key ) = 0;
 			virtual void          jsonBool( const bool &value ) = 0;
@@ -349,6 +352,7 @@ namespace houio
 			virtual void                                 jsonEndArray()override;
 			virtual void                                 jsonBeginMap()override;
 			virtual void                                   jsonEndMap()override;
+			virtual void                                   jsonNull()override;
 			virtual void         jsonString( const std::string &value )override;
 			virtual void              jsonKey( const std::string &key )override;
 			virtual void                  jsonBool( const bool &value )override;
@@ -366,6 +370,7 @@ namespace houio
 			bool jsonUniformArray(std::span<const T> data);
 			template<typename T>
 			bool jsonUniformArray(const std::vector<T>& data);
+			bool jsonUniformArray(const std::vector<bool>& data);
 			bool jsonUniformArrayReal16(std::span<const uword> data);
 
 			bool                                      writeId( Token::Type id );
@@ -380,6 +385,8 @@ namespace houio
 
 
 		private:
+			bool writeBoolUniformArray(std::span<const bool> data);
+
 			std::ostream& stream;
 		};
 
@@ -410,14 +417,22 @@ namespace houio
 		template<typename T>
 		bool BinaryWriter::jsonUniformArray(std::span<const T> data)
 		{
-			if (data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
-				throw std::length_error("BinaryWriter::jsonUniformArray element count exceeds sint64 range");
-			const sint64 element_count = static_cast<sint64>(data.size());
-			const Token::Type type = uniformArrayToken<T>();
-			return writeId(Token::JID_UNIFORM_ARRAY)
-				&& write<ubyte>(static_cast<ubyte>(type))
-				&& writeLength(element_count)
-				&& write(data);
+			using ValueType = std::remove_cv_t<T>;
+			if constexpr (std::is_same_v<ValueType, bool>)
+			{
+				return writeBoolUniformArray(data);
+			}
+			else
+			{
+				if (data.size() > static_cast<size_t>(std::numeric_limits<sint64>::max()))
+					throw std::length_error("BinaryWriter::jsonUniformArray element count exceeds sint64 range");
+				const sint64 element_count = static_cast<sint64>(data.size());
+				const Token::Type type = uniformArrayToken<ValueType>();
+				return writeId(Token::JID_UNIFORM_ARRAY)
+					&& write<ubyte>(static_cast<ubyte>(type))
+					&& writeLength(element_count)
+					&& write(data);
+			}
 		}
 
 		template<typename T>
@@ -437,6 +452,7 @@ namespace houio
 			virtual void                                 jsonEndArray()override;
 			virtual void                                 jsonBeginMap()override;
 			virtual void                                   jsonEndMap()override;
+			virtual void                                   jsonNull()override;
 			virtual void         jsonString( const std::string &value )override;
 			virtual void              jsonKey( const std::string &key )override;
 			virtual void                  jsonBool( const bool &value )override;
@@ -553,6 +569,12 @@ namespace houio
 				out << "jsonEndMap\n";std::flush(out);
 			}
 
+			void jsonNull() override
+			{
+				indent();
+				out << "jsonNull\n";std::flush(out);
+			}
+
 			void uaBool(sint64 element_count, Parser& parser) override
 			{
 				indent();
@@ -630,6 +652,11 @@ namespace houio
 				}
 				out << "]\n";
 				std::flush(out);
+			}
+
+			void uaUInt16(sint64 element_count, Parser& parser) override
+			{
+				uniformArray<uword>(element_count, parser, "<uint16>");
 			}
 
 			void uaString(sint64 element_count, Parser& parser) override
@@ -885,6 +912,7 @@ namespace houio
 			void jsonEndArray() override;
 			void jsonBeginMap() override;
 			void jsonEndMap() override;
+			void jsonNull() override;
 			void jsonString(const std::string& value) override;
 			void jsonKey(const std::string& key) override;
 			void jsonBool(const bool& value) override;
@@ -901,6 +929,7 @@ namespace houio
 			void uaInt32(sint64 element_count, Parser& parser) override;
 			void uaInt64(sint64 element_count, Parser& parser) override;
 			void uaUInt8(sint64 element_count, Parser& parser) override;
+			void uaUInt16(sint64 element_count, Parser& parser) override;
 			void uaString(sint64 element_count, Parser& parser) override;
 
 		private:
