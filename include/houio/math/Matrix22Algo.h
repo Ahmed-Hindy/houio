@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstddef>
 
 #include <houio/math/Matrix22.h>
 #include <houio/math/Vec2.h>
@@ -8,7 +9,9 @@
 namespace houio::math
 {
     template<typename T>
-    [[nodiscard]] constexpr Vec2<T> transform(const Vec2<T>& vector, const Matrix22<T>& matrix)
+    [[nodiscard]] constexpr Vec2<T> transform(
+        const Vec2<T>& vector,
+        const Matrix22<T>& matrix)
     {
         return Vec2<T>(
             vector.x * matrix(0, 0) + vector.y * matrix(1, 0),
@@ -16,12 +19,22 @@ namespace houio::math
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Matrix22<T> outer(const Vec2<T>& lhs, const Vec2<T>& rhs)
+    [[nodiscard]] constexpr Vec2<T> operator*(
+        const Vec2<T>& vector,
+        const Matrix22<T>& matrix)
+    {
+        return transform(vector, matrix);
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix22<T> outer(
+        const Vec2<T>& lhs,
+        const Vec2<T>& rhs) noexcept
     {
         return Matrix22<T>(
             lhs.x * rhs.x,
-            lhs.y * rhs.x,
             lhs.x * rhs.y,
+            lhs.y * rhs.x,
             lhs.y * rhs.y);
     }
 
@@ -44,35 +57,63 @@ namespace houio::math
     }
 
     template<typename T>
-    constexpr void matrixMultiply(
-        Matrix22<T>& result,
-        const Matrix22<T>& lhs,
-        const Matrix22<T>& rhs) noexcept
+    [[nodiscard]] constexpr Matrix22<T> operator+(Matrix22<T> lhs, T rhs) noexcept
     {
-        Matrix22<T> product = Matrix22<T>::Zero();
-        for (std::size_t row = 0; row < Matrix22<T>::dimension; ++row)
-        {
-            for (std::size_t column = 0; column < Matrix22<T>::dimension; ++column)
-            {
-                for (std::size_t inner = 0; inner < Matrix22<T>::dimension; ++inner)
-                    product(row, column) += lhs(row, inner) * rhs(inner, column);
-            }
-        }
-        result = product;
+        lhs += rhs;
+        return lhs;
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Matrix22<T> operator/(Matrix22<T> lhs, const T& rhs)
+    [[nodiscard]] constexpr Matrix22<T> operator-(Matrix22<T> lhs, T rhs) noexcept
+    {
+        lhs -= rhs;
+        return lhs;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix22<T> operator*(Matrix22<T> lhs, T rhs) noexcept
+    {
+        lhs *= rhs;
+        return lhs;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix22<T> operator/(Matrix22<T> lhs, T rhs)
     {
         lhs /= rhs;
         return lhs;
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Matrix22<T> operator*(Matrix22<T> lhs, const T& rhs) noexcept
+    [[nodiscard]] constexpr Matrix22<T> operator+(T lhs, Matrix22<T> rhs) noexcept
     {
-        lhs *= rhs;
-        return lhs;
+        rhs += lhs;
+        return rhs;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix22<T> operator-(T lhs, const Matrix22<T>& rhs) noexcept
+    {
+        Matrix22<T> result;
+        for (std::size_t index = 0; index < result.ma.size(); ++index)
+            result.ma[index] = lhs - rhs.ma[index];
+        return result;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix22<T> operator*(T lhs, Matrix22<T> rhs) noexcept
+    {
+        rhs *= lhs;
+        return rhs;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix22<T> operator/(T lhs, const Matrix22<T>& rhs)
+    {
+        Matrix22<T> result;
+        for (std::size_t index = 0; index < result.ma.size(); ++index)
+            result.ma[index] = lhs / rhs.ma[index];
+        return result;
     }
 
     template<typename T>
@@ -84,35 +125,20 @@ namespace houio::math
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Matrix22<T> operator*(const T& lhs, Matrix22<T> rhs) noexcept
-    {
-        rhs *= lhs;
-        return rhs;
-    }
-
-    template<typename T>
-    [[nodiscard]] constexpr Matrix22<T> operator/(const T& lhs, const Matrix22<T>& rhs)
-    {
-        Matrix22<T> result;
-        for (std::size_t index = 0; index < result.ma.size(); ++index)
-            result.ma[index] = lhs / rhs.ma[index];
-        return result;
-    }
-
-    template<typename T>
     [[nodiscard]] constexpr Matrix22<T> operator*(
         const Matrix22<T>& lhs,
         const Matrix22<T>& rhs) noexcept
     {
-        Matrix22<T> result;
-        matrixMultiply(result, lhs, rhs);
+        Matrix22<T> result = Matrix22<T>::zero();
+        for (std::size_t row = 0; row < Matrix22<T>::dimension; ++row)
+        {
+            for (std::size_t column = 0; column < Matrix22<T>::dimension; ++column)
+            {
+                for (std::size_t inner = 0; inner < Matrix22<T>::dimension; ++inner)
+                    result(row, column) += lhs(row, inner) * rhs(inner, column);
+            }
+        }
         return result;
-    }
-
-    template<typename T>
-    [[nodiscard]] constexpr Matrix22<T> transpose(const Matrix22<T>& matrix) noexcept
-    {
-        return matrix.transposed();
     }
 
     template<typename T>

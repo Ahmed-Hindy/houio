@@ -179,13 +179,13 @@ int verifyBinaryRoundTrip()
         {
             for (int x = 0; x < resolution.x; ++x)
             {
-                sourceField->lvalue(x, y, z) = static_cast<float>(x + y * 100 + z * 1000);
+                sourceField->voxel(x, y, z) = static_cast<float>(x + y * 100 + z * 1000);
             }
         }
     }
 
-    const houio::math::M44f sourceTransform = houio::math::M44f::ScaleMatrix(2.0f, 3.0f, 4.0f)
-        * houio::math::M44f::TranslationMatrix(5.0f, 6.0f, 7.0f);
+    const houio::math::M44f sourceTransform = houio::math::M44f::scaleMatrix(2.0f, 3.0f, 4.0f)
+        * houio::math::M44f::translationMatrix(5.0f, 6.0f, 7.0f);
     sourceField->setLocalToWorld(sourceTransform);
 
     houio::HouGeo::Ptr sourceGeometry = houio::HouGeo::create();
@@ -251,7 +251,7 @@ int verifyBinaryRoundTrip()
         {
             for (int x = 0; x < resolution.x; ++x)
             {
-                if (std::abs(importedVolume->voxelValue(x, y, z) - sourceField->sample(x, y, z)) > 1.0e-6f)
+                if (std::abs(importedVolume->voxelValue(x, y, z) - sourceField->voxel(x, y, z)) > 1.0e-6f)
                 {
                     return fail("volume binary round-trip lost voxel values");
                 }
@@ -353,15 +353,15 @@ int verifyFieldStorage()
 
     houio::ScalarField source;
     source.resize(2, 2, 1);
-    source.lvalue(0, 0, 0) = 1.0f;
-    source.lvalue(1, 0, 0) = 2.0f;
-    source.lvalue(0, 1, 0) = 3.0f;
-    source.lvalue(1, 1, 0) = 4.0f;
+    source.voxel(0, 0, 0) = 1.0f;
+    source.voxel(1, 0, 0) = 2.0f;
+    source.voxel(0, 1, 0) = 3.0f;
+    source.voxel(1, 1, 0) = 4.0f;
     source.store(storagePath.string());
 
     houio::ScalarField::Ptr loaded = houio::ScalarField::load(storagePath.string());
     std::filesystem::remove(storagePath);
-    if (!loaded || std::abs(loaded->sample(1, 1, 0) - 4.0f) > 1.0e-6f)
+    if (!loaded || std::abs(loaded->voxel(1, 1, 0) - 4.0f) > 1.0e-6f)
     {
         return fail("field storage round-trip failed");
     }
@@ -407,7 +407,7 @@ int verifyFieldResizeSafety()
 {
     houio::ScalarField field;
     field.resize(0, 2, 2);
-    const houio::math::V3i emptyResolution = field.getResolution();
+    const houio::math::V3i emptyResolution = field.resolution();
     if (emptyResolution.x != 0 || emptyResolution.y != 2 || emptyResolution.z != 2)
     {
         return fail("empty field resolution was not retained");

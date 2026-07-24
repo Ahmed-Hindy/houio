@@ -5,18 +5,15 @@
 ----------------------------------------------------------------------*/
 #pragma once
 
-#include <math.h>
+#include <algorithm>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
+#include <cstdint>
+#include <numbers>
+#include <optional>
 #include <span>
-
-#define MATH_PIf 3.14159265f
-#define MATH_PI 3.14159265
-
-#define MATH_2PIf 6.2831853f
-#define MATH_INV_PIf 0.31830988618379067154f
-#define MATH_INV_2PIf 0.15915494309189533577f
-#define MATH_INV_4PIf 0.07957747154594766788f
+#include <stdexcept>
 
 
 
@@ -48,60 +45,53 @@ namespace houio
 ///
 namespace math
 {
-	[[nodiscard]] constexpr float radToDeg(float radians) noexcept
+	template<std::floating_point T>
+	[[nodiscard]] constexpr T radiansToDegrees(T radians) noexcept
 	{
-		return (radians * 180.0f) / MATH_PIf;
+		return radians * static_cast<T>(180) / std::numbers::pi_v<T>;
 	}
 
-	[[nodiscard]] constexpr float degToRad(float degrees) noexcept
+	template<std::floating_point T>
+	[[nodiscard]] constexpr T degreesToRadians(T degrees) noexcept
 	{
-		return (degrees * MATH_PIf) / 180.0f;
+		return degrees * std::numbers::pi_v<T> / static_cast<T>(180);
 	}
 
-	[[nodiscard]] constexpr double radToDeg(double radians) noexcept
+	[[nodiscard]] constexpr float sign(float value) noexcept
 	{
-		return (radians * 180.0) / MATH_PI;
+		return value < 0.0f ? -1.0f : 1.0f;
 	}
 
-	[[nodiscard]] constexpr double degToRad(double degrees) noexcept
+	template<std::floating_point T>
+	struct SphericalCoordinates
 	{
-		return (degrees * MATH_PI) / 180.0;
+		T azimuth{};
+		T polarAngle{};
+		T radius{};
+	};
+
+	template<std::floating_point T>
+	[[nodiscard]] Vec3<T> fromSphericalCoordinates(
+		const SphericalCoordinates<T>& coordinates)
+	{
+		const T polar_sine = std::sin(coordinates.polarAngle);
+		return Vec3<T>(
+			coordinates.radius * polar_sine * std::cos(coordinates.azimuth),
+			coordinates.radius * std::cos(coordinates.polarAngle),
+			coordinates.radius * polar_sine * std::sin(coordinates.azimuth));
 	}
 
-	inline float sign( float f )
+	template<std::floating_point T>
+	[[nodiscard]] SphericalCoordinates<T> toSphericalCoordinates(const Vec3<T>& point)
 	{
-		return f < 0.0f ? -1.0f : 1.0f;
-	}
-
-	//
-	// spherical coordinate convention:
-	// 
-	//                  Y
-	//                  ^
-	//                  |  Z
-	// elevation -----> | /
-	// angle between  / |/ ) azimuth: -angle between X and YZ plane,
-	// Y and XZ plane \ +------> X    -is 0 for (1,0,0)
-	// is 0 for (0,1,0)               -increases towards Z+
-	//
-	//
-
-	// converts spherical to cartesian coordinates
-	template<typename T>
-	Vec3<T> sphericalToCartesian( T azimuth, T elevation, T r = 1.0f )
-	{
-		T sint = sin(elevation);
-		return Vec3<T>( r * sint * cos(azimuth), r * cos(elevation), r * sint * sin(azimuth));
-	}
-
-
-	// x=azimuth, y=elevation, z=distance
-	template<typename T>
-	void cartesianToSpherical( Vec3<T> p, T &azimuth, T &elevation, T &distance )
-	{
-		distance = p.getLength();
-		elevation = acos( p.y / distance );
-		azimuth = atan2( p.z, p.x );
+		const T radius = point.length();
+		if (radius == T{})
+			return {};
+		return SphericalCoordinates<T>{
+			std::atan2(point.z, point.x),
+			std::acos(std::clamp(point.y / radius, T{-1}, T{1})),
+			radius,
+		};
 	}
 
 	//
@@ -110,158 +100,111 @@ namespace math
 
 
 
-	// RGBA
-	#define REDMASK		0x000000ff
-	#define GREENMASK	0x0000ff00
-	#define BLUEMASK	0x00ff0000
-	#define ALPHAMASK	0xff000000
+	inline constexpr std::uint32_t red_mask = 0x000000ffu;
+	inline constexpr std::uint32_t green_mask = 0x0000ff00u;
+	inline constexpr std::uint32_t blue_mask = 0x00ff0000u;
+	inline constexpr std::uint32_t alpha_mask = 0xff000000u;
 
-	#define REDSHIFT   0
-	#define GREENSHIFT 8
-	#define BLUESHIFT  16
-	#define ALPHASHIFT 24
-
-	inline unsigned int getAlpha( const unsigned long &color )
+	[[nodiscard]] constexpr std::uint8_t rgbaRed(std::uint32_t color) noexcept
 	{
-		return ((color&ALPHAMASK) >> ALPHASHIFT);
-	}
-	inline unsigned int	getRed( const unsigned long &color )
-	{
-		return ((color&REDMASK) >> REDSHIFT);
-	}
-	inline unsigned int	getGreen( const unsigned long &color )
-	{
-		return ((color&GREENMASK) >> GREENSHIFT);
-	}
-	inline unsigned int	getBlue( const unsigned long &color )
-	{
-		return ((color&BLUEMASK) >> BLUESHIFT);
-	}
-	inline unsigned long setColor( const unsigned int &r, const unsigned int &g, const unsigned int &b, const unsigned int &a )
-	{
-		return ((a << ALPHASHIFT) + (r << REDSHIFT) + (g << GREENSHIFT) + (b << BLUESHIFT));
+		return static_cast<std::uint8_t>(color & red_mask);
 	}
 
-	[[nodiscard]] inline unsigned int getAlpha(const Color& color)
+	[[nodiscard]] constexpr std::uint8_t rgbaGreen(std::uint32_t color) noexcept
 	{
-		return static_cast<unsigned int>(color.a * 255.0f);
+		return static_cast<std::uint8_t>((color & green_mask) >> 8u);
 	}
 
-	[[nodiscard]] inline unsigned int getRed(const Color& color)
+	[[nodiscard]] constexpr std::uint8_t rgbaBlue(std::uint32_t color) noexcept
 	{
-		return static_cast<unsigned int>(color.r * 255.0f);
+		return static_cast<std::uint8_t>((color & blue_mask) >> 16u);
 	}
 
-	[[nodiscard]] inline unsigned int getGreen(const Color& color)
+	[[nodiscard]] constexpr std::uint8_t rgbaAlpha(std::uint32_t color) noexcept
 	{
-		return static_cast<unsigned int>(color.g * 255.0f);
+		return static_cast<std::uint8_t>((color & alpha_mask) >> 24u);
 	}
 
-	[[nodiscard]] inline unsigned int getBlue(const Color& color)
+	[[nodiscard]] constexpr std::uint32_t packRgba(
+		std::uint8_t red,
+		std::uint8_t green,
+		std::uint8_t blue,
+		std::uint8_t alpha) noexcept
 	{
-		return static_cast<unsigned int>(color.b * 255.0f);
+		return static_cast<std::uint32_t>(red)
+			| (static_cast<std::uint32_t>(green) << 8u)
+			| (static_cast<std::uint32_t>(blue) << 16u)
+			| (static_cast<std::uint32_t>(alpha) << 24u);
 	}
 
-	[[nodiscard]] inline Color setRGBColor(
-		unsigned int red,
-		unsigned int green,
-		unsigned int blue,
-		unsigned int alpha)
+	[[nodiscard]] inline std::uint8_t redByte(const Color& color) noexcept
 	{
-		return Color(
-			static_cast<float>(red) / 255.0f,
-			static_cast<float>(green) / 255.0f,
-			static_cast<float>(blue) / 255.0f,
-			static_cast<float>(alpha) / 255.0f);
+		return static_cast<std::uint8_t>(color.clamped().r * 255.0f);
 	}
 
-	//
-	// Color related ops
-	//
-
-	inline Color operator+( const Color &lhs, const Color &rhs )
+	[[nodiscard]] inline std::uint8_t greenByte(const Color& color) noexcept
 	{
-	return Color( lhs.r+rhs.r, lhs.g+rhs.g, lhs.b+rhs.b, lhs.a+rhs.a );
-	}
-	inline Color operator-( const Color &lhs, const Color &rhs )
-	{
-	return Color( lhs.r-rhs.r, lhs.g-rhs.g, lhs.b-rhs.b, lhs.a-rhs.a );
-	}
-	inline Color operator*( const Color &lhs, const Color &rhs )
-	{
-	return Color( lhs.r*rhs.r, lhs.g*rhs.g, lhs.b*rhs.b, lhs.a*rhs.a );
-	}
-	inline Color operator/( const Color &lhs, const Color &rhs )
-	{
-	return Color( lhs.r/rhs.r, lhs.g/rhs.g, lhs.b/rhs.b, lhs.a/rhs.a );
+		return static_cast<std::uint8_t>(color.clamped().g * 255.0f);
 	}
 
-	inline Color operator+( const Color &lhs, const float &rhs )
+	[[nodiscard]] inline std::uint8_t blueByte(const Color& color) noexcept
 	{
-	return Color( lhs.r+rhs, lhs.g+rhs, lhs.b+rhs, lhs.a+rhs );
-	}
-	inline Color operator-( const Color &lhs, const float &rhs )
-	{
-	return Color( lhs.r-rhs, lhs.g-rhs, lhs.b-rhs, lhs.a-rhs );
-	}
-	inline Color operator*( const Color &lhs, const float &rhs )
-	{
-	return Color( lhs.r*rhs, lhs.g*rhs, lhs.b*rhs, lhs.a*rhs );
-	}
-	inline Color operator/( const Color &lhs, const float &rhs )
-	{
-	return Color( lhs.r/rhs, lhs.g/rhs, lhs.b/rhs, lhs.a/rhs );
+		return static_cast<std::uint8_t>(color.clamped().b * 255.0f);
 	}
 
-	inline Color operator+( const float &lhs, const Color &rhs )
+	[[nodiscard]] inline std::uint8_t alphaByte(const Color& color) noexcept
 	{
-	return Color( (lhs + rhs.r), (lhs + rhs.g), (lhs + rhs.b), (lhs + rhs.a) );
-	}
-	inline Color operator-( const float &lhs, const Color &rhs )
-	{
-	return (rhs-lhs);
-	}
-	inline Color operator*( const float &lhs, const Color &rhs )
-	{
-	return (rhs*lhs);
-	}
-	inline Color operator/( const float &lhs, const Color &rhs )
-	{
-	return (rhs/lhs);
+		return static_cast<std::uint8_t>(color.clamped().a * 255.0f);
 	}
 
-	//
-	// Inverts only the color channels of the given color, not the alpha channel
-	//
-	inline Color invert( const Color &col )
+	[[nodiscard]] constexpr Color colorFromBytes(
+		std::uint8_t red,
+		std::uint8_t green,
+		std::uint8_t blue,
+		std::uint8_t alpha = 255) noexcept
 	{
-		return Color( 1.0f - col.r, 1.0f - col.g, 1.0f - col.b, col.a );
+		return Color::fromBytes(red, green, blue, alpha);
 	}
 
 
+	[[nodiscard]] float triangleArea(
+		const Vec3f& first_vertex,
+		const Vec3f& second_vertex,
+		const Vec3f& third_vertex);
+	[[nodiscard]] float distance(const Vec3f& first_point, const Vec3f& second_point);
+	[[nodiscard]] float squaredDistance(const Vec3f& first_point, const Vec3f& second_point);
+	[[nodiscard]] float signedDistanceToPlane(
+		const Vec3f& point,
+		const Vec3f& plane_normal,
+		float plane_offset);
+	[[nodiscard]] float distancePointToLine(
+		const Vec3f& point,
+		const Vec3f& first_line_point,
+		const Vec3f& second_line_point);
+	[[nodiscard]] float distancePointToTriangle(
+		const Vec3f& point,
+		const Vec3f& first_vertex,
+		const Vec3f& second_vertex,
+		const Vec3f& third_vertex);
+	[[nodiscard]] Vec3f projectPointOntoPlane(
+		const Vec3f& point,
+		const Vec3f& plane_normal,
+		float plane_offset);
+	[[nodiscard]] Vec3f projectPointOntoLine(
+		const Vec3f& point,
+		const Vec3f& first_line_point,
+		const Vec3f& second_line_point);
 
-
-	float                                                   area( const Vec3f &p0, const Vec3f &p1, const Vec3f &p2 ); // computes area of an triangle
-
-	float                                                                distance( const Vec3f &p0, const Vec3f &p1 ); // computes the euclidian distance between 2 points in space
-	float                                                         squaredDistance( const Vec3f &p0, const Vec3f &p1 ); // computes the squared euclidian distance between 2 points in space
-	float                  distancePointPlane( const math::Vec3f &point, const Vec3f &normal, const float &distance ); // computes the distance of a point to a given plane
-	float                             distancePointLine( const math::Vec3f &point, const Vec3f &p1, const Vec3f &p2 ); // returns the distance of the given point to the line specified by two points
-	float             distancePointTriangle( const Vec3f &point, const Vec3f &p1, const Vec3f &p2, const Vec3f &p3  ); // returns distance to the closest point on triangle given
-
-
-	math::Vec3f     projectPointOnPlane( const math::Vec3f &normal, const float &distance, const math::Vec3f &point ); // returns the projection of the given point on the normal and distance specified plane
-	math::Vec3f          projectPointOnLine( const math::Vec3f &point, const math::Vec3f &p1, const math::Vec3f &p2 );
-
-	//
-	// Misc mathematical utilities
-	//
-
-	//
-	//
-	//
-	float mapValueToRange( const float &sourceRangeMin, const float &sourceRangeMax, const float &targetRangeMin, const float &targetRangeMax, const float &value );
-	float mapValueTo0_1( const float &sourceRangeMin, const float &sourceRangeMax, const float &value );
+	[[nodiscard]] float normalizeRange(
+		float value,
+		float source_minimum,
+		float source_maximum);
+	[[nodiscard]] float remap(
+		float value,
+		float source_minimum,
+		float source_maximum,
+		float target_minimum,
+		float target_maximum);
 
 	template<typename T, typename R>
 	[[nodiscard]] constexpr T lerp(T start, T end, R factor)
@@ -269,35 +212,18 @@ namespace math
 		return T(start * (static_cast<R>(1.0) - factor) + end * factor);
 	}
 
-
 	template<typename T>
-	inline T max( T x, T y )
+	[[nodiscard]] constexpr T step(T value, T edge) noexcept
 	{
-		return x > y ? x : y;
+		return value < edge ? T{} : T{1};
 	}
 
-	template<typename T>
-	inline T min( T x, T y )
-	{
-		return x < y ? x : y;
-	}
-
-	template<typename T>
-	inline T clamp( T x, T _min, T _max )
-	{
-		return min( _max, max( _min, x ) );
-	}
-
-	template<typename T>
-	inline T step( T x, T edge )
-	{
-		return x < edge ? T(0.0) : T(1.0);
-	}
-
-	Vec3f slerp( Vec3f v0, Vec3f v1, float t  );
-	float clamp( float x, float left, float right );
-	float smoothstep( float x );
-	float smoothstep(float edge0, float edge1, float x);
+	[[nodiscard]] Vec3f sphericalLerp(
+		const Vec3f& start_direction,
+		const Vec3f& end_direction,
+		float factor);
+	[[nodiscard]] float smoothstep(float value);
+	[[nodiscard]] float smoothstep(float first_edge, float second_edge, float value);
 	void evaluateCatmullRom(
 		std::span<const float> key_positions,
 		std::span<const float> key_times,
@@ -315,7 +241,7 @@ namespace math
 	inline float sRGBToLinear( float c_srgb )
 	{
 		const float a = 0.055f;
-		float c_srgb_clamped = clamp( c_srgb, 0.0f, 1.0f );
+		const float c_srgb_clamped = std::clamp(c_srgb, 0.0f, 1.0f);
 
 		if( c_srgb_clamped <= 0.04045f )
 			return c_srgb_clamped/12.92f;
@@ -335,33 +261,49 @@ namespace math
 		}
 	}
 
-	[[nodiscard]] inline bool quadratic(
+	struct QuadraticRoots
+	{
+		float first{};
+		float second{};
+
+		[[nodiscard]] constexpr bool repeated() const noexcept
+		{
+			return first == second;
+		}
+	};
+
+	[[nodiscard]] inline std::optional<QuadraticRoots> solveQuadratic(
 		float coefficient_a,
 		float coefficient_b,
-		float coefficient_c,
-		float* first_root,
-		float* second_root)
+		float coefficient_c)
 	{
-		if (first_root == nullptr || second_root == nullptr || coefficient_a == 0.0f)
-			return false;
+		if (!std::isfinite(coefficient_a)
+			|| !std::isfinite(coefficient_b)
+			|| !std::isfinite(coefficient_c))
+		{
+			throw std::invalid_argument("Quadratic coefficients must be finite");
+		}
+		if (coefficient_a == 0.0f)
+			throw std::invalid_argument("Quadratic coefficient A must be non-zero");
 
 		const float discriminant = coefficient_b * coefficient_b
 			- 4.0f * coefficient_a * coefficient_c;
-		if (discriminant <= 0.0f)
-			return false;
+		if (discriminant < 0.0f)
+			return std::nullopt;
+		if (discriminant == 0.0f)
+		{
+			const float root = -coefficient_b / (2.0f * coefficient_a);
+			return QuadraticRoots{root, root};
+		}
 
 		const float root_discriminant = std::sqrt(discriminant);
 		const float q = coefficient_b < 0.0f
 			? -0.5f * (coefficient_b - root_discriminant)
 			: -0.5f * (coefficient_b + root_discriminant);
-		if (q == 0.0f)
-			return false;
-
-		*first_root = q / coefficient_a;
-		*second_root = coefficient_c / q;
-		if (*first_root > *second_root)
-			std::swap(*first_root, *second_root);
-		return true;
+		QuadraticRoots roots{q / coefficient_a, coefficient_c / q};
+		if (roots.first > roots.second)
+			std::swap(roots.first, roots.second);
+		return roots;
 	}
 
 }

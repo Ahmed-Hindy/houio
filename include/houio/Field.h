@@ -58,10 +58,10 @@ namespace houio
         Field();
 
         [[nodiscard]] T evaluate(const math::V3f& voxel_position) const;
-        [[nodiscard]] T sample(int x, int y, int z) const;
-        [[nodiscard]] T& lvalue(int x, int y, int z);
+        [[nodiscard]] const T& voxel(int x, int y, int z) const;
+        [[nodiscard]] T& voxel(int x, int y, int z);
 
-        [[nodiscard]] math::V3i getResolution() const noexcept;
+        [[nodiscard]] math::V3i resolution() const noexcept;
         void resize(int x, int y, int z);
         void resize(math::V3i resolution);
 
@@ -69,7 +69,7 @@ namespace houio
         void setBound(const math::Box3f& bound);
 
         [[nodiscard]] math::Box3f bound() const noexcept;
-        [[nodiscard]] math::V3f getVoxelSize() const;
+        [[nodiscard]] math::V3f voxelSize() const;
         [[nodiscard]] const math::M44f& localToWorldMatrix() const noexcept;
 
         [[nodiscard]] math::V3f worldToLocal(const math::V3f& world_position) const;
@@ -92,10 +92,10 @@ namespace houio
         [[nodiscard]] std::size_t linearIndex(int x, int y, int z) const;
         void updateVoxelTransforms();
 
-        math::M44f local_to_world_ = math::M44f::Identity();
-        math::M44f world_to_local_ = math::M44f::Identity();
-        math::M44f world_to_voxel_ = math::M44f::Identity();
-        math::M44f voxel_to_world_ = math::M44f::Identity();
+        math::M44f local_to_world_ = math::M44f::identity();
+        math::M44f world_to_local_ = math::M44f::identity();
+        math::M44f world_to_voxel_ = math::M44f::identity();
+        math::M44f voxel_to_world_ = math::M44f::identity();
         math::V3f sample_location_ = math::V3f(0.5f);
         math::V3i resolution_ = math::V3i(1);
         math::Box3f bound_;
@@ -133,7 +133,7 @@ namespace houio
         if (!source)
             throw std::invalid_argument("Field::create received a null source");
 
-        auto destination = Field<T>::create(source->getResolution(), source->bound());
+        auto destination = Field<T>::create(source->resolution(), source->bound());
         const std::span<const Source> source_values = source->values();
         std::span<T> destination_values = destination->values();
         if (source_values.size() != destination_values.size())
@@ -151,7 +151,7 @@ namespace houio
     Field<T>::Field()
     {
         resize(math::V3i(1));
-        setLocalToWorld(math::M44f::Identity());
+        setLocalToWorld(math::M44f::identity());
     }
 
     template<typename T>
@@ -304,13 +304,13 @@ namespace houio
     }
 
     template<typename T>
-    T Field<T>::sample(int x, int y, int z) const
+    const T& Field<T>::voxel(int x, int y, int z) const
     {
         return data_.at(linearIndex(x, y, z));
     }
 
     template<typename T>
-    T& Field<T>::lvalue(int x, int y, int z)
+    T& Field<T>::voxel(int x, int y, int z)
     {
         return data_.at(linearIndex(x, y, z));
     }
@@ -342,35 +342,35 @@ namespace houio
 
         const T lower_plane = math::lerp(
             math::lerp(
-                sample(lower.x, lower.y, lower.z),
-                sample(upper.x, lower.y, lower.z),
+                voxel(lower.x, lower.y, lower.z),
+                voxel(upper.x, lower.y, lower.z),
                 fraction_x),
             math::lerp(
-                sample(lower.x, upper.y, lower.z),
-                sample(upper.x, upper.y, lower.z),
+                voxel(lower.x, upper.y, lower.z),
+                voxel(upper.x, upper.y, lower.z),
                 fraction_x),
             fraction_y);
         const T upper_plane = math::lerp(
             math::lerp(
-                sample(lower.x, lower.y, upper.z),
-                sample(upper.x, lower.y, upper.z),
+                voxel(lower.x, lower.y, upper.z),
+                voxel(upper.x, lower.y, upper.z),
                 fraction_x),
             math::lerp(
-                sample(lower.x, upper.y, upper.z),
-                sample(upper.x, upper.y, upper.z),
+                voxel(lower.x, upper.y, upper.z),
+                voxel(upper.x, upper.y, upper.z),
                 fraction_x),
             fraction_y);
         return math::lerp(lower_plane, upper_plane, fraction_z);
     }
 
     template<typename T>
-    math::V3i Field<T>::getResolution() const noexcept
+    math::V3i Field<T>::resolution() const noexcept
     {
         return resolution_;
     }
 
     template<typename T>
-    math::V3f Field<T>::getVoxelSize() const
+    math::V3f Field<T>::voxelSize() const
     {
         if (resolution_.x == 0 || resolution_.y == 0 || resolution_.z == 0)
             return math::V3f(0.0f);
@@ -402,26 +402,26 @@ namespace houio
     {
         if (resolution_.x == 0 || resolution_.y == 0 || resolution_.z == 0)
         {
-            world_to_voxel_ = math::M44f::Identity();
-            voxel_to_world_ = math::M44f::Identity();
+            world_to_voxel_ = math::M44f::identity();
+            voxel_to_world_ = math::M44f::identity();
             return;
         }
         world_to_voxel_ = world_to_local_ * math::M44f().scale(math::V3f(resolution_));
-        voxel_to_world_ = world_to_voxel_.inverse();
+        voxel_to_world_ = world_to_voxel_.inverted();
     }
 
     template<typename T>
     void Field<T>::setLocalToWorld(const math::M44f& local_to_world)
     {
         local_to_world_ = local_to_world;
-        world_to_local_ = local_to_world_.inverse();
+        world_to_local_ = local_to_world_.inverted();
         updateVoxelTransforms();
 
-        bound_.makeEmpty();
+        bound_.reset();
         for (int z = 0; z <= 1; ++z)
             for (int y = 0; y <= 1; ++y)
                 for (int x = 0; x <= 1; ++x)
-                    bound_.extendBy(math::V3f(float(x), float(y), float(z)) * local_to_world_);
+                    bound_.extend(math::V3f(float(x), float(y), float(z)) * local_to_world_);
     }
 
     template<typename T>
@@ -431,7 +431,7 @@ namespace houio
         const math::V3f dimensions = bound_.size();
         local_to_world_ = math::M44f().scale(dimensions)
             * math::M44f().translate(bound_.minPoint);
-        world_to_local_ = local_to_world_.inverse();
+        world_to_local_ = local_to_world_.inverted();
         updateVoxelTransforms();
     }
 
@@ -464,7 +464,7 @@ namespace houio
     {
         if (resolution_.x == 0 || resolution_.y == 0 || resolution_.z == 0)
             throw std::runtime_error("Field::voxelToLocal requires non-zero resolution");
-        return voxel_position * math::M44f::ScaleMatrix(
+        return voxel_position * math::M44f::scaleMatrix(
             1.0f / float(resolution_.x),
             1.0f / float(resolution_.y),
             1.0f / float(resolution_.z));
@@ -473,7 +473,7 @@ namespace houio
     template<typename T>
     math::V3f Field<T>::localToVoxel(const math::V3f& local_position) const
     {
-        return local_position * math::M44f::ScaleMatrix(
+        return local_position * math::M44f::scaleMatrix(
             float(resolution_.x),
             float(resolution_.y),
             float(resolution_.z));
@@ -503,7 +503,7 @@ namespace houio
                         float(y) + 0.5f,
                         float(z) + 0.5f);
                     if (world_bound.encloses(voxelToWorld(voxel_position)))
-                        lvalue(x, y, z) = value;
+                        voxel(x, y, z) = value;
                 }
     }
 
@@ -545,10 +545,10 @@ namespace houio
     {
         if (sample_count <= 0)
             throw std::invalid_argument("field_writeplot requires a positive sample count");
-        math::Ray3f ray;
-        ray.o = world_start;
-        ray.d = (world_end - world_start).normalized();
-        const float step = (world_end - world_start).getLength() / float(sample_count);
+        const math::Ray3f ray(
+            world_start,
+            (world_end - world_start).normalized());
+        const float step = (world_end - world_start).length() / float(sample_count);
         for (int sample_index = 0; sample_index < sample_count; ++sample_index)
         {
             const float distance = step * float(sample_index);
@@ -570,10 +570,10 @@ namespace houio
             throw std::out_of_range("field_writeplot vector component is out of range");
         if (sample_count <= 0)
             throw std::invalid_argument("field_writeplot requires a positive sample count");
-        math::Ray3f ray;
-        ray.o = world_start;
-        ray.d = (world_end - world_start).normalized();
-        const float step = (world_end - world_start).getLength() / float(sample_count);
+        const math::Ray3f ray(
+            world_start,
+            (world_end - world_start).normalized());
+        const float step = (world_end - world_start).length() / float(sample_count);
         for (int sample_index = 0; sample_index < sample_count; ++sample_index)
         {
             const float distance = step * float(sample_index);

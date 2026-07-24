@@ -1,23 +1,17 @@
 #include <houio/math/Color.h>
-#include <houio/math/Math.h>
 
 #include <algorithm>
 #include <stdexcept>
 
 namespace houio::math
 {
-    Color Color::From255(
-        const unsigned char& red,
-        const unsigned char& green,
-        const unsigned char& blue,
-        const unsigned char& alpha) noexcept
+    namespace
     {
-        constexpr float scale = 1.0f / 255.0f;
-        return Color(
-            static_cast<float>(red) * scale,
-            static_cast<float>(green) * scale,
-            static_cast<float>(blue) * scale,
-            static_cast<float>(alpha) * scale);
+        [[nodiscard]] std::uint8_t channelByte(float value) noexcept
+        {
+            const float clamped = std::clamp(value, 0.0f, 1.0f);
+            return static_cast<std::uint8_t>(clamped * 255.0f);
+        }
     }
 
     void Color::clamp() noexcept
@@ -28,17 +22,15 @@ namespace houio::math
         a = std::clamp(a, 0.0f, 1.0f);
     }
 
-    unsigned long Color::makeDWORD()
+    std::uint32_t Color::packedRgba() const noexcept
     {
-        clamp();
-        return setColor(
-            static_cast<unsigned int>(r * 255.0f),
-            static_cast<unsigned int>(g * 255.0f),
-            static_cast<unsigned int>(b * 255.0f),
-            static_cast<unsigned int>(a * 255.0f));
+        return static_cast<std::uint32_t>(channelByte(r))
+            | (static_cast<std::uint32_t>(channelByte(g)) << 8u)
+            | (static_cast<std::uint32_t>(channelByte(b)) << 16u)
+            | (static_cast<std::uint32_t>(channelByte(a)) << 24u);
     }
 
-    const float& Color::operator[](int index) const
+    const float& Color::operator[](std::size_t index) const
     {
         if (index == 0)
             return r;
@@ -51,7 +43,7 @@ namespace houio::math
         throw std::out_of_range("Color index is out of range");
     }
 
-    float& Color::operator[](int index)
+    float& Color::operator[](std::size_t index)
     {
         if (index == 0)
             return r;

@@ -103,13 +103,13 @@ int verifyUniformInt8()
         return fail("failed to parse uniform int8 binary JSON");
     }
 
-    houio::json::ArrayPtr root = reader.getRoot().asArray();
+    houio::json::ArrayPtr root = reader.root().asArray();
     if (!root || root->size() != 1)
     {
         return fail("unexpected root array");
     }
 
-    houio::json::ArrayPtr values = root->getArray(0);
+    houio::json::ArrayPtr values = root->array(0);
     if (!values || values->size() != 2 || values->get<int>(0) != 4 || values->get<int>(1) != 6)
     {
         return fail("uniform int8 values were not widened correctly");
@@ -135,8 +135,8 @@ int verifyUniformBoolAcrossWords()
         return fail("failed to parse multiword uniform bool array");
     }
 
-    houio::json::ArrayPtr root = reader.getRoot().asArray();
-    houio::json::ArrayPtr values = root ? root->getArray(0) : houio::json::ArrayPtr();
+    houio::json::ArrayPtr root = reader.root().asArray();
+    houio::json::ArrayPtr values = root ? root->array(0) : houio::json::ArrayPtr();
     if (!values || values->size() != 40 || !values->get<bool>(0) || values->get<bool>(1)
         || !values->get<bool>(31) || !values->get<bool>(32) || !values->get<bool>(39))
     {
@@ -206,7 +206,7 @@ int verifyFloat16Tokens()
     houio::json::JSONReader scalarReader;
     houio::json::Parser parser;
     if (!parser.parse(scalarInput, scalarReader)
-        || scalarReader.getRoot().asArray()->get<houio::real32>(0) != 1.0f)
+        || scalarReader.root().asArray()->get<houio::real32>(0) != 1.0f)
     {
         return fail("standalone Float16 token was not decoded");
     }
@@ -230,7 +230,7 @@ int verifyFloat16Tokens()
     {
         return fail("failed to parse Float16 uniform array");
     }
-    houio::json::ArrayPtr values = reader.getRoot().asArray()->getArray(0);
+    houio::json::ArrayPtr values = reader.root().asArray()->array(0);
     if (!values || values->size() != 3 || values->get<houio::real32>(0) != 0.5f
         || values->get<houio::real32>(1) != -2.0f || values->get<houio::real32>(2) != 3.25f)
     {
@@ -256,7 +256,7 @@ int verifyWideScalarFidelity()
     {
         return fail("failed to parse wide scalar fixture");
     }
-    houio::json::ArrayPtr values = reader.getRoot().asArray();
+    houio::json::ArrayPtr values = reader.root().asArray();
     if (!values || values->size() != 2 || values->get<houio::sint64>(0) != 1099511627779LL
         || values->get<houio::real64>(1) != 1.0 / 3.0)
     {
@@ -292,7 +292,7 @@ int verifyRootAndClosingStateSafety()
     houio::json::JSONReader binaryScalarReader;
     houio::json::Parser binaryScalarParser;
     if (!binaryScalarParser.parse(binaryScalarInput, binaryScalarReader)
-        || binaryScalarReader.getRoot().as<houio::sint32>() != 5)
+        || binaryScalarReader.root().as<houio::sint32>() != 5)
     {
         return fail("valid binary scalar root was rejected");
     }
@@ -302,7 +302,7 @@ int verifyRootAndClosingStateSafety()
     houio::json::JSONReader scalarReader;
     houio::json::Parser scalarParser;
     if (!scalarParser.parse(nonSeekableScalarInput, scalarReader)
-        || scalarReader.getRoot().as<houio::sint64>() != 1)
+        || scalarReader.root().as<houio::sint64>() != 1)
     {
         return fail("non-seekable scalar root at exact EOF was rejected");
     }
@@ -410,7 +410,7 @@ int verifyArrayAndValueSafety()
     {
         return fail("failed to parse array safety fixture");
     }
-    houio::json::ArrayPtr values = reader.getRoot().asArray()->getArray(0);
+    houio::json::ArrayPtr values = reader.root().asArray()->array(0);
     try
     {
         static_cast<void>(values->get<int>(-1));
@@ -431,9 +431,27 @@ int verifyArrayAndValueSafety()
     const houio::sint64 integer_value = 0x102030405060708LL;
     const houio::json::Value typed_value =
         houio::json::Value::create<houio::sint64>(integer_value);
-    if (typed_value.as<houio::sint64>() != integer_value)
+    if (typed_value.as<houio::sint64>() != integer_value
+        || std::get<houio::sint64>(typed_value.variant()) != integer_value)
     {
-        return fail("int64 Value::as changed the value");
+        return fail("int64 Value access changed the value");
+    }
+
+    houio::json::ArrayPtr nested_array = houio::json::Array::create();
+    nested_array->appendValue<houio::sint32>(7);
+    houio::json::ObjectPtr child = houio::json::Object::create();
+    child->appendValue("name", std::string("child"));
+    houio::json::ObjectPtr object = houio::json::Object::create();
+    object->append("items", nested_array);
+    object->append("child", child);
+    if (!object->contains("items") || object->contains("missing")
+        || object->keys() != std::vector<std::string>({"child", "items"})
+        || !object->array("items") || object->array("items")->get<houio::sint32>(0) != 7
+        || !object->object("child")
+        || object->object("child")->get<std::string>("name") != "child"
+        || !object->value("missing").isNull())
+    {
+        return fail("modern JSON tree accessors are inconsistent");
     }
 
     try
@@ -518,7 +536,7 @@ int verifyParserReuse()
         {
             return fail("parser reuse failed");
         }
-        houio::json::ArrayPtr root = reader.getRoot().asArray();
+        houio::json::ArrayPtr root = reader.root().asArray();
         if (!root || root->size() != 1 || root->get<int>(0) != 5)
         {
             return fail("parser reuse retained invalid document state");

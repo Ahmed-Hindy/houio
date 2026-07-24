@@ -1,9 +1,13 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
+#include <limits>
 #include <stdexcept>
+#include <utility>
 
 #include <houio/math/Vec3.h>
 
@@ -19,15 +23,15 @@ namespace houio::math
         constexpr Matrix33() noexcept = default;
 
         constexpr Matrix33(
-            const T& value00,
-            const T& value01,
-            const T& value02,
-            const T& value10,
-            const T& value11,
-            const T& value12,
-            const T& value20,
-            const T& value21,
-            const T& value22) noexcept
+            T value00,
+            T value01,
+            T value02,
+            T value10,
+            T value11,
+            T value12,
+            T value20,
+            T value21,
+            T value22) noexcept
             : ma{
                   value00, value01, value02,
                   value10, value11, value12,
@@ -35,12 +39,12 @@ namespace houio::math
         {
         }
 
-        [[nodiscard]] static constexpr Matrix33 Zero() noexcept
+        [[nodiscard]] static constexpr Matrix33 zero() noexcept
         {
             return Matrix33{};
         }
 
-        [[nodiscard]] static constexpr Matrix33 Identity() noexcept
+        [[nodiscard]] static constexpr Matrix33 identity() noexcept
         {
             return Matrix33(
                 T{1}, T{}, T{},
@@ -48,8 +52,13 @@ namespace houio::math
                 T{}, T{}, T{1});
         }
 
-        [[nodiscard]] static Matrix33 RotationMatrix(const Vec3<T>& axis, const T& angle)
+        [[nodiscard]] static Matrix33 rotation(const Vec3<T>& axis, T angle)
+            requires std::floating_point<T>
         {
+            const T axis_length_squared = axis.squaredLength();
+            if (axis_length_squared <= std::numeric_limits<T>::epsilon())
+                throw std::invalid_argument("Matrix33 rotation requires a non-zero axis");
+
             const Vec3<T> normalized_axis = axis.normalized();
             using std::cos;
             using std::sin;
@@ -64,13 +73,13 @@ namespace houio::math
             const T sz = sine * normalized_axis.z;
             return Matrix33(
                 one_minus_cosine * normalized_axis.x * normalized_axis.x + cosine,
-                xy + sz,
-                xz - sy,
                 xy - sz,
-                one_minus_cosine * normalized_axis.y * normalized_axis.y + cosine,
-                yz + sx,
                 xz + sy,
+                xy + sz,
+                one_minus_cosine * normalized_axis.y * normalized_axis.y + cosine,
                 yz - sx,
+                xz - sy,
+                yz + sx,
                 one_minus_cosine * normalized_axis.z * normalized_axis.z + cosine);
         }
 
@@ -105,7 +114,7 @@ namespace houio::math
             return ma[0] + ma[4] + ma[8];
         }
 
-        [[nodiscard]] constexpr T getDeterminant() const noexcept
+        [[nodiscard]] constexpr T determinant() const noexcept
         {
             return ma[0] * (ma[4] * ma[8] - ma[5] * ma[7])
                 - ma[1] * (ma[3] * ma[8] - ma[5] * ma[6])
@@ -113,12 +122,24 @@ namespace houio::math
         }
 
         void invert()
+            requires std::floating_point<T>
         {
-            const T determinant = getDeterminant();
             using std::abs;
-            if (abs(determinant) <= static_cast<T>(1.0e-12))
+            const T scale = std::max({
+                T{1},
+                static_cast<T>(abs(ma[0])), static_cast<T>(abs(ma[1])),
+                static_cast<T>(abs(ma[2])), static_cast<T>(abs(ma[3])),
+                static_cast<T>(abs(ma[4])), static_cast<T>(abs(ma[5])),
+                static_cast<T>(abs(ma[6])), static_cast<T>(abs(ma[7])),
+                static_cast<T>(abs(ma[8])),
+            });
+            const T determinant_value = determinant();
+            const T tolerance = std::numeric_limits<T>::epsilon()
+                * scale * scale * scale * T{64};
+            if (abs(determinant_value) <= tolerance)
                 throw std::domain_error("Matrix33 is singular");
-            const T reciprocal = T{1} / determinant;
+
+            const T reciprocal = T{1} / determinant_value;
             const Matrix33 source = *this;
             ma = {
                 (source.ma[4] * source.ma[8] - source.ma[5] * source.ma[7]) * reciprocal,
@@ -131,6 +152,14 @@ namespace houio::math
                 (source.ma[1] * source.ma[6] - source.ma[0] * source.ma[7]) * reciprocal,
                 (source.ma[0] * source.ma[4] - source.ma[1] * source.ma[3]) * reciprocal,
             };
+        }
+
+        [[nodiscard]] Matrix33 inverted() const
+            requires std::floating_point<T>
+        {
+            Matrix33 result = *this;
+            result.invert();
+            return result;
         }
 
         [[nodiscard]] constexpr bool operator==(const Matrix33& rhs) const noexcept
@@ -157,28 +186,28 @@ namespace houio::math
             return *this;
         }
 
-        constexpr Matrix33& operator+=(const T& rhs) noexcept
+        constexpr Matrix33& operator+=(T rhs) noexcept
         {
             for (T& value : ma)
                 value += rhs;
             return *this;
         }
 
-        constexpr Matrix33& operator-=(const T& rhs) noexcept
+        constexpr Matrix33& operator-=(T rhs) noexcept
         {
             for (T& value : ma)
                 value -= rhs;
             return *this;
         }
 
-        constexpr Matrix33& operator*=(const T& rhs) noexcept
+        constexpr Matrix33& operator*=(T rhs) noexcept
         {
             for (T& value : ma)
                 value *= rhs;
             return *this;
         }
 
-        constexpr Matrix33& operator/=(const T& rhs)
+        constexpr Matrix33& operator/=(T rhs)
         {
             for (T& value : ma)
                 value /= rhs;

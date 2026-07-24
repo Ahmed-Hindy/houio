@@ -3,8 +3,12 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
+#include <limits>
+#include <numbers>
 #include <stdexcept>
+#include <utility>
 
 #include <houio/math/Vec3.h>
 
@@ -24,22 +28,22 @@ namespace houio::math
         constexpr Matrix44() noexcept = default;
 
         constexpr Matrix44(
-            const T& value00,
-            const T& value01,
-            const T& value02,
-            const T& value03,
-            const T& value10,
-            const T& value11,
-            const T& value12,
-            const T& value13,
-            const T& value20,
-            const T& value21,
-            const T& value22,
-            const T& value23,
-            const T& value30,
-            const T& value31,
-            const T& value32,
-            const T& value33) noexcept
+            T value00,
+            T value01,
+            T value02,
+            T value03,
+            T value10,
+            T value11,
+            T value12,
+            T value13,
+            T value20,
+            T value21,
+            T value22,
+            T value23,
+            T value30,
+            T value31,
+            T value32,
+            T value33) noexcept
             : ma{
                   value00, value01, value02, value03,
                   value10, value11, value12, value13,
@@ -52,12 +56,12 @@ namespace houio::math
             const Vec3<T>& right,
             const Vec3<T>& up,
             const Vec3<T>& forward,
-            const Vec3<T>& translation = Vec3<T>{}) noexcept
+            const Vec3<T>& translation_value = Vec3<T>{}) noexcept
             : Matrix44(
                   right.x, right.y, right.z, T{},
                   up.x, up.y, up.z, T{},
                   forward.x, forward.y, forward.z, T{},
-                  translation.x, translation.y, translation.z, T{1})
+                  translation_value.x, translation_value.y, translation_value.z, T{1})
         {
         }
 
@@ -68,7 +72,7 @@ namespace houio::math
                 ma[index] = static_cast<T>(other.ma[index]);
         }
 
-        [[nodiscard]] static constexpr Matrix44 Zero() noexcept
+        [[nodiscard]] static constexpr Matrix44 zero() noexcept
         {
             return Matrix44(
                 T{}, T{}, T{}, T{},
@@ -77,12 +81,13 @@ namespace houio::math
                 T{}, T{}, T{}, T{});
         }
 
-        [[nodiscard]] static constexpr Matrix44 Identity() noexcept
+        [[nodiscard]] static constexpr Matrix44 identity() noexcept
         {
             return Matrix44{};
         }
 
-        [[nodiscard]] static Matrix44 RotationMatrixX(const T& angle)
+        [[nodiscard]] static Matrix44 rotationX(T angle)
+            requires std::floating_point<T>
         {
             using std::cos;
             using std::sin;
@@ -95,7 +100,8 @@ namespace houio::math
                 T{}, T{}, T{}, T{1});
         }
 
-        [[nodiscard]] static Matrix44 RotationMatrixY(const T& angle)
+        [[nodiscard]] static Matrix44 rotationY(T angle)
+            requires std::floating_point<T>
         {
             using std::cos;
             using std::sin;
@@ -108,7 +114,8 @@ namespace houio::math
                 T{}, T{}, T{}, T{1});
         }
 
-        [[nodiscard]] static Matrix44 RotationMatrixZ(const T& angle)
+        [[nodiscard]] static Matrix44 rotationZ(T angle)
+            requires std::floating_point<T>
         {
             using std::cos;
             using std::sin;
@@ -121,8 +128,12 @@ namespace houio::math
                 T{}, T{}, T{}, T{1});
         }
 
-        [[nodiscard]] static Matrix44 RotationMatrix(const Vec3<T>& axis, const T& angle)
+        [[nodiscard]] static Matrix44 axisRotation(const Vec3<T>& axis, T angle)
+            requires std::floating_point<T>
         {
+            if (axis.squaredLength() <= std::numeric_limits<T>::epsilon())
+                throw std::invalid_argument("Matrix44 axis rotation requires a non-zero axis");
+
             const Vec3<T> normalized_axis = axis.normalized();
             using std::cos;
             using std::sin;
@@ -137,22 +148,31 @@ namespace houio::math
             const T sz = sine * normalized_axis.z;
             return Matrix44(
                 one_minus_cosine * normalized_axis.x * normalized_axis.x + cosine,
-                xy + sz,
-                xz - sy,
-                T{},
                 xy - sz,
-                one_minus_cosine * normalized_axis.y * normalized_axis.y + cosine,
-                yz + sx,
-                T{},
                 xz + sy,
+                T{},
+                xy + sz,
+                one_minus_cosine * normalized_axis.y * normalized_axis.y + cosine,
                 yz - sx,
+                T{},
+                xz - sy,
+                yz + sx,
                 one_minus_cosine * normalized_axis.z * normalized_axis.z + cosine,
                 T{},
                 T{}, T{}, T{}, T{1});
         }
 
-        [[nodiscard]] static Matrix44 RotationMatrix(const Vec3<T>& from, const Vec3<T>& to)
+        [[nodiscard]] static Matrix44 rotationBetween(
+            const Vec3<T>& from,
+            const Vec3<T>& to)
+            requires std::floating_point<T>
         {
+            if (from.squaredLength() <= std::numeric_limits<T>::epsilon()
+                || to.squaredLength() <= std::numeric_limits<T>::epsilon())
+            {
+                throw std::invalid_argument("Matrix44 rotationBetween requires non-zero vectors");
+            }
+
             const Vec3<T> normalized_from = from.normalized();
             const Vec3<T> normalized_to = to.normalized();
             T cosine = normalized_from.x * normalized_to.x
@@ -161,37 +181,35 @@ namespace houio::math
             cosine = std::clamp(cosine, T{-1}, T{1});
 
             const Vec3<T> axis(
-                normalized_from.y * normalized_to.z - normalized_from.z * normalized_to.y,
-                normalized_from.z * normalized_to.x - normalized_from.x * normalized_to.z,
-                normalized_from.x * normalized_to.y - normalized_from.y * normalized_to.x);
-            const T axis_length = axis.getLength();
-            using std::acos;
-            if (axis_length > static_cast<T>(1.0e-8))
+                normalized_to.y * normalized_from.z - normalized_to.z * normalized_from.y,
+                normalized_to.z * normalized_from.x - normalized_to.x * normalized_from.z,
+                normalized_to.x * normalized_from.y - normalized_to.y * normalized_from.x);
+            if (axis.squaredLength() > std::numeric_limits<T>::epsilon())
             {
-                Vec3<T> normalized_axis = axis;
-                normalized_axis.normalize();
-                return RotationMatrix(normalized_axis, static_cast<T>(acos(cosine)));
+                using std::acos;
+                return axisRotation(axis, static_cast<T>(acos(cosine)));
             }
             if (cosine > T{})
-                return Identity();
+                return identity();
 
             Vec3<T> perpendicular = std::abs(normalized_from.x) < std::abs(normalized_from.y)
                 ? Vec3<T>(T{}, -normalized_from.z, normalized_from.y)
                 : Vec3<T>(-normalized_from.z, T{}, normalized_from.x);
-            perpendicular.normalize();
-            return RotationMatrix(perpendicular, static_cast<T>(acos(T{-1})));
+            if (perpendicular.squaredLength() <= std::numeric_limits<T>::epsilon())
+                perpendicular = Vec3<T>(-normalized_from.y, normalized_from.x, T{});
+            return axisRotation(perpendicular, std::numbers::pi_v<T>);
         }
 
-        [[nodiscard]] static constexpr Matrix44 TranslationMatrix(
-            const Vec3<T>& translation) noexcept
+        [[nodiscard]] static constexpr Matrix44 translationMatrix(
+            const Vec3<T>& translation_value) noexcept
         {
-            return TranslationMatrix(translation.x, translation.y, translation.z);
+            return translationMatrix(
+                translation_value.x,
+                translation_value.y,
+                translation_value.z);
         }
 
-        [[nodiscard]] static constexpr Matrix44 TranslationMatrix(
-            const T& x,
-            const T& y,
-            const T& z) noexcept
+        [[nodiscard]] static constexpr Matrix44 translationMatrix(T x, T y, T z) noexcept
         {
             return Matrix44(
                 T{1}, T{}, T{}, T{},
@@ -200,15 +218,12 @@ namespace houio::math
                 x, y, z, T{1});
         }
 
-        [[nodiscard]] static constexpr Matrix44 ScaleMatrix(const T& uniform_scale) noexcept
+        [[nodiscard]] static constexpr Matrix44 scaleMatrix(T uniform_scale) noexcept
         {
-            return ScaleMatrix(uniform_scale, uniform_scale, uniform_scale);
+            return scaleMatrix(uniform_scale, uniform_scale, uniform_scale);
         }
 
-        [[nodiscard]] static constexpr Matrix44 ScaleMatrix(
-            const T& x,
-            const T& y,
-            const T& z) noexcept
+        [[nodiscard]] static constexpr Matrix44 scaleMatrix(T x, T y, T z) noexcept
         {
             return Matrix44(
                 x, T{}, T{}, T{},
@@ -217,9 +232,9 @@ namespace houio::math
                 T{}, T{}, T{}, T{1});
         }
 
-        [[nodiscard]] static constexpr Matrix44 ScaleMatrix(const Vec3<T>& scale) noexcept
+        [[nodiscard]] static constexpr Matrix44 scaleMatrix(const Vec3<T>& scale_value) noexcept
         {
-            return ScaleMatrix(scale.x, scale.y, scale.z);
+            return scaleMatrix(scale_value.x, scale_value.y, scale_value.z);
         }
 
         [[nodiscard]] constexpr T& operator()(std::size_t row, std::size_t column)
@@ -234,45 +249,53 @@ namespace houio::math
             return ma.at(row * dimension + column);
         }
 
-        void rotateX(const T& angle)
+        Matrix44& rotateX(T angle)
+            requires std::floating_point<T>
         {
-            *this = multiplied(*this, RotationMatrixX(angle));
-        }
-
-        void rotateY(const T& angle)
-        {
-            *this = multiplied(*this, RotationMatrixY(angle));
-        }
-
-        void rotateZ(const T& angle)
-        {
-            *this = multiplied(*this, RotationMatrixZ(angle));
-        }
-
-        Matrix44& translate(const Vec3<T>& translation)
-        {
-            *this = multiplied(*this, TranslationMatrix(translation));
+            *this = multiply(*this, rotationX(angle));
             return *this;
         }
 
-        void translate(const T& x, const T& y, const T& z)
+        Matrix44& rotateY(T angle)
+            requires std::floating_point<T>
         {
-            translate(Vec3<T>(x, y, z));
+            *this = multiply(*this, rotationY(angle));
+            return *this;
         }
 
-        void scale(const T& uniform_scale)
+        Matrix44& rotateZ(T angle)
+            requires std::floating_point<T>
         {
-            *this = multiplied(*this, ScaleMatrix(uniform_scale));
+            *this = multiply(*this, rotationZ(angle));
+            return *this;
         }
 
-        void scale(const T& x, const T& y, const T& z)
+        Matrix44& translate(const Vec3<T>& translation_value)
         {
-            *this = multiplied(*this, ScaleMatrix(x, y, z));
+            *this = multiply(*this, translationMatrix(translation_value));
+            return *this;
+        }
+
+        Matrix44& translate(T x, T y, T z)
+        {
+            return translate(Vec3<T>(x, y, z));
+        }
+
+        Matrix44& scale(T uniform_scale)
+        {
+            *this = multiply(*this, scaleMatrix(uniform_scale));
+            return *this;
+        }
+
+        Matrix44& scale(T x, T y, T z)
+        {
+            *this = multiply(*this, scaleMatrix(x, y, z));
+            return *this;
         }
 
         Matrix44& scale(const Vec3<T>& scale_value)
         {
-            *this = multiplied(*this, ScaleMatrix(scale_value));
+            *this = multiply(*this, scaleMatrix(scale_value));
             return *this;
         }
 
@@ -292,7 +315,51 @@ namespace houio::math
             return result;
         }
 
+        [[nodiscard]] T determinant() const
+            requires std::floating_point<T>
+        {
+            Matrix44 working = *this;
+            T determinant_value = T{1};
+            const T tolerance = pivotTolerance();
+            using std::abs;
+
+            for (std::size_t pivot_column = 0; pivot_column < dimension; ++pivot_column)
+            {
+                std::size_t pivot_row = pivot_column;
+                for (std::size_t candidate = pivot_column + 1; candidate < dimension; ++candidate)
+                {
+                    if (abs(working(candidate, pivot_column))
+                        > abs(working(pivot_row, pivot_column)))
+                    {
+                        pivot_row = candidate;
+                    }
+                }
+                if (abs(working(pivot_row, pivot_column)) <= tolerance)
+                    return T{};
+                if (pivot_row != pivot_column)
+                {
+                    for (std::size_t column = 0; column < dimension; ++column)
+                        std::swap(working(pivot_row, column), working(pivot_column, column));
+                    determinant_value = -determinant_value;
+                }
+
+                const T pivot = working(pivot_column, pivot_column);
+                determinant_value *= pivot;
+                for (std::size_t row = pivot_column + 1; row < dimension; ++row)
+                {
+                    const T factor = working(row, pivot_column) / pivot;
+                    for (std::size_t column = pivot_column + 1; column < dimension; ++column)
+                    {
+                        working(row, column)
+                            -= factor * working(pivot_column, column);
+                    }
+                }
+            }
+            return determinant_value;
+        }
+
         void invert()
+            requires std::floating_point<T>
         {
             std::array<std::array<T, dimension * 2>, dimension> augmented{};
             for (std::size_t row = 0; row < dimension; ++row)
@@ -302,6 +369,7 @@ namespace houio::math
                 augmented[row][dimension + row] = T{1};
             }
 
+            const T tolerance = pivotTolerance();
             using std::abs;
             for (std::size_t pivot_column = 0; pivot_column < dimension; ++pivot_column)
             {
@@ -314,7 +382,7 @@ namespace houio::math
                         pivot_row = candidate;
                     }
                 }
-                if (abs(augmented[pivot_row][pivot_column]) <= static_cast<T>(1.0e-12))
+                if (abs(augmented[pivot_row][pivot_column]) <= tolerance)
                     throw std::domain_error("Matrix44 is singular");
                 if (pivot_row != pivot_column)
                     std::swap(augmented[pivot_row], augmented[pivot_column]);
@@ -344,47 +412,43 @@ namespace houio::math
         }
 
         [[nodiscard]] Matrix44 inverted() const
+            requires std::floating_point<T>
         {
             Matrix44 result = *this;
             result.invert();
             return result;
         }
 
-        [[nodiscard]] Matrix44 inverse() const
-        {
-            return inverted();
-        }
-
-        [[nodiscard]] Vec3<T> getRight(const bool& normalized = true) const
+        [[nodiscard]] Vec3<T> right(bool normalize_result = true) const
         {
             Vec3<T> result(ma[0], ma[1], ma[2]);
-            if (normalized)
+            if (normalize_result)
                 result.normalize();
             return result;
         }
 
-        [[nodiscard]] Vec3<T> getUp(const bool& normalized = true) const
+        [[nodiscard]] Vec3<T> up(bool normalize_result = true) const
         {
             Vec3<T> result(ma[4], ma[5], ma[6]);
-            if (normalized)
+            if (normalize_result)
                 result.normalize();
             return result;
         }
 
-        [[nodiscard]] Vec3<T> getDir(const bool& normalized = true) const
+        [[nodiscard]] Vec3<T> direction(bool normalize_result = true) const
         {
             Vec3<T> result(ma[8], ma[9], ma[10]);
-            if (normalized)
+            if (normalize_result)
                 result.normalize();
             return result;
         }
 
-        [[nodiscard]] constexpr Vec3<T> getTranslation() const noexcept
+        [[nodiscard]] constexpr Vec3<T> translation() const noexcept
         {
             return Vec3<T>(ma[12], ma[13], ma[14]);
         }
 
-        [[nodiscard]] constexpr Matrix44 getOrientation() const noexcept
+        [[nodiscard]] constexpr Matrix44 orientation() const noexcept
         {
             return Matrix44(
                 ma[0], ma[1], ma[2], T{},
@@ -393,42 +457,37 @@ namespace houio::math
                 T{}, T{}, T{}, T{1});
         }
 
-        [[nodiscard]] Matrix44 getNormalizedOrientation() const
+        [[nodiscard]] Matrix44 normalizedOrientation() const
         {
-            return Matrix44(getRight(), getUp(), getDir());
+            return Matrix44(right(), up(), direction());
         }
 
-        [[nodiscard]] constexpr Matrix44 getTransposed() const noexcept
+        constexpr void setRight(const Vec3<T>& right_value) noexcept
         {
-            return transposed();
+            ma[0] = right_value.x;
+            ma[1] = right_value.y;
+            ma[2] = right_value.z;
         }
 
-        constexpr void setRight(const Vec3<T>& right) noexcept
+        constexpr void setUp(const Vec3<T>& up_value) noexcept
         {
-            ma[0] = right.x;
-            ma[1] = right.y;
-            ma[2] = right.z;
+            ma[4] = up_value.x;
+            ma[5] = up_value.y;
+            ma[6] = up_value.z;
         }
 
-        constexpr void setUp(const Vec3<T>& up) noexcept
+        constexpr void setDirection(const Vec3<T>& direction_value) noexcept
         {
-            ma[4] = up.x;
-            ma[5] = up.y;
-            ma[6] = up.z;
+            ma[8] = direction_value.x;
+            ma[9] = direction_value.y;
+            ma[10] = direction_value.z;
         }
 
-        constexpr void setDir(const Vec3<T>& direction) noexcept
+        constexpr void setTranslation(const Vec3<T>& translation_value) noexcept
         {
-            ma[8] = direction.x;
-            ma[9] = direction.y;
-            ma[10] = direction.z;
-        }
-
-        constexpr void setTranslation(const Vec3<T>& translation) noexcept
-        {
-            ma[12] = translation.x;
-            ma[13] = translation.y;
-            ma[14] = translation.z;
+            ma[12] = translation_value.x;
+            ma[13] = translation_value.y;
+            ma[14] = translation_value.z;
         }
 
         [[nodiscard]] constexpr bool operator==(const Matrix44& rhs) const noexcept
@@ -455,39 +514,40 @@ namespace houio::math
             return *this;
         }
 
-        constexpr Matrix44& operator+=(const T& rhs) noexcept
+        constexpr Matrix44& operator+=(T rhs) noexcept
         {
             for (T& value : ma)
                 value += rhs;
             return *this;
         }
 
-        constexpr Matrix44& operator-=(const T& rhs) noexcept
+        constexpr Matrix44& operator-=(T rhs) noexcept
         {
             for (T& value : ma)
                 value -= rhs;
             return *this;
         }
 
-        constexpr Matrix44& operator*=(const T& rhs) noexcept
+        constexpr Matrix44& operator*=(T rhs) noexcept
         {
             for (T& value : ma)
                 value *= rhs;
             return *this;
         }
 
-        constexpr Matrix44& operator/=(const T& rhs)
+        constexpr Matrix44& operator/=(T rhs)
         {
             for (T& value : ma)
                 value /= rhs;
             return *this;
         }
 
-        [[nodiscard]] static constexpr Matrix44 multiplied(
+    private:
+        [[nodiscard]] constexpr Matrix44 multiply(
             const Matrix44& lhs,
-            const Matrix44& rhs) noexcept
+            const Matrix44& rhs) const noexcept
         {
-            Matrix44 result = Zero();
+            Matrix44 result = zero();
             for (std::size_t row = 0; row < dimension; ++row)
             {
                 for (std::size_t column = 0; column < dimension; ++column)
@@ -497,6 +557,16 @@ namespace houio::math
                 }
             }
             return result;
+        }
+
+        [[nodiscard]] T pivotTolerance() const
+            requires std::floating_point<T>
+        {
+            using std::abs;
+            T scale = T{1};
+            for (const T value : ma)
+                scale = std::max(scale, static_cast<T>(abs(value)));
+            return std::numeric_limits<T>::epsilon() * scale * T{64};
         }
     };
 

@@ -19,6 +19,40 @@ namespace houio
             return static_cast<Geometry::Index>(value);
         }
 
+        [[nodiscard]] Geometry::Index checkedIndex(std::size_t value, const char* description)
+        {
+            if (value > static_cast<std::size_t>(std::numeric_limits<Geometry::Index>::max()))
+                throw std::overflow_error(std::string(description) + " exceeds Geometry::Index range");
+            return static_cast<Geometry::Index>(value);
+        }
+
+        [[nodiscard]] std::size_t checkedProduct(
+            std::size_t left,
+            std::size_t right,
+            const char* description)
+        {
+            if (left != 0 && right > std::numeric_limits<std::size_t>::max() / left)
+                throw std::overflow_error(std::string(description) + " exceeds addressable storage");
+            return left * right;
+        }
+
+        [[nodiscard]] std::size_t checkedSum(
+            std::size_t left,
+            std::size_t right,
+            const char* description)
+        {
+            if (right > std::numeric_limits<std::size_t>::max() - left)
+                throw std::overflow_error(std::string(description) + " exceeds addressable storage");
+            return left + right;
+        }
+
+        [[nodiscard]] int checkedElementCount(std::size_t count, const char* description)
+        {
+            if (count > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+                throw std::overflow_error(std::string(description) + " exceeds Attribute element range");
+            return static_cast<int>(count);
+        }
+
         void validateGridResolution(int resolution, const char* axis)
         {
             if (resolution < 2)
@@ -34,9 +68,9 @@ namespace houio
             const math::Vec3f edge0 = point1 - point0;
             const math::Vec3f edge1 = point2 - point0;
             const math::Vec3f normal = math::cross(edge0, edge1);
-            if (normal.getLength() == 0.0f)
+            if (normal.length() == 0.0f)
                 return math::Vec3f(0.0f);
-            return math::normalize(normal);
+            return normal.normalized();
         }
     }
 
@@ -64,35 +98,35 @@ namespace houio
         throw std::invalid_argument("Unknown Geometry primitive type");
     }
 
-    Attribute::Ptr Geometry::getAttr(const std::string& name)
+    Attribute::Ptr Geometry::attribute(const std::string& name)
     {
         const auto attribute = attributes_.find(name);
         return attribute == attributes_.end() ? nullptr : attribute->second;
     }
 
-    Attribute::CPtr Geometry::getAttr(const std::string& name) const
+    Attribute::CPtr Geometry::attribute(const std::string& name) const
     {
         const auto attribute = attributes_.find(name);
         return attribute == attributes_.end() ? nullptr : attribute->second;
     }
 
-    void Geometry::setAttr(const std::string& name, Attribute::Ptr attribute)
+    void Geometry::setAttribute(const std::string& name, Attribute::Ptr attribute)
     {
         if (name.empty())
-            throw std::invalid_argument("Geometry::setAttr requires a non-empty name");
+            throw std::invalid_argument("Geometry::setAttribute requires a non-empty name");
         if (!attribute)
-            throw std::invalid_argument("Geometry::setAttr received a null attribute");
+            throw std::invalid_argument("Geometry::setAttribute received a null attribute");
         attributes_[name] = std::move(attribute);
     }
 
-    bool Geometry::hasAttr(const std::string& name) const
+    bool Geometry::hasAttribute(const std::string& name) const
     {
         return attributes_.contains(name);
     }
 
-    void Geometry::getAttrNames(std::vector<std::string>& names) const
+    std::vector<std::string> Geometry::attributeNames() const
     {
-        names.clear();
+        std::vector<std::string> names;
         names.reserve(attributes_.size());
         for (const auto& [name, attribute] : attributes_)
         {
@@ -100,9 +134,10 @@ namespace houio
                 throw std::runtime_error("Geometry contains a null attribute named " + name);
             names.push_back(name);
         }
+        return names;
     }
 
-    void Geometry::removeAttr(const std::string& name)
+    void Geometry::removeAttribute(const std::string& name)
     {
         attributes_.erase(name);
     }
@@ -200,7 +235,7 @@ namespace houio
 
     Geometry::Index Geometry::duplicatePoint(Index point_index)
     {
-        const Attribute::Ptr positions = getAttr("P");
+        const Attribute::Ptr positions = attribute("P");
         if (!positions)
             throw std::runtime_error("Geometry::duplicatePoint requires a P attribute");
 
@@ -211,14 +246,18 @@ namespace houio
             throw std::overflow_error("Geometry::duplicatePoint exceeds the supported point range");
 
         const Index duplicate_index = static_cast<Index>(point_count);
-        for (const auto& [name, attribute] : attributes_)
+        for (const auto& [name, point_attribute] : attributes_)
         {
-            if (!attribute)
+            if (!point_attribute)
                 throw std::runtime_error("Geometry contains a null attribute named " + name);
-            if (attribute->numElements() != point_count)
+            if (point_attribute->numElements() != point_count)
                 throw std::runtime_error(
                     "Geometry attribute counts are inconsistent while duplicating a point");
-            if (attribute->duplicateElement(point_index) != duplicate_index)
+        }
+        for (const auto& [name, point_attribute] : attributes_)
+        {
+            static_cast<void>(name);
+            if (point_attribute->duplicateElement(point_index) != duplicate_index)
                 throw std::runtime_error("Geometry attributes produced different duplicate indices");
         }
         return duplicate_index;
@@ -226,7 +265,7 @@ namespace houio
 
     void Geometry::transform(const math::M44f& transform_matrix)
     {
-        const Attribute::Ptr positions = getAttr("P");
+        const Attribute::Ptr positions = attribute("P");
         if (!positions)
             throw std::runtime_error("Geometry::transform requires a P attribute");
         if (positions->numComponents() != 3
@@ -250,7 +289,7 @@ namespace houio
         if (primitive_type_ != PrimitiveType::triangle && primitive_type_ != PrimitiveType::quad)
             throw std::logic_error("Geometry::addNormals supports only triangle and quad geometry");
 
-        const Attribute::Ptr positions = getAttr("P");
+        const Attribute::Ptr positions = attribute("P");
         if (!positions)
             throw std::runtime_error("Geometry::addNormals requires a P attribute");
         if (positions->numComponents() != 3
@@ -265,7 +304,7 @@ namespace houio
         if (indices_.size() != static_cast<std::size_t>(primitive_count_) * vertices_per_primitive_)
             throw std::runtime_error("Geometry topology does not match its primitive counts");
 
-        Attribute::Ptr normals = getAttr("N");
+        Attribute::Ptr normals = attribute("N");
         if (!normals)
             normals = Attribute::createV3f(point_count);
         else
@@ -334,21 +373,21 @@ namespace houio
             const math::Vec3f accumulated = normals->get<math::Vec3f>(index);
             normals->set<math::Vec3f>(
                 index,
-                accumulated.getLength() == 0.0f ? accumulated : math::normalize(accumulated));
+                accumulated.length() == 0.0f ? accumulated : accumulated.normalized());
         }
-        setAttr("N", std::move(normals));
+        setAttribute("N", std::move(normals));
     }
 
-    math::BoundingBox3f Geometry::getBound() const
+    math::BoundingBox3f Geometry::bounds() const
     {
         math::BoundingBox3f bound;
-        const Attribute::CPtr positions = getAttr("P");
+        const Attribute::CPtr positions = attribute("P");
         if (!positions)
             return bound;
         if (positions->numComponents() != 3
             || positions->elementComponentType() != Attribute::ComponentType::float32)
         {
-            throw std::runtime_error("Geometry::getBound requires a Float32 P attribute with three components");
+            throw std::runtime_error("Geometry::bounds requires a Float32 P attribute with three components");
         }
         for (int point_index = 0; point_index < positions->numElements(); ++point_index)
             bound.extend(positions->get<math::V3f>(static_cast<unsigned int>(point_index)));
@@ -366,35 +405,35 @@ namespace houio
     Geometry::Ptr Geometry::createPointGeometry()
     {
         auto geometry = std::make_shared<Geometry>(PrimitiveType::point);
-        geometry->setAttr("P", Attribute::createV3f());
+        geometry->setAttribute("P", Attribute::createV3f());
         return geometry;
     }
 
     Geometry::Ptr Geometry::createLineGeometry()
     {
         auto geometry = std::make_shared<Geometry>(PrimitiveType::line);
-        geometry->setAttr("P", Attribute::createV3f());
+        geometry->setAttribute("P", Attribute::createV3f());
         return geometry;
     }
 
     Geometry::Ptr Geometry::createTriangleGeometry()
     {
         auto geometry = std::make_shared<Geometry>(PrimitiveType::triangle);
-        geometry->setAttr("P", Attribute::createV3f());
+        geometry->setAttribute("P", Attribute::createV3f());
         return geometry;
     }
 
     Geometry::Ptr Geometry::createQuadGeometry()
     {
         auto geometry = std::make_shared<Geometry>(PrimitiveType::quad);
-        geometry->setAttr("P", Attribute::createV3f());
+        geometry->setAttribute("P", Attribute::createV3f());
         return geometry;
     }
 
     Geometry::Ptr Geometry::createPolyGeometry()
     {
         auto geometry = std::make_shared<Geometry>(PrimitiveType::polygon);
-        geometry->setAttr("P", Attribute::createV3f());
+        geometry->setAttribute("P", Attribute::createV3f());
         return geometry;
     }
 
@@ -416,8 +455,8 @@ namespace houio
         positions->appendElement(math::Vec3f(1.0f, -1.0f, 0.0f));
         texture_coordinates->appendElement(1.0f, 0.0f);
 
-        geometry->setAttr("P", positions);
-        geometry->setAttr("UV", texture_coordinates);
+        geometry->setAttribute("P", positions);
+        geometry->setAttribute("UV", texture_coordinates);
         if (primitive_type == PrimitiveType::quad)
             geometry->addQuad(3, 2, 1, 0);
         else
@@ -442,11 +481,18 @@ namespace houio
             throw std::invalid_argument("Geometry::createGrid supports point, line, or triangle output");
         }
 
+        const int point_count = checkedElementCount(
+            checkedProduct(
+                static_cast<std::size_t>(x_resolution),
+                static_cast<std::size_t>(z_resolution),
+                "Geometry 2D grid point count"),
+            "Geometry 2D grid point count");
+
         auto geometry = std::make_shared<Geometry>(primitive_type);
         auto positions = Attribute::createV3f();
         auto texture_coordinates = Attribute::createV2f();
-        geometry->setAttr("P", positions);
-        geometry->setAttr("UV", texture_coordinates);
+        geometry->setAttribute("P", positions);
+        geometry->setAttribute("UV", texture_coordinates);
 
         for (int z_index = 0; z_index < z_resolution; ++z_index)
         {
@@ -461,7 +507,6 @@ namespace houio
 
         if (primitive_type == PrimitiveType::point)
         {
-            const int point_count = x_resolution * z_resolution;
             for (int point_index = 0; point_index < point_count; ++point_index)
                 geometry->addPoint(checkedIndex(point_index, "Grid point index"));
         }
@@ -521,16 +566,34 @@ namespace houio
         if (primitive_type != PrimitiveType::point && primitive_type != PrimitiveType::line)
             throw std::invalid_argument("Geometry 3D grid supports point or line output");
 
+        const int point_count_x = checkedElementCount(
+            checkedSum(static_cast<std::size_t>(x_resolution), 1u, "Geometry 3D grid X point count"),
+            "Geometry 3D grid X point count");
+        const int point_count_y = checkedElementCount(
+            checkedSum(static_cast<std::size_t>(y_resolution), 1u, "Geometry 3D grid Y point count"),
+            "Geometry 3D grid Y point count");
+        const int point_count_z = checkedElementCount(
+            checkedSum(static_cast<std::size_t>(z_resolution), 1u, "Geometry 3D grid Z point count"),
+            "Geometry 3D grid Z point count");
+        const std::size_t point_count_xy = checkedProduct(
+            static_cast<std::size_t>(point_count_x),
+            static_cast<std::size_t>(point_count_y),
+            "Geometry 3D grid XY point count");
+        const std::size_t total_point_count = checkedProduct(
+            point_count_xy,
+            static_cast<std::size_t>(point_count_z),
+            "Geometry 3D grid point count");
+        static_cast<void>(checkedElementCount(total_point_count, "Geometry 3D grid point count"));
+
         auto geometry = std::make_shared<Geometry>(primitive_type);
         auto positions = Attribute::createV3f();
-        geometry->setAttr("P", positions);
+        geometry->setAttribute("P", positions);
 
-        const int point_count_x = x_resolution + 1;
-        const int point_count_y = y_resolution + 1;
-        const int point_count_z = z_resolution + 1;
-        const auto linear_index = [=](int x, int y, int z)
+        const auto linear_index = [=](int x, int y, int z) -> std::size_t
         {
-            return z * point_count_x * point_count_y + y * point_count_x + x;
+            return static_cast<std::size_t>(z) * point_count_xy
+                + static_cast<std::size_t>(y) * static_cast<std::size_t>(point_count_x)
+                + static_cast<std::size_t>(x);
         };
 
         for (int z_index = 0; z_index < point_count_z; ++z_index)
@@ -605,9 +668,17 @@ namespace houio
             throw std::invalid_argument("Geometry::createSphere supports point, line, or triangle output");
         }
 
+        const std::size_t ring_point_count = checkedProduct(
+            static_cast<std::size_t>(v_subdivisions - 1),
+            static_cast<std::size_t>(u_subdivisions),
+            "Geometry sphere ring point count");
+        static_cast<void>(checkedElementCount(
+            checkedSum(ring_point_count, 2u, "Geometry sphere point count"),
+            "Geometry sphere point count"));
+
         auto geometry = std::make_shared<Geometry>(primitive_type);
         auto positions = Attribute::createV3f();
-        geometry->setAttr("P", positions);
+        geometry->setAttribute("P", positions);
 
         const Index north_pole = positions->appendElement(math::V3f(0.0f, radius, 0.0f) + center);
         for (int latitude = 1; latitude < v_subdivisions; ++latitude)
@@ -734,7 +805,7 @@ namespace houio
         {
             for (const math::Vec3f& corner : corners)
                 positions->appendElement(corner);
-            geometry->setAttr("P", positions);
+            geometry->setAttribute("P", positions);
             if (primitive_type == PrimitiveType::point)
             {
                 for (Index point_index = 0; point_index < corners.size(); ++point_index)
@@ -770,8 +841,8 @@ namespace houio
                 geometry->addTriangle(point0, point2, point3);
             }
         }
-        geometry->setAttr("P", positions);
-        geometry->setAttr("UV", texture_coordinates);
+        geometry->setAttribute("P", positions);
+        geometry->setAttribute("UV", texture_coordinates);
         return geometry;
     }
 
@@ -780,7 +851,7 @@ namespace houio
         const math::V3f& point1)
     {
         auto geometry = createLineGeometry();
-        const Attribute::Ptr positions = geometry->getAttr("P");
+        const Attribute::Ptr positions = geometry->attribute("P");
         const Index index0 = positions->appendElement(point0);
         const Index index1 = positions->appendElement(point1);
         geometry->addLine(index0, index1);
@@ -796,14 +867,13 @@ namespace houio
             throw std::invalid_argument("Geometry::merge received a null geometry");
 
         auto result = std::make_shared<Geometry>(reference->primitiveType());
-        std::vector<std::string> attribute_names;
-        reference->getAttrNames(attribute_names);
+        const std::vector<std::string> attribute_names = reference->attributeNames();
         for (const std::string& name : attribute_names)
         {
-            const Attribute::Ptr source = reference->getAttr(name);
+            const Attribute::Ptr source = reference->attribute(name);
             if (!source)
                 throw std::runtime_error("Geometry::merge reference contains a null attribute");
-            result->setAttr(
+            result->setAttribute(
                 name,
                 std::make_shared<Attribute>(
                     source->numComponents(),
@@ -817,12 +887,11 @@ namespace houio
             if (geometry->primitiveType() != reference->primitiveType())
                 throw std::invalid_argument("Geometry::merge requires a common primitive type");
 
-            std::vector<std::string> source_attribute_names;
-            geometry->getAttrNames(source_attribute_names);
+            const std::vector<std::string> source_attribute_names = geometry->attributeNames();
             if (source_attribute_names != attribute_names)
                 throw std::invalid_argument("Geometry::merge requires identical attribute names");
 
-            const Attribute::Ptr result_positions = result->getAttr("P");
+            const Attribute::Ptr result_positions = result->attribute("P");
             if (!result_positions)
                 throw std::runtime_error("Geometry::merge requires a P attribute");
             const int point_offset_value = result_positions->numElements();
@@ -832,8 +901,8 @@ namespace houio
 
             for (const std::string& name : attribute_names)
             {
-                const Attribute::Ptr source = geometry->getAttr(name);
-                const Attribute::Ptr destination = result->getAttr(name);
+                const Attribute::Ptr source = geometry->attribute(name);
+                const Attribute::Ptr destination = result->attribute(name);
                 if (!source || !destination)
                     throw std::runtime_error("Geometry::merge encountered a missing attribute");
                 if (source->numComponents() != destination->numComponents()

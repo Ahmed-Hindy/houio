@@ -123,7 +123,7 @@ if (!result)
 
 for (const houio::ScalarField::Ptr& volume : result.value)
 {
-    const houio::math::V3i resolution = volume->getResolution();
+    const houio::math::V3i resolution = volume->resolution();
 }
 ```
 

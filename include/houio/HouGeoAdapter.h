@@ -94,17 +94,6 @@ namespace houio
                 float16,
             };
 
-            static constexpr Type ATTR_TYPE_INVALID = Type::invalid;
-            static constexpr Type ATTR_TYPE_NUMERIC = Type::numeric;
-            static constexpr Type ATTR_TYPE_STRING = Type::string;
-            static constexpr Type ATTR_TYPE_DICT = Type::dictionary;
-            static constexpr Storage ATTR_STORAGE_INVALID = Storage::invalid;
-            static constexpr Storage ATTR_STORAGE_FPREAL32 = Storage::float32;
-            static constexpr Storage ATTR_STORAGE_FPREAL64 = Storage::float64;
-            static constexpr Storage ATTR_STORAGE_INT32 = Storage::int32;
-            static constexpr Storage ATTR_STORAGE_INT64 = Storage::int64;
-            static constexpr Storage ATTR_STORAGE_FPREAL16 = Storage::float16;
-
             virtual ~AttributeAdapter() = default;
 
             [[nodiscard]] virtual std::string name() const;
@@ -116,17 +105,6 @@ namespace houio
             [[nodiscard]] virtual std::string stringValue(int index) const = 0;
             [[nodiscard]] virtual std::shared_ptr<json::Object> dictionaryValue(int index) const;
             [[nodiscard]] virtual RawDataView rawData() const;
-
-            [[nodiscard]] std::string getName() const { return name(); }
-            [[nodiscard]] Type getType() const { return type(); }
-            [[nodiscard]] int getTupleSize() const { return tupleSize(); }
-            [[nodiscard]] Storage getStorage() const { return storage(); }
-            [[nodiscard]] int getNumElements() const { return elementCount(); }
-            [[nodiscard]] std::string getString(int index) const { return stringValue(index); }
-            [[nodiscard]] std::shared_ptr<json::Object> getDictionary(int index) const
-            {
-                return dictionaryValue(index);
-            }
 
             [[nodiscard]] static Type parseType(const std::string& type_name);
             [[nodiscard]] static Storage parseStorage(const std::string& storage_name);
@@ -157,9 +135,6 @@ namespace houio
                 volume,
                 polygon,
             };
-
-            static constexpr Type PRIM_VOLUME = Type::volume;
-            static constexpr Type PRIM_POLY = Type::polygon;
 
             virtual ~Primitive() = default;
             [[nodiscard]] virtual int primitiveCount() const { return 1; }

@@ -105,7 +105,7 @@ namespace houio
 				uword,
 				std::string>;
 			Token();
-			void event(Parser* parser, bool key = false);
+			void event(Parser& parser, bool key = false);
 
 		private:
 			friend struct Parser;
@@ -708,8 +708,8 @@ namespace houio
 			[[nodiscard]] ObjectPtr asObject();
 			[[nodiscard]] ConstObjectPtr asObject() const;
 
-			[[nodiscard]] Variant& getVariant() noexcept;
-			[[nodiscard]] const Variant& getVariant() const noexcept;
+			[[nodiscard]] Variant& variant() noexcept;
+			[[nodiscard]] const Variant& variant() const noexcept;
 
 			[[nodiscard]] static Value createArray();
 			[[nodiscard]] static Value createArray(ArrayPtr array);
@@ -790,9 +790,9 @@ namespace houio
 
 			template<typename T>
 			[[nodiscard]] T get(int index) const;
-			[[nodiscard]] ObjectPtr getObject(int index) const;
-			[[nodiscard]] ArrayPtr getArray(int index) const;
-			[[nodiscard]] Value getValue(int index) const;
+			[[nodiscard]] ObjectPtr object(int index) const;
+			[[nodiscard]] ArrayPtr array(int index) const;
+			[[nodiscard]] Value value(int index) const;
 			[[nodiscard]] sint64 size() const;
 			[[nodiscard]] bool isUniform() const noexcept;
 			[[nodiscard]] std::span<const Value> elements() const noexcept;
@@ -822,7 +822,7 @@ namespace houio
 		template<typename T>
 		T Array::get(int index) const
 		{
-			return getValue(index).as<T>();
+			return value(index).as<T>();
 		}
 
 		template<typename T>
@@ -836,14 +836,14 @@ namespace houio
 			using EntryMap = std::map<std::string, Value>;
 
 			[[nodiscard]] static ObjectPtr create();
-			[[nodiscard]] bool hasKey(const std::string& key) const;
+			[[nodiscard]] bool contains(const std::string& key) const;
 
 			template<typename T>
 			[[nodiscard]] T get(const std::string& key, T default_value = T()) const;
-			[[nodiscard]] ObjectPtr getObject(const std::string& key) const;
-			[[nodiscard]] ArrayPtr getArray(const std::string& key) const;
-			[[nodiscard]] Value getValue(const std::string& key) const;
-			void getKeys(std::vector<std::string>& keys) const;
+			[[nodiscard]] ObjectPtr object(const std::string& key) const;
+			[[nodiscard]] ArrayPtr array(const std::string& key) const;
+			[[nodiscard]] Value value(const std::string& key) const;
+			[[nodiscard]] std::vector<std::string> keys() const;
 			[[nodiscard]] sint64 size() const;
 			[[nodiscard]] const EntryMap& entries() const noexcept;
 
@@ -879,7 +879,7 @@ namespace houio
 
 			JSONReader() = default;
 
-			[[nodiscard]] Value getRoot() const;
+			[[nodiscard]] Value root() const;
 
 			void jsonBeginArray() override;
 			void jsonEndArray() override;

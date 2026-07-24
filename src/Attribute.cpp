@@ -116,8 +116,9 @@ namespace houio
         dirty_ = false;
     }
 
-    std::span<std::byte> Attribute::bytes() noexcept
+    std::span<std::byte> Attribute::mutableBytes() noexcept
     {
+        dirty_ = true;
         return data_;
     }
 
@@ -126,9 +127,10 @@ namespace houio
         return data_;
     }
 
-    std::span<std::byte> Attribute::elementBytes(std::size_t index)
+    std::span<std::byte> Attribute::mutableElementBytes(std::size_t index)
     {
         const std::size_t offset = checkedElementOffset(index);
+        dirty_ = true;
         return std::span<std::byte>(data_).subspan(offset, elementByteSize());
     }
 
@@ -280,8 +282,7 @@ namespace houio
     void Attribute::setElementBytes(std::size_t index, std::span<const std::byte> source)
     {
         validateElementRepresentation(source.size());
-        auto destination = elementBytes(index);
+        auto destination = mutableElementBytes(index);
         std::memcpy(destination.data(), source.data(), source.size());
-        dirty_ = true;
     }
 }

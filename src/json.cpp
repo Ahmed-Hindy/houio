@@ -78,58 +78,58 @@ namespace houio
 		{
 		}
 
-		void Token::event(Parser* p, bool key)
+		void Token::event(Parser& parser, bool key)
 		{
 			if (type == JID_ARRAY_BEGIN)
-				p->handler->jsonBeginArray();
+				parser.handler->jsonBeginArray();
 			else if (type == JID_ARRAY_END)
-				p->handler->jsonEndArray();
+				parser.handler->jsonEndArray();
 			if (type == JID_MAP_BEGIN)
-				p->handler->jsonBeginMap();
+				parser.handler->jsonBeginMap();
 			else if (type == JID_MAP_END)
-				p->handler->jsonEndMap();
+				parser.handler->jsonEndMap();
 			else if (type == JID_STRING)
 			{
-				if( key )
-					p->handler->jsonKey(std::get<std::string>(value));
+				if (key)
+					parser.handler->jsonKey(std::get<std::string>(value));
 				else
-					p->handler->jsonString(std::get<std::string>(value));
+					parser.handler->jsonString(std::get<std::string>(value));
 			}
 			else if (type == JID_BOOL)
-				p->handler->jsonBool(std::get<bool>(value));
+				parser.handler->jsonBool(std::get<bool>(value));
 			else if (type == JID_INT8)
-				p->handler->jsonInt32(std::get<sbyte>(value));
+				parser.handler->jsonInt32(std::get<sbyte>(value));
 			else if (type == JID_INT16)
-				p->handler->jsonInt32(std::get<sword>(value));
+				parser.handler->jsonInt32(std::get<sword>(value));
 			else if (type == JID_INT32)
-				p->handler->jsonInt32(std::get<sint32>(value));
+				parser.handler->jsonInt32(std::get<sint32>(value));
 			else if (type == JID_INT64)
-				p->handler->jsonInt64(std::get<sint64>(value));
+				parser.handler->jsonInt64(std::get<sint64>(value));
 			else if (type == JID_REAL16)
-				p->handler->jsonReal32(std::get<real32>(value));
+				parser.handler->jsonReal32(std::get<real32>(value));
 			else if (type == JID_REAL32)
-				p->handler->jsonReal32(std::get<real32>(value));
+				parser.handler->jsonReal32(std::get<real32>(value));
 			else if (type == JID_REAL64)
-				p->handler->jsonReal64(std::get<real64>(value));
+				parser.handler->jsonReal64(std::get<real64>(value));
 			else if (type == JID_UINT8)
-				p->handler->jsonInt32(std::get<ubyte>(value));
+				parser.handler->jsonInt32(std::get<ubyte>(value));
 			else if (type == JID_UINT16)
-				p->handler->jsonInt32(std::get<uword>(value));
+				parser.handler->jsonInt32(std::get<uword>(value));
 			else if (type == JID_UNIFORM_ARRAY)
 			{
-				sint64 numElements = std::get<sint64>(value);
-				switch( uaType )
+				const sint64 element_count = std::get<sint64>(value);
+				switch (uaType)
 				{
-				case Token::JID_BOOL:p->handler->uaBool(numElements, *p);break;
-				case Token::JID_INT8:p->handler->uaInt8(numElements, *p);break;
-				case Token::JID_INT16:p->handler->uaInt16(numElements, *p);break;
-				case Token::JID_INT32:p->handler->uaInt32(numElements, *p);break;
-				case Token::JID_INT64:p->handler->uaInt64(numElements, *p);break;
-				case Token::JID_REAL16:p->handler->uaReal16(numElements, *p);break;
-				case Token::JID_REAL32:p->handler->uaReal32(numElements, *p);break;
-				case Token::JID_REAL64:p->handler->uaReal64(numElements, *p);break;
-				case Token::JID_UINT8:p->handler->uaUInt8(numElements, *p);break;
-				case Token::JID_STRING:p->handler->uaString(numElements, *p);break;
+				case Token::JID_BOOL: parser.handler->uaBool(element_count, parser); break;
+				case Token::JID_INT8: parser.handler->uaInt8(element_count, parser); break;
+				case Token::JID_INT16: parser.handler->uaInt16(element_count, parser); break;
+				case Token::JID_INT32: parser.handler->uaInt32(element_count, parser); break;
+				case Token::JID_INT64: parser.handler->uaInt64(element_count, parser); break;
+				case Token::JID_REAL16: parser.handler->uaReal16(element_count, parser); break;
+				case Token::JID_REAL32: parser.handler->uaReal32(element_count, parser); break;
+				case Token::JID_REAL64: parser.handler->uaReal64(element_count, parser); break;
+				case Token::JID_UINT8: parser.handler->uaUInt8(element_count, parser); break;
+				case Token::JID_STRING: parser.handler->uaString(element_count, parser); break;
 				case Token::JID_NULL:
 				case Token::JID_MAP_BEGIN:
 				case Token::JID_MAP_END:
@@ -146,14 +146,11 @@ namespace houio
 				case Token::JID_MAGIC:
 				case Token::JID_UINT16:
 				default:
-					p->fail(DiagnosticCategory::unsupported_input,
+					parser.fail(
+						DiagnosticCategory::unsupported_input,
 						"Token::event encountered an unsupported uniform-array type");
-				};
+				}
 			}
-
-
-
-
 		}
 
 
@@ -455,7 +452,7 @@ namespace houio
 					}
 
 					// call event handler for current token
-					t.event( this );
+					t.event(*this);
 					if( topLevelScalar )
 					{
 						state = STATE_COMPLETE;
@@ -471,14 +468,14 @@ namespace houio
 					{
 						// we will expect a key value seperator next
 						setState( STATE_MAP_SEPERATOR );
-						t.event( this, 1 );
+						t.event(*this, true);
 					}else
 					if( t.type == Token::JID_MAP_END )
 					{
 						if( !binary && state == STATE_MAP_NEED_KEY )
 							fail(DiagnosticCategory::malformed_input, "Parser encountered a map end after a trailing separator", tokenOffset);
 						popState();
-						t.event( this );
+						t.event(*this);
 						if( stateStack.empty() )
 							return true;
 					}else
@@ -498,7 +495,7 @@ namespace houio
 					if( t.type == Token::JID_MAP_END )
 					{
 						popState();
-						t.event( this );
+						t.event(*this);
 						if( stateStack.empty() )
 							return true;
 					}else
@@ -512,7 +509,7 @@ namespace houio
 					if( t.type == Token::JID_ARRAY_END )
 					{
 						popState();
-						t.event( this );
+						t.event(*this);
 						if( stateStack.empty() )
 							return true;
 					}else
@@ -1255,12 +1252,12 @@ namespace houio
 			return object_;
 		}
 
-		Value::Variant& Value::getVariant() noexcept
+		Value::Variant& Value::variant() noexcept
 		{
 			return scalar_;
 		}
 
-		const Value::Variant& Value::getVariant() const noexcept
+		const Value::Variant& Value::variant() const noexcept
 		{
 			return scalar_;
 		}
@@ -1389,7 +1386,7 @@ namespace houio
 			return static_cast<sint64>(values_.size());
 		}
 
-		Value Array::getValue(int index) const
+		Value Array::value(int index) const
 		{
 			const sint64 element_count = size();
 			if (index < 0 || static_cast<sint64>(index) >= element_count)
@@ -1446,17 +1443,17 @@ namespace houio
 		}
 
 
-		ObjectPtr Array::getObject(int index) const
+		ObjectPtr Array::object(int index) const
 		{
-			const Value value = getValue(index);
+			const Value value = this->value(index);
 			return value.isObject()
 				? std::const_pointer_cast<Object>(value.asObject())
 				: nullptr;
 		}
 
-		ArrayPtr Array::getArray(int index) const
+		ArrayPtr Array::array(int index) const
 		{
-			const Value value = getValue(index);
+			const Value value = this->value(index);
 			return value.isArray()
 				? std::const_pointer_cast<Array>(value.asArray())
 				: nullptr;
@@ -1468,39 +1465,40 @@ namespace houio
 			return std::make_shared<Object>();
 		}
 
-		bool Object::hasKey(const std::string& key) const
+		bool Object::contains(const std::string& key) const
 		{
 			return entries_.contains(key);
 		}
 
-		Value Object::getValue(const std::string& key) const
+		Value Object::value(const std::string& key) const
 		{
 			const auto entry = entries_.find(key);
 			return entry == entries_.end() ? Value() : entry->second;
 		}
 
-		void Object::getKeys(std::vector<std::string>& keys) const
+		std::vector<std::string> Object::keys() const
 		{
-			keys.clear();
-			keys.reserve(entries_.size());
+			std::vector<std::string> result;
+			result.reserve(entries_.size());
 			for (const auto& [key, value] : entries_)
 			{
 				static_cast<void>(value);
-				keys.push_back(key);
+				result.push_back(key);
 			}
+			return result;
 		}
 
-		ObjectPtr Object::getObject(const std::string& key) const
+		ObjectPtr Object::object(const std::string& key) const
 		{
-			const Value value = getValue(key);
+			const Value value = this->value(key);
 			return value.isObject()
 				? std::const_pointer_cast<Object>(value.asObject())
 				: nullptr;
 		}
 
-		ArrayPtr Object::getArray(const std::string& key) const
+		ArrayPtr Object::array(const std::string& key) const
 		{
-			const Value value = getValue(key);
+			const Value value = this->value(key);
 			return value.isArray()
 				? std::const_pointer_cast<Array>(value.asArray())
 				: nullptr;
@@ -1536,7 +1534,7 @@ namespace houio
 
 		// JSONReader ===============================================
 
-		Value JSONReader::getRoot() const
+		Value JSONReader::root() const
 		{
 			return root_;
 		}
@@ -1740,7 +1738,7 @@ namespace houio
 			else
 			if( !value.isNull() )
 			{
-				std::visit(*this, value.getVariant());
+				std::visit(*this, value.variant());
 			}
 			return false;
 		}

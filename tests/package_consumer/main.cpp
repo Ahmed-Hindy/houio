@@ -23,7 +23,7 @@ int main()
     std::error_code removeError;
     std::filesystem::remove(outputPath, removeError);
 
-    if (!readResult || readResult.value->numPrimitives() != 1)
+    if (!readResult || readResult.value->primitiveCount() != 1)
     {
         std::cerr << "failed to import geometry through installed HouIO package\n";
         return 1;

@@ -217,13 +217,13 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
     }
 
     houio::Geometry::Ptr converted = houio::HouGeoIO::convertToGeometry(geometry, primitives.front());
-    if (!converted || converted->numPrimitives() != 1)
+    if (!converted || converted->primitiveCount() != 1)
     {
         return fail("failed to convert modern geometry to the simplified mesh model");
     }
 
-    houio::Attribute::Ptr convertedPositions = converted->getAttr("P");
-    houio::Attribute::Ptr convertedUv = converted->getAttr("UV");
+    houio::Attribute::Ptr convertedPositions = converted->attribute("P");
+    houio::Attribute::Ptr convertedUv = converted->attribute("UV");
     if (!convertedPositions || convertedPositions->numElements() != 4 || !convertedUv
         || convertedUv->numElements() != 4)
     {

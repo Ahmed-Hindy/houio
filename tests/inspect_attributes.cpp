@@ -36,7 +36,7 @@ void printArraySummary(const houio::json::ArrayPtr& array, int depth)
     {
         printIndent(depth + 1);
         std::cout << '[' << index << "] ";
-        printValueSummary(array->getValue(static_cast<int>(index)), depth + 1);
+        printValueSummary(array->value(static_cast<int>(index)), depth + 1);
     }
 }
 
@@ -49,14 +49,13 @@ void printObjectSummary(const houio::json::ObjectPtr& object, int depth)
         return;
     }
 
-    std::vector<std::string> keys;
-    object->getKeys(keys);
+    const std::vector<std::string> keys = object->keys();
     std::cout << "object keys=" << keys.size() << '\n';
     for (const std::string& key : keys)
     {
         printIndent(depth + 1);
         std::cout << key << ": ";
-        printValueSummary(object->getValue(key), depth + 1);
+        printValueSummary(object->value(key), depth + 1);
     }
 }
 
@@ -103,9 +102,9 @@ int inspectPrimitiveAttributes(const std::string& inputPath)
         return 1;
     }
 
-    houio::json::ObjectPtr root = houio::HouGeo::toObject(reader.getRoot().asArray());
-    houio::json::ObjectPtr attributes = houio::HouGeo::toObject(root->getArray("attributes"));
-    houio::json::ArrayPtr primitiveAttributes = attributes->getArray("primitiveattributes");
+    houio::json::ObjectPtr root = houio::HouGeo::toObject(reader.root().asArray());
+    houio::json::ObjectPtr attributes = houio::HouGeo::toObject(root->array("attributes"));
+    houio::json::ArrayPtr primitiveAttributes = attributes->array("primitiveattributes");
     if (!primitiveAttributes)
     {
         std::cout << "no primitive attributes\n";
@@ -115,9 +114,9 @@ int inspectPrimitiveAttributes(const std::string& inputPath)
     std::cout << "primitive attribute count=" << primitiveAttributes->size() << '\n';
     for (houio::sint64 index = 0; index < primitiveAttributes->size(); ++index)
     {
-        houio::json::ArrayPtr attribute = primitiveAttributes->getArray(static_cast<int>(index));
-        houio::json::ObjectPtr definition = houio::HouGeo::toObject(attribute->getArray(0));
-        houio::json::ObjectPtr data = houio::HouGeo::toObject(attribute->getArray(1));
+        houio::json::ArrayPtr attribute = primitiveAttributes->array(static_cast<int>(index));
+        houio::json::ObjectPtr definition = houio::HouGeo::toObject(attribute->array(0));
+        houio::json::ObjectPtr data = houio::HouGeo::toObject(attribute->array(1));
         std::cout << "attribute " << index << " name=" << definition->get<std::string>("name")
                   << " type=" << definition->get<std::string>("type") << '\n';
         printObjectSummary(data, 1);

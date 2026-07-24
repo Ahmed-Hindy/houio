@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstddef>
 
 #include <houio/math/Matrix33.h>
 #include <houio/math/Vec3.h>
@@ -8,57 +9,12 @@
 namespace houio::math
 {
     template<typename T>
-    constexpr void matrixMultiply(
-        Matrix33<T>& result,
-        const Matrix33<T>& lhs,
+    [[nodiscard]] constexpr Matrix33<T> operator+(
+        Matrix33<T> lhs,
         const Matrix33<T>& rhs) noexcept
-    {
-        Matrix33<T> product = Matrix33<T>::Zero();
-        for (std::size_t row = 0; row < Matrix33<T>::dimension; ++row)
-        {
-            for (std::size_t column = 0; column < Matrix33<T>::dimension; ++column)
-            {
-                for (std::size_t inner = 0; inner < Matrix33<T>::dimension; ++inner)
-                    product(row, column) += lhs(row, inner) * rhs(inner, column);
-            }
-        }
-        result = product;
-    }
-
-    template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> operator/(Matrix33<T> lhs, const T& rhs)
-    {
-        lhs /= rhs;
-        return lhs;
-    }
-
-    template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> operator*(Matrix33<T> lhs, const T& rhs) noexcept
-    {
-        lhs *= rhs;
-        return lhs;
-    }
-
-    template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> operator-(Matrix33<T> lhs, const T& rhs) noexcept
-    {
-        lhs -= rhs;
-        return lhs;
-    }
-
-    template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> operator+(Matrix33<T> lhs, const T& rhs) noexcept
     {
         lhs += rhs;
         return lhs;
-    }
-
-    template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> operator-(const Matrix33<T>& matrix) noexcept
-    {
-        Matrix33<T> result = matrix;
-        result *= T{-1};
-        return result;
     }
 
     template<typename T>
@@ -71,32 +27,42 @@ namespace houio::math
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> operator+(
-        Matrix33<T> lhs,
-        const Matrix33<T>& rhs) noexcept
+    [[nodiscard]] constexpr Matrix33<T> operator+(Matrix33<T> lhs, T rhs) noexcept
     {
         lhs += rhs;
         return lhs;
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> operator*(const T& lhs, Matrix33<T> rhs) noexcept
+    [[nodiscard]] constexpr Matrix33<T> operator-(Matrix33<T> lhs, T rhs) noexcept
     {
-        rhs *= lhs;
+        lhs -= rhs;
+        return lhs;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix33<T> operator*(Matrix33<T> lhs, T rhs) noexcept
+    {
+        lhs *= rhs;
+        return lhs;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix33<T> operator/(Matrix33<T> lhs, T rhs)
+    {
+        lhs /= rhs;
+        return lhs;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix33<T> operator+(T lhs, Matrix33<T> rhs) noexcept
+    {
+        rhs += lhs;
         return rhs;
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> operator/(const T& lhs, const Matrix33<T>& rhs)
-    {
-        Matrix33<T> result;
-        for (std::size_t index = 0; index < result.ma.size(); ++index)
-            result.ma[index] = lhs / rhs.ma[index];
-        return result;
-    }
-
-    template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> operator-(const T& lhs, const Matrix33<T>& rhs) noexcept
+    [[nodiscard]] constexpr Matrix33<T> operator-(T lhs, const Matrix33<T>& rhs) noexcept
     {
         Matrix33<T> result;
         for (std::size_t index = 0; index < result.ma.size(); ++index)
@@ -105,10 +71,27 @@ namespace houio::math
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> operator+(const T& lhs, Matrix33<T> rhs) noexcept
+    [[nodiscard]] constexpr Matrix33<T> operator*(T lhs, Matrix33<T> rhs) noexcept
     {
-        rhs += lhs;
+        rhs *= lhs;
         return rhs;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix33<T> operator/(T lhs, const Matrix33<T>& rhs)
+    {
+        Matrix33<T> result;
+        for (std::size_t index = 0; index < result.ma.size(); ++index)
+            result.ma[index] = lhs / rhs.ma[index];
+        return result;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr Matrix33<T> operator-(const Matrix33<T>& matrix) noexcept
+    {
+        Matrix33<T> result = matrix;
+        result *= T{-1};
+        return result;
     }
 
     template<typename T>
@@ -116,13 +99,22 @@ namespace houio::math
         const Matrix33<T>& lhs,
         const Matrix33<T>& rhs) noexcept
     {
-        Matrix33<T> result;
-        matrixMultiply(result, lhs, rhs);
+        Matrix33<T> result = Matrix33<T>::zero();
+        for (std::size_t row = 0; row < Matrix33<T>::dimension; ++row)
+        {
+            for (std::size_t column = 0; column < Matrix33<T>::dimension; ++column)
+            {
+                for (std::size_t inner = 0; inner < Matrix33<T>::dimension; ++inner)
+                    result(row, column) += lhs(row, inner) * rhs(inner, column);
+            }
+        }
         return result;
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Vec3<T> transform(const Vec3<T>& vector, const Matrix33<T>& matrix)
+    [[nodiscard]] constexpr Vec3<T> transform(
+        const Vec3<T>& vector,
+        const Matrix33<T>& matrix)
     {
         return Vec3<T>(
             vector.x * matrix(0, 0) + vector.y * matrix(1, 0) + vector.z * matrix(2, 0),
@@ -131,9 +123,11 @@ namespace houio::math
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> transpose(const Matrix33<T>& matrix) noexcept
+    [[nodiscard]] constexpr Vec3<T> operator*(
+        const Vec3<T>& vector,
+        const Matrix33<T>& matrix)
     {
-        return matrix.transposed();
+        return transform(vector, matrix);
     }
 
     template<typename T>
@@ -147,7 +141,9 @@ namespace houio::math
     }
 
     template<typename T>
-    [[nodiscard]] constexpr Matrix33<T> outer(const Vec3<T>& lhs, const Vec3<T>& rhs)
+    [[nodiscard]] constexpr Matrix33<T> outer(
+        const Vec3<T>& lhs,
+        const Vec3<T>& rhs) noexcept
     {
         return Matrix33<T>(
             lhs.x * rhs.x, lhs.x * rhs.y, lhs.x * rhs.z,

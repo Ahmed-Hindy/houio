@@ -77,7 +77,7 @@ namespace houio
                 numeric_attribute_ = std::move(attribute);
                 tuple_size_ = numeric_attribute_->numComponents();
                 element_count_ = numeric_attribute_->numElements();
-                type_ = ATTR_TYPE_NUMERIC;
+                type_ = Type::numeric;
             }
 
             [[nodiscard]] Attribute::Ptr numericAttribute() noexcept
@@ -95,8 +95,8 @@ namespace houio
                 string_values_ = std::move(values);
                 dictionary_values_.clear();
                 numeric_attribute_.reset();
-                type_ = ATTR_TYPE_STRING;
-                storage_ = ATTR_STORAGE_INT32;
+                type_ = Type::string;
+                storage_ = Storage::int32;
                 tuple_size_ = 1;
                 element_count_ = static_cast<int>(string_values_.size());
             }
@@ -111,8 +111,8 @@ namespace houio
                 dictionary_values_ = std::move(values);
                 string_values_.clear();
                 numeric_attribute_.reset();
-                type_ = ATTR_TYPE_DICT;
-                storage_ = ATTR_STORAGE_INT32;
+                type_ = Type::dictionary;
+                storage_ = Storage::int32;
                 tuple_size_ = 1;
                 element_count_ = static_cast<int>(dictionary_values_.size());
             }
@@ -125,8 +125,8 @@ namespace houio
         private:
             std::string name_;
             int tuple_size_ = 1;
-            Storage storage_ = ATTR_STORAGE_INVALID;
-            Type type_ = ATTR_TYPE_NUMERIC;
+            Storage storage_ = Storage::invalid;
+            Type type_ = Type::numeric;
             std::vector<std::string> string_values_;
             std::vector<json::ObjectPtr> dictionary_values_;
             int element_count_ = 0;

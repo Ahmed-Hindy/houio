@@ -1,204 +1,120 @@
-/*---------------------------------------------------------------------
-
-The BoundingBox class is a very simple utility class for working with
-axis aligned bounding boxes
-
-----------------------------------------------------------------------*/
 #pragma once
 
-#include "Vec3.h"
+#include <algorithm>
 #include <limits>
 
-namespace houio
+#include <houio/math/Vec3.h>
+
+namespace houio::math
 {
+    template<typename T>
+    struct BoundingBox3
+    {
+        Vec3<T> minPoint;
+        Vec3<T> maxPoint;
 
-namespace math
-{
-	///
-	/// \brief The BoundingBox class is a very simple utility class for working
-	/// with axis aligned bounding boxes
-	///
-	template<typename T>
-	struct BoundingBox3
-	{
-		BoundingBox3();                                                            ///< constructor
-		BoundingBox3( math::Vec3<T> _minPoint, math::Vec3<T> _maxPoint );          ///< constructor
-		BoundingBox3( T minx, T miny, T minz, T maxx, T maxy, T maxz );            ///< constructor
-		template<typename S>
-		BoundingBox3( const BoundingBox3<S> &other );
+        constexpr BoundingBox3() noexcept
+        {
+            reset();
+        }
 
-		math::Vec3<T>                                          size( void ) const;  ///< returns a vector which represents the dimension in each axis
-		void                             extend( const math::Vec3<T> &nextPoint );  ///< adobts the bounding borders if neccessary so that the given point lies within the bounding box
-		void                           extendBy( const math::Vec3<T> &nextPoint );  ///< adobts the bounding borders if neccessary so that the given point lies within the bounding box - just here for Imath compatibility
-		void                           extend( const BoundingBox3<T> &nextBound );  ///< adobts the bounding borders if neccessary so that the given boundingbox lies within the bounding box
-		math::Vec3<T>                                     getCenter( void ) const;  ///< returns the geometrical center of the box
-		bool                         encloses( const math::Vec3<T> &point ) const;  ///< this utility function checks wether the given point is within the volume descripted by the bounding box
-		bool encloses( const math::Vec3<T> &min, const math::Vec3<T> &max ) const;  ///< this utility function checks wether the given box is within the volume descripted by the bounding box
-		bool                                                      isEmpty() const;
-		void                                                          makeEmpty();
-		int                                                      maxExtend()const;
+        constexpr BoundingBox3(Vec3<T> minimum, Vec3<T> maximum) noexcept
+            : minPoint(minimum), maxPoint(maximum)
+        {
+        }
 
-		math::Vec3<T>                                                    minPoint;  ///< the position of all lowends for each axis
-		math::Vec3<T>                                                    maxPoint;  ///< the position of all highends for each axis
-	};
+        constexpr BoundingBox3(
+            T minimum_x,
+            T minimum_y,
+            T minimum_z,
+            T maximum_x,
+            T maximum_y,
+            T maximum_z) noexcept
+            : minPoint(minimum_x, minimum_y, minimum_z),
+              maxPoint(maximum_x, maximum_y, maximum_z)
+        {
+        }
 
+        template<typename S>
+        constexpr BoundingBox3(const BoundingBox3<S>& other) noexcept
+            : minPoint(other.minPoint), maxPoint(other.maxPoint)
+        {
+        }
 
+        [[nodiscard]] constexpr Vec3<T> size() const noexcept
+        {
+            return maxPoint - minPoint;
+        }
 
+        [[nodiscard]] constexpr Vec3<T> center() const noexcept
+        {
+            return Vec3<T>(
+                minPoint.x + (maxPoint.x - minPoint.x) / static_cast<T>(2),
+                minPoint.y + (maxPoint.y - minPoint.y) / static_cast<T>(2),
+                minPoint.z + (maxPoint.z - minPoint.z) / static_cast<T>(2));
+        }
 
+        [[nodiscard]] constexpr bool empty() const noexcept
+        {
+            return minPoint.x >= maxPoint.x
+                || minPoint.y >= maxPoint.y
+                || minPoint.z >= maxPoint.z;
+        }
 
+        constexpr void reset() noexcept
+        {
+            const T maximum = std::numeric_limits<T>::max();
+            const T minimum = std::numeric_limits<T>::lowest();
+            minPoint = Vec3<T>(maximum);
+            maxPoint = Vec3<T>(minimum);
+        }
 
+        [[nodiscard]] constexpr int longestAxis() const noexcept
+        {
+            const Vec3<T> diagonal = maxPoint - minPoint;
+            if (diagonal.x > diagonal.y && diagonal.x > diagonal.z)
+                return 0;
+            return diagonal.y > diagonal.z ? 1 : 2;
+        }
 
-	// constructor
-	template<typename T>
-	BoundingBox3<T>::BoundingBox3()
-	{
-		makeEmpty();
-	}
+        constexpr void extend(const Vec3<T>& point) noexcept
+        {
+            minPoint.x = std::min(minPoint.x, point.x);
+            minPoint.y = std::min(minPoint.y, point.y);
+            minPoint.z = std::min(minPoint.z, point.z);
+            maxPoint.x = std::max(maxPoint.x, point.x);
+            maxPoint.y = std::max(maxPoint.y, point.y);
+            maxPoint.z = std::max(maxPoint.z, point.z);
+        }
 
-	// constructor
-	template<typename T>
-	BoundingBox3<T>::BoundingBox3( math::Vec3<T> _minPoint, math::Vec3<T> _maxPoint )
-	{
-		minPoint = _minPoint;
-		maxPoint = _maxPoint;
-	}
+        constexpr void extend(const BoundingBox3& bounds) noexcept
+        {
+            extend(bounds.minPoint);
+            extend(bounds.maxPoint);
+        }
 
-	template<typename T>
-	BoundingBox3<T>::BoundingBox3( T minx, T miny, T minz, T maxx, T maxy, T maxz )
-	{
-		minPoint = math::Vec3<T>( minx, miny, minz );
-		maxPoint = math::Vec3<T>( maxx, maxy, maxz );
-	}
+        [[nodiscard]] constexpr bool encloses(const Vec3<T>& point) const noexcept
+        {
+            return point.x > minPoint.x && point.x < maxPoint.x
+                && point.y > minPoint.y && point.y < maxPoint.y
+                && point.z > minPoint.z && point.z < maxPoint.z;
+        }
 
-	// constructor
-	template<typename T>
-	template<typename S>
-	BoundingBox3<T>::BoundingBox3( const BoundingBox3<S> &other )
-	{
-		minPoint = other.minPoint;
-		maxPoint = other.maxPoint;
-	}
+        [[nodiscard]] constexpr bool encloses(
+            const Vec3<T>& minimum,
+            const Vec3<T>& maximum) const noexcept
+        {
+            return minimum.x >= minPoint.x
+                && minimum.y >= minPoint.y
+                && minimum.z >= minPoint.z
+                && maximum.x <= maxPoint.x
+                && maximum.y <= maxPoint.y
+                && maximum.z <= maxPoint.z;
+        }
+    };
 
-	// returns a vector which represents the dimension in each axis
-	template<typename T>
-	math::Vec3<T> BoundingBox3<T>::size( void ) const
-	{
-		return math::Vec3<T>( maxPoint - minPoint );
-	}
-
-	template<typename T>
-	bool BoundingBox3<T>::isEmpty() const
-	{
-		return (minPoint.x >= maxPoint.x)&&(minPoint.y >= maxPoint.y)&&(minPoint.z >= maxPoint.z);
-	}
-
-	template<typename T>
-	void BoundingBox3<T>::makeEmpty()
-	{
-		minPoint = math::Vec3<T>( (T)std::numeric_limits<T>::max(), (T)std::numeric_limits<T>::max(), (T)std::numeric_limits<T>::max() );
-		maxPoint = math::Vec3<T>( (T)-std::numeric_limits<T>::max(), (T)-std::numeric_limits<T>::max(), (T)-std::numeric_limits<T>::max() );
-	}
-
-	template<typename T>
-	int BoundingBox3<T>::maxExtend()const
-	{
-		Vec3<T> diag = maxPoint - minPoint;
-		if (diag.x > diag.y && diag.x > diag.z)
-			return 0;
-		else if (diag.y > diag.z)
-			return 1;
-		else
-			return 2;
-	}
-
-	// adobts the bounding borders if neccessary so that the given point lies within
-	// the bounding box
-	template<typename T>
-    void BoundingBox3<T>::extend( const math::Vec3<T> &nextPoint )
-	{
-		if( nextPoint.x > maxPoint.x )
-			maxPoint.x = nextPoint.x;
-		if( nextPoint.y > maxPoint.y )
-			maxPoint.y = nextPoint.y;
-		if( nextPoint.z > maxPoint.z )
-			maxPoint.z = nextPoint.z;
-
-		if( nextPoint.x < minPoint.x )
-			minPoint.x = nextPoint.x;
-		if( nextPoint.y < minPoint.y )
-			minPoint.y = nextPoint.y;
-		if( nextPoint.z < minPoint.z )
-			minPoint.z = nextPoint.z;
-	}
-
-	// adobts the bounding borders if neccessary so that the given point lies within
-	// the bounding box
-	template<typename T>
-    void BoundingBox3<T>::extendBy( const math::Vec3<T> &nextPoint )
-	{
-		if( nextPoint.x > maxPoint.x )
-			maxPoint.x = nextPoint.x;
-		if( nextPoint.y > maxPoint.y )
-			maxPoint.y = nextPoint.y;
-		if( nextPoint.z > maxPoint.z )
-			maxPoint.z = nextPoint.z;
-
-		if( nextPoint.x < minPoint.x )
-			minPoint.x = nextPoint.x;
-		if( nextPoint.y < minPoint.y )
-			minPoint.y = nextPoint.y;
-		if( nextPoint.z < minPoint.z )
-			minPoint.z = nextPoint.z;
-	}
-
-	///< adobts the bounding borders if neccessary so that the given boundingbox lies within the bounding box
-	template<typename T>
-	void BoundingBox3<T>::extend( const BoundingBox3<T> &nextBound )
-	{
-		extend( nextBound.minPoint );
-		extend( nextBound.maxPoint );
-	}
-
-
-	// returns the geometrical center of the box
-	template<typename T>
-    math::Vec3<T> BoundingBox3<T>::getCenter( void ) const
-	{
-		return (minPoint + maxPoint)*(T)0.5;
-	}
-
-	// this utility function checks wether the given point
-	// is within the volume descripted by the bounding box
-	template<typename T>
-	bool BoundingBox3<T>::encloses( const math::Vec3<T> &point ) const
-	{
-		// check each dimension
-		if( (point.x > minPoint.x)&&(point.x < maxPoint.x)&&
-			(point.y > minPoint.y)&&(point.y < maxPoint.y)&&
-			(point.z > minPoint.z)&&(point.z < maxPoint.z))
-			return true;
-		else
-			return false;
-	}
-
-	// this utility function checks wether the given box
-	// is within the volume descripted by the bounding box
-	template<typename T>
-	bool BoundingBox3<T>::encloses( const math::Vec3<T> &min, const math::Vec3<T> &max ) const
-	{
-		// check each dimension for each point
-		if( (min.x >= minPoint.x)&&(min.y >= minPoint.y)&&(min.z >= minPoint.z)&&
-			(max.x <= maxPoint.x)&&(max.y <= maxPoint.y)&&(max.z <= maxPoint.z))
-			return true;
-		else
-			return false;
-	}
-
-	using BoundingBox3f = BoundingBox3<float>;
-	using BoundingBox3d = BoundingBox3<double>;
-	using Box3f = BoundingBox3<float>;
-	using Box3d = BoundingBox3<double>;
-
+    using BoundingBox3f = BoundingBox3<float>;
+    using BoundingBox3d = BoundingBox3<double>;
+    using Box3f = BoundingBox3<float>;
+    using Box3d = BoundingBox3<double>;
 }
-
-} // namespace houio

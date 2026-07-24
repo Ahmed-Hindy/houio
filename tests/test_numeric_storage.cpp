@@ -95,12 +95,14 @@ int main()
     positions->appendElement(houio::math::V3f(1.0f, 0.0f, 0.0f));
     geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("P", positions));
 
-    houio::Attribute::Ptr identifiers = std::make_shared<houio::Attribute>(1, houio::Attribute::INT64);
+    houio::Attribute::Ptr identifiers = std::make_shared<houio::Attribute>(
+        1, houio::Attribute::ComponentType::int64);
     identifiers->appendElement<houio::sint64>(1099511627776LL);
     identifiers->appendElement<houio::sint64>(-1099511627777LL);
     geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("large_id", identifiers));
 
-    houio::Attribute::Ptr halfValues = std::make_shared<houio::Attribute>(1, houio::Attribute::HALF);
+    houio::Attribute::Ptr halfValues = std::make_shared<houio::Attribute>(
+        1, houio::Attribute::ComponentType::float16);
     halfValues->appendElement<houio::uword>(houio::floatToHalfBits(0.5f));
     halfValues->appendElement<houio::uword>(houio::floatToHalfBits(-2.0f));
     geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("half_value", halfValues));
@@ -133,8 +135,9 @@ int main()
 
     houio::Geometry::Ptr converted = houio::HouGeoIO::convertToGeometry(
         imported, houio::HouGeoAdapter::Primitive::Ptr());
-    houio::Attribute::Ptr convertedHalf = converted ? converted->getAttr("half_value") : nullptr;
-    if (!convertedHalf || convertedHalf->elementComponentType() != houio::Attribute::HALF
+    houio::Attribute::Ptr convertedHalf = converted ? converted->attribute("half_value") : nullptr;
+    if (!convertedHalf
+        || convertedHalf->elementComponentType() != houio::Attribute::ComponentType::float16
         || convertedHalf->numElements() != 2)
     {
         return fail("simplified conversion did not preserve Float16 attribute storage");

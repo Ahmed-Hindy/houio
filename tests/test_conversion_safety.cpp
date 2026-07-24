@@ -101,7 +101,7 @@ int verifyNullAndCountGuards()
     houio::Geometry::Ptr geometry = houio::Geometry::createPointGeometry();
     try
     {
-        geometry->setAttr("invalid", houio::Attribute::Ptr());
+        geometry->setAttribute("invalid", houio::Attribute::Ptr());
         return fail("Geometry accepted a null attribute");
     }
     catch (const std::invalid_argument&)
@@ -260,7 +260,8 @@ int verifyRawDataViewBounds()
 
 int verifyAttributeAndStringBounds()
 {
-    houio::Attribute oversized(4, houio::Attribute::FLOAT);
+    houio::Attribute oversized(
+        4, houio::Attribute::ComponentType::float32);
     try
     {
         oversized.resize(std::numeric_limits<size_t>::max());

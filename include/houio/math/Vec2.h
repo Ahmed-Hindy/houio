@@ -24,13 +24,13 @@ namespace houio::math
         {
         }
 
-        [[nodiscard]] T getLength() const
+        [[nodiscard]] T length() const
         {
             using std::sqrt;
             return static_cast<T>(sqrt(x * x + y * y));
         }
 
-        [[nodiscard]] constexpr T getSquaredLength() const noexcept
+        [[nodiscard]] constexpr T squaredLength() const noexcept
         {
             return x * x + y * y;
         }
@@ -44,7 +44,7 @@ namespace houio::math
 
         void normalize()
         {
-            const T length = getLength();
+            const T length = this->length();
             if (length != T{})
             {
                 x /= length;
@@ -54,7 +54,7 @@ namespace houio::math
 
         [[nodiscard]] Vec2 normalized() const
         {
-            const T length = getLength();
+            const T length = this->length();
             return length == T{} ? Vec2{} : Vec2(x / length, y / length);
         }
 
@@ -80,49 +80,49 @@ namespace houio::math
             return !(*this == rhs);
         }
 
-        constexpr bool operator+=(const Vec2& rhs) noexcept
+        constexpr Vec2& operator+=(const Vec2& rhs) noexcept
         {
             x += rhs.x;
             y += rhs.y;
-            return true;
+            return *this;
         }
 
-        constexpr bool operator-=(const Vec2& rhs) noexcept
+        constexpr Vec2& operator-=(const Vec2& rhs) noexcept
         {
             x -= rhs.x;
             y -= rhs.y;
-            return true;
+            return *this;
         }
 
-        constexpr bool operator+=(const T& rhs) noexcept
+        constexpr Vec2& operator+=(const T& rhs) noexcept
         {
             x += rhs;
             y += rhs;
-            return true;
+            return *this;
         }
 
-        constexpr bool operator-=(const T& rhs) noexcept
+        constexpr Vec2& operator-=(const T& rhs) noexcept
         {
             x -= rhs;
             y -= rhs;
-            return true;
+            return *this;
         }
 
-        constexpr bool operator*=(const T& rhs) noexcept
+        constexpr Vec2& operator*=(const T& rhs) noexcept
         {
             x *= rhs;
             y *= rhs;
-            return true;
+            return *this;
         }
 
-        constexpr bool operator/=(const T& rhs)
+        constexpr Vec2& operator/=(const T& rhs)
         {
             x /= rhs;
             y /= rhs;
-            return true;
+            return *this;
         }
 
-        [[nodiscard]] constexpr const T& operator[](int index) const
+        [[nodiscard]] constexpr const T& operator[](std::size_t index) const
         {
             if (index == 0)
                 return x;
@@ -131,7 +131,7 @@ namespace houio::math
             throw std::out_of_range("Vec2 index is out of range");
         }
 
-        [[nodiscard]] constexpr T& operator[](int index)
+        [[nodiscard]] constexpr T& operator[](std::size_t index)
         {
             if (index == 0)
                 return x;

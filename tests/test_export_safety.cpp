@@ -28,7 +28,7 @@ public:
 
     Type type() const override
     {
-        return ATTR_TYPE_DICT;
+        return Type::dictionary;
     }
 
     int tupleSize() const override
@@ -38,7 +38,7 @@ public:
 
     Storage storage() const override
     {
-        return ATTR_STORAGE_INT32;
+        return Storage::int32;
     }
 
     int elementCount() const override
@@ -162,7 +162,7 @@ int verifyAdapterDictionaryExport()
                               : houio::HouGeoAdapter::AttributeAdapter::Ptr();
     auto dictionary = attribute ? attribute->dictionaryValue(0)
                                 : std::shared_ptr<houio::json::Object>();
-    auto label = dictionary ? dictionary->getObject("label")
+    auto label = dictionary ? dictionary->object("label")
                             : std::shared_ptr<houio::json::Object>();
     if (!label || label->get<std::string>("value") != "adapter")
         return fail("abstract adapter dictionary value changed during export");

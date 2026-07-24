@@ -4,6 +4,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <houio/Attribute.h>
@@ -42,14 +43,14 @@ namespace houio
         void transform(const math::M44f& transform_matrix);
         void addNormals();
 
-        [[nodiscard]] math::BoundingBox3f getBound() const;
+        [[nodiscard]] math::BoundingBox3f bounds() const;
 
-        [[nodiscard]] Attribute::Ptr getAttr(const std::string& name);
-        [[nodiscard]] Attribute::CPtr getAttr(const std::string& name) const;
-        void setAttr(const std::string& name, Attribute::Ptr attribute);
-        [[nodiscard]] bool hasAttr(const std::string& name) const;
-        void getAttrNames(std::vector<std::string>& names) const;
-        void removeAttr(const std::string& name);
+        [[nodiscard]] Attribute::Ptr attribute(const std::string& name);
+        [[nodiscard]] Attribute::CPtr attribute(const std::string& name) const;
+        void setAttribute(const std::string& name, Attribute::Ptr attribute);
+        [[nodiscard]] bool hasAttribute(const std::string& name) const;
+        [[nodiscard]] std::vector<std::string> attributeNames() const;
+        void removeAttribute(const std::string& name);
 
         [[nodiscard]] const AttributeMap& attributes() const noexcept
         {
@@ -61,12 +62,12 @@ namespace houio
             return primitive_type_;
         }
 
-        [[nodiscard]] unsigned int numPrimitives() const noexcept
+        [[nodiscard]] unsigned int primitiveCount() const noexcept
         {
             return primitive_count_;
         }
 
-        [[nodiscard]] unsigned int numPrimitiveVertices() const noexcept
+        [[nodiscard]] unsigned int verticesPerPrimitive() const noexcept
         {
             return vertices_per_primitive_;
         }
@@ -104,7 +105,7 @@ namespace houio
             int x_resolution,
             int y_resolution,
             int z_resolution,
-            PrimitiveType primitive_type = PrimitiveType::triangle);
+            PrimitiveType primitive_type = PrimitiveType::point);
         [[nodiscard]] static Ptr createSphere(
             int u_subdivisions,
             int v_subdivisions,

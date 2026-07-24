@@ -218,7 +218,7 @@ namespace houio
 			else
 			{
 				JsonScalarWriter scalarWriter{writer};
-				std::visit(scalarWriter, value.getVariant());
+				std::visit(scalarWriter, value.variant());
 			}
 		}
 	}
@@ -255,7 +255,7 @@ namespace houio
 
 		try
 		{
-			json::ArrayPtr rootArray = reader.getRoot().asArray();
+			json::ArrayPtr rootArray = reader.root().asArray();
 			if( !rootArray )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::import expected a flattened root array", -1, "root"});
@@ -415,14 +415,15 @@ namespace houio
 			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->pointAttribute(attrName);
 			const std::string attributePath = "attributes.pointattributes." + attrName;
 			validateDomainAttribute(houAttr, numPoints, attributePath);
-			if( houAttr->getType() != HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
+			if( houAttr->type() != HouGeoAdapter::AttributeAdapter::Type::numeric )
 			{
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry skips non-numeric point attribute " + attrName,
 					-1, attributePath});
 				continue;
 			}
-			const int numComponents = houAttr->getTupleSize();
+			const int numComponents = houAttr->tupleSize();
+			const HouGeoAdapter::AttributeAdapter::Storage storage = houAttr->storage();
 
 			Attribute::Ptr attr;
 			if( attrName == "P" )
@@ -431,28 +432,28 @@ namespace houio
 					throw std::runtime_error( "HouGeoIO::convertToGeometry: P requires at least three components" );
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 
-				attr = result->getAttr("P");
+				attr = result->attribute("P");
 				if( !attr )
 					throw std::runtime_error( "HouGeoIO::convertToGeometry target geometry has no P attribute" );
 				for( size_t pointIndex=0;pointIndex<pointCount;++pointIndex )
 				{
 					math::Vec3f position;
 					const size_t tupleOffset = pointIndex * static_cast<size_t>(numComponents);
-					if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+					if( storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 					{
 						position = math::Vec3f(
 							halfBitsToFloat(raw_data.read<uword>(tupleOffset)),
 							halfBitsToFloat(raw_data.read<uword>(tupleOffset + 1)),
 							halfBitsToFloat(raw_data.read<uword>(tupleOffset + 2)));
 					}
-					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+					else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float32 )
 					{
 						position = math::Vec3f(
 							raw_data.read<real32>(tupleOffset),
 							raw_data.read<real32>(tupleOffset + 1),
 							raw_data.read<real32>(tupleOffset + 2));
 					}
-					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+					else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float64 )
 					{
 						position = math::Vec3f(
 							static_cast<real32>(raw_data.read<real64>(tupleOffset)),
@@ -476,19 +477,19 @@ namespace houio
 				{
 					math::Vec2f uv;
 					const size_t tupleOffset = pointIndex * static_cast<size_t>(numComponents);
-					if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+					if( storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 					{
 						uv = math::Vec2f(
 							halfBitsToFloat(raw_data.read<uword>(tupleOffset)),
 							halfBitsToFloat(raw_data.read<uword>(tupleOffset + 1)));
 					}
-					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+					else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float32 )
 					{
 						uv = math::Vec2f(
 							raw_data.read<real32>(tupleOffset),
 							raw_data.read<real32>(tupleOffset + 1));
 					}
-					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+					else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float64 )
 					{
 						uv = math::Vec2f(
 							static_cast<real32>(raw_data.read<real64>(tupleOffset)),
@@ -499,29 +500,29 @@ namespace houio
 					attr->appendElement(uv);
 				}
 			}else
-			if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+			if( storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::HALF,
-					raw_data.bytes(), houAttr->getNumElements());
+				attr = Attribute::create(numComponents, Attribute::ComponentType::float16,
+					raw_data.bytes(), houAttr->elementCount());
 			}
-			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float32 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::FLOAT,
-					raw_data.bytes(), houAttr->getNumElements());
+				attr = Attribute::create(numComponents, Attribute::ComponentType::float32,
+					raw_data.bytes(), houAttr->elementCount());
 			}
-			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
+			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::int32 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::INT,
-					raw_data.bytes(), houAttr->getNumElements());
+				attr = Attribute::create(numComponents, Attribute::ComponentType::int32,
+					raw_data.bytes(), houAttr->elementCount());
 			}
-			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
+			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::int64 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::INT64,
-					raw_data.bytes(), houAttr->getNumElements());
+				attr = Attribute::create(numComponents, Attribute::ComponentType::int64,
+					raw_data.bytes(), houAttr->elementCount());
 			}
 			else
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
@@ -529,10 +530,10 @@ namespace houio
 					-1, "attributes.pointattributes." + attrName});
 
 			if( attr )
-				result->setAttr(attrName, attr);
+				result->setAttribute(attrName, attr);
 		}
 
-		Attribute::Ptr convertedPositions = result->getAttr("P");
+		Attribute::Ptr convertedPositions = result->attribute("P");
 		if( !convertedPositions || convertedPositions->numElements() != static_cast<int>(pointCount) )
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 				"HouGeoIO::convertToGeometry requires one converted P value per point", -1,
@@ -546,14 +547,15 @@ namespace houio
 			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->vertexAttribute(attrName);
 			const std::string attributePath = "attributes.vertexattributes." + attrName;
 			validateDomainAttribute(houAttr, numVertices, attributePath);
-			if( houAttr->getType() != HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
+			if( houAttr->type() != HouGeoAdapter::AttributeAdapter::Type::numeric )
 			{
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry skips non-numeric vertex attribute " + attrName,
 					-1, attributePath});
 				continue;
 			}
-			const int numComponents = houAttr->getTupleSize();
+			const int numComponents = houAttr->tupleSize();
+			const HouGeoAdapter::AttributeAdapter::Storage storage = houAttr->storage();
 
 			Attribute::Ptr attr;
 			if( (attrName == "UV")||(attrName == "uv") )
@@ -569,19 +571,19 @@ namespace houio
 				{
 					math::Vec2f uv;
 					const size_t tupleOffset = vertexIndex * static_cast<size_t>(numComponents);
-					if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+					if( storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 					{
 						uv = math::Vec2f(
 							halfBitsToFloat(raw_data.read<uword>(tupleOffset)),
 							halfBitsToFloat(raw_data.read<uword>(tupleOffset + 1)));
 					}
-					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+					else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float32 )
 					{
 						uv = math::Vec2f(
 							raw_data.read<real32>(tupleOffset),
 							raw_data.read<real32>(tupleOffset + 1));
 					}
-					else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+					else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float64 )
 					{
 						uv = math::Vec2f(
 							static_cast<real32>(raw_data.read<real64>(tupleOffset)),
@@ -592,23 +594,23 @@ namespace houio
 					attr->appendElement(uv);
 				}
 			}else
-			if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+			if( storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::HALF,
-					raw_data.bytes(), houAttr->getNumElements());
+				attr = Attribute::create(numComponents, Attribute::ComponentType::float16,
+					raw_data.bytes(), houAttr->elementCount());
 			}
-			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float32 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::FLOAT,
-					raw_data.bytes(), houAttr->getNumElements());
+				attr = Attribute::create(numComponents, Attribute::ComponentType::float32,
+					raw_data.bytes(), houAttr->elementCount());
 			}
-			else if( houAttr->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
+			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::int64 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::INT64,
-					raw_data.bytes(), houAttr->getNumElements());
+				attr = Attribute::create(numComponents, Attribute::ComponentType::int64,
+					raw_data.bytes(), houAttr->elementCount());
 			}
 
 			if( !attr )
@@ -624,7 +626,7 @@ namespace houio
 			pointAttr->resize(pointCount);
 			pointAttr->fillZero();
 
-			result->setAttr( attrName, pointAttr );
+			result->setAttribute(attrName, pointAttr);
 			vertex2pointAttr.push_back( std::make_pair( attr, pointAttr ) );
 		}
 
@@ -712,7 +714,7 @@ namespace houio
 					{
 						const size_t elementBytes = attributeElementBytes(attributePair.first);
 						std::span<std::byte> destination_value =
-							attributePair.second->elementBytes(static_cast<size_t>(finalPointIndex));
+							attributePair.second->mutableElementBytes(static_cast<size_t>(finalPointIndex));
 						const std::span<const std::byte> source_value =
 							attributePair.first->elementBytes(globalVertexIndex);
 						if (destination_value.size() != elementBytes || source_value.size() != elementBytes)
@@ -790,16 +792,16 @@ namespace houio
 			return HouGeo::Ptr();
 		HouGeo::Ptr houdiniGeometry = std::make_shared<HouGeo>();
 
-		std::vector<std::string> pointAttributeNames;
-		geometry->getAttrNames(pointAttributeNames);
+		const std::vector<std::string> pointAttributeNames = geometry->attributeNames();
 		for( const std::string &name : pointAttributeNames )
 		{
-			Attribute::Ptr sourceAttribute = geometry->getAttr(name);
+			Attribute::Ptr sourceAttribute = geometry->attribute(name);
 
 			// Houdini stores P as a four-component point position in this representation.
 			if( name == "P" && sourceAttribute->numComponents() == 3 )
 			{
-				Attribute::Ptr promotedAttribute = std::make_shared<Attribute>(4, Attribute::FLOAT);
+				Attribute::Ptr promotedAttribute = std::make_shared<Attribute>(
+					4, Attribute::ComponentType::float32);
 				const int elementCount = sourceAttribute->numElements();
 				for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
 				{
@@ -815,7 +817,7 @@ namespace houio
 			houdiniGeometry->setPointAttribute(houdiniAttribute);
 		}
 
-		if( geometry->numPrimitives() > 0 )
+		if( geometry->primitiveCount() > 0 )
 		{
 			HouGeo::HouTopology::Ptr topology = std::make_shared<HouGeo::HouTopology>();
 			const std::span<const Geometry::Index> geometry_indices = geometry->indexBuffer();
@@ -830,8 +832,8 @@ namespace houio
 
 			// The simplified Geometry model uses a fixed vertex count, so all polygons form one run.
 			HouGeo::HouPoly::Ptr polygon_run = std::make_shared<HouGeo::HouPoly>();
-			const int primitive_count = geometry->numPrimitives();
-			const int vertices_per_primitive = geometry->numPrimitiveVertices();
+			const int primitive_count = static_cast<int>(geometry->primitiveCount());
+			const int vertices_per_primitive = static_cast<int>(geometry->verticesPerPrimitive());
 			std::vector<int> vertex_offsets(static_cast<size_t>(primitive_count), 0);
 			for (int primitive_index = 1; primitive_index < primitive_count; ++primitive_index)
 			{
@@ -891,11 +893,11 @@ namespace houio
 
 			Attribute::Ptr attribute = Attribute::createV3f(elementCount);
 			const std::span<const std::byte> source_bytes = std::as_bytes(std::span(values));
-			std::span<std::byte> destination_bytes = attribute->bytes();
+			std::span<std::byte> destination_bytes = attribute->mutableBytes();
 			if (source_bytes.size() != destination_bytes.size())
 				throw std::runtime_error("HouGeoIO::exportPointAttributes byte size mismatch");
 			std::memcpy(destination_bytes.data(), source_bytes.data(), source_bytes.size());
-			geometry->setAttr(name, attribute);
+			geometry->setAttribute(name, attribute);
 		}
 
 		return exportGeometry(filename, geometry);
@@ -1054,11 +1056,13 @@ namespace houio
 
 		std::string attributeType;
 		std::string storageName;
-		const int sourceTupleSize = attribute->getTupleSize();
-		const std::string name = attribute->getName();
+		const HouGeoAdapter::AttributeAdapter::Type attribute_type = attribute->type();
+		const HouGeoAdapter::AttributeAdapter::Storage attribute_storage = attribute->storage();
+		const int sourceTupleSize = attribute->tupleSize();
+		const std::string name = attribute->name();
 		const bool promotePosition = name == "P" && sourceTupleSize == 3;
 		const int exportTupleSize = promotePosition ? 4 : sourceTupleSize;
-		const int elementCount = attribute->getNumElements();
+		const int elementCount = attribute->elementCount();
 		if (sourceTupleSize <= 0 || elementCount < 0)
 			throw std::runtime_error("HouGeoIO::exportAttribute: invalid element metadata for attribute " + name);
 		const size_t element_count = static_cast<size_t>(elementCount);
@@ -1067,27 +1071,27 @@ namespace houio
 			throw std::length_error("HouGeoIO::exportAttribute: scalar count overflow for attribute " + name);
 		const size_t scalar_count = element_count * tuple_size;
 
-		if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
+		if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric )
 			attributeType = "numeric";
-		else if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING )
+		else if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::string )
 			attributeType = "string";
-		else if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_DICT )
+		else if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::dictionary )
 			attributeType = "dict";
 		else
 			throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported type for attribute " + name );
 
-		if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+		if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 			storageName = "fpreal16";
-		else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+		else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float32 )
 			storageName = "fpreal32";
-		else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+		else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float64 )
 			storageName = "fpreal64";
-		else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
+		else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::int32 )
 			storageName = "int32";
-		else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
+		else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::int64 )
 			storageName = "int64";
 
-		if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC && storageName.empty() )
+		if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric && storageName.empty() )
 			throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported storage for attribute " + name );
 
 		if( name == "P" && exportTupleSize != 4 )
@@ -1108,7 +1112,7 @@ namespace houio
 		writer.jsonEndArray();
 
 		writer.jsonBeginArray();
-		if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_NUMERIC )
+		if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric )
 		{
 			writer.jsonString( "size" );
 			writer.jsonInt( exportTupleSize );
@@ -1132,7 +1136,7 @@ namespace houio
 			{
 				if (element_count > std::numeric_limits<size_t>::max() / 4u)
 					throw std::length_error("HouGeoIO::exportAttribute: promoted P size overflow");
-				if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+				if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 				{
 					const std::vector<uword> source = copyRawValues<uword>(
 						raw_data, scalar_count, "HouGeoIO::exportAttribute P");
@@ -1148,7 +1152,7 @@ namespace houio
 					}
 					writer.jsonUniformArrayReal16(std::span<const uword>(promotedData));
 				}
-				else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+				else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float32 )
 				{
 					const std::vector<real32> source = copyRawValues<real32>(
 						raw_data, scalar_count, "HouGeoIO::exportAttribute P");
@@ -1167,23 +1171,23 @@ namespace houio
 				else
 					throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported three-component P storage" );
 			}
-			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL16 )
+			else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 			{
 				const std::vector<uword> values = copyRawValues<uword>(raw_data, scalar_count, name);
 				writer.jsonUniformArrayReal16(std::span<const uword>(values));
 			}
-			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL32 )
+			else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float32 )
 				writer.jsonUniformArray(copyRawValues<real32>(raw_data, scalar_count, name));
-			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_FPREAL64 )
+			else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float64 )
 				writer.jsonUniformArray(copyRawValues<real64>(raw_data, scalar_count, name));
-			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT32 )
+			else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::int32 )
 				writer.jsonUniformArray(copyRawValues<sint32>(raw_data, scalar_count, name));
-			else if( attribute->getStorage() == HouGeoAdapter::AttributeAdapter::ATTR_STORAGE_INT64 )
+			else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::int64 )
 				writer.jsonUniformArray(copyRawValues<sint64>(raw_data, scalar_count, name));
 
 			writer.jsonEndArray();
 		}
-		else if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_STRING )
+		else if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::string )
 		{
 			writer.jsonString( "size" );
 			writer.jsonInt( exportTupleSize );
@@ -1197,7 +1201,7 @@ namespace houio
 			stringIndices.reserve(static_cast<size_t>(elementCount));
 			for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
 			{
-				const std::string value = attribute->getString(elementIndex);
+				const std::string value = attribute->stringValue(elementIndex);
 				auto insertion = stringLookup.emplace(value, static_cast<sint32>(stringTable.size()));
 				if( insertion.second )
 					stringTable.push_back(value);
@@ -1221,13 +1225,13 @@ namespace houio
 			writer.jsonString( "rawpagedata" );
 			writer.jsonUniformArray(stringIndices);
 			writer.jsonEndArray();
-		}else if( attribute->getType() == HouGeoAdapter::AttributeAdapter::ATTR_TYPE_DICT )
+		}else if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::dictionary )
 		{
 			std::vector<std::shared_ptr<json::Object>> dictionaries;
 			dictionaries.reserve(static_cast<size_t>(elementCount));
 			for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
 			{
-				std::shared_ptr<json::Object> dictionary = attribute->getDictionary(elementIndex);
+				std::shared_ptr<json::Object> dictionary = attribute->dictionaryValue(elementIndex);
 				if( !dictionary )
 					throw std::runtime_error( "HouGeoIO::exportAttribute: invalid dictionary data for attribute " + name );
 				dictionaries.push_back(std::move(dictionary));
@@ -1355,9 +1359,9 @@ namespace houio
 		writer.jsonString("transform");
 		const math::M44f volume_transform = volume->transform();
 		const math::M44f translation =
-			math::M44f::TranslationMatrix(volume_transform.getTranslation());
-		const math::M44f rotationScale = math::M44f::ScaleMatrix(0.5f)
-			* math::M44f::TranslationMatrix(1.0, 1.0, 1.0)
+			math::M44f::translationMatrix(volume_transform.translation());
+		const math::M44f rotationScale = math::M44f::scaleMatrix(0.5f)
+			* math::M44f::translationMatrix(1.0, 1.0, 1.0)
 			* volume_transform * translation.inverted();
 		const math::M33f transform( rotationScale.ma[0], rotationScale.ma[1], rotationScale.ma[2],
 			rotationScale.ma[4], rotationScale.ma[5], rotationScale.ma[6],

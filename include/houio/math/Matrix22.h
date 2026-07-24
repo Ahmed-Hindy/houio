@@ -1,9 +1,13 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
+#include <limits>
 #include <stdexcept>
+#include <utility>
 
 namespace houio::math
 {
@@ -17,25 +21,26 @@ namespace houio::math
         constexpr Matrix22() noexcept = default;
 
         constexpr Matrix22(
-            const T& value00,
-            const T& value01,
-            const T& value10,
-            const T& value11) noexcept
+            T value00,
+            T value01,
+            T value10,
+            T value11) noexcept
             : ma{value00, value01, value10, value11}
         {
         }
 
-        [[nodiscard]] static constexpr Matrix22 Zero() noexcept
+        [[nodiscard]] static constexpr Matrix22 zero() noexcept
         {
             return Matrix22{};
         }
 
-        [[nodiscard]] static constexpr Matrix22 Identity() noexcept
+        [[nodiscard]] static constexpr Matrix22 identity() noexcept
         {
             return Matrix22(T{1}, T{}, T{}, T{1});
         }
 
-        [[nodiscard]] static Matrix22 RotationMatrix(const T& angle)
+        [[nodiscard]] static Matrix22 rotation(T angle)
+            requires std::floating_point<T>
         {
             using std::cos;
             using std::sin;
@@ -68,13 +73,33 @@ namespace houio::math
             return result;
         }
 
-        void invert()
+        [[nodiscard]] constexpr T trace() const noexcept
         {
-            const T determinant = ma[0] * ma[3] - ma[1] * ma[2];
+            return ma[0] + ma[3];
+        }
+
+        [[nodiscard]] constexpr T determinant() const noexcept
+        {
+            return ma[0] * ma[3] - ma[1] * ma[2];
+        }
+
+        void invert()
+            requires std::floating_point<T>
+        {
             using std::abs;
-            if (abs(determinant) <= static_cast<T>(1.0e-12))
+            const T scale = std::max({
+                T{1},
+                static_cast<T>(abs(ma[0])),
+                static_cast<T>(abs(ma[1])),
+                static_cast<T>(abs(ma[2])),
+                static_cast<T>(abs(ma[3])),
+            });
+            const T determinant_value = determinant();
+            const T tolerance = std::numeric_limits<T>::epsilon() * scale * scale * T{16};
+            if (abs(determinant_value) <= tolerance)
                 throw std::domain_error("Matrix22 is singular");
-            const T reciprocal = T{1} / determinant;
+
+            const T reciprocal = T{1} / determinant_value;
             *this = Matrix22(
                 ma[3] * reciprocal,
                 -ma[1] * reciprocal,
@@ -82,9 +107,12 @@ namespace houio::math
                 ma[0] * reciprocal);
         }
 
-        [[nodiscard]] constexpr T trace() const noexcept
+        [[nodiscard]] Matrix22 inverted() const
+            requires std::floating_point<T>
         {
-            return ma[0] + ma[3];
+            Matrix22 result = *this;
+            result.invert();
+            return result;
         }
 
         [[nodiscard]] constexpr bool operator==(const Matrix22& rhs) const noexcept
@@ -111,28 +139,28 @@ namespace houio::math
             return *this;
         }
 
-        constexpr Matrix22& operator+=(const T& rhs) noexcept
+        constexpr Matrix22& operator+=(T rhs) noexcept
         {
             for (T& value : ma)
                 value += rhs;
             return *this;
         }
 
-        constexpr Matrix22& operator-=(const T& rhs) noexcept
+        constexpr Matrix22& operator-=(T rhs) noexcept
         {
             for (T& value : ma)
                 value -= rhs;
             return *this;
         }
 
-        constexpr Matrix22& operator*=(const T& rhs) noexcept
+        constexpr Matrix22& operator*=(T rhs) noexcept
         {
             for (T& value : ma)
                 value *= rhs;
             return *this;
         }
 
-        constexpr Matrix22& operator/=(const T& rhs)
+        constexpr Matrix22& operator/=(T rhs)
         {
             for (T& value : ma)
                 value /= rhs;
@@ -142,4 +170,6 @@ namespace houio::math
 
     using Matrix22f = Matrix22<float>;
     using Matrix22d = Matrix22<double>;
+    using M22f = Matrix22<float>;
+    using M22d = Matrix22<double>;
 }

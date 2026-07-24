@@ -1,6 +1,43 @@
-# Roadmap
+# Roadmap and Current Work
 
-This roadmap contains current work only. Completed migration history is intentionally omitted.
+The long-term roadmap remains below. The active modernization program is summarized first so completed work, validation state, and the immediate execution order are visible in one place. Detailed implementation steps are maintained in `implementation-plan.md`.
+
+## Active branch
+
+- Branch: `refactor/modernize-legacy-core`
+- Baseline commit: `16c485a`
+- Current exact source: MSVC warnings-as-errors suite passes **19/19**.
+- Current exact source: full Release/Houdini matrix passes **47/47**.
+- Current exact source: Windows AddressSanitizer matrix passes **19/19**.
+- Documentation audit contains no retired API references.
+- Linux GCC/UBSan and Clang/fuzzing CI remain pending until the branch checkpoint is pushed.
+
+## Modernization completed
+
+- [x] Modernize `Field<T>` access, storage, transforms, and call sites.
+- [x] Modernize `Geometry` attribute access and remove legacy forwarding methods.
+- [x] Add checked generator arithmetic and overflow tests.
+- [x] Modernize the JSON tree API and remove all legacy JSON compatibility methods.
+- [x] Make parser token dispatch non-null by construction.
+- [x] Restrict adapter compatibility aliases from public consumers.
+- [x] Modernize vector lengths, compound operators, and complete `Vec4` arithmetic.
+- [x] Replace legacy vector algorithm headers and correct reflection/basis behavior.
+- [x] Modernize bounding boxes, rays, color packing, angle conversion, and spherical conversion.
+- [x] Replace the legacy point-to-triangle algorithm and harden line/plane/range interpolation utilities.
+- [x] Add source-level guards for retired APIs and broaden math regression coverage.
+
+## Modernization next
+
+- [x] Complete `Matrix22`, `Matrix33`, and `Matrix44` core and algorithm modernization.
+- [x] Replace output-pointer matrix basis helpers with value-returning APIs.
+- [x] Migrate `HouGeoIO` off private adapter getter shims and remove adapter compatibility aliases.
+- [x] Replace the quadratic output-pointer API and audit `smoothstep`, RNG, and interpolation edge cases.
+- [x] Audit typed `Attribute` access for alignment and strict-aliasing safety.
+- [x] Add remaining container copy, resize, duplicate-point, and immutable-view tests.
+- [x] Rerun strict, Release/Houdini, and AddressSanitizer matrices locally.
+- [x] Update README examples and audit documentation for retired API names.
+- [ ] Create and push the checkpoint commit.
+- [ ] Verify Linux GCC/UBSan and Clang/fuzzing CI matrices.
 
 Priority levels:
 

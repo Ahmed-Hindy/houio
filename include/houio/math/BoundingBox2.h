@@ -1,111 +1,84 @@
-/*---------------------------------------------------------------------
-
-The BoundingBox2<T> class is a very simple utility class for working with
-axis aligned bounding boxes in 2d
-
-----------------------------------------------------------------------*/
 #pragma once
-#include "Math.h"
 
-namespace houio
+#include <algorithm>
+#include <limits>
+
+#include <houio/math/Vec2.h>
+
+namespace houio::math
 {
+    template<typename T>
+    struct BoundingBox2
+    {
+        Vec2<T> minPoint;
+        Vec2<T> maxPoint;
 
-namespace math
-{
-	///
-	/// \brief The BoundingBox2<T> class is a very simple utility class for working
-	/// with axis aligned bounding boxes
-	///
-	template<typename T>
-	struct BoundingBox2
-	{
-		BoundingBox2();                                                        ///< constructor
-		BoundingBox2( math::Vec2<T> _minPoint, math::Vec2<T> _maxPoint );          ///< constructor
+        constexpr BoundingBox2() noexcept
+        {
+            reset();
+        }
 
-		math::Vec2<T>                                          size( void ) const;  ///< returns a vector which represents the dimension in each axis
-		void                             extend( const math::Vec2<T> &nextPoint );  ///< adobts the bounding borders if neccessary so that the given point lies within the bounding box
-		math::Vec2<T>                                     getCenter( void ) const;  ///< returns the geometrical center of the box
-		bool                         encloses( const math::Vec2<T> &point ) const;  ///< this utility function checks wether the given point is within the volume descripted by the bounding box
-		bool encloses( const math::Vec2<T> &min, const math::Vec2<T> &max ) const;  ///< this utility function checks wether the given box is within the volume descripted by the bounding box
+        constexpr BoundingBox2(Vec2<T> minimum, Vec2<T> maximum) noexcept
+            : minPoint(minimum), maxPoint(maximum)
+        {
+        }
 
-		math::Vec2<T>                                                    minPoint;  ///< the position of all lowends for each axis
-		math::Vec2<T>                                                    maxPoint;  ///< the position of all highends for each axis
-	};
+        [[nodiscard]] constexpr Vec2<T> size() const noexcept
+        {
+            return maxPoint - minPoint;
+        }
 
+        [[nodiscard]] constexpr Vec2<T> center() const noexcept
+        {
+            return Vec2<T>(
+                minPoint.x + (maxPoint.x - minPoint.x) / static_cast<T>(2),
+                minPoint.y + (maxPoint.y - minPoint.y) / static_cast<T>(2));
+        }
 
+        [[nodiscard]] constexpr bool empty() const noexcept
+        {
+            return minPoint.x >= maxPoint.x || minPoint.y >= maxPoint.y;
+        }
 
-	// constructor
-	template<typename T>
-	BoundingBox2<T>::BoundingBox2()
-	{
-		minPoint = math::Vec2<T>( (T)99999999999.0, (T)99999999999.0 );
-		maxPoint = math::Vec2<T>( (T)-99999999999.0, (T)-99999999999.0 );
-	}
+        constexpr void reset() noexcept
+        {
+            const T maximum = std::numeric_limits<T>::max();
+            const T minimum = std::numeric_limits<T>::lowest();
+            minPoint = Vec2<T>(maximum);
+            maxPoint = Vec2<T>(minimum);
+        }
 
-	// constructor
-	template<typename T>
-	BoundingBox2<T>::BoundingBox2( math::Vec2<T> _minPoint, math::Vec2<T> _maxPoint )
-	{
-		minPoint = _minPoint;
-		maxPoint = _maxPoint;
-	}
+        constexpr void extend(const Vec2<T>& point) noexcept
+        {
+            minPoint.x = std::min(minPoint.x, point.x);
+            minPoint.y = std::min(minPoint.y, point.y);
+            maxPoint.x = std::max(maxPoint.x, point.x);
+            maxPoint.y = std::max(maxPoint.y, point.y);
+        }
 
-	// returns a vector which represents the dimension in each axis
-	template<typename T>
-	math::Vec2<T> BoundingBox2<T>::size( void ) const
-	{
-		return math::Vec2<T>( maxPoint - minPoint );
-	}
+        constexpr void extend(const BoundingBox2& bounds) noexcept
+        {
+            extend(bounds.minPoint);
+            extend(bounds.maxPoint);
+        }
 
-	// adobts the bounding borders if neccessary so that the given point lies within
-	// the bounding box
-	template<typename T>
-	void BoundingBox2<T>::extend( const math::Vec2<T> &nextPoint )
-	{
-		if( nextPoint.x > maxPoint.x )
-			maxPoint.x = nextPoint.x;
-		if( nextPoint.y > maxPoint.y )
-			maxPoint.y = nextPoint.y;
+        [[nodiscard]] constexpr bool encloses(const Vec2<T>& point) const noexcept
+        {
+            return point.x > minPoint.x && point.x < maxPoint.x
+                && point.y > minPoint.y && point.y < maxPoint.y;
+        }
 
-		if( nextPoint.x < minPoint.x )
-			minPoint.x = nextPoint.x;
-		if( nextPoint.y < minPoint.y )
-			minPoint.y = nextPoint.y;
-	}
+        [[nodiscard]] constexpr bool encloses(
+            const Vec2<T>& minimum,
+            const Vec2<T>& maximum) const noexcept
+        {
+            return minimum.x >= minPoint.x && minimum.y >= minPoint.y
+                && maximum.x <= maxPoint.x && maximum.y <= maxPoint.y;
+        }
+    };
 
-
-	// returns the geometrical center of the box
-	template<typename T>
-	math::Vec2<T> BoundingBox2<T>::getCenter( void ) const
-	{
-		return (minPoint + maxPoint)*(T)0.5;
-	}
-
-	// this utility function checks wether the given point
-	// is within the volume descripted by the bounding box
-	template<typename T>
-	bool BoundingBox2<T>::encloses( const math::Vec2<T> &point ) const
-	{
-		// check each dimension
-		if( (point.x > minPoint.x)&&(point.x < maxPoint.x)&&
-			(point.y > minPoint.y)&&(point.y < maxPoint.y))
-			return true;
-		else
-			return false;
-	}
-
-	// this utility function checks wether the given box
-	// is within the volume descripted by the bounding box
-	template<typename T>
-	bool BoundingBox2<T>::encloses( const math::Vec2<T> &min, const math::Vec2<T> &max ) const
-	{
-		// check each dimension for each point
-		if( (min.x >= minPoint.x)&&(min.y >= minPoint.y)&&
-			(max.x <= maxPoint.x)&&(max.y <= maxPoint.y))
-			return true;
-		else
-			return false;
-	}
+    using BoundingBox2f = BoundingBox2<float>;
+    using BoundingBox2d = BoundingBox2<double>;
+    using Box2f = BoundingBox2<float>;
+    using Box2d = BoundingBox2<double>;
 }
-
-} // namespace houio

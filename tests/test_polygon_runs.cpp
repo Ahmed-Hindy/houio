@@ -236,10 +236,10 @@ int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
         return fail("global dictionary attribute metadata was not preserved");
     }
     const auto dictionary = settings->dictionaryValues().front();
-    const auto emptySetting = dictionary->getObject("empty");
-    const auto countSetting = dictionary->getObject("count");
-    const auto rangeSetting = dictionary->getObject("range");
-    const auto rangeValues = rangeSetting ? rangeSetting->getArray("value") : houio::json::ArrayPtr();
+    const auto emptySetting = dictionary->object("empty");
+    const auto countSetting = dictionary->object("count");
+    const auto rangeSetting = dictionary->object("range");
+    const auto rangeValues = rangeSetting ? rangeSetting->array("value") : houio::json::ArrayPtr();
     if (!emptySetting || emptySetting->get<std::string>("value") != ""
         || !countSetting || countSetting->get<int>("value") != 3
         || !rangeValues || rangeValues->size() != 2

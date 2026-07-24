@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstddef>
 #include <ostream>
 #include <stdexcept>
 #include <type_traits>
@@ -16,16 +17,13 @@ namespace houio::math
         T w{};
 
         constexpr Vec4() noexcept = default;
-        constexpr Vec4(
-            const T& x_value,
-            const T& y_value,
-            const T& z_value,
-            const T& w_value) noexcept
+
+        constexpr Vec4(T x_value, T y_value, T z_value, T w_value) noexcept
             : x(x_value), y(y_value), z(z_value), w(w_value)
         {
         }
 
-        explicit constexpr Vec4(const T& value) noexcept
+        explicit constexpr Vec4(T value) noexcept
             : x(value), y(value), z(value), w(value)
         {
         }
@@ -37,6 +35,56 @@ namespace houio::math
               z(static_cast<T>(value.z)),
               w(static_cast<T>(value.w))
         {
+        }
+
+        constexpr void set(T x_value, T y_value, T z_value, T w_value) noexcept
+        {
+            x = x_value;
+            y = y_value;
+            z = z_value;
+            w = w_value;
+        }
+
+        [[nodiscard]] T length() const
+        {
+            using std::sqrt;
+            return static_cast<T>(sqrt(squaredLength()));
+        }
+
+        [[nodiscard]] constexpr T squaredLength() const noexcept
+        {
+            return x * x + y * y + z * z + w * w;
+        }
+
+        void setLength(T requested_length)
+        {
+            normalize();
+            *this *= requested_length;
+        }
+
+        void normalize()
+        {
+            const T current_length = length();
+            if (current_length != T{})
+                *this /= current_length;
+        }
+
+        [[nodiscard]] Vec4 normalized() const
+        {
+            const T current_length = length();
+            return current_length == T{} ? Vec4{} : Vec4(
+                x / current_length,
+                y / current_length,
+                z / current_length,
+                w / current_length);
+        }
+
+        constexpr void negate() noexcept
+        {
+            x = -x;
+            y = -y;
+            z = -z;
+            w = -w;
         }
 
         [[nodiscard]] constexpr bool operator==(const Vec4& rhs) const noexcept
@@ -57,7 +105,61 @@ namespace houio::math
             return !(*this == rhs);
         }
 
-        [[nodiscard]] constexpr const T& operator[](int index) const
+        constexpr Vec4& operator+=(const Vec4& rhs) noexcept
+        {
+            x += rhs.x;
+            y += rhs.y;
+            z += rhs.z;
+            w += rhs.w;
+            return *this;
+        }
+
+        constexpr Vec4& operator-=(const Vec4& rhs) noexcept
+        {
+            x -= rhs.x;
+            y -= rhs.y;
+            z -= rhs.z;
+            w -= rhs.w;
+            return *this;
+        }
+
+        constexpr Vec4& operator+=(T rhs) noexcept
+        {
+            x += rhs;
+            y += rhs;
+            z += rhs;
+            w += rhs;
+            return *this;
+        }
+
+        constexpr Vec4& operator-=(T rhs) noexcept
+        {
+            x -= rhs;
+            y -= rhs;
+            z -= rhs;
+            w -= rhs;
+            return *this;
+        }
+
+        constexpr Vec4& operator*=(T rhs) noexcept
+        {
+            x *= rhs;
+            y *= rhs;
+            z *= rhs;
+            w *= rhs;
+            return *this;
+        }
+
+        constexpr Vec4& operator/=(T rhs)
+        {
+            x /= rhs;
+            y /= rhs;
+            z /= rhs;
+            w /= rhs;
+            return *this;
+        }
+
+        [[nodiscard]] constexpr const T& operator[](std::size_t index) const
         {
             if (index == 0)
                 return x;
@@ -70,7 +172,7 @@ namespace houio::math
             throw std::out_of_range("Vec4 index is out of range");
         }
 
-        [[nodiscard]] constexpr T& operator[](int index)
+        [[nodiscard]] constexpr T& operator[](std::size_t index)
         {
             if (index == 0)
                 return x;

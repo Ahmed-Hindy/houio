@@ -53,7 +53,8 @@ int verifyBoundsChecks()
 
     try
     {
-        houio::Attribute invalidAttribute(0, houio::Attribute::FLOAT);
+        houio::Attribute invalidAttribute(
+            0, houio::Attribute::ComponentType::float32);
         return fail("Attribute accepted zero components");
     }
     catch (const std::invalid_argument&)
@@ -64,7 +65,7 @@ int verifyBoundsChecks()
     {
         static_cast<void>(houio::Attribute::create(
             1,
-            houio::Attribute::FLOAT,
+            houio::Attribute::ComponentType::float32,
             std::span<const std::byte>(),
             1));
         return fail("Attribute::create accepted mismatched non-empty storage");
@@ -107,6 +108,40 @@ int verifySafeTypedAccess()
     catch (const std::invalid_argument&)
     {
     }
+    try
+    {
+        static_cast<void>(attribute->get<houio::math::Vec3i>(0));
+        return fail("typed read accepted a same-size tuple with the wrong scalar type");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+
+    attribute->markClean();
+    const std::span<const std::byte> immutable_bytes = attribute->bytes();
+    if (attribute->isDirty() || immutable_bytes.size() != attribute->byteSize())
+        return fail("immutable byte access changed dirty state or byte count");
+
+    std::span<std::byte> mutable_bytes = attribute->mutableBytes();
+    if (!attribute->isDirty() || mutable_bytes.size() != attribute->byteSize())
+        return fail("mutable byte access did not mark the attribute dirty");
+
+    attribute->markClean();
+    std::span<std::byte> mutable_element = attribute->mutableElementBytes(0);
+    if (!attribute->isDirty() || mutable_element.size() != attribute->elementByteSize())
+        return fail("mutable element access did not mark the attribute dirty");
+
+    houio::Attribute::Ptr scalar_attribute = houio::Attribute::createFloat();
+    try
+    {
+        scalar_attribute->appendElement<houio::sint32>(1);
+        return fail("typed append accepted a same-size scalar with the wrong component type");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+    if (scalar_attribute->numElements() != 0)
+        return fail("rejected typed append changed the attribute");
     return 0;
 }
 
@@ -142,6 +177,30 @@ int verifyCopyAppendAndDuplicate()
     catch (const std::invalid_argument&)
     {
     }
+
+    destination->markClean();
+    destination->resize(5);
+    if (!destination->isDirty()
+        || destination->numElements() != 5
+        || destination->get<houio::sint32>(0) != 10
+        || destination->get<houio::sint32>(3) != 0
+        || destination->get<houio::sint32>(4) != 0)
+    {
+        return fail("Attribute growth did not preserve values or zero new storage");
+    }
+    destination->resize(1);
+    if (destination->numElements() != 1
+        || destination->get<houio::sint32>(0) != 10)
+    {
+        return fail("Attribute shrink did not preserve the retained prefix");
+    }
+
+    const houio::math::Matrix33f matrix = houio::math::Matrix33f::rotation(
+        houio::math::Vec3f(0.0f, 0.0f, 1.0f), 0.5f);
+    houio::Attribute::Ptr matrix_attribute = houio::Attribute::createM33f();
+    matrix_attribute->appendElement(matrix);
+    if (matrix_attribute->get<houio::math::Matrix33f>(0) != matrix)
+        return fail("Attribute matrix layout did not round-trip exactly");
     return 0;
 }
 }

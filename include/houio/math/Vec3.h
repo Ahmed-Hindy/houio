@@ -39,13 +39,13 @@ namespace houio::math
             z = z_value;
         }
 
-        [[nodiscard]] T getLength() const
+        [[nodiscard]] T length() const
         {
             using std::sqrt;
             return static_cast<T>(sqrt(x * x + y * y + z * z));
         }
 
-        [[nodiscard]] constexpr T getSquaredLength() const noexcept
+        [[nodiscard]] constexpr T squaredLength() const noexcept
         {
             return x * x + y * y + z * z;
         }
@@ -60,7 +60,7 @@ namespace houio::math
 
         void normalize()
         {
-            const T length = getLength();
+            const T length = this->length();
             if (length != T{})
             {
                 x /= length;
@@ -71,7 +71,7 @@ namespace houio::math
 
         [[nodiscard]] Vec3 normalized() const
         {
-            const T length = getLength();
+            const T length = this->length();
             return length == T{} ? Vec3{} : Vec3(x / length, y / length, z / length);
         }
 
@@ -82,15 +82,13 @@ namespace houio::math
             z = -z;
         }
 
-        void reflect(const Vec3& normal)
+        void reflect(const Vec3& normal) noexcept
         {
-            normalize();
-            const Vec3 original(x, y, z);
-            const T scale = static_cast<T>(2) * (
-                normal.x * x + normal.y * y + normal.z * z);
-            x = normal.x * scale - original.x;
-            y = normal.y * scale - original.y;
-            z = normal.z * scale - original.z;
+            const T scale = static_cast<T>(2)
+                * (normal.x * x + normal.y * y + normal.z * z);
+            x -= normal.x * scale;
+            y -= normal.y * scale;
+            z -= normal.z * scale;
         }
 
         [[nodiscard]] constexpr bool operator==(const Vec3& rhs) const noexcept
@@ -110,55 +108,55 @@ namespace houio::math
             return !(*this == rhs);
         }
 
-        constexpr bool operator+=(const Vec3& rhs) noexcept
+        constexpr Vec3& operator+=(const Vec3& rhs) noexcept
         {
             x += rhs.x;
             y += rhs.y;
             z += rhs.z;
-            return true;
+            return *this;
         }
 
-        constexpr bool operator-=(const Vec3& rhs) noexcept
+        constexpr Vec3& operator-=(const Vec3& rhs) noexcept
         {
             x -= rhs.x;
             y -= rhs.y;
             z -= rhs.z;
-            return true;
+            return *this;
         }
 
-        constexpr bool operator+=(const T& rhs) noexcept
+        constexpr Vec3& operator+=(const T& rhs) noexcept
         {
             x += rhs;
             y += rhs;
             z += rhs;
-            return true;
+            return *this;
         }
 
-        constexpr bool operator-=(const T& rhs) noexcept
+        constexpr Vec3& operator-=(const T& rhs) noexcept
         {
             x -= rhs;
             y -= rhs;
             z -= rhs;
-            return true;
+            return *this;
         }
 
-        constexpr bool operator*=(const T& rhs) noexcept
+        constexpr Vec3& operator*=(const T& rhs) noexcept
         {
             x *= rhs;
             y *= rhs;
             z *= rhs;
-            return true;
+            return *this;
         }
 
-        constexpr bool operator/=(const T& rhs)
+        constexpr Vec3& operator/=(const T& rhs)
         {
             x /= rhs;
             y /= rhs;
             z /= rhs;
-            return true;
+            return *this;
         }
 
-        [[nodiscard]] constexpr const T& operator[](int index) const
+        [[nodiscard]] constexpr const T& operator[](std::size_t index) const
         {
             if (index == 0)
                 return x;
@@ -169,7 +167,7 @@ namespace houio::math
             throw std::out_of_range("Vec3 index is out of range");
         }
 
-        [[nodiscard]] constexpr T& operator[](int index)
+        [[nodiscard]] constexpr T& operator[](std::size_t index)
         {
             if (index == 0)
                 return x;
