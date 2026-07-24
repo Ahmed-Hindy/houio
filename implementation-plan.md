@@ -58,7 +58,8 @@ Every phase must preserve these constraints:
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Documentation audit contains no retired API references.
-- Linux GCC/UBSan and Clang/fuzzing CI remain pending until the branch checkpoint is pushed.
+- CI run `30082459984` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
+- CI reports non-failing Node.js deprecation annotations for `ilammy/msvc-dev-cmd@v1`; action maintenance is tracked separately.
 
 ## Execution phases
 
@@ -168,18 +169,18 @@ Exit criteria:
 
 ### Phase 5 — Full validation and documentation
 
-**Status: in progress. Local validation and documentation audit are complete; CI and checkpoint finalization remain.**
+**Status: complete.**
 
 Tasks:
 
 - [x] Run MSVC warnings-as-errors: **19/19**.
 - [x] Run full Release/Houdini matrix: **47/47**.
 - [x] Run Windows AddressSanitizer: **19/19**.
-- [ ] Run CI Linux GCC/UBSan and Clang/fuzzing jobs.
+- [x] Run CI Linux GCC/UBSan and Clang/fuzzing jobs.
 - [x] Review the complete diff for whitespace errors and stale compatibility references.
 - [x] Update README examples and API references.
 - [x] Update `todo.md` with current status and remaining backlog.
-- [ ] Create a focused checkpoint commit, push the branch, and verify CI.
+- [x] Create checkpoint `da14f8f`, push the branch, and verify CI run `30082459984`.
 
 Exit criteria:
 
