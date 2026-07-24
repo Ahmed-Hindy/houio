@@ -19,6 +19,7 @@ public:
         label->appendValue("value", std::string("adapter"));
         dictionary_ = houio::json::Object::create();
         dictionary_->append("label", label);
+        dictionary_->append("missing", houio::json::Value{});
     }
 
     std::string name() const override
@@ -164,8 +165,11 @@ int verifyAdapterDictionaryExport()
                                 : std::shared_ptr<houio::json::Object>();
     auto label = dictionary ? dictionary->object("label")
                             : std::shared_ptr<houio::json::Object>();
-    if (!label || label->get<std::string>("value") != "adapter")
+    if (!label || label->get<std::string>("value") != "adapter"
+        || !dictionary->contains("missing") || !dictionary->value("missing").isNull())
+    {
         return fail("abstract adapter dictionary value changed during export");
+    }
     return 0;
 }
 
