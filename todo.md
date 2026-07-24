@@ -9,8 +9,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
-- Branch CI is pending.
-- The merged modernization CI reported non-failing Node.js deprecation annotations for `ilammy/msvc-dev-cmd@v1`.
+- Branch CI run `30087208906` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
+- CI reports non-failing Node.js deprecation annotations for `ilammy/msvc-dev-cmd@v1`.
 
 ## Modernization completed
 
@@ -27,6 +27,9 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add source-level guards for retired APIs and broaden math regression coverage.
 - [x] Complete binary JSON scalar-token, length-width, string-token, uniform-array, and null round-trip coverage.
 - [x] Add packed-bool and UInt16 uniform-array writer/reader support.
+- [x] Preserve parsed uniform arrays when serializing JSON trees.
+- [x] Serialize signed and unsigned 8-bit ASCII values numerically.
+- [x] Preserve null values in exported adapter dictionaries.
 
 ## Modernization next
 
