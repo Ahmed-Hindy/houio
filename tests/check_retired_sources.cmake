@@ -323,6 +323,14 @@ foreach(retired_pattern IN ITEMS
     endif()
 endforeach()
 
+file(READ "${HOUIO_SOURCE_DIR}/include/houio/json.h" json_header)
+foreach(unscoped_pattern IN ITEMS "enum Type" "enum State")
+    string(FIND "${json_header}" "${unscoped_pattern}" unscoped_position)
+    if(NOT unscoped_position EQUAL -1)
+        message(FATAL_ERROR "JSON API reintroduced unscoped enum ${unscoped_pattern}")
+    endif()
+endforeach()
+
 file(GLOB test_sources LIST_DIRECTORIES FALSE "${HOUIO_SOURCE_DIR}/tests/*.cpp")
 foreach(file_path IN LISTS test_sources)
     file(READ "${file_path}" test_content)

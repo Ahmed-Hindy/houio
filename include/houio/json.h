@@ -65,35 +65,61 @@ namespace houio
 
 		struct Token
 		{
-			enum Type
+			enum class Type : ubyte
 			{
-				// JSON identifiers used in binary encoding and parsing
-				JID_NULL                = 0x00,
-				JID_MAP_BEGIN           = 0x7b, // '{'
-				JID_MAP_END             = 0x7d, // '}'
-				JID_ARRAY_BEGIN         = 0x5b, // '['
-				JID_ARRAY_END           = 0x5d, // ']'
-				JID_BOOL                = 0x10,
-				JID_INT8                = 0x11,
-				JID_INT16               = 0x12,
-				JID_INT32               = 0x13,
-				JID_INT64               = 0x14,
-				JID_REAL16              = 0x18,
-				JID_REAL32              = 0x19,
-				JID_REAL64              = 0x1a,
-				JID_UINT8               = 0x21,
-				JID_UINT16              = 0x22,
-				JID_STRING              = 0x27,
-				JID_FALSE               = 0x30,
-				JID_TRUE                = 0x31,
-				JID_TOKENDEF            = 0x2b, // triggers on-the-fly string definition
-				JID_TOKENREF            = 0x26, // references a previous defined string
-				JID_TOKENUNDEF          = 0x2d,
-				JID_UNIFORM_ARRAY       = 0x40,
-				JID_KEY_SEPARATOR       = 0x3a,
-				JID_VALUE_SEPARATOR     = 0x2c,
-				JID_MAGIC               = 0x7f
+				nullValue = 0x00,
+				mapBegin = 0x7b,
+				mapEnd = 0x7d,
+				arrayBegin = 0x5b,
+				arrayEnd = 0x5d,
+				boolean = 0x10,
+				int8 = 0x11,
+				int16 = 0x12,
+				int32 = 0x13,
+				int64 = 0x14,
+				real16 = 0x18,
+				real32 = 0x19,
+				real64 = 0x1a,
+				uint8 = 0x21,
+				uint16 = 0x22,
+				string = 0x27,
+				falseValue = 0x30,
+				trueValue = 0x31,
+				tokenDefinition = 0x2b,
+				tokenReference = 0x26,
+				tokenUndefinition = 0x2d,
+				uniformArray = 0x40,
+				keySeparator = 0x3a,
+				valueSeparator = 0x2c,
+				magic = 0x7f
 			};
+
+			// Stable binary-token names retained for source compatibility.
+			static constexpr Type JID_NULL = Type::nullValue;
+			static constexpr Type JID_MAP_BEGIN = Type::mapBegin;
+			static constexpr Type JID_MAP_END = Type::mapEnd;
+			static constexpr Type JID_ARRAY_BEGIN = Type::arrayBegin;
+			static constexpr Type JID_ARRAY_END = Type::arrayEnd;
+			static constexpr Type JID_BOOL = Type::boolean;
+			static constexpr Type JID_INT8 = Type::int8;
+			static constexpr Type JID_INT16 = Type::int16;
+			static constexpr Type JID_INT32 = Type::int32;
+			static constexpr Type JID_INT64 = Type::int64;
+			static constexpr Type JID_REAL16 = Type::real16;
+			static constexpr Type JID_REAL32 = Type::real32;
+			static constexpr Type JID_REAL64 = Type::real64;
+			static constexpr Type JID_UINT8 = Type::uint8;
+			static constexpr Type JID_UINT16 = Type::uint16;
+			static constexpr Type JID_STRING = Type::string;
+			static constexpr Type JID_FALSE = Type::falseValue;
+			static constexpr Type JID_TRUE = Type::trueValue;
+			static constexpr Type JID_TOKENDEF = Type::tokenDefinition;
+			static constexpr Type JID_TOKENREF = Type::tokenReference;
+			static constexpr Type JID_TOKENUNDEF = Type::tokenUndefinition;
+			static constexpr Type JID_UNIFORM_ARRAY = Type::uniformArray;
+			static constexpr Type JID_KEY_SEPARATOR = Type::keySeparator;
+			static constexpr Type JID_VALUE_SEPARATOR = Type::valueSeparator;
+			static constexpr Type JID_MAGIC = Type::magic;
 
 			using Value = std::variant<
 				bool,
@@ -205,21 +231,32 @@ namespace houio
 
 		struct Parser
 		{
-			enum State
+			enum class State : int
 			{
-				// Parsing states
-				STATE_INVALID           = -1,
-				STATE_START             = 0,
-				STATE_COMPLETE          = 1,
-				STATE_MAP_START         = 2,
-				STATE_MAP_SEPERATOR     = 3,
-				STATE_MAP_NEED_VALUE    = 4,
-				STATE_MAP_GOT_VALUE     = 5,
-				STATE_MAP_NEED_KEY      = 6,
-				STATE_ARRAY_START       = 7,
-				STATE_ARRAY_NEED_VALUE  = 8,
-				STATE_ARRAY_GOT_VALUE   = 9
+				invalid = -1,
+				start = 0,
+				complete = 1,
+				mapStart = 2,
+				mapSeparator = 3,
+				mapNeedValue = 4,
+				mapGotValue = 5,
+				mapNeedKey = 6,
+				arrayStart = 7,
+				arrayNeedValue = 8,
+				arrayGotValue = 9
 			};
+
+			static constexpr State STATE_INVALID = State::invalid;
+			static constexpr State STATE_START = State::start;
+			static constexpr State STATE_COMPLETE = State::complete;
+			static constexpr State STATE_MAP_START = State::mapStart;
+			static constexpr State STATE_MAP_SEPERATOR = State::mapSeparator;
+			static constexpr State STATE_MAP_NEED_VALUE = State::mapNeedValue;
+			static constexpr State STATE_MAP_GOT_VALUE = State::mapGotValue;
+			static constexpr State STATE_MAP_NEED_KEY = State::mapNeedKey;
+			static constexpr State STATE_ARRAY_START = State::arrayStart;
+			static constexpr State STATE_ARRAY_NEED_VALUE = State::arrayNeedValue;
+			static constexpr State STATE_ARRAY_GOT_VALUE = State::arrayGotValue;
 
 			Parser();
 			explicit Parser( const ParserLimits &limits );
