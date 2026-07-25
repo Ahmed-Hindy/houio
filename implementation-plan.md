@@ -2,7 +2,7 @@
 
 ## Scope
 
-This plan tracks the staged modernization work through branch `maintenance/modernization-audit`, based on `origin/master` commit `b13bdbd` and stacked Phases 11–13.
+This plan tracks the staged modernization work through branch `refactor/remove-opengl-buffer-state`, based on `origin/master` commit `b13bdbd` and stacked Phases 11–14.
 
 The objective is to modernize the retained HouIO core without changing supported file-format behavior, Houdini interoperability, package layout, or documented row-vector matrix semantics. Compatibility aliases are removed only after every in-tree caller has migrated and regression guards are in place.
 
@@ -406,7 +406,7 @@ Exit criteria:
 
 ### Phase 14 — Modernization audit closure
 
-**Status: complete locally; active branch.**
+**Status: complete locally; PR #28 open and stacked on #27.**
 
 Target files:
 
@@ -427,6 +427,31 @@ Exit criteria:
 - The roadmap distinguishes completed audits from genuine redesign and compatibility work.
 - Source checks fail if the closed legacy patterns return.
 - All validation matrices pass.
+
+### Phase 15 — Remove OpenGL-specific core state
+
+**Status: complete locally; active branch.**
+
+Target files:
+
+- `include/houio/Geometry.h`
+- active core source audit
+- `tests/check_retired_sources.cmake`
+- roadmap documents
+
+Tasks:
+
+- Verify the retained geometry container exposes only format-neutral topology and attribute storage.
+- Confirm no OpenGL headers, `GLuint` identifiers, buffer targets, or buffer lifecycle calls remain in active core code.
+- Keep the existing `indexBuffer()` API because it represents CPU-side mesh topology rather than a graphics-resource identifier.
+- Add source-level guards against reintroducing OpenGL-specific buffer ownership into the file-format library.
+- Close the stale data-model roadmap entry without adding an optional rendering dependency.
+
+Exit criteria:
+
+- The core library remains rendering-API independent.
+- CPU-side topology naming is not incorrectly treated as graphics-resource state.
+- Regression guards and all validation matrices pass.
 
 ## Deferred work
 

@@ -78,6 +78,21 @@ foreach(file_path IN LISTS active_sources)
     if(NOT half_reference EQUAL -1)
         message(FATAL_ERROR "Active source references retired half code: ${file_path}")
     endif()
+
+    foreach(opengl_pattern IN ITEMS
+        "#include <GL/"
+        "#include <OpenGL/"
+        "GLuint"
+        "GL_ARRAY_BUFFER"
+        "glGenBuffers("
+        "glDeleteBuffers("
+        "glBindBuffer("
+    )
+        string(FIND "${file_content}" "${opengl_pattern}" opengl_reference)
+        if(NOT opengl_reference EQUAL -1)
+            message(FATAL_ERROR "Core source reintroduced OpenGL-specific buffer state ${opengl_pattern}: ${file_path}")
+        endif()
+    endforeach()
 endforeach()
 
 file(GLOB_RECURSE public_headers LIST_DIRECTORIES FALSE
