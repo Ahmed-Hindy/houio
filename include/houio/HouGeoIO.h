@@ -44,11 +44,11 @@ namespace houio
         // and domain-consistent attributes. Vertex attributes are flattened to
         // points by duplicating points where values differ.
         [[nodiscard]] static Geometry::Ptr convertToGeometry(
-            HouGeo::Ptr houdini_geometry,
-            HouGeoAdapter::Primitive::Ptr primitive);
+            HouGeo::ConstPtr houdini_geometry,
+            HouGeoAdapter::Primitive::ConstPtr primitive);
         [[nodiscard]] static Geometry::Ptr convertToGeometry(
-            HouGeo::Ptr houdini_geometry,
-            HouGeoAdapter::Primitive::Ptr primitive,
+            HouGeo::ConstPtr houdini_geometry,
+            HouGeoAdapter::Primitive::ConstPtr primitive,
             DiagnosticList* diagnostics);
 
         [[nodiscard]] static bool exportVolume(
@@ -59,7 +59,7 @@ namespace houio
             Geometry::Ptr geometry);
         [[nodiscard]] static bool exportGeometry(
             std::ostream& output,
-            HouGeoAdapter::Ptr geometry,
+            HouGeoAdapter::ConstPtr geometry,
             bool binary = true);
         [[nodiscard]] static bool exportPoints(
             const std::string& filename,
@@ -87,16 +87,16 @@ namespace houio
 
         static bool exportAttribute(
             ExportContext& context,
-            HouGeoAdapter::AttributeAdapter::Ptr attribute);
+            HouGeoAdapter::AttributeAdapter::ConstPtr attribute);
         static bool exportTopology(
             ExportContext& context,
-            HouGeoAdapter::Topology::Ptr topology);
+            HouGeoAdapter::Topology::ConstPtr topology);
         static bool exportPrimitive(
             ExportContext& context,
-            HouGeoAdapter::VolumePrimitive::Ptr volume);
+            HouGeoAdapter::VolumePrimitive::ConstPtr volume);
         static bool exportPrimitive(
             ExportContext& context,
-            HouGeoAdapter::PolyPrimitive::Ptr polygon_run,
+            HouGeoAdapter::PolyPrimitive::ConstPtr polygon_run,
             int start_vertex);
         static bool exportGroup(
             ExportContext& context,

@@ -177,12 +177,20 @@ namespace houio
         [[nodiscard]] virtual sint64 primitiveCount() const;
         [[nodiscard]] virtual std::vector<std::string> pointAttributeNames() const;
         [[nodiscard]] virtual AttributeAdapter::Ptr pointAttribute(const std::string& name);
+        [[nodiscard]] virtual AttributeAdapter::ConstPtr pointAttribute(
+            const std::string& name) const;
         [[nodiscard]] virtual std::vector<std::string> vertexAttributeNames() const;
         [[nodiscard]] virtual AttributeAdapter::Ptr vertexAttribute(const std::string& name);
+        [[nodiscard]] virtual AttributeAdapter::ConstPtr vertexAttribute(
+            const std::string& name) const;
         [[nodiscard]] virtual std::vector<std::string> globalAttributeNames() const;
         [[nodiscard]] virtual AttributeAdapter::Ptr globalAttribute(const std::string& name);
+        [[nodiscard]] virtual AttributeAdapter::ConstPtr globalAttribute(
+            const std::string& name) const;
         [[nodiscard]] virtual std::vector<std::string> primitiveAttributeNames() const = 0;
         [[nodiscard]] virtual AttributeAdapter::Ptr primitiveAttribute(const std::string& name) = 0;
+        [[nodiscard]] virtual AttributeAdapter::ConstPtr primitiveAttribute(
+            const std::string& name) const = 0;
         [[nodiscard]] virtual std::vector<std::string> pointGroupNames() const;
         [[nodiscard]] virtual std::optional<std::vector<bool>> pointGroupMembership(
             const std::string& name) const;
@@ -194,6 +202,8 @@ namespace houio
             const std::string& name) const;
         [[nodiscard]] virtual bool hasPrimitiveAttribute(const std::string& name) const;
         [[nodiscard]] virtual std::vector<Primitive::Ptr> primitives();
+        [[nodiscard]] virtual std::vector<Primitive::ConstPtr> primitives() const;
         [[nodiscard]] virtual Topology::Ptr topology();
+        [[nodiscard]] virtual Topology::ConstPtr topology() const;
     };
 }

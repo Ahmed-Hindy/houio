@@ -42,7 +42,9 @@ namespace houio
 			return static_cast<size_t>(count);
 		}
 
-		void validateDomainAttribute( const HouGeoAdapter::AttributeAdapter::Ptr &attribute, sint64 expectedCount,
+		void validateDomainAttribute(
+			const HouGeoAdapter::AttributeAdapter::ConstPtr& attribute,
+			sint64 expectedCount,
 			const std::string &path )
 		{
 			if( !attribute )
@@ -57,7 +59,7 @@ namespace houio
 		}
 
 		size_t expectedAttributeBytes(
-			const HouGeoAdapter::AttributeAdapter::Ptr& attribute,
+			const HouGeoAdapter::AttributeAdapter::ConstPtr& attribute,
 			const std::string& path)
 		{
 			const int component_bytes = HouGeoAdapter::AttributeAdapter::storageSize(attribute->storage());
@@ -78,7 +80,7 @@ namespace houio
 		}
 
 		HouGeoAdapter::RawDataView requireRawAttributeData(
-			const HouGeoAdapter::AttributeAdapter::Ptr& attribute,
+			const HouGeoAdapter::AttributeAdapter::ConstPtr& attribute,
 			const std::string& path)
 		{
 			const HouGeoAdapter::RawDataView raw_data = attribute->rawData();
@@ -320,12 +322,16 @@ namespace houio
 		return result.value;
 	}
 
-	Geometry::Ptr HouGeoIO::convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim )
+	Geometry::Ptr HouGeoIO::convertToGeometry(
+		HouGeo::ConstPtr houGeo,
+		HouGeoAdapter::Primitive::ConstPtr houPrim )
 	{
 		return convertToGeometry(houGeo, houPrim, nullptr);
 	}
 
-	Geometry::Ptr HouGeoIO::convertToGeometry(HouGeo::Ptr houGeo, HouGeoAdapter::Primitive::Ptr houPrim,
+	Geometry::Ptr HouGeoIO::convertToGeometry(
+		HouGeo::ConstPtr houGeo,
+		HouGeoAdapter::Primitive::ConstPtr houPrim,
 		DiagnosticList *diagnostics )
 	{
 		try
@@ -346,7 +352,8 @@ namespace houio
 		int numVerticesPerPoly = 0;
 		if( houPrim )
 		{
-			HouGeo::HouPoly::Ptr poly = std::dynamic_pointer_cast<HouGeo::HouPoly>(houPrim);
+			HouGeo::HouPoly::ConstPtr poly =
+				std::dynamic_pointer_cast<const HouGeo::HouPoly>(houPrim);
 			if( !poly )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 					"HouGeoIO::convertToGeometry supports only polygon primitives", -1, "conversion.primitive"});
@@ -412,7 +419,8 @@ namespace houio
 		for (const std::string& attribute_name : pointAttributesNames)
 		{
 			std::string attrName = attribute_name;
-			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->pointAttribute(attrName);
+			HouGeoAdapter::AttributeAdapter::ConstPtr houAttr =
+				houGeo->pointAttribute(attrName);
 			const std::string attributePath = "attributes.pointattributes." + attrName;
 			validateDomainAttribute(houAttr, numPoints, attributePath);
 			if( houAttr->type() != HouGeoAdapter::AttributeAdapter::Type::numeric )
@@ -544,7 +552,8 @@ namespace houio
 		for (const std::string& attribute_name : vertexAttributesNames)
 		{
 			std::string attrName = attribute_name;
-			HouGeoAdapter::AttributeAdapter::Ptr houAttr = houGeo->vertexAttribute(attrName);
+			HouGeoAdapter::AttributeAdapter::ConstPtr houAttr =
+				houGeo->vertexAttribute(attrName);
 			const std::string attributePath = "attributes.vertexattributes." + attrName;
 			validateDomainAttribute(houAttr, numVertices, attributePath);
 			if( houAttr->type() != HouGeoAdapter::AttributeAdapter::Type::numeric )
@@ -634,7 +643,8 @@ namespace houio
 		// only done when we have primitives...
 		if( houPrim )
 		{
-			HouGeo::HouPoly::Ptr poly = std::dynamic_pointer_cast<HouGeo::HouPoly>(houPrim);
+			HouGeo::HouPoly::ConstPtr poly =
+				std::dynamic_pointer_cast<const HouGeo::HouPoly>(houPrim);
 			if( !poly )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 					"HouGeoIO::convertToGeometry expected a polygon primitive", -1, "conversion.primitive"});
@@ -908,7 +918,7 @@ namespace houio
 
 	bool HouGeoIO::exportGeometry(
 		std::ostream& output,
-		HouGeoAdapter::Ptr geometry,
+		HouGeoAdapter::ConstPtr geometry,
 		bool binary)
 	{
 		if (!geometry || !output.good() || !binary)
@@ -936,7 +946,7 @@ namespace houio
 
 		writer.jsonString( "topology" );
 		writer.jsonBeginArray();
-		if (const HouGeoAdapter::Topology::Ptr geometry_topology = geometry->topology())
+		if (const HouGeoAdapter::Topology::ConstPtr geometry_topology = geometry->topology())
 			exportTopology(context, geometry_topology);
 		writer.jsonEndArray();
 
@@ -974,17 +984,17 @@ namespace houio
 			writer.jsonString( "primitives" );
 			writer.jsonBeginArray();
 
-			const std::vector<HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
+			const std::vector<HouGeoAdapter::Primitive::ConstPtr> primitives = geometry->primitives();
 
 			int topologyVertexOffset = 0;
-			for( const HouGeoAdapter::Primitive::Ptr &primitive : primitives )
+			for( const HouGeoAdapter::Primitive::ConstPtr &primitive : primitives )
 			{
-				if( auto volume = std::dynamic_pointer_cast<HouGeoAdapter::VolumePrimitive>(primitive) )
+				if( auto volume = std::dynamic_pointer_cast<const HouGeoAdapter::VolumePrimitive>(primitive) )
 				{
 					exportPrimitive(context, volume);
 					++topologyVertexOffset;
 				}
-				else if( auto polygonRun = std::dynamic_pointer_cast<HouGeoAdapter::PolyPrimitive>(primitive) )
+				else if( auto polygonRun = std::dynamic_pointer_cast<const HouGeoAdapter::PolyPrimitive>(primitive) )
 				{
 					exportPrimitive(context, polygonRun, topologyVertexOffset);
 					for( int polygonIndex=0;polygonIndex<polygonRun->polygonCount();++polygonIndex )
@@ -1048,7 +1058,9 @@ namespace houio
 
 
 
-	bool HouGeoIO::exportAttribute( ExportContext &context, HouGeoAdapter::AttributeAdapter::Ptr attribute )
+	bool HouGeoIO::exportAttribute(
+		ExportContext &context,
+		HouGeoAdapter::AttributeAdapter::ConstPtr attribute )
 	{
 		if( !attribute )
 			return false;
@@ -1268,7 +1280,9 @@ namespace houio
 		return true;
 	}
 
-	bool HouGeoIO::exportTopology( ExportContext &context, HouGeoAdapter::Topology::Ptr topology )
+	bool HouGeoIO::exportTopology(
+		ExportContext &context,
+		HouGeoAdapter::Topology::ConstPtr topology )
 	{
 		if( !topology )
 			return false;
@@ -1338,7 +1352,9 @@ namespace houio
 		return true;
 	}
 
-	bool HouGeoIO::exportPrimitive( ExportContext &context, HouGeoAdapter::VolumePrimitive::Ptr volume )
+	bool HouGeoIO::exportPrimitive(
+		ExportContext &context,
+		HouGeoAdapter::VolumePrimitive::ConstPtr volume )
 	{
 		if( !volume )
 			return false;
@@ -1473,7 +1489,7 @@ namespace houio
 	}
 
 	bool HouGeoIO::exportPrimitive( ExportContext &context,
-		HouGeoAdapter::PolyPrimitive::Ptr polygonRun, int startVertex )
+		HouGeoAdapter::PolyPrimitive::ConstPtr polygonRun, int startVertex )
 	{
 		if( !polygonRun || startVertex < 0 || polygonRun->polygonCount() <= 0 )
 			return false;

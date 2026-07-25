@@ -243,6 +243,13 @@ namespace houio
 		return iterator != m_pointAttributes.end() ? iterator->second : nullptr;
 	}
 
+	HouGeoAdapter::AttributeAdapter::ConstPtr HouGeo::pointAttribute(
+		const std::string& name) const
+	{
+		const auto iterator = m_pointAttributes.find(name);
+		return iterator != m_pointAttributes.end() ? iterator->second : nullptr;
+	}
+
 	std::vector<std::string> HouGeo::vertexAttributeNames() const
 	{
 		std::vector<std::string> names;
@@ -258,6 +265,13 @@ namespace houio
 		return iterator != m_vertexAttributes.end() ? iterator->second : nullptr;
 	}
 
+	HouGeoAdapter::AttributeAdapter::ConstPtr HouGeo::vertexAttribute(
+		const std::string& name) const
+	{
+		const auto iterator = m_vertexAttributes.find(name);
+		return iterator != m_vertexAttributes.end() ? iterator->second : nullptr;
+	}
+
 	std::vector<std::string> HouGeo::globalAttributeNames() const
 	{
 		std::vector<std::string> names;
@@ -268,6 +282,13 @@ namespace houio
 	}
 
 	HouGeoAdapter::AttributeAdapter::Ptr HouGeo::globalAttribute(const std::string& name)
+	{
+		const auto iterator = m_globalAttributes.find(name);
+		return iterator != m_globalAttributes.end() ? iterator->second : nullptr;
+	}
+
+	HouGeoAdapter::AttributeAdapter::ConstPtr HouGeo::globalAttribute(
+		const std::string& name) const
 	{
 		const auto iterator = m_globalAttributes.find(name);
 		return iterator != m_globalAttributes.end() ? iterator->second : nullptr;
@@ -353,12 +374,29 @@ namespace houio
 		return iterator != m_primitiveAttributes.end() ? iterator->second : nullptr;
 	}
 
+	HouGeoAdapter::AttributeAdapter::ConstPtr HouGeo::primitiveAttribute(
+		const std::string& name) const
+	{
+		const auto iterator = m_primitiveAttributes.find(name);
+		return iterator != m_primitiveAttributes.end() ? iterator->second : nullptr;
+	}
+
 	std::vector<HouGeoAdapter::Primitive::Ptr> HouGeo::primitives()
 	{
 		return m_primitives;
 	}
 
+	std::vector<HouGeoAdapter::Primitive::ConstPtr> HouGeo::primitives() const
+	{
+		return {m_primitives.begin(), m_primitives.end()};
+	}
+
 	HouGeo::Topology::Ptr HouGeo::topology()
+	{
+		return m_topology;
+	}
+
+	HouGeo::Topology::ConstPtr HouGeo::topology() const
 	{
 		return m_topology;
 	}
@@ -375,7 +413,10 @@ namespace houio
 			throw std::invalid_argument( "HouGeo::addPrimitive received a null field" );
 
 		// Houdini encodes the volume translation through a topology vertex referencing P.
-		HouAttribute::Ptr positionAttribute = std::dynamic_pointer_cast<HouAttribute>(pointAttribute("P"));
+		const auto position_iterator = m_pointAttributes.find("P");
+		HouAttribute::Ptr positionAttribute = position_iterator != m_pointAttributes.end()
+			? position_iterator->second
+			: nullptr;
 		if( !positionAttribute )
 		{
 			positionAttribute = std::make_shared<HouAttribute>();
@@ -1303,7 +1344,10 @@ namespace houio
 				volumePrimitive->topology_vertex_ = topologyVertex;
 
 				const int pointIndex = m_topology->indexBuffer[static_cast<size_t>(topologyVertex)];
-				HouAttribute::Ptr positionAttribute = std::dynamic_pointer_cast<HouAttribute>(pointAttribute("P"));
+				const auto position_iterator = m_pointAttributes.find("P");
+				HouAttribute::Ptr positionAttribute = position_iterator != m_pointAttributes.end()
+					? position_iterator->second
+					: nullptr;
 				if( !positionAttribute || !positionAttribute->numeric_attribute_ )
 					throw std::runtime_error( "HouGeo::loadVolumePrimitive requires a point P attribute" );
 				if( positionAttribute->tupleSize() < 3 )

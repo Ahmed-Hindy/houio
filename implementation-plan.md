@@ -2,7 +2,7 @@
 
 ## Scope
 
-This plan tracks the active modernization work on branch `refactor/modernize-legacy-core`, based on commit `16c485a`.
+This plan tracks the staged modernization work through branch `refactor/raii-const-correctness`, based on `origin/master` commit `d96f9be`.
 
 The objective is to modernize the retained HouIO core without changing supported file-format behavior, Houdini interoperability, package layout, or documented row-vector matrix semantics. Compatibility aliases are removed only after every in-tree caller has migrated and regression guards are in place.
 
@@ -29,6 +29,7 @@ Every phase must preserve these constraints:
 - Removed the complete legacy JSON compatibility surface after migrating `HouGeo` and all other consumers.
 - Changed token dispatch from nullable `Parser*` to required `Parser&`.
 - Removed adapter compatibility constants, private getter shims, and exporter friendship after migrating every in-tree caller to scoped enums and modern virtual methods.
+- Added const-correct adapter accessors and moved geometry conversion and binary export onto immutable adapter views.
 
 ### Math and geometry utilities
 
@@ -57,9 +58,9 @@ Every phase must preserve these constraints:
 - Current exact source: MSVC warnings-as-errors CTest suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
+- Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
 - Documentation audit contains no retired API references.
-- CI run `30082459984` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
-- CI reports non-failing Node.js deprecation annotations for `ilammy/msvc-dev-cmd@v1`; action maintenance is tracked separately.
+- CI validation for the active branch is pending until it is pushed.
 
 ## Execution phases
 
@@ -187,6 +188,35 @@ Exit criteria:
 - All local and CI matrices are green.
 - Documentation contains no retired API names.
 - Working tree is clean after the checkpoint commit.
+
+### Phase 6 — Const-correct adapter access
+
+**Status: complete locally.**
+
+Target files:
+
+- `include/houio/HouGeoAdapter.h`
+- `include/houio/HouGeo.h`
+- `include/houio/HouGeoIO.h`
+- `src/HouGeoAdapter.cpp`
+- `src/HouGeo.cpp`
+- `src/HouGeoIO.cpp`
+- adapter and modern-geometry tests
+
+Tasks:
+
+- Add const overloads for point, vertex, primitive, and global attributes.
+- Add const overloads for primitive collections and topology.
+- Return `shared_ptr<const T>` from const adapter accessors.
+- Make geometry conversion accept immutable `HouGeo` and primitive views.
+- Make binary export accept an immutable adapter and immutable child views.
+- Add compile-time return-type checks and exercise a full round-trip through a const geometry handle.
+
+Exit criteria:
+
+- Export and conversion require no mutable adapter pointers.
+- Mutable access remains available only through non-const geometry handles.
+- Strict, Release/Houdini, and AddressSanitizer matrices pass.
 
 ## Deferred work
 

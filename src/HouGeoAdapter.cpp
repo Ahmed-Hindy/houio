@@ -162,6 +162,12 @@ namespace houio
         return nullptr;
     }
 
+    HouGeoAdapter::AttributeAdapter::ConstPtr HouGeoAdapter::pointAttribute(
+        const std::string&) const
+    {
+        return nullptr;
+    }
+
     std::vector<std::string> HouGeoAdapter::vertexAttributeNames() const
     {
         return {};
@@ -172,12 +178,24 @@ namespace houio
         return nullptr;
     }
 
+    HouGeoAdapter::AttributeAdapter::ConstPtr HouGeoAdapter::vertexAttribute(
+        const std::string&) const
+    {
+        return nullptr;
+    }
+
     std::vector<std::string> HouGeoAdapter::globalAttributeNames() const
     {
         return {};
     }
 
     HouGeoAdapter::AttributeAdapter::Ptr HouGeoAdapter::globalAttribute(const std::string&)
+    {
+        return nullptr;
+    }
+
+    HouGeoAdapter::AttributeAdapter::ConstPtr HouGeoAdapter::globalAttribute(
+        const std::string&) const
     {
         return nullptr;
     }
@@ -225,7 +243,17 @@ namespace houio
         return {};
     }
 
+    std::vector<HouGeoAdapter::Primitive::ConstPtr> HouGeoAdapter::primitives() const
+    {
+        return {};
+    }
+
     HouGeoAdapter::Topology::Ptr HouGeoAdapter::topology()
+    {
+        return nullptr;
+    }
+
+    HouGeoAdapter::Topology::ConstPtr HouGeoAdapter::topology() const
     {
         return nullptr;
     }
