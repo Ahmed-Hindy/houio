@@ -423,6 +423,8 @@ int verifyFieldStorage()
     const std::filesystem::path storagePath = std::filesystem::temp_directory_path() / "houio_field_storage.bin";
     const std::filesystem::path truncatedPath = std::filesystem::temp_directory_path() / "houio_field_truncated.bin";
     const std::filesystem::path compactPath = std::filesystem::temp_directory_path() / "houio_field_compact.bin";
+    const std::filesystem::path missingPayloadPath =
+        std::filesystem::temp_directory_path() / "houio_field_missing_payload.bin";
 
     houio::ScalarField source;
     source.resize(2, 2, 1);
@@ -451,6 +453,38 @@ int verifyFieldStorage()
     if (loaded)
     {
         return fail("truncated field storage was accepted");
+    }
+
+    {
+        std::ofstream missingPayloadOutput(missingPayloadPath, std::ios::binary | std::ios::trunc);
+        const auto writeValue = [&missingPayloadOutput](const auto& value)
+        {
+            missingPayloadOutput.write(
+                reinterpret_cast<const char*>(&value),
+                static_cast<std::streamsize>(sizeof(value)));
+        };
+        const int resolutionX = 50000;
+        const int resolutionY = 50000;
+        const int resolutionZ = 1;
+        const float minimum = 0.0f;
+        const float maximum = 1.0f;
+        const int dataType = 1;
+        writeValue(resolutionX);
+        writeValue(resolutionY);
+        writeValue(resolutionZ);
+        writeValue(minimum);
+        writeValue(minimum);
+        writeValue(minimum);
+        writeValue(maximum);
+        writeValue(maximum);
+        writeValue(maximum);
+        writeValue(dataType);
+    }
+    loaded = houio::loadField<float>(missingPayloadPath.string());
+    std::filesystem::remove(missingPayloadPath);
+    if (loaded)
+    {
+        return fail("field storage allocated before validating its payload size");
     }
 
     if (!houio::storeFieldWithoutBoundingBox(source, compactPath.string()))

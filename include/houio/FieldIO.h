@@ -59,6 +59,22 @@ namespace houio
         template<typename Value>
         inline constexpr int fieldStorageCode = FieldStorageCode<Value>::value;
 
+        inline bool checkedFieldValueCount(math::V3i resolution, std::size_t& value_count) noexcept
+        {
+            if (resolution.x < 0 || resolution.y < 0 || resolution.z < 0)
+                return false;
+            const std::size_t x = static_cast<std::size_t>(resolution.x);
+            const std::size_t y = static_cast<std::size_t>(resolution.y);
+            const std::size_t z = static_cast<std::size_t>(resolution.z);
+            if (x != 0 && y > std::numeric_limits<std::size_t>::max() / x)
+                return false;
+            const std::size_t xy = x * y;
+            if (xy != 0 && z > std::numeric_limits<std::size_t>::max() / xy)
+                return false;
+            value_count = xy * z;
+            return true;
+        }
+
         template<typename Value>
         bool writeFieldPayload(std::ostream& output, std::span<const Value> values)
         {
@@ -112,10 +128,36 @@ namespace houio
             return nullptr;
         }
 
+        const math::V3i resolution(resolution_x, resolution_y, resolution_z);
+        std::size_t value_count = 0;
+        if (!detail::checkedFieldValueCount(resolution, value_count)
+            || value_count > std::numeric_limits<std::size_t>::max() / sizeof(T))
+        {
+            return nullptr;
+        }
+        const std::size_t byte_count = value_count * sizeof(T);
+        if (byte_count > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
+            return nullptr;
+
+        const std::streampos payload_position = input.tellg();
+        if (payload_position == std::streampos(-1))
+            return nullptr;
+        input.seekg(0, std::ios::end);
+        const std::streampos end_position = input.tellg();
+        if (end_position == std::streampos(-1)
+            || end_position < payload_position
+            || end_position - payload_position < static_cast<std::streamoff>(byte_count))
+        {
+            return nullptr;
+        }
+        input.seekg(payload_position);
+        if (!input)
+            return nullptr;
+
         auto field = std::make_shared<Field<T>>();
         try
         {
-            field->resize(math::V3i(resolution_x, resolution_y, resolution_z));
+            field->resize(resolution);
         }
         catch (const std::exception&)
         {
@@ -123,11 +165,6 @@ namespace houio
         }
 
         std::span<T> values = field->values();
-        if (values.size() > std::numeric_limits<std::size_t>::max() / sizeof(T))
-            return nullptr;
-        const std::size_t byte_count = values.size() * sizeof(T);
-        if (byte_count > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
-            return nullptr;
         if (byte_count > 0)
         {
             input.read(
