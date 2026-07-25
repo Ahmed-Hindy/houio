@@ -1338,15 +1338,15 @@ namespace houio
 		HouVolume::Ptr volumePrimitive = std::make_shared<HouVolume>();
 		volumePrimitive->scalar_field_ = std::make_shared<ScalarField>();
 
+		math::V3i resolution;
 		withSchemaPath("res", [&]()
 		{
 			json::ArrayPtr resolutionValues = volume->array("res");
 			if( !resolutionValues || resolutionValues->size() != 3 )
 				throw std::runtime_error( "HouGeo::loadVolumePrimitive resolution must contain three values" );
-			const math::V3i resolution(resolutionValues->get<int>(0), resolutionValues->get<int>(1),
+			resolution = math::V3i(resolutionValues->get<int>(0), resolutionValues->get<int>(1),
 				resolutionValues->get<int>(2));
 			volumeVoxelCount(resolution);
-			volumePrimitive->scalar_field_->resize(resolution);
 		});
 
 		const bool hasVertex = volume->contains("vertex");
@@ -1438,6 +1438,7 @@ namespace houio
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 				"HouGeo::loadVolumePrimitive requires exactly one voxel payload", -1, "voxels"});
 
+		std::vector<float> voxelValues;
 		if( hasSharedVoxels )
 		{
 			withSchemaPath("sharedvoxels", [&]()
@@ -1446,18 +1447,19 @@ namespace houio
 				const auto sharedData = sharedPrimitiveData.sharedVoxelData.find(dataId);
 				if( sharedData == sharedPrimitiveData.sharedVoxelData.end() )
 					throw std::runtime_error( "HouGeo::loadVolumePrimitive shared voxel data was not found" );
-				loadVoxelData(sharedData->second, volumePrimitive->scalar_field_->resolution(),
-					volumePrimitive->scalar_field_->values());
+				voxelValues = loadVoxelData(sharedData->second, resolution);
 			});
 		}
 		else
 		{
 			withSchemaPath("voxels", [&]()
 			{
-				loadVoxelData(toObject(volume->array("voxels")), volumePrimitive->scalar_field_->resolution(),
-					volumePrimitive->scalar_field_->values());
+				voxelValues = loadVoxelData(toObject(volume->array("voxels")), resolution);
 			});
 		}
+
+		volumePrimitive->scalar_field_->resize(resolution);
+		std::copy(voxelValues.begin(), voxelValues.end(), volumePrimitive->scalar_field_->values().begin());
 
 		if( volume->contains("visualization") )
 		{
@@ -1477,16 +1479,13 @@ namespace houio
 		m_primitives.push_back(volumePrimitive);
 	}
 
-	void HouGeo::loadVoxelData(
+	std::vector<float> HouGeo::loadVoxelData(
 		json::ObjectPtr voxelObject,
-		const math::V3i& resolution,
-		std::span<float> voxelData)
+		const math::V3i& resolution)
 	{
 		if( !voxelObject )
 			throw std::invalid_argument( "HouGeo::loadVoxelData received null voxel data" );
 		const size_t voxelCount = volumeVoxelCount(resolution);
-		if (voxelData.size() != voxelCount)
-			throw std::invalid_argument("HouGeo::loadVoxelData volume storage size mismatch");
 
 		const bool hasTiledArray = voxelObject->contains("tiledarray");
 		const bool hasConstantArray = voxelObject->contains("constantarray");
@@ -1496,8 +1495,7 @@ namespace houio
 		if( hasConstantArray )
 		{
 			const float constantValue = voxelObject->get<float>("constantarray");
-			std::fill(voxelData.begin(), voxelData.end(), constantValue);
-			return;
+			return std::vector<float>(voxelCount, constantValue);
 		}
 
 		json::ObjectPtr tiledArray = toObject(voxelObject->array("tiledarray"));
@@ -1517,6 +1515,21 @@ namespace houio
 		if( tiles->size() != static_cast<sint64>(expectedTileCount) )
 			throw std::runtime_error( "HouGeo::loadVoxelData tile count does not match resolution" );
 
+		struct TileInfo
+		{
+			json::ObjectPtr tile;
+			int compression = 0;
+			int voxelOffsetX = 0;
+			int voxelOffsetY = 0;
+			int voxelOffsetZ = 0;
+			int tileSizeX = 0;
+			int tileSizeY = 0;
+			int tileSizeZ = 0;
+			size_t voxelCount = 0;
+		};
+
+		std::vector<TileInfo> tileInfos;
+		tileInfos.reserve(expectedTileCount);
 		size_t currentTileIndex = 0;
 		for( size_t tileZ=0;tileZ<tilesZ;++tileZ )
 		{
@@ -1549,32 +1562,10 @@ namespace houio
 							json::ArrayPtr data = tile->array("data");
 							if( !data || data->size() != static_cast<sint64>(tileVoxelCount) )
 								throw std::runtime_error( "HouGeo::loadVoxelData raw tile payload size mismatch" );
-
-							size_t sourceIndex = 0;
-							for( int localZ=0;localZ<tileSizeZ;++localZ )
-								for( int localY=0;localY<tileSizeY;++localY )
-									for( int localX=0;localX<tileSizeX;++localX, ++sourceIndex )
-									{
-										const size_t destinationIndex = volumeIndex(voxelOffsetX + localX,
-											voxelOffsetY + localY, voxelOffsetZ + localZ, resolution);
-										if( destinationIndex >= voxelCount )
-											throw std::out_of_range( "HouGeo::loadVoxelData destination index exceeds volume" );
-										voxelData[destinationIndex] = data->get<float>(static_cast<int>(sourceIndex));
-									}
 						}
 						else if( compression == 2 )
 						{
-							const float constantValue = tile->get<float>("data");
-							for( int localZ=0;localZ<tileSizeZ;++localZ )
-								for( int localY=0;localY<tileSizeY;++localY )
-									for( int localX=0;localX<tileSizeX;++localX )
-									{
-										const size_t destinationIndex = volumeIndex(voxelOffsetX + localX,
-											voxelOffsetY + localY, voxelOffsetZ + localZ, resolution);
-										if( destinationIndex >= voxelCount )
-											throw std::out_of_range( "HouGeo::loadVoxelData destination index exceeds volume" );
-										voxelData[destinationIndex] = constantValue;
-									}
+							static_cast<void>(tile->get<float>("data"));
 						}
 						else
 						{
@@ -1583,10 +1574,48 @@ namespace houio
 								"HouGeo::loadVoxelData does not support tile compression " + std::to_string(compression),
 								-1, "compression"});
 						}
+
+						tileInfos.push_back(TileInfo{tile, compression, voxelOffsetX, voxelOffsetY, voxelOffsetZ,
+							tileSizeX, tileSizeY, tileSizeZ, tileVoxelCount});
 					});
 				}
 			}
 		}
+
+		std::vector<float> voxelData(voxelCount);
+		for( const TileInfo &tileInfo : tileInfos )
+		{
+			if( tileInfo.compression == 0 || tileInfo.compression == 1 )
+			{
+				json::ArrayPtr data = tileInfo.tile->array("data");
+				size_t sourceIndex = 0;
+				for( int localZ=0;localZ<tileInfo.tileSizeZ;++localZ )
+					for( int localY=0;localY<tileInfo.tileSizeY;++localY )
+						for( int localX=0;localX<tileInfo.tileSizeX;++localX, ++sourceIndex )
+						{
+							const size_t destinationIndex = volumeIndex(tileInfo.voxelOffsetX + localX,
+								tileInfo.voxelOffsetY + localY, tileInfo.voxelOffsetZ + localZ, resolution);
+							if( destinationIndex >= voxelCount || sourceIndex >= tileInfo.voxelCount )
+								throw std::out_of_range( "HouGeo::loadVoxelData tile index exceeds validated storage" );
+							voxelData[destinationIndex] = data->get<float>(static_cast<int>(sourceIndex));
+						}
+			}
+			else
+			{
+				const float constantValue = tileInfo.tile->get<float>("data");
+				for( int localZ=0;localZ<tileInfo.tileSizeZ;++localZ )
+					for( int localY=0;localY<tileInfo.tileSizeY;++localY )
+						for( int localX=0;localX<tileInfo.tileSizeX;++localX )
+						{
+							const size_t destinationIndex = volumeIndex(tileInfo.voxelOffsetX + localX,
+								tileInfo.voxelOffsetY + localY, tileInfo.voxelOffsetZ + localZ, resolution);
+							if( destinationIndex >= voxelCount )
+								throw std::out_of_range( "HouGeo::loadVoxelData tile index exceeds validated storage" );
+							voxelData[destinationIndex] = constantValue;
+						}
+			}
+		}
+		return voxelData;
 	}
 
 	int HouGeo::HouVolume::topologyVertex() const
