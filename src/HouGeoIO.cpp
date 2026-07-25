@@ -50,9 +50,6 @@ namespace houio
 			if( !attribute )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry encountered a null attribute", -1, path});
-			if (attribute->tupleSize() <= 0)
-				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
-					"HouGeoIO::convertToGeometry attribute has an invalid tuple size", -1, path});
 			if (attribute->elementCount() != expectedCount)
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry attribute element count does not match its domain", -1, path});
@@ -62,17 +59,17 @@ namespace houio
 			const HouGeoAdapter::AttributeAdapter::ConstPtr& attribute,
 			const std::string& path)
 		{
-			const int component_bytes = HouGeoAdapter::AttributeAdapter::storageSize(attribute->storage());
-			if (component_bytes <= 0 || attribute->tupleSize() <= 0 || attribute->elementCount() < 0)
+			const std::optional<size_t> component_size =
+				HouGeoAdapter::AttributeAdapter::storageByteWidth(attribute->storage());
+			if (!component_size || attribute->elementCount() < 0)
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO attribute has invalid numeric storage metadata", -1, path});
-			const size_t component_count = static_cast<size_t>(attribute->tupleSize());
+			const size_t component_count = attribute->tupleSize().asSize();
 			const size_t element_count = static_cast<size_t>(attribute->elementCount());
-			const size_t component_size = static_cast<size_t>(component_bytes);
-			if (component_count > std::numeric_limits<size_t>::max() / component_size)
+			if (component_count > std::numeric_limits<size_t>::max() / *component_size)
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO attribute tuple byte count overflow", -1, path});
-			const size_t element_bytes = component_count * component_size;
+			const size_t element_bytes = component_count * *component_size;
 			if (element_count > std::numeric_limits<size_t>::max() / element_bytes)
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO attribute byte count overflow", -1, path});
@@ -430,7 +427,7 @@ namespace houio
 					-1, attributePath});
 				continue;
 			}
-			const int numComponents = houAttr->tupleSize();
+			const int numComponents = houAttr->tupleSize().value();
 			const HouGeoAdapter::AttributeAdapter::Storage storage = houAttr->storage();
 
 			Attribute::Ptr attr;
@@ -563,7 +560,7 @@ namespace houio
 					-1, attributePath});
 				continue;
 			}
-			const int numComponents = houAttr->tupleSize();
+			const int numComponents = houAttr->tupleSize().value();
 			const HouGeoAdapter::AttributeAdapter::Storage storage = houAttr->storage();
 
 			Attribute::Ptr attr;
@@ -1066,44 +1063,29 @@ namespace houio
 			return false;
 		json::BinaryWriter &writer = context.writer;
 
-		std::string attributeType;
-		std::string storageName;
 		const HouGeoAdapter::AttributeAdapter::Type attribute_type = attribute->type();
 		const HouGeoAdapter::AttributeAdapter::Storage attribute_storage = attribute->storage();
-		const int sourceTupleSize = attribute->tupleSize();
+		const HouGeoAdapter::AttributeAdapter::TupleSize sourceTupleSize = attribute->tupleSize();
 		const std::string name = attribute->name();
-		const bool promotePosition = name == "P" && sourceTupleSize == 3;
-		const int exportTupleSize = promotePosition ? 4 : sourceTupleSize;
+		const bool promotePosition = name == "P" && sourceTupleSize.value() == 3;
+		const int exportTupleSize = promotePosition ? 4 : sourceTupleSize.value();
 		const int elementCount = attribute->elementCount();
-		if (sourceTupleSize <= 0 || elementCount < 0)
+		if (elementCount < 0)
 			throw std::runtime_error("HouGeoIO::exportAttribute: invalid element metadata for attribute " + name);
 		const size_t element_count = static_cast<size_t>(elementCount);
-		const size_t tuple_size = static_cast<size_t>(sourceTupleSize);
+		const size_t tuple_size = sourceTupleSize.asSize();
 		if (element_count > std::numeric_limits<size_t>::max() / tuple_size)
 			throw std::length_error("HouGeoIO::exportAttribute: scalar count overflow for attribute " + name);
 		const size_t scalar_count = element_count * tuple_size;
 
-		if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric )
-			attributeType = "numeric";
-		else if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::string )
-			attributeType = "string";
-		else if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::dictionary )
-			attributeType = "dict";
-		else
+		const std::optional<std::string_view> attributeTypeName =
+			HouGeoAdapter::AttributeAdapter::typeName(attribute_type);
+		if( !attributeTypeName )
 			throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported type for attribute " + name );
 
-		if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
-			storageName = "fpreal16";
-		else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float32 )
-			storageName = "fpreal32";
-		else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float64 )
-			storageName = "fpreal64";
-		else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::int32 )
-			storageName = "int32";
-		else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::int64 )
-			storageName = "int64";
-
-		if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric && storageName.empty() )
+		const std::optional<std::string_view> storageName =
+			HouGeoAdapter::AttributeAdapter::storageName(attribute_storage);
+		if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric && !storageName )
 			throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported storage for attribute " + name );
 
 		if( name == "P" && exportTupleSize != 4 )
@@ -1115,7 +1097,7 @@ namespace houio
 		writer.jsonString( "scope" );
 		writer.jsonString( "public" );
 		writer.jsonString( "type" );
-		writer.jsonString(attributeType);
+		writer.jsonString(std::string(*attributeTypeName));
 		writer.jsonString( "name" );
 		writer.jsonString( name );
 		writer.jsonString( "options" );
@@ -1129,14 +1111,14 @@ namespace houio
 			writer.jsonString( "size" );
 			writer.jsonInt( exportTupleSize );
 			writer.jsonString( "storage" );
-			writer.jsonString( storageName );
+			writer.jsonString(std::string(*storageName));
 
 			writer.jsonString( "values" );
 			writer.jsonBeginArray();
 			writer.jsonString( "size" );
 			writer.jsonInt( exportTupleSize );
 			writer.jsonString( "storage" );
-			writer.jsonString( storageName );
+			writer.jsonString(std::string(*storageName));
 			writer.jsonString( "pagesize" );
 			writer.jsonInt( 1024 );
 			writer.jsonString( "rawpagedata" );

@@ -14,11 +14,6 @@ namespace houio
         return Type::invalid;
     }
 
-    int HouGeoAdapter::AttributeAdapter::tupleSize() const
-    {
-        return 0;
-    }
-
     HouGeoAdapter::AttributeAdapter::Storage HouGeoAdapter::AttributeAdapter::storage() const
     {
         return Storage::invalid;
@@ -45,7 +40,7 @@ namespace houio
     }
 
     HouGeoAdapter::AttributeAdapter::Type HouGeoAdapter::AttributeAdapter::parseType(
-        const std::string& type_name)
+        std::string_view type_name) noexcept
     {
         if (type_name == "numeric")
             return Type::numeric;
@@ -56,8 +51,24 @@ namespace houio
         return Type::invalid;
     }
 
+    std::optional<std::string_view> HouGeoAdapter::AttributeAdapter::typeName(Type type) noexcept
+    {
+        switch (type)
+        {
+        case Type::numeric:
+            return "numeric";
+        case Type::string:
+            return "string";
+        case Type::dictionary:
+            return "dict";
+        case Type::invalid:
+            return std::nullopt;
+        }
+        return std::nullopt;
+    }
+
     HouGeoAdapter::AttributeAdapter::Storage HouGeoAdapter::AttributeAdapter::parseStorage(
-        const std::string& storage_name)
+        std::string_view storage_name) noexcept
     {
         if (storage_name == "fpreal16")
             return Storage::float16;
@@ -72,24 +83,46 @@ namespace houio
         return Storage::invalid;
     }
 
-    int HouGeoAdapter::AttributeAdapter::storageSize(Storage storage_type)
+    std::optional<std::string_view> HouGeoAdapter::AttributeAdapter::storageName(
+        Storage storage) noexcept
     {
-        switch (storage_type)
+        switch (storage)
         {
         case Storage::float16:
-            return static_cast<int>(sizeof(uword));
+            return "fpreal16";
         case Storage::float32:
-            return static_cast<int>(sizeof(real32));
+            return "fpreal32";
         case Storage::float64:
-            return static_cast<int>(sizeof(real64));
+            return "fpreal64";
         case Storage::int32:
-            return static_cast<int>(sizeof(sint32));
+            return "int32";
         case Storage::int64:
-            return static_cast<int>(sizeof(sint64));
+            return "int64";
         case Storage::invalid:
-            return 0;
+            return std::nullopt;
         }
-        return 0;
+        return std::nullopt;
+    }
+
+    std::optional<std::size_t> HouGeoAdapter::AttributeAdapter::storageByteWidth(
+        Storage storage) noexcept
+    {
+        switch (storage)
+        {
+        case Storage::float16:
+            return sizeof(uword);
+        case Storage::float32:
+            return sizeof(real32);
+        case Storage::float64:
+            return sizeof(real64);
+        case Storage::int32:
+            return sizeof(sint32);
+        case Storage::int64:
+            return sizeof(sint64);
+        case Storage::invalid:
+            return std::nullopt;
+        }
+        return std::nullopt;
     }
 
     math::Vec3i HouGeoAdapter::VolumePrimitive::resolution() const

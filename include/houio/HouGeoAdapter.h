@@ -8,6 +8,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -76,6 +77,28 @@ namespace houio
             using Ptr = std::shared_ptr<AttributeAdapter>;
             using ConstPtr = std::shared_ptr<const AttributeAdapter>;
 
+            class TupleSize final
+            {
+            public:
+                explicit TupleSize(int value)
+                    : value_(value)
+                {
+                    if (value <= 0)
+                        throw std::invalid_argument("Attribute tuple size must be positive");
+                }
+
+                [[nodiscard]] int value() const noexcept { return value_; }
+                [[nodiscard]] std::size_t asSize() const noexcept
+                {
+                    return static_cast<std::size_t>(value_);
+                }
+
+                friend bool operator==(TupleSize, TupleSize) = default;
+
+            private:
+                int value_;
+            };
+
             enum class Type
             {
                 invalid,
@@ -98,7 +121,7 @@ namespace houio
 
             [[nodiscard]] virtual std::string name() const;
             [[nodiscard]] virtual Type type() const;
-            [[nodiscard]] virtual int tupleSize() const;
+            [[nodiscard]] virtual TupleSize tupleSize() const = 0;
             [[nodiscard]] virtual Storage storage() const;
             [[nodiscard]] virtual std::vector<int> packing() const;
             [[nodiscard]] virtual int elementCount() const;
@@ -106,9 +129,11 @@ namespace houio
             [[nodiscard]] virtual std::shared_ptr<json::Object> dictionaryValue(int index) const;
             [[nodiscard]] virtual RawDataView rawData() const;
 
-            [[nodiscard]] static Type parseType(const std::string& type_name);
-            [[nodiscard]] static Storage parseStorage(const std::string& storage_name);
-            [[nodiscard]] static int storageSize(Storage storage_type);
+            [[nodiscard]] static Type parseType(std::string_view type_name) noexcept;
+            [[nodiscard]] static std::optional<std::string_view> typeName(Type type) noexcept;
+            [[nodiscard]] static Storage parseStorage(std::string_view storage_name) noexcept;
+            [[nodiscard]] static std::optional<std::string_view> storageName(Storage storage) noexcept;
+            [[nodiscard]] static std::optional<std::size_t> storageByteWidth(Storage storage) noexcept;
         };
 
         class Topology

@@ -230,19 +230,6 @@ namespace houio
         throw std::invalid_argument("Attribute component type is unknown");
     }
 
-    Attribute::ComponentType Attribute::componentType(const std::string& storage_name)
-    {
-        if (storage_name == "fpreal32" || storage_name == "float")
-            return ComponentType::float32;
-        if (storage_name == "int32" || storage_name == "int")
-            return ComponentType::int32;
-        if (storage_name == "int64")
-            return ComponentType::int64;
-        if (storage_name == "fpreal16")
-            return ComponentType::float16;
-        return ComponentType::invalid;
-    }
-
     std::size_t Attribute::checkedElementOffset(std::size_t index) const
     {
         if (index >= element_count_)

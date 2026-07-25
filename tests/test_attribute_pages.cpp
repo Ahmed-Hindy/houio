@@ -36,7 +36,7 @@ std::vector<houio::sint32> attributeValues(const houio::HouGeo::Ptr& geometry)
     }
     houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->pointAttribute("paged");
     if (!attribute || attribute->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::int32
-        || attribute->tupleSize() != 3 || attribute->elementCount() != 5)
+        || attribute->tupleSize().value() != 3 || attribute->elementCount() != 5)
     {
         throw std::runtime_error("Paged attribute metadata was not preserved");
     }

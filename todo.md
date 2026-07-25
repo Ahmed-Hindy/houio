@@ -4,14 +4,14 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `test/dense-field-sampling`
-- Baseline commit: `f501032`.
+- Branch: `refactor/strong-attribute-metadata`
+- Baseline commit: `56e6541`.
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
 - Branch CI validation is pending until the branch is pushed.
-- CI action maintenance remains tracked separately.
+- Dense-field sampling and CI/static-analysis maintenance are merged into `master`.
 
 ## Modernization completed
 
@@ -37,6 +37,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add independent direct `Poly`, legacy `run/Poly`, and polygon-run regression coverage.
 - [x] Add exact scalar/vector field sampling, boundary, interpolation, and transform coverage.
 - [x] Reject non-finite field sampling coordinates before floor/integer conversion.
+- [x] Introduce validated tuple-size metadata and canonical attribute type/storage metadata helpers.
 
 ## Modernization next
 
@@ -104,7 +105,7 @@ Priority levels:
 - [x] Replace unsafe typed attribute access with validated views or `memcpy`-based operations.
 - [x] Resolve alignment and strict-aliasing risks in typed `get()` and `set()` methods.
 - [x] Add immutable attribute views for adapter export.
-- [ ] Represent tuple size and storage type with stronger types.
+- [x] Represent tuple size and storage type with stronger types.
 - [x] Reject appended values that do not match declared component metadata.
 
 ## P2 — Format compatibility

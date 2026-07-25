@@ -153,7 +153,6 @@ namespace houio
         [[nodiscard]] static Ptr createInt(int element_count = 0);
 
         [[nodiscard]] static int componentSize(ComponentType component_type);
-        [[nodiscard]] static ComponentType componentType(const std::string& storage_name);
 
     private:
         template<typename T>

@@ -1,5 +1,6 @@
 #include <houio/HouGeoIO.h>
 
+#include <array>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -17,6 +18,12 @@ static_assert(std::is_same_v<
 static_assert(std::is_same_v<
     decltype(std::declval<const houio::HouGeoAdapter&>().topology()),
     houio::HouGeoAdapter::Topology::ConstPtr>);
+static_assert(std::is_same_v<
+    decltype(std::declval<const houio::HouGeoAdapter::AttributeAdapter&>().tupleSize()),
+    houio::HouGeoAdapter::AttributeAdapter::TupleSize>);
+static_assert(!std::is_convertible_v<
+    houio::HouGeoAdapter::AttributeAdapter::TupleSize,
+    int>);
 
 namespace
 {
@@ -154,6 +161,82 @@ const char* modernQuadGeometry()
     ])JSON";
 }
 
+int verifyStrongAttributeMetadata()
+{
+    using AttributeAdapter = houio::HouGeoAdapter::AttributeAdapter;
+
+    const AttributeAdapter::TupleSize tupleSize(3);
+    if (tupleSize.value() != 3 || tupleSize.asSize() != 3u)
+    {
+        return fail("strong tuple-size metadata did not preserve its value");
+    }
+
+    for (const int invalidValue : {0, -1})
+    {
+        try
+        {
+            static_cast<void>(AttributeAdapter::TupleSize(invalidValue));
+            return fail("strong tuple-size metadata accepted a non-positive value");
+        }
+        catch (const std::invalid_argument&)
+        {
+        }
+    }
+
+    struct TypeCase
+    {
+        AttributeAdapter::Type type;
+        std::string_view name;
+    };
+    const std::array<TypeCase, 3> typeCases{{
+        {AttributeAdapter::Type::numeric, "numeric"},
+        {AttributeAdapter::Type::string, "string"},
+        {AttributeAdapter::Type::dictionary, "dict"}}};
+    for (const TypeCase& typeCase : typeCases)
+    {
+        const auto name = AttributeAdapter::typeName(typeCase.type);
+        if (!name || *name != typeCase.name || AttributeAdapter::parseType(*name) != typeCase.type)
+        {
+            return fail("attribute type metadata did not round-trip through its canonical name");
+        }
+    }
+    if (AttributeAdapter::typeName(AttributeAdapter::Type::invalid)
+        || AttributeAdapter::parseType("unknown") != AttributeAdapter::Type::invalid)
+    {
+        return fail("invalid attribute type metadata was not rejected");
+    }
+
+    struct StorageCase
+    {
+        AttributeAdapter::Storage storage;
+        std::string_view name;
+        std::size_t byteWidth;
+    };
+    const std::array<StorageCase, 5> storageCases{{
+        {AttributeAdapter::Storage::float16, "fpreal16", sizeof(houio::uword)},
+        {AttributeAdapter::Storage::float32, "fpreal32", sizeof(houio::real32)},
+        {AttributeAdapter::Storage::float64, "fpreal64", sizeof(houio::real64)},
+        {AttributeAdapter::Storage::int32, "int32", sizeof(houio::sint32)},
+        {AttributeAdapter::Storage::int64, "int64", sizeof(houio::sint64)}}};
+    for (const StorageCase& storageCase : storageCases)
+    {
+        const auto name = AttributeAdapter::storageName(storageCase.storage);
+        const auto byteWidth = AttributeAdapter::storageByteWidth(storageCase.storage);
+        if (!name || *name != storageCase.name || !byteWidth || *byteWidth != storageCase.byteWidth
+            || AttributeAdapter::parseStorage(*name) != storageCase.storage)
+        {
+            return fail("attribute storage metadata did not round-trip through its canonical representation");
+        }
+    }
+    if (AttributeAdapter::storageName(AttributeAdapter::Storage::invalid)
+        || AttributeAdapter::storageByteWidth(AttributeAdapter::Storage::invalid)
+        || AttributeAdapter::parseStorage("unknown") != AttributeAdapter::Storage::invalid)
+    {
+        return fail("invalid attribute storage metadata was not rejected");
+    }
+    return 0;
+}
+
 int verifyGeometry(const houio::HouGeo::ConstPtr& geometry, int expectedPositionTupleSize)
 {
     if (!geometry)
@@ -170,21 +253,21 @@ int verifyGeometry(const houio::HouGeo::ConstPtr& geometry, int expectedPosition
     {
         return fail("modern tuple-based P attribute is missing");
     }
-    if (position->tupleSize() != expectedPositionTupleSize || position->elementCount() != 4)
+    if (position->tupleSize().value() != expectedPositionTupleSize || position->elementCount() != 4)
     {
         return fail(
-            "unexpected P metadata: tuple_size=" + std::to_string(position->tupleSize())
+            "unexpected P metadata: tuple_size=" + std::to_string(position->tupleSize().value())
             + ", elements=" + std::to_string(position->elementCount()));
     }
 
     houio::HouGeoAdapter::AttributeAdapter::ConstPtr normals = geometry->vertexAttribute("N");
-    if (!normals || normals->tupleSize() != 3 || normals->elementCount() != 4)
+    if (!normals || normals->tupleSize().value() != 3 || normals->elementCount() != 4)
     {
         return fail("vertex N attribute was not preserved");
     }
 
     houio::HouGeoAdapter::AttributeAdapter::ConstPtr uv = geometry->vertexAttribute("uv");
-    if (!uv || uv->tupleSize() != 2 || uv->elementCount() != 4)
+    if (!uv || uv->tupleSize().value() != 2 || uv->elementCount() != 4)
     {
         return fail("vertex uv attribute was not preserved");
     }
@@ -209,7 +292,7 @@ int verifyGeometry(const houio::HouGeo::ConstPtr& geometry, int expectedPosition
     houio::HouGeoAdapter::AttributeAdapter::ConstPtr piece =
         geometry->primitiveAttribute("piece");
     if (!piece || piece->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::int32
-        || piece->tupleSize() != 1 || piece->elementCount() != 1)
+        || piece->tupleSize().value() != 1 || piece->elementCount() != 1)
     {
         return fail("primitive integer attribute metadata was not preserved");
     }
@@ -261,6 +344,11 @@ int verifyGeometry(const houio::HouGeo::ConstPtr& geometry, int expectedPosition
 
 int main()
 {
+    if (const int result = verifyStrongAttributeMetadata(); result != 0)
+    {
+        return result;
+    }
+
     std::istringstream source(modernQuadGeometry());
     houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(source);
     if (const int result = verifyGeometry(geometry, 3); result != 0)
