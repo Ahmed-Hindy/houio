@@ -9,9 +9,9 @@ The long-term roadmap remains below. The active modernization program is summari
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
-- Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
+- Generated fixtures, the large Crag asset, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Current branch continues fixture-independent modernization from that complete source state.
+- Current branch completes field/API cleanup, Houdini 20.0 producer compatibility, indexed string tuples, and maintained project contracts.
 
 ## Modernization completed
 
@@ -49,6 +49,10 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Make concrete JSON handlers and test adapters explicit `final` classes with complete `override` declarations.
 - [x] Complete the bounded `noexcept` audit without annotating allocating or checked-access APIs incorrectly.
 - [x] Remove obsolete commented-out parser implementation and guard against disabled code blocks returning.
+- [x] Preserve indexed string tuples across point, vertex, primitive, and global domains.
+- [x] Validate multi-page string indices and Houdini 20.0 `varmap` tuple encoding.
+- [x] Run fixture, large-asset, and package matrices across Houdini 20.0, 20.5, 21.0, and 22.0.
+- [x] Define maintained compatibility, fixture, contribution, versioning, and experimental field-format contracts.
 
 ## Modernization next
 
@@ -84,10 +88,10 @@ Priority levels:
 
 ### Houdini 20.0+ compatibility
 
-- [ ] Add generated compatibility coverage using Houdini 20.0 as a fixture producer.
-- [ ] Keep package validation active for 20.0, 20.5, 21.0, and 22.0.
-- [ ] Document recognized records that remain unsupported.
-- [ ] Record intentional round-trip losses in fixture manifests.
+- [x] Add generated compatibility coverage using Houdini 20.0 as a fixture producer.
+- [x] Keep package validation active for 20.0, 20.5, 21.0, and 22.0.
+- [x] Document recognized records that remain unsupported.
+- [x] Record intentional round-trip losses in fixture manifests and reject unknown loss keys.
 
 ### Tests
 
@@ -125,7 +129,7 @@ Priority levels:
 
 - [ ] Add unsigned integer storage where the file format uses it.
 - [ ] Preserve complete attribute type and semantic metadata.
-- [ ] Extend string-table coverage to every supported domain and page layout.
+- [x] Extend string-table coverage to every supported domain and maintained page layout.
 
 ### Geometry
 
@@ -171,7 +175,7 @@ Add fixture-backed support one record type at a time:
 - [x] Separate custom binary persistence from the field container through `FieldIO.h`.
 - [x] Audit coordinate conventions and transform composition.
 - [x] Add const sampling APIs.
-- [ ] Define whether the custom field format remains public.
+- [x] Keep the custom field I/O API public and opt-in while explicitly classifying its native on-disk layout as experimental.
 
 ### Modern C++
 
@@ -197,9 +201,9 @@ Add fixture-backed support one record type at a time:
 
 ## Documentation and releases
 
-- [ ] Add a maintained Houdini-version and feature compatibility matrix.
-- [ ] Add contributor guidelines.
-- [ ] Document fixture regeneration steps.
-- [ ] Define semantic-versioning expectations.
+- [x] Add a maintained Houdini-version and feature compatibility matrix.
+- [x] Add contributor guidelines.
+- [x] Document fixture regeneration steps.
+- [x] Define semantic-versioning expectations.
 - [ ] Add release notes when versioned releases begin.
 - [ ] Publish checksums and build provenance with every binary artifact.

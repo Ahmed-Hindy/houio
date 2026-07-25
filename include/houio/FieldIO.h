@@ -10,6 +10,11 @@
 
 namespace houio
 {
+    /// Experimental native binary persistence for dense fields.
+    ///
+    /// The installed API is public and opt-in, but its current on-disk layout
+    /// has no magic, version, canonical byte order, or stable portability
+    /// guarantee. Prefer Houdini geometry formats for maintained interchange.
     namespace detail
     {
         template<typename Value>

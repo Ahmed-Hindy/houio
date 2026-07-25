@@ -9,7 +9,7 @@ Supported containers:
 - `.bgeo.sc`
 - `.vdb` through the Houdini Python bridge
 
-The minimum supported Houdini version is **20.0**. The package is validated with Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368.
+The minimum supported Houdini version is **20.0**. The file, large-asset, and package matrices are validated with Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368. See the [compatibility matrix](docs/compatibility.md).
 
 > [!IMPORTANT]
 > This project does not currently include a project-wide license file. Do not redistribute source or binaries until licensing and third-party provenance are resolved.
@@ -127,6 +127,17 @@ for (const houio::ScalarField::Ptr& volume : result.value)
 }
 ```
 
+### Experimental native field persistence
+
+```cpp
+#include <houio/FieldIO.h>
+
+const bool stored = houio::storeField(*volume, "volume.field");
+const houio::ScalarField::Ptr loaded = houio::loadField<float>("volume.field");
+```
+
+This installed API is opt-in, but the current native binary layout is experimental, platform-dependent, and not covered by stable interchange guarantees. See [Experimental field persistence format](docs/field-format.md).
+
 ### Write geometry
 
 ```cpp
@@ -217,19 +228,28 @@ The generated fixture matrix covers:
 - Dense scalar volumes
 - Point, vertex, and primitive groups
 
-Run it with installed Houdini versions:
+Run it with the maintained Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368 matrix:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_fixture_roundtrips.ps1
 ```
 
-A static Crag round-trip is also available:
+The same four-version matrix validates each output inside Houdini. A large Crag round-trip is also available:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_crag_roundtrip.ps1
 ```
+
+Validate the generated Houdini package across the maintained matrix:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\tools\houdini\run_package_matrix.ps1
+```
+
+See [Fixture generation and validation](docs/fixtures.md) for the manifest, known-loss, and extension workflow.
 
 ## Development checks
 
@@ -261,6 +281,11 @@ cmake --build --preset linux-clang-fuzzer
 
 - [Architecture](architecture.md)
 - [Developer onboarding](onboard.md)
+- [Contributing](CONTRIBUTING.md)
+- [Compatibility matrix](docs/compatibility.md)
+- [Fixture generation and validation](docs/fixtures.md)
+- [Experimental field persistence format](docs/field-format.md)
+- [Versioning and release policy](docs/versioning.md)
 - [Houdini package](docs/houdini-package.md)
 - [Houdini integration on Windows](docs/houdini-windows.md)
 - [Security policy](SECURITY.md)
