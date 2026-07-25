@@ -403,6 +403,181 @@ int verifyFieldStorage()
     return 0;
 }
 
+bool nearlyEqual(float left, float right, float tolerance = 1.0e-6f)
+{
+    return std::abs(left - right) <= tolerance;
+}
+
+bool nearlyEqual(
+    const houio::math::V3f& left,
+    const houio::math::V3f& right,
+    float tolerance = 1.0e-6f)
+{
+    return nearlyEqual(left.x, right.x, tolerance)
+        && nearlyEqual(left.y, right.y, tolerance)
+        && nearlyEqual(left.z, right.z, tolerance);
+}
+
+int verifyScalarFieldSampling()
+{
+    houio::ScalarField field;
+    field.resize(3, 2, 2);
+    for (int z = 0; z < 2; ++z)
+    {
+        for (int y = 0; y < 2; ++y)
+        {
+            for (int x = 0; x < 3; ++x)
+            {
+                field.voxel(x, y, z) = static_cast<float>(x + y * 10 + z * 100);
+            }
+        }
+    }
+
+    const houio::ScalarField& sampledField = field;
+    for (int z = 0; z < 2; ++z)
+    {
+        for (int y = 0; y < 2; ++y)
+        {
+            for (int x = 0; x < 3; ++x)
+            {
+                const float sampled = sampledField.evaluate(houio::math::V3f(
+                    static_cast<float>(x) + 0.5f,
+                    static_cast<float>(y) + 0.5f,
+                    static_cast<float>(z) + 0.5f));
+                if (!nearlyEqual(sampled, field.voxel(x, y, z)))
+                {
+                    return fail("field sampling did not reproduce an exact voxel center");
+                }
+            }
+        }
+    }
+
+    if (!nearlyEqual(sampledField.evaluate(houio::math::V3f(1.0f)), 55.5f))
+    {
+        return fail("field trilinear center interpolation is incorrect");
+    }
+    if (!nearlyEqual(sampledField.evaluate(houio::math::V3f(1.25f, 0.75f, 1.1f)), 63.25f))
+    {
+        return fail("field arbitrary trilinear interpolation is incorrect");
+    }
+    if (!nearlyEqual(sampledField.evaluate(houio::math::V3f(-100.0f, 1.0f, 1.0f)), 55.0f)
+        || !nearlyEqual(sampledField.evaluate(houio::math::V3f(100.0f, 1.0f, 1.0f)), 57.0f)
+        || !nearlyEqual(sampledField.evaluate(houio::math::V3f(-100.0f)), 0.0f)
+        || !nearlyEqual(sampledField.evaluate(houio::math::V3f(100.0f)), 112.0f))
+    {
+        return fail("field sampling did not clamp coordinates to boundary voxels");
+    }
+
+    houio::ScalarField singleAxisField;
+    singleAxisField.resize(1, 2, 2);
+    singleAxisField.voxel(0, 0, 0) = 0.0f;
+    singleAxisField.voxel(0, 1, 0) = 10.0f;
+    singleAxisField.voxel(0, 0, 1) = 100.0f;
+    singleAxisField.voxel(0, 1, 1) = 110.0f;
+    if (!nearlyEqual(singleAxisField.evaluate(houio::math::V3f(-50.0f, 1.0f, 1.0f)), 55.0f)
+        || !nearlyEqual(singleAxisField.evaluate(houio::math::V3f(50.0f, 1.0f, 1.0f)), 55.0f))
+    {
+        return fail("field sampling failed for a single-voxel axis");
+    }
+
+    houio::ScalarField tileBoundaryField;
+    tileBoundaryField.resize(18, 1, 1);
+    for (int x = 0; x < 18; ++x)
+    {
+        tileBoundaryField.voxel(x, 0, 0) = static_cast<float>(x);
+    }
+    if (!nearlyEqual(tileBoundaryField.evaluate(houio::math::V3f(15.5f, 0.5f, 0.5f)), 15.0f)
+        || !nearlyEqual(tileBoundaryField.evaluate(houio::math::V3f(16.0f, 0.5f, 0.5f)), 15.5f)
+        || !nearlyEqual(tileBoundaryField.evaluate(houio::math::V3f(16.5f, 0.5f, 0.5f)), 16.0f)
+        || !nearlyEqual(tileBoundaryField.evaluate(houio::math::V3f(17.0f, 0.5f, 0.5f)), 16.5f))
+    {
+        return fail("field interpolation failed across a 16-voxel tile boundary");
+    }
+    return 0;
+}
+
+int verifyVectorFieldSampling()
+{
+    houio::VectorField field;
+    field.resize(2, 2, 2);
+    for (int z = 0; z < 2; ++z)
+    {
+        for (int y = 0; y < 2; ++y)
+        {
+            for (int x = 0; x < 2; ++x)
+            {
+                field.voxel(x, y, z) = houio::math::V3f(
+                    static_cast<float>(x),
+                    static_cast<float>(y * 2),
+                    static_cast<float>(z * 4));
+            }
+        }
+    }
+
+    const houio::math::V3f interpolated = field.evaluate(houio::math::V3f(1.0f));
+    if (!nearlyEqual(interpolated, houio::math::V3f(0.5f, 1.0f, 2.0f)))
+    {
+        return fail("vector field trilinear interpolation is incorrect");
+    }
+    if (!nearlyEqual(
+            field.evaluate(houio::math::V3f(-10.0f, 1.0f, 10.0f)),
+            houio::math::V3f(0.0f, 1.0f, 4.0f)))
+    {
+        return fail("vector field boundary clamping is incorrect");
+    }
+    return 0;
+}
+
+int verifyFieldCoordinateTransforms()
+{
+    houio::ScalarField field;
+    field.resize(2, 3, 4);
+    field.setBound(houio::math::Box3f(10.0f, 20.0f, 30.0f, 14.0f, 26.0f, 38.0f));
+
+    const houio::math::V3f firstCenterWorld = field.voxelToWorld(houio::math::V3f(0.5f));
+    if (!nearlyEqual(firstCenterWorld, houio::math::V3f(11.0f, 21.0f, 31.0f), 1.0e-5f))
+    {
+        return fail("voxel-to-world transform does not map the first voxel center correctly");
+    }
+    if (!nearlyEqual(field.worldToVoxel(firstCenterWorld), houio::math::V3f(0.5f), 1.0e-5f))
+    {
+        return fail("world-to-voxel transform did not invert voxel-to-world");
+    }
+
+    const houio::math::V3f lastCenterWorld = field.voxelToWorld(houio::math::V3f(1.5f, 2.5f, 3.5f));
+    if (!nearlyEqual(lastCenterWorld, houio::math::V3f(13.0f, 25.0f, 37.0f), 1.0e-5f))
+    {
+        return fail("voxel-to-world transform does not map the last voxel center correctly");
+    }
+    return 0;
+}
+
+int verifyFieldSamplingRejectsNonFiniteCoordinates()
+{
+    houio::ScalarField field;
+    field.resize(1, 1, 1);
+    field.voxel(0, 0, 0) = 1.0f;
+
+    const float infinity = std::numeric_limits<float>::infinity();
+    const float quietNaN = std::numeric_limits<float>::quiet_NaN();
+    const houio::math::V3f invalidCoordinates[] = {
+        houio::math::V3f(infinity, 0.5f, 0.5f),
+        houio::math::V3f(0.5f, -infinity, 0.5f),
+        houio::math::V3f(0.5f, 0.5f, quietNaN)};
+    for (const houio::math::V3f& coordinates : invalidCoordinates)
+    {
+        try
+        {
+            static_cast<void>(field.evaluate(coordinates));
+            return fail("field sampling accepted non-finite coordinates");
+        }
+        catch (const std::invalid_argument&)
+        {
+        }
+    }
+    return 0;
+}
+
 int verifyFieldResizeSafety()
 {
     houio::ScalarField field;
@@ -454,6 +629,22 @@ int main()
         return result;
     }
     if (const int result = verifyFieldStorage(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyScalarFieldSampling(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyVectorFieldSampling(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyFieldCoordinateTransforms(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyFieldSamplingRejectsNonFiniteCoordinates(); result != 0)
     {
         return result;
     }

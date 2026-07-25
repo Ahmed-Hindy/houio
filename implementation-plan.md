@@ -2,7 +2,7 @@
 
 ## Scope
 
-This plan tracks the staged modernization work through branch `test/primitive-loading-safety`, based on `origin/master` commit `a69f13d`.
+This plan tracks the staged modernization work through branch `test/dense-field-sampling`, based on `origin/master` commit `f501032`.
 
 The objective is to modernize the retained HouIO core without changing supported file-format behavior, Houdini interoperability, package layout, or documented row-vector matrix semantics. Compatibility aliases are removed only after every in-tree caller has migrated and regression guards are in place.
 
@@ -31,6 +31,7 @@ Every phase must preserve these constraints:
 - Removed adapter compatibility constants, private getter shims, and exporter friendship after migrating every in-tree caller to scoped enums and modern virtual methods.
 - Added const-correct adapter accessors and moved geometry conversion and binary export onto immutable adapter views.
 - Hardened direct polygon and polygon-run loading against null, empty, and structurally invalid records.
+- Added exact scalar/vector field interpolation, clamped-boundary, transform, and non-finite-input coverage.
 
 ### Math and geometry utilities
 
@@ -61,8 +62,8 @@ Every phase must preserve these constraints:
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
 - Documentation audit contains no retired API references.
-- CI run `30169444900` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
-- CI reports a non-failing Node.js deprecation annotation for `ilammy/msvc-dev-cmd@v1`; action maintenance remains tracked separately.
+- CI validation for the active branch is pending until it is pushed.
+- Replacement of the deprecated MSVC environment action remains the next independent phase.
 
 ## Execution phases
 
@@ -242,6 +243,31 @@ Exit criteria:
 
 - Malformed primitive records produce diagnostics instead of null dereferences.
 - Direct polygon and all supported polygon-run encodings have independent regression coverage.
+- Strict, Release/Houdini, and AddressSanitizer matrices pass.
+
+### Phase 8 — Dense-field sampling correctness
+
+**Status: complete locally.**
+
+Target files:
+
+- `include/houio/Field.h`
+- `tests/test_volumes.cpp`
+
+Tasks:
+
+- Verify exact sampling at every voxel center.
+- Verify trilinear interpolation at half-cell and arbitrary fractional coordinates.
+- Define and test clamped sampling outside each field boundary.
+- Cover single-voxel axes and interpolation across 16-voxel tile boundaries.
+- Exercise scalar and vector fields through const sampling APIs.
+- Verify voxel/world transform round trips at known field bounds.
+- Reject NaN and infinite coordinates before floor and integer conversion.
+
+Exit criteria:
+
+- Sampling behavior is explicit for centers, interiors, boundaries, and degenerate axes.
+- Non-finite coordinates fail deterministically with `std::invalid_argument`.
 - Strict, Release/Houdini, and AddressSanitizer matrices pass.
 
 ## Deferred work

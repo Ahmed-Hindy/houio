@@ -320,6 +320,12 @@ namespace houio
     {
         if (data_.empty())
             throw std::runtime_error("Field::evaluate requires non-empty storage");
+        if (!std::isfinite(voxel_position.x)
+            || !std::isfinite(voxel_position.y)
+            || !std::isfinite(voxel_position.z))
+        {
+            throw std::invalid_argument("Field::evaluate requires finite voxel coordinates");
+        }
 
         using Real = float;
         math::Vec3<Real> position = voxel_position - sample_location_;
