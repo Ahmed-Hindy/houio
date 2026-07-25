@@ -336,6 +336,78 @@ int verifyMalformedVolumes()
         return result;
     }
 
+    const std::string extraTile =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
+          "[[\"compression\", 2, \"data\", 1.0], [\"compression\", 2, \"data\", 2.0]]]]";
+    if (const int result = expectFailure(makeVolumeDocument(extraTile), houio::DiagnosticCategory::schema,
+            "primitives[0].data.voxels", "extra volume tile"); result != 0)
+    {
+        return result;
+    }
+
+    const std::string nonObjectTile =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", [1.0]]]";
+    if (const int result = expectFailure(makeVolumeDocument(nonObjectTile), houio::DiagnosticCategory::schema,
+            "primitives[0].data.voxels.tiledarray.tiles[0]", "non-object volume tile"); result != 0)
+    {
+        return result;
+    }
+
+    const std::string missingTileData =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
+          "[[\"compression\", 2]]]]";
+    if (const int result = expectFailure(makeVolumeDocument(missingTileData), houio::DiagnosticCategory::schema,
+            "primitives[0].data.voxels.tiledarray.tiles[0]", "volume tile without data"); result != 0)
+    {
+        return result;
+    }
+
+    const std::string scalarRawTile =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
+          "[[\"compression\", 0, \"data\", 1.0]]]]";
+    if (const int result = expectFailure(makeVolumeDocument(scalarRawTile), houio::DiagnosticCategory::schema,
+            "primitives[0].data.voxels.tiledarray.tiles[0]", "scalar raw volume tile"); result != 0)
+    {
+        return result;
+    }
+
+    const std::string arrayConstantTile =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
+          "[[\"compression\", 2, \"data\", [1.0]]]]]";
+    if (const int result = expectFailure(makeVolumeDocument(arrayConstantTile), houio::DiagnosticCategory::schema,
+            "primitives[0].data.voxels.tiledarray.tiles[0]", "array constant volume tile"); result != 0)
+    {
+        return result;
+    }
+
+    const std::string invalidCompressionType =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
+          "[[\"compression\", \"two\", \"data\", 1.0]]]]";
+    if (const int result = expectFailure(makeVolumeDocument(invalidCompressionType),
+            houio::DiagnosticCategory::malformed_input, "primitives[0].data.voxels.tiledarray.tiles[0]",
+            "non-integer volume compression"); result != 0)
+    {
+        return result;
+    }
+
+    const int maximum = std::numeric_limits<int>::max();
+    const std::string oversizedTileGrid =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [" + std::to_string(maximum) + ", " + std::to_string(maximum)
+        + ", 1], \"voxels\", [\"tiledarray\", [\"tiles\", []]]";
+    if (const int result = expectFailure(makeVolumeDocument(oversizedTileGrid),
+            houio::DiagnosticCategory::schema, "primitives[0].data.voxels",
+            "oversized volume tile grid"); result != 0)
+    {
+        return result;
+    }
+
     const std::string unsupportedCompression =
         "\"vertex\", 0, \"transform\", " + identityTransform()
         + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
