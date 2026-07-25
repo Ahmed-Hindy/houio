@@ -160,6 +160,28 @@ namespace houio
 			std::memcpy(data.data() + byte_offset, &value, sizeof(T));
 		}
 
+		Attribute::ComponentType componentTypeForStorage(
+			HouGeoAdapter::AttributeAdapter::Storage storage) noexcept
+		{
+			using Storage = HouGeoAdapter::AttributeAdapter::Storage;
+			switch (storage)
+			{
+			case Storage::float16:
+				return Attribute::ComponentType::float16;
+			case Storage::float32:
+				return Attribute::ComponentType::float32;
+			case Storage::float64:
+				return Attribute::ComponentType::float64;
+			case Storage::int32:
+				return Attribute::ComponentType::int32;
+			case Storage::int64:
+				return Attribute::ComponentType::int64;
+			case Storage::invalid:
+				return Attribute::ComponentType::invalid;
+			}
+			return Attribute::ComponentType::invalid;
+		}
+
 		void storeNumericComponent(
 			std::span<std::byte> data,
 			size_t destination_index,
@@ -421,7 +443,7 @@ namespace houio
 		{
 			positionAttribute = std::make_shared<HouAttribute>();
 			positionAttribute->name_ = "P";
-			positionAttribute->tuple_size_ = 4;
+			positionAttribute->tuple_size_ = HouAttribute::TupleSize(4);
 			positionAttribute->storage_ = HouAttribute::Storage::float32;
 			positionAttribute->type_ = HouAttribute::Type::numeric;
 			positionAttribute->numeric_attribute_ = Attribute::createV4f();
@@ -510,7 +532,7 @@ namespace houio
 
 	HouGeo::HouAttribute::HouAttribute(const std::string& name, Attribute::Ptr attribute)
 		: name_(name),
-		  tuple_size_(attribute ? attribute->numComponents() : 1),
+		  tuple_size_(TupleSize(attribute ? attribute->numComponents() : 1)),
 		  storage_(Storage::float32),
 		  type_(Type::numeric),
 		  element_count_(attribute ? attribute->numElements() : 0),
@@ -522,6 +544,9 @@ namespace houio
 		{
 		case Attribute::ComponentType::float32:
 			storage_ = Storage::float32;
+			break;
+		case Attribute::ComponentType::float64:
+			storage_ = Storage::float64;
 			break;
 		case Attribute::ComponentType::float16:
 			storage_ = Storage::float16;
@@ -547,9 +572,9 @@ namespace houio
 		return type_;
 	}
 
-	int HouGeo::HouAttribute::tupleSize() const
+	HouGeoAdapter::AttributeAdapter::TupleSize HouGeo::HouAttribute::tupleSize() const
 	{
-		return numeric_attribute_ ? numeric_attribute_->numComponents() : tuple_size_;
+		return numeric_attribute_ ? TupleSize(numeric_attribute_->numComponents()) : tuple_size_;
 	}
 
 	HouGeoAdapter::AttributeAdapter::Storage HouGeo::HouAttribute::storage() const
@@ -579,7 +604,7 @@ namespace houio
 		string_values_.push_back(value);
 		type_ = Type::string;
 		storage_ = Storage::int32;
-		tuple_size_ = 1;
+		tuple_size_ = TupleSize(1);
 		return element_count_++;
 	}
 
@@ -872,26 +897,25 @@ namespace houio
 
 		if( attrType == AttributeAdapter::Type::numeric )
 		{
-			AttributeAdapter::Storage attrStorage = AttributeAdapter::parseStorage(
-				attrData->get<std::string>("storage"));
-			int attrTupleSize = attrData->get<int>("size");
+			const std::string storageName = attrData->get<std::string>("storage");
+			const AttributeAdapter::Storage attrStorage = AttributeAdapter::parseStorage(storageName);
+			const std::optional<size_t> componentByteWidth = AttributeAdapter::storageByteWidth(attrStorage);
+			const Attribute::ComponentType attrComponentType = componentTypeForStorage(attrStorage);
+			if( !componentByteWidth || attrComponentType == Attribute::ComponentType::invalid )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
+					"HouGeo::loadAttribute does not support storage " + storageName, -1, "storage"});
 
-			Attribute::ComponentType attrComponentType = Attribute::componentType(attrData->get<std::string>("storage"));
-			int attrNumComponents = attrData->get<int>("size");
-			attr->numeric_attribute_ = std::make_shared<Attribute>(attrNumComponents, attrComponentType);
+			const AttributeAdapter::TupleSize tupleSize(attrData->get<int>("size"));
+			const int attrTupleSize = tupleSize.value();
+			attr->numeric_attribute_ = std::make_shared<Attribute>(attrTupleSize, attrComponentType);
 			attr->numeric_attribute_->resize(elementCount);
 			std::span<std::byte> data = attr->numeric_attribute_->mutableBytes();
 
-			const int attrComponentSize = AttributeAdapter::storageSize(attrStorage);
-			if( attrStorage == AttributeAdapter::Storage::invalid || attrComponentSize <= 0 )
-				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
-					"HouGeo::loadAttribute does not support storage " + attrData->get<std::string>("storage"),
-					-1, "storage"});
 			const int dstTupleSize = attrTupleSize;
 			attr->name_ = attrName;
 			attr->type_ = attrType;
 			attr->storage_ = attrStorage;
-			attr->tuple_size_ = dstTupleSize;
+			attr->tuple_size_ = tupleSize;
 			attr->element_count_ = static_cast<int>(elementCount);
 
 			if( attrData->contains("values") )
@@ -1126,7 +1150,7 @@ namespace houio
 			attr->name_ = attrName;
 			attr->type_ = attrType;
 			attr->storage_ = AttributeAdapter::Storage::int32;
-			attr->tuple_size_ = 1;
+			attr->tuple_size_ = AttributeAdapter::TupleSize(1);
 
 			if( attrData->contains("indices") )
 			{
@@ -1174,7 +1198,7 @@ namespace houio
 			attr->name_ = attrName;
 			attr->type_ = attrType;
 			attr->storage_ = AttributeAdapter::Storage::int32;
-			attr->tuple_size_ = 1;
+			attr->tuple_size_ = AttributeAdapter::TupleSize(1);
 			attr->dictionary_values_.reserve(static_cast<size_t>(elementCount));
 
 			if( attrData->contains("indices") )
@@ -1363,7 +1387,7 @@ namespace houio
 					: nullptr;
 				if( !positionAttribute || !positionAttribute->numeric_attribute_ )
 					throw std::runtime_error( "HouGeo::loadVolumePrimitive requires a point P attribute" );
-				if( positionAttribute->tupleSize() < 3 )
+				if( positionAttribute->tupleSize().value() < 3 )
 					throw std::runtime_error( "HouGeo::loadVolumePrimitive P requires at least three components" );
 				if( pointIndex < 0 || static_cast<sint64>(pointIndex) >= positionAttribute->elementCount() )
 					throw std::runtime_error( "HouGeo::loadVolumePrimitive point index is outside P" );
@@ -1373,7 +1397,7 @@ namespace houio
 					throw std::runtime_error("HouGeo::loadVolumePrimitive P has no data");
 
 				const size_t tuple_offset = static_cast<size_t>(pointIndex)
-					* static_cast<size_t>(positionAttribute->tupleSize());
+					* positionAttribute->tupleSize().asSize();
 				if( positionAttribute->storage_ == AttributeAdapter::Storage::float16 )
 				{
 					position = math::V3f(

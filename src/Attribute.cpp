@@ -220,6 +220,8 @@ namespace houio
             return static_cast<int>(sizeof(sint32));
         case ComponentType::float32:
             return static_cast<int>(sizeof(real32));
+        case ComponentType::float64:
+            return static_cast<int>(sizeof(real64));
         case ComponentType::int64:
             return static_cast<int>(sizeof(sint64));
         case ComponentType::float16:
@@ -228,19 +230,6 @@ namespace houio
             throw std::invalid_argument("Attribute component type is invalid");
         }
         throw std::invalid_argument("Attribute component type is unknown");
-    }
-
-    Attribute::ComponentType Attribute::componentType(const std::string& storage_name)
-    {
-        if (storage_name == "fpreal32" || storage_name == "float")
-            return ComponentType::float32;
-        if (storage_name == "int32" || storage_name == "int")
-            return ComponentType::int32;
-        if (storage_name == "int64")
-            return ComponentType::int64;
-        if (storage_name == "fpreal16")
-            return ComponentType::float16;
-        return ComponentType::invalid;
     }
 
     std::size_t Attribute::checkedElementOffset(std::size_t index) const

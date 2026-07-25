@@ -88,6 +88,7 @@ foreach(retired_pattern IN ITEMS
     "static constexpr ComponentType HALF"
     "std::span<std::byte> bytes()"
     "std::span<std::byte> elementBytes("
+    "componentType(const std::string"
 )
     string(FIND "${attribute_header}" "${retired_pattern}" retired_position)
     if(NOT retired_position EQUAL -1)
@@ -106,6 +107,8 @@ foreach(retired_pattern IN ITEMS
     "getNumElements("
     "getString("
     "getDictionary("
+    "storageSize("
+    "virtual int tupleSize("
     "friend class ::houio::HouGeoIO"
 )
     string(FIND "${adapter_header}" "${retired_pattern}" retired_position)

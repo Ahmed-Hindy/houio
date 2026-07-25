@@ -32,9 +32,9 @@ public:
         return Type::dictionary;
     }
 
-    int tupleSize() const override
+    TupleSize tupleSize() const override
     {
-        return 1;
+        return TupleSize(1);
     }
 
     Storage storage() const override

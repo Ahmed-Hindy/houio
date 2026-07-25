@@ -31,7 +31,7 @@ namespace houio
 
             [[nodiscard]] std::string name() const override;
             [[nodiscard]] Type type() const override;
-            [[nodiscard]] int tupleSize() const override;
+            [[nodiscard]] TupleSize tupleSize() const override;
             [[nodiscard]] Storage storage() const override;
             [[nodiscard]] std::vector<int> packing() const override;
             [[nodiscard]] int elementCount() const override;
@@ -46,10 +46,8 @@ namespace houio
                 name_ = std::move(name);
             }
 
-            void setTupleSize(int tuple_size)
+            void setTupleSize(TupleSize tuple_size) noexcept
             {
-                if (tuple_size <= 0)
-                    throw std::invalid_argument("HouAttribute tuple size must be positive");
                 tuple_size_ = tuple_size;
             }
 
@@ -75,7 +73,7 @@ namespace houio
                 if (!attribute)
                     throw std::invalid_argument("HouAttribute numeric storage cannot be null");
                 numeric_attribute_ = std::move(attribute);
-                tuple_size_ = numeric_attribute_->numComponents();
+                tuple_size_ = TupleSize(numeric_attribute_->numComponents());
                 element_count_ = numeric_attribute_->numElements();
                 type_ = Type::numeric;
             }
@@ -97,7 +95,7 @@ namespace houio
                 numeric_attribute_.reset();
                 type_ = Type::string;
                 storage_ = Storage::int32;
-                tuple_size_ = 1;
+                tuple_size_ = TupleSize(1);
                 element_count_ = static_cast<int>(string_values_.size());
             }
 
@@ -113,7 +111,7 @@ namespace houio
                 numeric_attribute_.reset();
                 type_ = Type::dictionary;
                 storage_ = Storage::int32;
-                tuple_size_ = 1;
+                tuple_size_ = TupleSize(1);
                 element_count_ = static_cast<int>(dictionary_values_.size());
             }
 
@@ -124,7 +122,7 @@ namespace houio
 
         private:
             std::string name_;
-            int tuple_size_ = 1;
+            TupleSize tuple_size_{1};
             Storage storage_ = Storage::invalid;
             Type type_ = Type::numeric;
             std::vector<std::string> string_values_;

@@ -2,7 +2,7 @@
 
 ## Scope
 
-This plan tracks the staged modernization work through branch `test/dense-field-sampling`, based on `origin/master` commit `f501032`.
+This plan tracks the staged modernization work through branch `refactor/strong-attribute-metadata`, based on `origin/master` commit `56e6541`.
 
 The objective is to modernize the retained HouIO core without changing supported file-format behavior, Houdini interoperability, package layout, or documented row-vector matrix semantics. Compatibility aliases are removed only after every in-tree caller has migrated and regression guards are in place.
 
@@ -32,6 +32,7 @@ Every phase must preserve these constraints:
 - Added const-correct adapter accessors and moved geometry conversion and binary export onto immutable adapter views.
 - Hardened direct polygon and polygon-run loading against null, empty, and structurally invalid records.
 - Added exact scalar/vector field interpolation, clamped-boundary, transform, and non-finite-input coverage.
+- Replaced raw tuple-size integers and sentinel storage widths with validated metadata types and optional canonical representations.
 
 ### Math and geometry utilities
 
@@ -63,7 +64,8 @@ Every phase must preserve these constraints:
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
 - Documentation audit contains no retired API references.
 - CI validation for the active branch is pending until it is pushed.
-- Replacement of the deprecated MSVC environment action remains the next independent phase.
+- Dense-field sampling and CI/static-analysis maintenance are merged into `master`.
+- The active strong-metadata branch is rebased on those completed phases.
 
 ## Execution phases
 
@@ -247,7 +249,7 @@ Exit criteria:
 
 ### Phase 8 — Dense-field sampling correctness
 
-**Status: complete locally.**
+**Status: complete and merged.**
 
 Target files:
 
@@ -269,6 +271,61 @@ Exit criteria:
 - Sampling behavior is explicit for centers, interiors, boundaries, and degenerate axes.
 - Non-finite coordinates fail deterministically with `std::invalid_argument`.
 - Strict, Release/Houdini, and AddressSanitizer matrices pass.
+
+### Phase 9 — CI and static-analysis maintenance
+
+**Status: complete and merged.**
+
+Target files:
+
+- `.github/workflows/ci.yml`
+- `CMakeLists.txt`
+- `CMakePresets.json`
+- analyzer-reported source locations
+
+Tasks:
+
+- Replace the deprecated Node-based MSVC environment action with direct Visual Studio discovery and initialization.
+- Add an independent MSVC `/analyze` configure/build preset and CI matrix entry.
+- Treat analyzer diagnostics as errors.
+- Resolve analyzer findings without changing supported behavior.
+
+Exit criteria:
+
+- CI no longer depends on `ilammy/msvc-dev-cmd@v1`.
+- Native MSVC static analysis is error-clean.
+- Existing Linux, Windows, sanitizer, fuzzing, package, and Houdini validation remains green.
+
+### Phase 10 — Strong attribute metadata
+
+**Status: complete locally.**
+
+Target files:
+
+- `include/houio/HouGeoAdapter.h`
+- `include/houio/HouGeo.h`
+- `include/houio/Attribute.h`
+- `src/HouGeoAdapter.cpp`
+- `src/HouGeo.cpp`
+- `src/HouGeoIO.cpp`
+- adapter, geometry, numeric-storage, and retired-source tests
+
+Tasks:
+
+- Replace adapter tuple-size integers with an explicit positive `TupleSize` value type.
+- Keep the value type non-convertible so callers must choose integer or size representations deliberately.
+- Replace zero-byte invalid-storage sentinels with `std::optional<std::size_t>`.
+- Centralize canonical type and storage names for parsing and serialization.
+- Parse storage strings once and convert enums explicitly between lossless and simplified attribute models.
+- Remove the duplicate simplified-container string parser.
+- Add compile-time contracts, invalid-value tests, canonical-name round trips, and retired-API guards.
+
+Exit criteria:
+
+- Non-positive tuple sizes cannot be represented.
+- Invalid storage has no usable byte width or canonical name.
+- Export uses the same canonical metadata table as import.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work
 
