@@ -61,7 +61,8 @@ Every phase must preserve these constraints:
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
 - Documentation audit contains no retired API references.
-- CI validation for the active branch is pending until it is pushed.
+- CI run `30169444900` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
+- CI reports a non-failing Node.js deprecation annotation for `ilammy/msvc-dev-cmd@v1`; action maintenance remains tracked separately.
 
 ## Execution phases
 
@@ -221,7 +222,7 @@ Exit criteria:
 
 ### Phase 7 — Primitive loading safety
 
-**Status: complete locally.**
+**Status: complete.**
 
 Target files:
 

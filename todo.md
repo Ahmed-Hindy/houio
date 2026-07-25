@@ -10,7 +10,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
-- CI validation is pending until the branch is pushed.
+- Branch CI run `30169444900` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
+- CI reports a non-failing Node.js deprecation annotation for `ilammy/msvc-dev-cmd@v1`.
 
 ## Modernization completed
 
