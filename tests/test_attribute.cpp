@@ -1,5 +1,7 @@
 #include <houio/Attribute.h>
 
+#include "TestSupport.h"
+
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -7,11 +9,7 @@
 
 namespace
 {
-int fail(const std::string& message)
-{
-    std::cerr << "error: " << message << '\n';
-    return 1;
-}
+using houio::test::fail;
 
 int verifyAppendStorage()
 {

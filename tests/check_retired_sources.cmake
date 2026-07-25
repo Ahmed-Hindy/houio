@@ -323,6 +323,15 @@ foreach(retired_pattern IN ITEMS
     endif()
 endforeach()
 
+file(GLOB test_sources LIST_DIRECTORIES FALSE "${HOUIO_SOURCE_DIR}/tests/*.cpp")
+foreach(file_path IN LISTS test_sources)
+    file(READ "${file_path}" test_content)
+    string(FIND "${test_content}" "int fail(" local_failure_helper)
+    if(NOT local_failure_helper EQUAL -1)
+        message(FATAL_ERROR "Test reintroduced a private failure helper instead of TestSupport.h: ${file_path}")
+    endif()
+endforeach()
+
 file(READ "${HOUIO_SOURCE_DIR}/CMakeLists.txt" root_cmake)
 string(FIND "${root_cmake}" "src/math/Half/half.cpp" compiled_half_reference)
 if(NOT compiled_half_reference EQUAL -1)

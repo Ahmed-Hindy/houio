@@ -1,5 +1,7 @@
 #include <houio/HouGeoIO.h>
 
+#include "TestSupport.h"
+
 #include <array>
 #include <iostream>
 #include <limits>
@@ -10,11 +12,7 @@
 
 namespace
 {
-int fail(const std::string& message)
-{
-    std::cerr << "error: " << message << '\n';
-    return 1;
-}
+using houio::test::fail;
 
 houio::HouGeo::Ptr importPointOnlyGeometry(int pointCount)
 {

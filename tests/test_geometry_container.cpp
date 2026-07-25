@@ -1,5 +1,7 @@
 #include <houio/Geometry.h>
 
+#include "TestSupport.h"
+
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -9,11 +11,7 @@
 
 namespace
 {
-    int fail(const std::string& message)
-    {
-        std::cerr << "error: " << message << '\n';
-        return 1;
-    }
+    using houio::test::fail;
 
     int verifyTriangleBox()
     {
