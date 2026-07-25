@@ -301,14 +301,23 @@ namespace houio
         [[nodiscard]] sint64 primitiveCount() const override;
         [[nodiscard]] std::vector<std::string> pointAttributeNames() const override;
         [[nodiscard]] AttributeAdapter::Ptr pointAttribute(const std::string& name) override;
+        [[nodiscard]] AttributeAdapter::ConstPtr pointAttribute(
+            const std::string& name) const override;
         [[nodiscard]] std::vector<std::string> vertexAttributeNames() const override;
         [[nodiscard]] AttributeAdapter::Ptr vertexAttribute(const std::string& name) override;
+        [[nodiscard]] AttributeAdapter::ConstPtr vertexAttribute(
+            const std::string& name) const override;
         [[nodiscard]] bool hasPrimitiveAttribute(const std::string& name) const override;
         [[nodiscard]] std::vector<std::string> primitiveAttributeNames() const override;
         [[nodiscard]] AttributeAdapter::Ptr primitiveAttribute(const std::string& name) override;
+        [[nodiscard]] AttributeAdapter::ConstPtr primitiveAttribute(
+            const std::string& name) const override;
         [[nodiscard]] std::vector<Primitive::Ptr> primitives() override;
+        [[nodiscard]] std::vector<Primitive::ConstPtr> primitives() const override;
         [[nodiscard]] std::vector<std::string> globalAttributeNames() const override;
         [[nodiscard]] AttributeAdapter::Ptr globalAttribute(const std::string& name) override;
+        [[nodiscard]] AttributeAdapter::ConstPtr globalAttribute(
+            const std::string& name) const override;
         [[nodiscard]] std::vector<std::string> pointGroupNames() const override;
         [[nodiscard]] std::optional<std::vector<bool>> pointGroupMembership(
             const std::string& name) const override;
@@ -319,6 +328,7 @@ namespace houio
         [[nodiscard]] std::optional<std::vector<bool>> primitiveGroupMembership(
             const std::string& name) const override;
         [[nodiscard]] Topology::Ptr topology() override;
+        [[nodiscard]] Topology::ConstPtr topology() const override;
 
         struct SharedPrimitiveData
         {

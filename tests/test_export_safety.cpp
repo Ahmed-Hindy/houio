@@ -79,6 +79,11 @@ public:
         return nullptr;
     }
 
+    AttributeAdapter::ConstPtr primitiveAttribute(const std::string&) const override
+    {
+        return nullptr;
+    }
+
     std::vector<std::string> globalAttributeNames() const override
     {
         return {"settings"};
@@ -87,6 +92,11 @@ public:
     AttributeAdapter::Ptr globalAttribute(const std::string& name) override
     {
         return name == "settings" ? attribute_ : AttributeAdapter::Ptr();
+    }
+
+    AttributeAdapter::ConstPtr globalAttribute(const std::string& name) const override
+    {
+        return name == "settings" ? attribute_ : AttributeAdapter::ConstPtr();
     }
 
 private:

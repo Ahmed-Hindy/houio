@@ -3,7 +3,20 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
+
+static_assert(std::is_same_v<
+    decltype(std::declval<const houio::HouGeoAdapter&>().pointAttribute(
+        std::declval<const std::string&>())),
+    houio::HouGeoAdapter::AttributeAdapter::ConstPtr>);
+static_assert(std::is_same_v<
+    decltype(std::declval<const houio::HouGeoAdapter&>().primitives()),
+    std::vector<houio::HouGeoAdapter::Primitive::ConstPtr>>);
+static_assert(std::is_same_v<
+    decltype(std::declval<const houio::HouGeoAdapter&>().topology()),
+    houio::HouGeoAdapter::Topology::ConstPtr>);
 
 namespace
 {
@@ -141,7 +154,7 @@ const char* modernQuadGeometry()
     ])JSON";
 }
 
-int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTupleSize)
+int verifyGeometry(const houio::HouGeo::ConstPtr& geometry, int expectedPositionTupleSize)
 {
     if (!geometry)
     {
@@ -152,7 +165,7 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
         return fail("unexpected geometry counts");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr position = geometry->pointAttribute("P");
+    houio::HouGeoAdapter::AttributeAdapter::ConstPtr position = geometry->pointAttribute("P");
     if (!position)
     {
         return fail("modern tuple-based P attribute is missing");
@@ -164,13 +177,13 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
             + ", elements=" + std::to_string(position->elementCount()));
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr normals = geometry->vertexAttribute("N");
+    houio::HouGeoAdapter::AttributeAdapter::ConstPtr normals = geometry->vertexAttribute("N");
     if (!normals || normals->tupleSize() != 3 || normals->elementCount() != 4)
     {
         return fail("vertex N attribute was not preserved");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr uv = geometry->vertexAttribute("uv");
+    houio::HouGeoAdapter::AttributeAdapter::ConstPtr uv = geometry->vertexAttribute("uv");
     if (!uv || uv->tupleSize() != 2 || uv->elementCount() != 4)
     {
         return fail("vertex uv attribute was not preserved");
@@ -185,14 +198,16 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
         return fail("representative vertex attribute values were not preserved");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr name = geometry->primitiveAttribute("name");
+    houio::HouGeoAdapter::AttributeAdapter::ConstPtr name =
+        geometry->primitiveAttribute("name");
     if (!name || name->type() != houio::HouGeoAdapter::AttributeAdapter::Type::string
         || name->elementCount() != 1 || name->stringValue(0) != "prop")
     {
         return fail("indexed primitive string attribute was not preserved");
     }
 
-    houio::HouGeoAdapter::AttributeAdapter::Ptr piece = geometry->primitiveAttribute("piece");
+    houio::HouGeoAdapter::AttributeAdapter::ConstPtr piece =
+        geometry->primitiveAttribute("piece");
     if (!piece || piece->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::int32
         || piece->tupleSize() != 1 || piece->elementCount() != 1)
     {
@@ -204,13 +219,15 @@ int verifyGeometry(const houio::HouGeo::Ptr& geometry, int expectedPositionTuple
         return fail("primitive integer attribute value was not preserved");
     }
 
-    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
+    const std::vector<houio::HouGeoAdapter::Primitive::ConstPtr> primitives =
+        geometry->primitives();
     if (primitives.size() != 1)
     {
         return fail("unexpected primitive container count");
     }
 
-    const auto polygon = std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(primitives.front());
+    const auto polygon =
+        std::dynamic_pointer_cast<const houio::HouGeoAdapter::PolyPrimitive>(primitives.front());
     if (!polygon || polygon->polygonCount() != 1 || polygon->polygonVertexCount(0) != 4)
     {
         return fail("Polygon_run was not expanded correctly");

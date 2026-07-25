@@ -4,12 +4,13 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `test/complete-binary-json-coverage`
-- Baseline commit: `7d09bdb`
+- Branch: `refactor/raii-const-correctness`
+- Baseline commit: `d96f9be`.
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
-- Branch CI run `30087208906` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
+- Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
+- Branch CI run `30167188257` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
 - CI reports non-failing Node.js deprecation annotations for `ilammy/msvc-dev-cmd@v1`.
 
 ## Modernization completed
@@ -30,6 +31,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Preserve parsed uniform arrays when serializing JSON trees.
 - [x] Serialize signed and unsigned 8-bit ASCII values numerically.
 - [x] Preserve null values in exported adapter dictionaries.
+- [x] Add const-correct adapter accessors for attributes, primitives, and topology.
+- [x] Move geometry conversion and binary export onto immutable adapter views.
 
 ## Modernization next
 
@@ -92,7 +95,7 @@ Priority levels:
 
 ### Public API
 
-- [ ] Add const-correct accessors across geometry and field types.
+- [x] Add const-correct accessors across geometry, field, and adapter types.
 - [ ] Replace remaining raw owning pointers with RAII types.
 - [x] Replace unsafe typed attribute access with validated views or `memcpy`-based operations.
 - [x] Resolve alignment and strict-aliasing risks in typed `get()` and `set()` methods.
