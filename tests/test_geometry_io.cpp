@@ -1,6 +1,8 @@
 #include <houio/GeometryIO.h>
 #include <houio/HouGeoIO.h>
 
+#include "TestSupport.h"
+
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -11,11 +13,7 @@
 
 namespace
 {
-int fail(const std::string &message)
-{
-    std::cerr << "error: " << message << '\n';
-    return 1;
-}
+using houio::test::fail;
 
 houio::HouGeo::Ptr createPointGeometry()
 {

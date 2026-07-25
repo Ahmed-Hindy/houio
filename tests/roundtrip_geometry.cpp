@@ -1,15 +1,13 @@
 #include <houio/GeometryIO.h>
 
+#include "TestSupport.h"
+
 #include <iostream>
 #include <string>
 
 namespace
 {
-int fail(const std::string &message)
-{
-    std::cerr << "error: " << message << '\n';
-    return 1;
-}
+using houio::test::fail;
 
 void printDiagnostics(const houio::DiagnosticList &diagnostics)
 {

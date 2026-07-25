@@ -1,5 +1,7 @@
 #include <houio/HouGeoIO.h>
 
+#include "TestSupport.h"
+
 #include <array>
 #include <iostream>
 #include <sstream>
@@ -27,11 +29,7 @@ static_assert(!std::is_convertible_v<
 
 namespace
 {
-int fail(const std::string& message)
-{
-    std::cerr << "error: " << message << '\n';
-    return 1;
-}
+using houio::test::fail;
 
 const char* modernQuadGeometry()
 {

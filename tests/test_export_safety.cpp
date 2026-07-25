@@ -1,5 +1,7 @@
 #include <houio/HouGeoIO.h>
 
+#include "TestSupport.h"
+
 #include <atomic>
 #include <iostream>
 #include <sstream>
@@ -117,11 +119,7 @@ protected:
     }
 };
 
-int fail(const std::string& message)
-{
-    std::cerr << "error: " << message << '\n';
-    return 1;
-}
+using houio::test::fail;
 
 houio::HouGeo::Ptr createPointGeometry()
 {

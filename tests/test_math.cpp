@@ -8,6 +8,8 @@
 #include <houio/math/Vec3.h>
 #include <houio/math/Vec4.h>
 
+#include "TestSupport.h"
+
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -20,11 +22,7 @@
 
 namespace
 {
-int fail(const std::string& message)
-{
-    std::cerr << "error: " << message << '\n';
-    return 1;
-}
+using houio::test::fail;
 
 template<typename T>
 bool nearlyEqual(T lhs, T rhs, T tolerance = static_cast<T>(1.0e-5))

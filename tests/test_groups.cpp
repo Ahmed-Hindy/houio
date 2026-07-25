@@ -1,5 +1,7 @@
 #include <houio/HouGeoIO.h>
 
+#include "TestSupport.h"
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -7,11 +9,7 @@
 
 namespace
 {
-int fail(const std::string& message)
-{
-    std::cerr << "error: " << message << '\n';
-    return 1;
-}
+using houio::test::fail;
 
 const char* groupedGeometry()
 {

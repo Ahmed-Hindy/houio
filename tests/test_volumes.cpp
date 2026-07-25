@@ -1,5 +1,7 @@
 #include <houio/HouGeoIO.h>
 
+#include "TestSupport.h"
+
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -12,11 +14,8 @@
 
 namespace
 {
-int fail(const std::string& message)
-{
-    std::cerr << "error: " << message << '\n';
-    return 1;
-}
+using houio::test::expectThrows;
+using houio::test::fail;
 
 std::string positionAttribute(const std::string& storage = "fpreal32")
 {
@@ -381,24 +380,20 @@ int verifyFieldStorage()
     empty.resize(0, 2, 2);
     empty.store(storagePath.string());
     std::filesystem::remove(storagePath);
-    try
+    if (const int result = expectThrows<std::invalid_argument>(
+            [&empty] { static_cast<void>(houio::field_maximum(empty)); },
+            "field_maximum accepted an empty field"); result != 0)
     {
-        static_cast<void>(houio::field_maximum(empty));
-        return fail("field_maximum accepted an empty field");
-    }
-    catch (const std::invalid_argument&)
-    {
+        return result;
     }
 
     float minimum = 0.0f;
     float maximum = 0.0f;
-    try
+    if (const int result = expectThrows<std::invalid_argument>(
+            [&empty, &minimum, &maximum] { houio::field_range(empty, minimum, maximum); },
+            "field_range accepted an empty field"); result != 0)
     {
-        houio::field_range(empty, minimum, maximum);
-        return fail("field_range accepted an empty field");
-    }
-    catch (const std::invalid_argument&)
-    {
+        return result;
     }
     return 0;
 }
@@ -566,13 +561,11 @@ int verifyFieldSamplingRejectsNonFiniteCoordinates()
         houio::math::V3f(0.5f, 0.5f, quietNaN)};
     for (const houio::math::V3f& coordinates : invalidCoordinates)
     {
-        try
+        if (const int result = expectThrows<std::invalid_argument>(
+                [&field, coordinates] { static_cast<void>(field.evaluate(coordinates)); },
+                "field sampling accepted non-finite coordinates"); result != 0)
         {
-            static_cast<void>(field.evaluate(coordinates));
-            return fail("field sampling accepted non-finite coordinates");
-        }
-        catch (const std::invalid_argument&)
-        {
+            return result;
         }
     }
     return 0;
@@ -588,23 +581,22 @@ int verifyFieldResizeSafety()
         return fail("empty field resolution was not retained");
     }
 
-    try
+    if (const int result = expectThrows<std::invalid_argument>(
+            [&field] { field.resize(-1, 2, 2); },
+            "negative field resolution was accepted"); result != 0)
     {
-        field.resize(-1, 2, 2);
-        return fail("negative field resolution was accepted");
-    }
-    catch (const std::invalid_argument&)
-    {
+        return result;
     }
 
-    try
+    if (const int result = expectThrows<std::length_error>(
+            [&field]
+            {
+                const int maximum = std::numeric_limits<int>::max();
+                field.resize(maximum, maximum, maximum);
+            },
+            "overflowing field resolution was accepted"); result != 0)
     {
-        const int maximum = std::numeric_limits<int>::max();
-        field.resize(maximum, maximum, maximum);
-        return fail("overflowing field resolution was accepted");
-    }
-    catch (const std::length_error&)
-    {
+        return result;
     }
     return 0;
 }

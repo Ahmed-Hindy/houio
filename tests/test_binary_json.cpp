@@ -1,5 +1,7 @@
 #include <houio/json.h>
 
+#include "TestSupport.h"
+
 #include <array>
 #include <cstring>
 #include <initializer_list>
@@ -34,11 +36,7 @@ protected:
     }
 };
 
-int fail(const std::string& message)
-{
-    std::cerr << "error: " << message << '\n';
-    return 1;
-}
+using houio::test::fail;
 
 std::string binaryDocument(std::initializer_list<unsigned char> payload)
 {
