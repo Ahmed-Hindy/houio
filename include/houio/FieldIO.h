@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <limits>
+#include <span>
 #include <string>
 #include <type_traits>
 
@@ -189,7 +190,7 @@ namespace houio
 
         const math::V3i resolution = field.resolution();
         const math::Box3f bound = field.bound();
-        return detail::writeFieldBinaryValue(output, resolution.x)
+        const bool write_succeeded = detail::writeFieldBinaryValue(output, resolution.x)
             && detail::writeFieldBinaryValue(output, resolution.y)
             && detail::writeFieldBinaryValue(output, resolution.z)
             && detail::writeFieldBinaryValue(output, bound.minPoint.x)
@@ -200,6 +201,8 @@ namespace houio
             && detail::writeFieldBinaryValue(output, bound.maxPoint.z)
             && detail::writeFieldBinaryValue(output, detail::fieldStorageCode<T>)
             && detail::writeFieldPayload(output, field.values());
+        output.close();
+        return write_succeeded && output.good();
     }
 
     template<typename T>
@@ -210,10 +213,12 @@ namespace houio
             return false;
 
         const math::V3i resolution = field.resolution();
-        return detail::writeFieldBinaryValue(output, resolution.x)
+        const bool write_succeeded = detail::writeFieldBinaryValue(output, resolution.x)
             && detail::writeFieldBinaryValue(output, resolution.y)
             && detail::writeFieldBinaryValue(output, resolution.z)
             && detail::writeFieldBinaryValue(output, detail::fieldStorageCode<T>)
             && detail::writeFieldPayload(output, field.values());
+        output.close();
+        return write_succeeded && output.good();
     }
 }
