@@ -1245,14 +1245,17 @@ namespace houio
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 				"HouGeo::loadPrimitive expected definition and data arrays", -1, ""});
 
-		json::ArrayPtr definitionValues = primitive->array(0);
-		if( !definitionValues )
-			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
-				"HouGeo::loadPrimitive definition must be a flattened object", -1, "definition"});
-		json::ObjectPtr definition = toObject(definitionValues);
-		if( !definition )
-			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
-				"HouGeo::loadPrimitive definition is invalid", -1, "definition"});
+		json::ObjectPtr definition;
+		withSchemaPath("definition", [&]()
+		{
+			json::ArrayPtr definitionValues = primitive->array(0);
+			if( !definitionValues )
+				throw std::runtime_error(
+					"HouGeo::loadPrimitive definition must be a flattened object" );
+			definition = toObject(definitionValues);
+			if( !definition )
+				throw std::runtime_error( "HouGeo::loadPrimitive definition is invalid" );
+		});
 		std::string primitiveType;
 		if( definition->contains("type") )
 			primitiveType = definition->get<std::string>("type", "");

@@ -393,6 +393,21 @@ int verifyMalformedPrimitiveRecords()
         return result;
     }
 
+    const std::string malformedFlattenedDefinition = R"JSON([
+        "pointcount", 0,
+        "vertexcount", 0,
+        "primitivecount", 1,
+        "primitives", [[ [42, "Poly"], [] ]]
+    ])JSON";
+    if (const int result = expectImportFailure(
+            malformedFlattenedDefinition,
+            "primitives[0].definition",
+            "primitive definition with a non-string key");
+        result != 0)
+    {
+        return result;
+    }
+
     const std::string malformedPolyData = R"JSON([
         "pointcount", 1,
         "vertexcount", 1,
