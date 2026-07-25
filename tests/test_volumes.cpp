@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <numbers>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -539,6 +540,19 @@ bool nearlyEqual(
         && nearlyEqual(left.z, right.z, tolerance);
 }
 
+bool nearlyEqual(
+    const houio::math::M44f& left,
+    const houio::math::M44f& right,
+    float tolerance = 1.0e-6f)
+{
+    for (std::size_t component = 0; component < left.ma.size(); ++component)
+    {
+        if (!nearlyEqual(left.ma[component], right.ma[component], tolerance))
+            return false;
+    }
+    return true;
+}
+
 int verifyScalarFieldSampling()
 {
     houio::ScalarField field;
@@ -670,6 +684,90 @@ int verifyFieldCoordinateTransforms()
     {
         return fail("voxel-to-world transform does not map the last voxel center correctly");
     }
+    if (!nearlyEqual(field.voxelSize(), houio::math::V3f(2.0f), 1.0e-5f))
+    {
+        return fail("axis-aligned field voxel spacing is incorrect");
+    }
+
+    const houio::math::V3f localPosition(0.25f, 0.5f, 0.75f);
+    const houio::math::V3f voxelPosition = field.localToVoxel(localPosition);
+    const houio::math::V3f worldPosition = field.localToWorld(localPosition);
+    if (!nearlyEqual(voxelPosition, houio::math::V3f(0.5f, 1.5f, 3.0f), 1.0e-5f)
+        || !nearlyEqual(field.voxelToLocal(voxelPosition), localPosition, 1.0e-5f)
+        || !nearlyEqual(field.worldToLocal(worldPosition), localPosition, 1.0e-5f)
+        || !nearlyEqual(field.worldToVoxel(worldPosition), voxelPosition, 1.0e-5f)
+        || !nearlyEqual(field.voxelToWorld(voxelPosition), worldPosition, 1.0e-5f))
+    {
+        return fail("field local, voxel, and world transforms do not compose consistently");
+    }
+
+    houio::math::M44f rotatedTransform = houio::math::M44f::identity();
+    rotatedTransform.scale(4.0f, 6.0f, 8.0f)
+        .rotateZ(std::numbers::pi_v<float> * 0.5f)
+        .translate(10.0f, 20.0f, 30.0f);
+    field.setLocalToWorld(rotatedTransform);
+    if (!nearlyEqual(field.voxelSize(), houio::math::V3f(2.0f), 1.0e-5f))
+    {
+        return fail("rotated field voxel spacing must use transformed basis lengths");
+    }
+    const houio::math::V3f rotatedWorldPosition = field.localToWorld(localPosition);
+    if (!nearlyEqual(field.worldToLocal(rotatedWorldPosition), localPosition, 1.0e-5f)
+        || !nearlyEqual(
+            field.worldToVoxel(rotatedWorldPosition), field.localToVoxel(localPosition), 1.0e-5f))
+    {
+        return fail("rotated field coordinate transforms are inconsistent");
+    }
+    return 0;
+}
+
+int verifyFieldTransformMutationSafety()
+{
+    houio::ScalarField field;
+    field.resize(2, 2, 2);
+    field.setBound(houio::math::Box3f(1.0f, 2.0f, 3.0f, 5.0f, 8.0f, 11.0f));
+    const houio::math::M44f originalTransform = field.localToWorldMatrix();
+    const houio::math::Box3f originalBound = field.bound();
+
+    if (const int result = expectThrows<std::domain_error>(
+            [&field]
+            {
+                field.setLocalToWorld(houio::math::M44f::scaleMatrix(1.0f, 0.0f, 1.0f));
+            },
+            "singular field transform was accepted"); result != 0)
+    {
+        return result;
+    }
+    if (!nearlyEqual(field.localToWorldMatrix(), originalTransform)
+        || !nearlyEqual(field.bound().minPoint, originalBound.minPoint)
+        || !nearlyEqual(field.bound().maxPoint, originalBound.maxPoint))
+    {
+        return fail("singular field transform partially mutated field state");
+    }
+
+    if (const int result = expectThrows<std::invalid_argument>(
+            [&field]
+            {
+                field.setBound(houio::math::Box3f(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f));
+            },
+            "empty field bound was accepted"); result != 0)
+    {
+        return result;
+    }
+    if (!nearlyEqual(field.localToWorldMatrix(), originalTransform)
+        || !nearlyEqual(field.bound().minPoint, originalBound.minPoint)
+        || !nearlyEqual(field.bound().maxPoint, originalBound.maxPoint))
+    {
+        return fail("invalid field bound partially mutated field state");
+    }
+
+    houio::math::M44f nonFiniteTransform = originalTransform;
+    nonFiniteTransform.ma[0] = std::numeric_limits<float>::infinity();
+    if (const int result = expectThrows<std::invalid_argument>(
+            [&field, &nonFiniteTransform] { field.setLocalToWorld(nonFiniteTransform); },
+            "non-finite field transform was accepted"); result != 0)
+    {
+        return result;
+    }
     return 0;
 }
 
@@ -759,6 +857,10 @@ int main()
         return result;
     }
     if (const int result = verifyFieldCoordinateTransforms(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyFieldTransformMutationSafety(); result != 0)
     {
         return result;
     }

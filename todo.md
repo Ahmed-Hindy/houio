@@ -4,14 +4,14 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `refactor/separate-field-io`
-- Baseline commit: `b13bdbd` (`master` after Phase 10).
+- Branch: `refactor/modernization-phases-17-20`
+- Baseline commit: `e00d4b6` (complete Phases 11–16 stack; integration PR #31 targets `master`).
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
-- Stacked PRs #25–#27 contain the assertion harness, scoped JSON enums, and tile-validation phases.
-- CI validation for the active field-I/O separation branch is pending until it is pushed.
+- Phases 11–16 are consolidated for `master` by integration PR #31.
+- Current branch continues fixture-independent modernization from that complete source state.
 
 ## Modernization completed
 
@@ -43,6 +43,9 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Validate complete tiled-volume metadata before allocating destination field storage.
 - [x] Audit active ownership: no raw heap allocation/deallocation remains; the platform library handle is enclosed by `BloscLibrary` RAII.
 - [x] Move custom field persistence out of the `Field<T>` container into a dedicated nonmember I/O API.
+- [x] Define and test normalized-local, voxel-center, and row-vector field transform conventions.
+- [x] Make field transform and bound updates strongly exception-safe.
+- [x] Report voxel spacing from transformed basis-vector lengths.
 
 ## Modernization next
 
@@ -163,7 +166,7 @@ Add fixture-backed support one record type at a time:
 ### Field
 
 - [x] Separate custom binary persistence from the field container through `FieldIO.h`.
-- [ ] Audit coordinate conventions and transform composition.
+- [x] Audit coordinate conventions and transform composition.
 - [x] Add const sampling APIs.
 - [ ] Define whether the custom field format remains public.
 

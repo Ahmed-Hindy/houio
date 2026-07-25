@@ -2,7 +2,7 @@
 
 ## Scope
 
-This plan tracks the staged modernization work through branch `refactor/separate-field-io`, based on `origin/master` commit `b13bdbd` and stacked Phases 11–15.
+This plan tracks the staged modernization work through branch `refactor/modernization-phases-17-20`, based on the complete Phases 11–16 stack at `e00d4b6`. Integration PR #31 consolidates that stack onto `master`.
 
 The objective is to modernize the retained HouIO core without changing supported file-format behavior, Houdini interoperability, package layout, or documented row-vector matrix semantics. Compatibility aliases are removed only after every in-tree caller has migrated and regression guards are in place.
 
@@ -33,6 +33,9 @@ Every phase must preserve these constraints:
 - Hardened direct polygon and polygon-run loading against null, empty, and structurally invalid records.
 - Added exact scalar/vector field interpolation, clamped-boundary, transform, and non-finite-input coverage.
 - Replaced raw tuple-size integers and sentinel storage widths with validated metadata types and optional canonical representations.
+- Defined normalized-local, voxel-center, and row-vector field coordinate conventions.
+- Made field transform and bound updates strongly exception-safe.
+- Corrected voxel spacing to use transformed per-axis basis lengths.
 - Added shared dependency-free test assertions and typed exception checks.
 - Converted the remaining JSON token and parser-state enums to scoped enums while preserving binary values and compatibility constants.
 - Split tiled-volume validation from allocation and decode so malformed metadata is rejected before destination storage is created.
@@ -333,7 +336,7 @@ Exit criteria:
 
 ### Phase 11 — Lightweight assertion support
 
-**Status: complete locally; PR #25 open.**
+**Status: complete; consolidated by integration PR #31.**
 
 Target files:
 
@@ -356,7 +359,7 @@ Exit criteria:
 
 ### Phase 12 — Scoped JSON enums
 
-**Status: complete locally; PR #26 open and stacked on #25.**
+**Status: complete; consolidated by integration PR #31.**
 
 Target files:
 
@@ -382,7 +385,7 @@ Exit criteria:
 
 ### Phase 13 — Volume metadata before allocation
 
-**Status: complete locally; PR #27 open and stacked on #26.**
+**Status: complete; consolidated by integration PR #31.**
 
 Target files:
 
@@ -406,7 +409,7 @@ Exit criteria:
 
 ### Phase 14 — Modernization audit closure
 
-**Status: complete locally; PR #28 open and stacked on #27.**
+**Status: complete; consolidated by integration PR #31.**
 
 Target files:
 
@@ -430,7 +433,7 @@ Exit criteria:
 
 ### Phase 15 — Remove OpenGL-specific core state
 
-**Status: complete locally; PR #29 open and stacked on #28.**
+**Status: complete; consolidated by integration PR #31.**
 
 Target files:
 
@@ -455,7 +458,7 @@ Exit criteria:
 
 ### Phase 16 — Separate field persistence
 
-**Status: complete locally; active branch.**
+**Status: complete; consolidated by integration PR #31.**
 
 Target files:
 
@@ -479,6 +482,33 @@ Exit criteria:
 - `Field<T>` owns sampling, transforms, and voxel storage but no custom persistence policy.
 - Existing field files remain readable and writable with unchanged type codes and layout.
 - The compact no-bounds writer has direct regression coverage.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 17 — Field coordinate and transform contract
+
+**Status: complete locally.**
+
+Target files:
+
+- `include/houio/Field.h`
+- `tests/test_volumes.cpp`
+- roadmap documents
+
+Tasks:
+
+- Define the field local domain as the normalized cube `[0, 1]^3`.
+- Define voxel coordinates as `[0, resolution]` with centers at integer coordinates plus `0.5`.
+- Preserve the library's row-vector composition order from voxel to local to world space.
+- Correct `voxelSize()` to measure the transformed x, y, and z voxel basis vectors independently.
+- Validate finite transforms and finite non-empty bounds.
+- Compute inverses and transformed bounds before committing field state.
+- Add axis-aligned, rotated, composition, singular-transform, invalid-bound, and non-finite-transform tests.
+
+Exit criteria:
+
+- Per-axis voxel spacing remains positive and rotation-independent.
+- Local, voxel, and world transformations compose and invert consistently.
+- Failed transform or bound updates leave the previous field state unchanged.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work

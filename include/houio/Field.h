@@ -15,6 +15,11 @@
 
 namespace houio
 {
+    /// Dense field over the normalized local cube [0, 1]^3.
+    ///
+    /// Voxel coordinates span [0, resolution] and voxel centers are located at
+    /// integer coordinates plus 0.5. Points use the library's row-vector matrix
+    /// convention: voxel -> local -> world.
     template<typename T>
     class Field
     {
@@ -47,6 +52,7 @@ namespace houio
         void setBound(const math::Box3f& bound);
 
         [[nodiscard]] math::Box3f bound() const noexcept;
+        /// Returns the world-space lengths of the three transformed voxel basis vectors.
         [[nodiscard]] math::V3f voxelSize() const;
         [[nodiscard]] const math::M44f& localToWorldMatrix() const noexcept;
 
@@ -245,9 +251,12 @@ namespace houio
     {
         if (resolution_.x == 0 || resolution_.y == 0 || resolution_.z == 0)
             return math::V3f(0.0f);
-        const math::V3f minimum = voxelToWorld(math::V3f(0.0f));
-        const math::V3f maximum = voxelToWorld(math::V3f(1.0f));
-        return maximum - minimum;
+
+        const math::V3f origin = voxelToWorld(math::V3f(0.0f));
+        return math::V3f(
+            (voxelToWorld(math::V3f(1.0f, 0.0f, 0.0f)) - origin).length(),
+            (voxelToWorld(math::V3f(0.0f, 1.0f, 0.0f)) - origin).length(),
+            (voxelToWorld(math::V3f(0.0f, 0.0f, 1.0f)) - origin).length());
     }
 
     template<typename T>
@@ -284,25 +293,44 @@ namespace houio
     template<typename T>
     void Field<T>::setLocalToWorld(const math::M44f& local_to_world)
     {
-        local_to_world_ = local_to_world;
-        world_to_local_ = local_to_world_.inverted();
-        updateVoxelTransforms();
+        if (!std::all_of(local_to_world.ma.begin(), local_to_world.ma.end(),
+                [](float value) { return std::isfinite(value); }))
+        {
+            throw std::invalid_argument("Field::setLocalToWorld requires finite matrix values");
+        }
 
-        bound_.reset();
+        const math::M44f world_to_local = local_to_world.inverted();
+        math::Box3f transformed_bound;
         for (int z = 0; z <= 1; ++z)
             for (int y = 0; y <= 1; ++y)
                 for (int x = 0; x <= 1; ++x)
-                    bound_.extend(math::V3f(float(x), float(y), float(z)) * local_to_world_);
+                    transformed_bound.extend(math::V3f(float(x), float(y), float(z)) * local_to_world);
+
+        local_to_world_ = local_to_world;
+        world_to_local_ = world_to_local;
+        bound_ = transformed_bound;
+        updateVoxelTransforms();
     }
 
     template<typename T>
     void Field<T>::setBound(const math::Box3f& bound)
     {
+        if (bound.empty()
+            || !std::isfinite(bound.minPoint.x) || !std::isfinite(bound.minPoint.y)
+            || !std::isfinite(bound.minPoint.z) || !std::isfinite(bound.maxPoint.x)
+            || !std::isfinite(bound.maxPoint.y) || !std::isfinite(bound.maxPoint.z))
+        {
+            throw std::invalid_argument("Field::setBound requires a finite non-empty bound");
+        }
+
+        const math::V3f dimensions = bound.size();
+        const math::M44f local_to_world = math::M44f().scale(dimensions)
+            * math::M44f().translate(bound.minPoint);
+        const math::M44f world_to_local = local_to_world.inverted();
+
         bound_ = bound;
-        const math::V3f dimensions = bound_.size();
-        local_to_world_ = math::M44f().scale(dimensions)
-            * math::M44f().translate(bound_.minPoint);
-        world_to_local_ = local_to_world_.inverted();
+        local_to_world_ = local_to_world;
+        world_to_local_ = world_to_local;
         updateVoxelTransforms();
     }
 
