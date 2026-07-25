@@ -1,3 +1,4 @@
+#include <houio/FieldIO.h>
 #include <houio/HouGeoIO.h>
 
 #include "TestSupport.h"
@@ -421,6 +422,7 @@ int verifyFieldStorage()
 {
     const std::filesystem::path storagePath = std::filesystem::temp_directory_path() / "houio_field_storage.bin";
     const std::filesystem::path truncatedPath = std::filesystem::temp_directory_path() / "houio_field_truncated.bin";
+    const std::filesystem::path compactPath = std::filesystem::temp_directory_path() / "houio_field_compact.bin";
 
     houio::ScalarField source;
     source.resize(2, 2, 1);
@@ -428,9 +430,12 @@ int verifyFieldStorage()
     source.voxel(1, 0, 0) = 2.0f;
     source.voxel(0, 1, 0) = 3.0f;
     source.voxel(1, 1, 0) = 4.0f;
-    source.store(storagePath.string());
+    if (!houio::storeField(source, storagePath.string()))
+    {
+        return fail("field storage write failed");
+    }
 
-    houio::ScalarField::Ptr loaded = houio::ScalarField::load(storagePath.string());
+    houio::ScalarField::Ptr loaded = houio::loadField<float>(storagePath.string());
     std::filesystem::remove(storagePath);
     if (!loaded || std::abs(loaded->voxel(1, 1, 0) - 4.0f) > 1.0e-6f)
     {
@@ -441,16 +446,31 @@ int verifyFieldStorage()
         std::ofstream truncatedOutput(truncatedPath, std::ios::binary | std::ios::trunc);
         truncatedOutput.write("bad", 3);
     }
-    loaded = houio::ScalarField::load(truncatedPath.string());
+    loaded = houio::loadField<float>(truncatedPath.string());
     std::filesystem::remove(truncatedPath);
     if (loaded)
     {
         return fail("truncated field storage was accepted");
     }
 
+    if (!houio::storeFieldWithoutBoundingBox(source, compactPath.string()))
+    {
+        return fail("compact field storage write failed");
+    }
+    const std::uintmax_t compactSize = std::filesystem::file_size(compactPath);
+    std::filesystem::remove(compactPath);
+    const std::uintmax_t expectedCompactSize = sizeof(int) * 4u + sizeof(float) * 4u;
+    if (compactSize != expectedCompactSize)
+    {
+        return fail("compact field storage layout changed");
+    }
+
     houio::ScalarField empty;
     empty.resize(0, 2, 2);
-    empty.store(storagePath.string());
+    if (!houio::storeField(empty, storagePath.string()))
+    {
+        return fail("empty field storage write failed");
+    }
     std::filesystem::remove(storagePath);
     if (const int result = expectThrows<std::invalid_argument>(
             [&empty] { static_cast<void>(houio::field_maximum(empty)); },

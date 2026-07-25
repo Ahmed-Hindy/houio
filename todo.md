@@ -4,14 +4,14 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `refactor/remove-opengl-buffer-state`
+- Branch: `refactor/separate-field-io`
 - Baseline commit: `b13bdbd` (`master` after Phase 10).
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
 - Stacked PRs #25–#27 contain the assertion harness, scoped JSON enums, and tile-validation phases.
-- CI validation for the active OpenGL-state audit branch is pending until it is pushed.
+- CI validation for the active field-I/O separation branch is pending until it is pushed.
 
 ## Modernization completed
 
@@ -42,6 +42,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Convert the remaining public JSON token and parser-state enums to scoped enums.
 - [x] Validate complete tiled-volume metadata before allocating destination field storage.
 - [x] Audit active ownership: no raw heap allocation/deallocation remains; the platform library handle is enclosed by `BloscLibrary` RAII.
+- [x] Move custom field persistence out of the `Field<T>` container into a dedicated nonmember I/O API.
 
 ## Modernization next
 
@@ -161,7 +162,7 @@ Add fixture-backed support one record type at a time:
 
 ### Field
 
-- [ ] Separate file I/O concerns from the field container.
+- [x] Separate custom binary persistence from the field container through `FieldIO.h`.
 - [ ] Audit coordinate conventions and transform composition.
 - [x] Add const sampling APIs.
 - [ ] Define whether the custom field format remains public.
