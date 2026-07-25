@@ -537,6 +537,31 @@ Exit criteria:
 - No broad or mechanically unsafe `noexcept` annotations are introduced.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
+### Phase 19 — Retired implementation-comment cleanup
+
+**Status: complete locally.**
+
+Target files:
+
+- `src/json.cpp`
+- `tests/check_retired_sources.cmake`
+- roadmap documents
+
+Tasks:
+
+- Remove the remaining commented-out parser return statement.
+- Replace stale implementation comments that referenced removed internal types.
+- Correct and compact the binary-length encoding documentation.
+- Verify active source contains no `#if 0` implementation blocks.
+- Add regression checks for preprocessor-disabled and clearly commented-out control-flow or ownership statements.
+
+Exit criteria:
+
+- Active source contains no obsolete commented-out implementation blocks.
+- Maintained explanatory comments describe the current C++ implementation and format behavior.
+- The retired-source test rejects disabled code and clear commented-code patterns.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
 ## Deferred work
 
 The following remain separate from this modernization branch unless required by a discovered defect:

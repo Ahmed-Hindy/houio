@@ -58,6 +58,13 @@ foreach(file_path IN LISTS active_sources)
 
     file(STRINGS "${file_path}" source_lines)
     foreach(source_line IN LISTS source_lines)
+        if(source_line MATCHES "^[ \t]*#[ \t]*if[ \t]+0([ \t]|$)")
+            message(FATAL_ERROR "Active source reintroduced preprocessor-disabled implementation: ${file_path}: ${source_line}")
+        endif()
+        if(source_line MATCHES "^[ \t]*//[ \t]*(return[ \t]+(true|false|nullptr)|throw[ \t]+|delete[ \t]+|new[ \t]+|if[ \t]*\\(|for[ \t]*\\(|while[ \t]*\\()")
+            message(FATAL_ERROR "Active source reintroduced commented-out implementation: ${file_path}: ${source_line}")
+        endif()
+
         string(REGEX REPLACE "//.*$" "" code_line "${source_line}")
         if(code_line MATCHES "(^|[=({,:;])[ \t]*new[ \t]+[A-Za-z_:]")
             message(FATAL_ERROR "Active source reintroduced raw new allocation: ${file_path}: ${source_line}")

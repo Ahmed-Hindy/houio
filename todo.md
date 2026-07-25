@@ -48,6 +48,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Report voxel spacing from transformed basis-vector lengths.
 - [x] Make concrete JSON handlers and test adapters explicit `final` classes with complete `override` declarations.
 - [x] Complete the bounded `noexcept` audit without annotating allocating or checked-access APIs incorrectly.
+- [x] Remove obsolete commented-out parser implementation and guard against disabled code blocks returning.
 
 ## Modernization next
 
@@ -180,7 +181,7 @@ Add fixture-backed support one record type at a time:
 - [x] Add `override`, `final`, and `noexcept` where correct.
 - [ ] Apply const-correctness consistently.
 - [ ] Use `std::span` or equivalent views for non-owning ranges.
-- [ ] Remove obsolete commented-out implementation blocks.
+- [x] Remove obsolete commented-out implementation blocks.
 
 ## P3 — Performance
 
