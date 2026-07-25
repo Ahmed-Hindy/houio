@@ -220,6 +220,8 @@ namespace houio
             return static_cast<int>(sizeof(sint32));
         case ComponentType::float32:
             return static_cast<int>(sizeof(real32));
+        case ComponentType::float64:
+            return static_cast<int>(sizeof(real64));
         case ComponentType::int64:
             return static_cast<int>(sizeof(sint64));
         case ComponentType::float16:

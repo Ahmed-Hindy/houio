@@ -78,6 +78,7 @@ namespace houio
             invalid,
             int32,
             float32,
+            float64,
             int64,
             float16,
         };
@@ -188,6 +189,8 @@ namespace houio
             return ComponentType::int32;
         else if constexpr (std::is_same_v<Scalar, real32>)
             return ComponentType::float32;
+        else if constexpr (std::is_same_v<Scalar, real64>)
+            return ComponentType::float64;
         else if constexpr (std::is_same_v<Scalar, sint64>)
             return ComponentType::int64;
         else if constexpr (std::is_same_v<Scalar, uword>)

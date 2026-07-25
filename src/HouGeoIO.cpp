@@ -517,6 +517,12 @@ namespace houio
 				attr = Attribute::create(numComponents, Attribute::ComponentType::float32,
 					raw_data.bytes(), houAttr->elementCount());
 			}
+			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float64 )
+			{
+				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
+				attr = Attribute::create(numComponents, Attribute::ComponentType::float64,
+					raw_data.bytes(), houAttr->elementCount());
+			}
 			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::int32 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
@@ -610,6 +616,12 @@ namespace houio
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attr = Attribute::create(numComponents, Attribute::ComponentType::float32,
+					raw_data.bytes(), houAttr->elementCount());
+			}
+			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float64 )
+			{
+				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
+				attr = Attribute::create(numComponents, Attribute::ComponentType::float64,
 					raw_data.bytes(), houAttr->elementCount());
 			}
 			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::int64 )

@@ -170,11 +170,12 @@ namespace houio
 				return Attribute::ComponentType::float16;
 			case Storage::float32:
 				return Attribute::ComponentType::float32;
+			case Storage::float64:
+				return Attribute::ComponentType::float64;
 			case Storage::int32:
 				return Attribute::ComponentType::int32;
 			case Storage::int64:
 				return Attribute::ComponentType::int64;
-			case Storage::float64:
 			case Storage::invalid:
 				return Attribute::ComponentType::invalid;
 			}
@@ -543,6 +544,9 @@ namespace houio
 		{
 		case Attribute::ComponentType::float32:
 			storage_ = Storage::float32;
+			break;
+		case Attribute::ComponentType::float64:
+			storage_ = Storage::float64;
 			break;
 		case Attribute::ComponentType::float16:
 			storage_ = Storage::float16;

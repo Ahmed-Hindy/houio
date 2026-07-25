@@ -26,6 +26,13 @@ houio::sint64 readInt64(const houio::HouGeoAdapter::AttributeAdapter::Ptr& attri
     return attribute->rawData().read<houio::sint64>(static_cast<size_t>(index));
 }
 
+houio::real64 readFloat64(const houio::HouGeoAdapter::AttributeAdapter::Ptr& attribute, int index)
+{
+    if (index < 0)
+        throw std::out_of_range("Float64 attribute index cannot be negative");
+    return attribute->rawData().read<houio::real64>(static_cast<size_t>(index));
+}
+
 int verifyHalfConversion()
 {
     for (unsigned int value = 0; value <= 0xffffu; ++value)
@@ -79,6 +86,24 @@ int verifyInt64Attribute(const houio::HouGeo::Ptr& geometry)
     }
     return 0;
 }
+
+int verifyFloat64Attribute(const houio::HouGeo::Ptr& geometry)
+{
+    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->pointAttribute("precise_value");
+    if (!attribute
+        || attribute->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::float64
+        || attribute->tupleSize().value() != 1 || attribute->elementCount() != 2)
+    {
+        return fail("Float64 attribute metadata was not preserved");
+    }
+
+    if (readFloat64(attribute, 0) != 1.0000000000000002
+        || readFloat64(attribute, 1) != -123456789.125)
+    {
+        return fail("Float64 attribute values were narrowed or changed");
+    }
+    return 0;
+}
 }
 
 int main()
@@ -107,11 +132,21 @@ int main()
     halfValues->appendElement<houio::uword>(houio::floatToHalfBits(-2.0f));
     geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("half_value", halfValues));
 
+    houio::Attribute::Ptr preciseValues = std::make_shared<houio::Attribute>(
+        1, houio::Attribute::ComponentType::float64);
+    preciseValues->appendElement<houio::real64>(1.0000000000000002);
+    preciseValues->appendElement<houio::real64>(-123456789.125);
+    geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("precise_value", preciseValues));
+
     if (const int result = verifyInt64Attribute(geometry); result != 0)
     {
         return result;
     }
     if (const int result = verifyHalfAttribute(geometry); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyFloat64Attribute(geometry); result != 0)
     {
         return result;
     }
@@ -132,6 +167,10 @@ int main()
     {
         return result;
     }
+    if (const int result = verifyFloat64Attribute(imported); result != 0)
+    {
+        return result;
+    }
 
     houio::Geometry::Ptr converted = houio::HouGeoIO::convertToGeometry(
         imported, houio::HouGeoAdapter::Primitive::Ptr());
@@ -141,6 +180,16 @@ int main()
         || convertedHalf->numElements() != 2)
     {
         return fail("simplified conversion did not preserve Float16 attribute storage");
+    }
+
+    houio::Attribute::Ptr convertedFloat64 = converted ? converted->attribute("precise_value") : nullptr;
+    if (!convertedFloat64
+        || convertedFloat64->elementComponentType() != houio::Attribute::ComponentType::float64
+        || convertedFloat64->numElements() != 2
+        || convertedFloat64->get<houio::real64>(0) != 1.0000000000000002
+        || convertedFloat64->get<houio::real64>(1) != -123456789.125)
+    {
+        return fail("simplified conversion did not preserve Float64 attribute storage");
     }
     return 0;
 }
