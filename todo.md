@@ -4,14 +4,14 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `test/primitive-loading-safety`
-- Baseline commit: `a69f13d`.
+- Branch: `test/dense-field-sampling`
+- Baseline commit: `f501032`.
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
-- Branch CI run `30169444900` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
-- CI reports a non-failing Node.js deprecation annotation for `ilammy/msvc-dev-cmd@v1`.
+- Branch CI validation is pending until the branch is pushed.
+- CI action maintenance remains tracked separately.
 
 ## Modernization completed
 
@@ -35,6 +35,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Move geometry conversion and binary export onto immutable adapter views.
 - [x] Harden direct polygon and polygon-run loading against malformed JSON records.
 - [x] Add independent direct `Poly`, legacy `run/Poly`, and polygon-run regression coverage.
+- [x] Add exact scalar/vector field sampling, boundary, interpolation, and transform coverage.
+- [x] Reject non-finite field sampling coordinates before floor/integer conversion.
 
 ## Modernization next
 
@@ -77,7 +79,7 @@ Priority levels:
 
 ### Tests
 
-- [ ] Add exact dense-volume boundary and interpolation tests.
+- [x] Add exact dense-volume boundary and interpolation tests.
 - [x] Add matrix, scalar, copy, resize, and duplicate-point tests for `Attribute` and `Geometry`.
 - [x] Unit-test every supported binary token type.
 - [x] Unit-test binary integer length encodings.
@@ -156,7 +158,7 @@ Add fixture-backed support one record type at a time:
 
 - [ ] Separate file I/O concerns from the field container.
 - [ ] Audit coordinate conventions and transform composition.
-- [ ] Add const sampling APIs.
+- [x] Add const sampling APIs.
 - [ ] Define whether the custom field format remains public.
 
 ### Modern C++
