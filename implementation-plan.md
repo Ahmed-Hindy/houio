@@ -2,7 +2,7 @@
 
 ## Scope
 
-This plan tracks the staged modernization work through branch `refactor/strong-attribute-metadata`, based on `origin/master` commit `56e6541`.
+This plan tracks the staged modernization work through branch `maintenance/modernization-audit`, based on `origin/master` commit `b13bdbd` and stacked Phases 11–13.
 
 The objective is to modernize the retained HouIO core without changing supported file-format behavior, Houdini interoperability, package layout, or documented row-vector matrix semantics. Compatibility aliases are removed only after every in-tree caller has migrated and regression guards are in place.
 
@@ -33,6 +33,10 @@ Every phase must preserve these constraints:
 - Hardened direct polygon and polygon-run loading against null, empty, and structurally invalid records.
 - Added exact scalar/vector field interpolation, clamped-boundary, transform, and non-finite-input coverage.
 - Replaced raw tuple-size integers and sentinel storage widths with validated metadata types and optional canonical representations.
+- Added shared dependency-free test assertions and typed exception checks.
+- Converted the remaining JSON token and parser-state enums to scoped enums while preserving binary values and compatibility constants.
+- Split tiled-volume validation from allocation and decode so malformed metadata is rejected before destination storage is created.
+- Completed the ownership and legacy-syntax audit for raw heap operations, `typedef`, `NULL`, and unscoped public enums.
 
 ### Math and geometry utilities
 
@@ -63,9 +67,9 @@ Every phase must preserve these constraints:
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
 - Documentation audit contains no retired API references.
-- CI validation for the active branch is pending until it is pushed.
-- Dense-field sampling and CI/static-analysis maintenance are merged into `master`.
-- The active strong-metadata branch is rebased on those completed phases.
+- Phases 8–10 are merged into `master`.
+- Stacked PRs #25–#27 contain Phases 11–13; the active audit phase will be published above them.
+- CI validation for the active stacked branches is tracked separately from the completed local matrices.
 
 ## Execution phases
 
@@ -298,7 +302,7 @@ Exit criteria:
 
 ### Phase 10 — Strong attribute metadata
 
-**Status: complete locally.**
+**Status: complete and merged.**
 
 Target files:
 
@@ -326,6 +330,103 @@ Exit criteria:
 - Invalid storage has no usable byte width or canonical name.
 - Export uses the same canonical metadata table as import.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 11 — Lightweight assertion support
+
+**Status: complete locally; PR #25 open.**
+
+Target files:
+
+- `tests/TestSupport.h`
+- unit-test translation units
+- `tests/check_retired_sources.cmake`
+
+Tasks:
+
+- Add dependency-free shared failure, equality, near-value, and typed exception helpers.
+- Remove duplicated local failure functions from unit-test executables.
+- Migrate representative exception checks to the typed harness.
+- Guard against reintroducing private failure helpers.
+
+Exit criteria:
+
+- Every unit-test executable can use one shared support surface without an external dependency.
+- CTest and direct IDE execution remain unchanged.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 12 — Scoped JSON enums
+
+**Status: complete locally; PR #26 open and stacked on #25.**
+
+Target files:
+
+- `include/houio/json.h`
+- `src/json.cpp`
+- `tests/test_binary_json.cpp`
+- `tests/check_retired_sources.cmake`
+
+Tasks:
+
+- Convert binary-token identifiers to a byte-backed scoped enum.
+- Convert parser states to a scoped enum.
+- Preserve established constant names and exact binary values for source compatibility.
+- Type raw-byte validation boundaries explicitly.
+- Add compile-time non-conversion and binary-value checks.
+
+Exit criteria:
+
+- Token and parser-state values cannot implicitly convert to integers.
+- Binary encoding values remain unchanged.
+- Public headers contain no unscoped enum declarations.
+- All validation matrices pass.
+
+### Phase 13 — Volume metadata before allocation
+
+**Status: complete locally; PR #27 open and stacked on #26.**
+
+Target files:
+
+- `include/houio/HouGeo.h`
+- `src/HouGeo.cpp`
+- `tests/test_volumes.cpp`
+
+Tasks:
+
+- Parse and validate the full tiled-volume representation before allocating a `Field`.
+- Validate tile count, object structure, compression metadata, payload kind, and exact payload size in a first pass.
+- Decode only validated tile descriptors in a second pass with source and destination bounds checks.
+- Reject oversized tile grids before voxel allocation.
+- Add adversarial malformed-tile coverage.
+
+Exit criteria:
+
+- Invalid tile metadata cannot cause destination field allocation or indexing.
+- Raw and constant tiles preserve current values and ordering.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 14 — Modernization audit closure
+
+**Status: complete locally; active branch.**
+
+Target files:
+
+- `tests/check_retired_sources.cmake`
+- `todo.md`
+- `implementation-plan.md`
+
+Tasks:
+
+- Verify active code contains no `typedef`, `NULL`, raw heap allocation/deallocation, or unscoped public enums.
+- Enforce those findings with source-level regression checks.
+- Record that `BloscLibrary` encloses its platform handle with deterministic RAII cleanup.
+- Close stale roadmap entries for the test harness, ownership audit, tile validation, aliases, null pointers, and scoped enums.
+- Leave broad const-correctness, `noexcept`, span adoption, and comment cleanup open until dedicated audits establish completion.
+
+Exit criteria:
+
+- The roadmap distinguishes completed audits from genuine redesign and compatibility work.
+- Source checks fail if the closed legacy patterns return.
+- All validation matrices pass.
 
 ## Deferred work
 
