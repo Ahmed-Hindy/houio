@@ -17,7 +17,7 @@ namespace houio
 	{
 		namespace
 		{
-			bool isDefinedTokenType( ubyte value )
+			bool isDefinedTokenType(Token::Type value)
 			{
 				switch( value )
 				{
@@ -52,7 +52,7 @@ namespace houio
 				}
 			}
 
-			bool isSupportedUniformArrayType( ubyte value )
+			bool isSupportedUniformArrayType(Token::Type value)
 			{
 				switch( value )
 				{
@@ -576,7 +576,7 @@ namespace houio
 		{
 			auto assignTokenType = [&]( ubyte value, sint64 offset )
 			{
-				if( !isDefinedTokenType(value) )
+				if( !isDefinedTokenType(static_cast<Token::Type>(value)) )
 				{
 					std::ostringstream message;
 					message << "Parser encountered unknown binary token id " << static_cast<int>(value);
@@ -630,7 +630,7 @@ namespace houio
 			case Token::JID_UNIFORM_ARRAY:
 				{
 					const ubyte uniformType = read<ubyte>();
-					if( !isSupportedUniformArrayType(uniformType) )
+					if( !isSupportedUniformArrayType(static_cast<Token::Type>(uniformType)) )
 						fail(DiagnosticCategory::unsupported_input, "Parser::readBinaryToken encountered an unsupported uniform-array type", byteOffset - 1);
 					t.uaType = static_cast<Token::Type>(uniformType);
 

@@ -13,6 +13,12 @@
 #include <type_traits>
 #include <vector>
 
+static_assert(std::is_enum_v<houio::json::Token::Type>);
+static_assert(!std::is_convertible_v<houio::json::Token::Type, int>);
+static_assert(static_cast<houio::ubyte>(houio::json::Token::JID_MAGIC) == 0x7f);
+static_assert(std::is_enum_v<houio::json::Parser::State>);
+static_assert(!std::is_convertible_v<houio::json::Parser::State, int>);
+
 namespace
 {
 constexpr unsigned char binaryMagic[] = {0x7f, 0x4e, 0x53, 0x4a, 0x62};
