@@ -4,14 +4,13 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `refactor/raii-const-correctness`
-- Baseline commit: `d96f9be`.
+- Branch: `test/primitive-loading-safety`
+- Baseline commit: `a69f13d`.
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
-- Branch CI run `30167188257` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
-- CI reports non-failing Node.js deprecation annotations for `ilammy/msvc-dev-cmd@v1`.
+- CI validation is pending until the branch is pushed.
 
 ## Modernization completed
 
@@ -33,6 +32,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Preserve null values in exported adapter dictionaries.
 - [x] Add const-correct adapter accessors for attributes, primitives, and topology.
 - [x] Move geometry conversion and binary export onto immutable adapter views.
+- [x] Harden direct polygon and polygon-run loading against malformed JSON records.
+- [x] Add independent direct `Poly`, legacy `run/Poly`, and polygon-run regression coverage.
 
 ## Modernization next
 
@@ -81,7 +82,7 @@ Priority levels:
 - [x] Unit-test binary integer length encodings.
 - [x] Unit-test string definition and reference handling.
 - [x] Unit-test every supported uniform numeric array type.
-- [ ] Unit-test direct polygon and polygon-run loading independently.
+- [x] Unit-test direct polygon and polygon-run loading independently.
 - [ ] Introduce a small assertion harness or lightweight maintained C++ test framework.
 - [x] Keep all tests runnable through CTest and directly from IDEs.
 

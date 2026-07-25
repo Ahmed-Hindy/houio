@@ -102,6 +102,49 @@ const char* mixedPolygonGeometry()
     ])JSON";
 }
 
+const char* directPolygonGeometry()
+{
+    return R"JSON([
+        "pointcount", 4,
+        "vertexcount", 4,
+        "primitivecount", 1,
+        "topology", [
+            "pointref", [
+                "indices", [0, 1, 2, 3]
+            ]
+        ],
+        "primitives", [
+            [
+                ["type", "Poly"],
+                ["closed", false, "vertex", [0, 1, 2, 3]]
+            ]
+        ]
+    ])JSON";
+}
+
+const char* polyPrimitiveRunGeometry()
+{
+    return R"JSON([
+        "pointcount", 4,
+        "vertexcount", 6,
+        "primitivecount", 2,
+        "topology", [
+            "pointref", [
+                "indices", [0, 1, 2, 0, 2, 3]
+            ]
+        ],
+        "primitives", [
+            [
+                ["type", "run", "runtype", "Poly"],
+                [
+                    [[0, 1, 2]],
+                    [[3, 4, 5]]
+                ]
+            ]
+        ]
+    ])JSON";
+}
+
 const char* openPolygonGeometry()
 {
     return R"JSON([
@@ -250,6 +293,44 @@ int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
     return 0;
 }
 
+int verifyDirectGeometry(const houio::HouGeo::Ptr& geometry)
+{
+    if (!geometry || geometry->pointCount() != 4 || geometry->vertexCount() != 4
+        || geometry->primitiveCount() != 1)
+    {
+        return fail("direct Poly counts are incorrect");
+    }
+
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
+    if (primitives.size() != 1)
+    {
+        return fail("direct Poly record was not imported");
+    }
+
+    const auto polygon = std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(
+        primitives.front());
+    return verifyPolygon(polygon, false, {{0, 1, 2, 3}});
+}
+
+int verifyPolyPrimitiveRunGeometry(const houio::HouGeo::Ptr& geometry)
+{
+    if (!geometry || geometry->pointCount() != 4 || geometry->vertexCount() != 6
+        || geometry->primitiveCount() != 2)
+    {
+        return fail("run/Poly counts are incorrect");
+    }
+
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
+    if (primitives.size() != 1)
+    {
+        return fail("run/Poly records were not grouped into one primitive adapter");
+    }
+
+    const auto polygon = std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(
+        primitives.front());
+    return verifyPolygon(polygon, true, {{0, 1, 2}, {0, 2, 3}});
+}
+
 int verifyOpenGeometry(const houio::HouGeo::Ptr& geometry)
 {
     if (!geometry || geometry->pointCount() != 4 || geometry->vertexCount() != 4
@@ -266,6 +347,146 @@ int verifyOpenGeometry(const houio::HouGeo::Ptr& geometry)
 
     const auto polygon = std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(primitives.front());
     return verifyPolygon(polygon, false, {{0, 1, 2, 3}});
+}
+
+int expectImportFailure(
+    const std::string& sourceText,
+    const std::string& expectedPath,
+    const std::string& description)
+{
+    std::istringstream source(sourceText);
+    houio::DiagnosticList diagnostics;
+    if (houio::HouGeoIO::import(source, &diagnostics))
+    {
+        return fail(description + " was accepted");
+    }
+    if (diagnostics.empty())
+    {
+        return fail(description + " did not produce a diagnostic");
+    }
+    const houio::Diagnostic& diagnostic = diagnostics.back();
+    if (diagnostic.category != houio::DiagnosticCategory::schema)
+    {
+        return fail(description + " produced the wrong diagnostic category");
+    }
+    if (diagnostic.path != expectedPath)
+    {
+        return fail(description + " path mismatch: " + diagnostic.path);
+    }
+    return 0;
+}
+
+int verifyMalformedPrimitiveRecords()
+{
+    const std::string malformedDefinition = R"JSON([
+        "pointcount", 0,
+        "vertexcount", 0,
+        "primitivecount", 1,
+        "primitives", [[42, []]]
+    ])JSON";
+    if (const int result = expectImportFailure(
+            malformedDefinition,
+            "primitives[0].definition",
+            "non-object primitive definition");
+        result != 0)
+    {
+        return result;
+    }
+
+    const std::string malformedPolyData = R"JSON([
+        "pointcount", 1,
+        "vertexcount", 1,
+        "primitivecount", 1,
+        "topology", ["pointref", ["indices", [0]]],
+        "primitives", [[ ["type", "Poly"], 42 ]]
+    ])JSON";
+    if (const int result = expectImportFailure(
+            malformedPolyData,
+            "primitives[0].data",
+            "non-object Poly data");
+        result != 0)
+    {
+        return result;
+    }
+
+    const std::string malformedPolygonRunData = R"JSON([
+        "pointcount", 1,
+        "vertexcount", 1,
+        "primitivecount", 1,
+        "topology", ["pointref", ["indices", [0]]],
+        "primitives", [[ ["type", "Polygon_run"], 42 ]]
+    ])JSON";
+    if (const int result = expectImportFailure(
+            malformedPolygonRunData,
+            "primitives[0].data",
+            "non-object Polygon_run data");
+        result != 0)
+    {
+        return result;
+    }
+
+    const std::string missingPolyVertices = R"JSON([
+        "pointcount", 1,
+        "vertexcount", 1,
+        "primitivecount", 1,
+        "topology", ["pointref", ["indices", [0]]],
+        "primitives", [[ ["type", "Poly"], [] ]]
+    ])JSON";
+    if (const int result = expectImportFailure(
+            missingPolyVertices,
+            "primitives[0].data",
+            "Poly without vertices");
+        result != 0)
+    {
+        return result;
+    }
+
+    const std::string emptyPolyVertices = R"JSON([
+        "pointcount", 0,
+        "vertexcount", 0,
+        "primitivecount", 1,
+        "topology", ["pointref", ["indices", []]],
+        "primitives", [[ ["type", "Poly"], ["vertex", []] ]]
+    ])JSON";
+    if (const int result = expectImportFailure(
+            emptyPolyVertices,
+            "primitives[0].data",
+            "zero-vertex Poly");
+        result != 0)
+    {
+        return result;
+    }
+
+    const std::string emptyPolyRun = R"JSON([
+        "pointcount", 0,
+        "vertexcount", 0,
+        "primitivecount", 0,
+        "topology", ["pointref", ["indices", []]],
+        "primitives", [[ ["type", "run", "runtype", "Poly"], [] ]]
+    ])JSON";
+    if (const int result = expectImportFailure(
+            emptyPolyRun,
+            "primitives[0].data",
+            "empty run/Poly record");
+        result != 0)
+    {
+        return result;
+    }
+
+    const std::string emptyPolygonRun = R"JSON([
+        "pointcount", 0,
+        "vertexcount", 0,
+        "primitivecount", 0,
+        "topology", ["pointref", ["indices", []]],
+        "primitives", [[
+            ["type", "Polygon_run"],
+            ["startvertex", 0, "nprimitives", 0, "nvertices", []]
+        ]]
+    ])JSON";
+    return expectImportFailure(
+        emptyPolygonRun,
+        "primitives[0].data",
+        "zero-primitive Polygon_run");
 }
 
 template <typename Verifier>
@@ -291,9 +512,23 @@ int verifyRoundtrip(const char* sourceText, Verifier verifier)
 
 int main()
 {
+    if (const int result = verifyRoundtrip(directPolygonGeometry(), verifyDirectGeometry); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyRoundtrip(
+            polyPrimitiveRunGeometry(), verifyPolyPrimitiveRunGeometry);
+        result != 0)
+    {
+        return result;
+    }
     if (const int result = verifyRoundtrip(mixedPolygonGeometry(), verifyMixedGeometry); result != 0)
     {
         return result;
     }
-    return verifyRoundtrip(openPolygonGeometry(), verifyOpenGeometry);
+    if (const int result = verifyRoundtrip(openPolygonGeometry(), verifyOpenGeometry); result != 0)
+    {
+        return result;
+    }
+    return verifyMalformedPrimitiveRecords();
 }

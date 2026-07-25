@@ -2,7 +2,7 @@
 
 ## Scope
 
-This plan tracks the staged modernization work through branch `refactor/raii-const-correctness`, based on `origin/master` commit `d96f9be`.
+This plan tracks the staged modernization work through branch `test/primitive-loading-safety`, based on `origin/master` commit `a69f13d`.
 
 The objective is to modernize the retained HouIO core without changing supported file-format behavior, Houdini interoperability, package layout, or documented row-vector matrix semantics. Compatibility aliases are removed only after every in-tree caller has migrated and regression guards are in place.
 
@@ -30,6 +30,7 @@ Every phase must preserve these constraints:
 - Changed token dispatch from nullable `Parser*` to required `Parser&`.
 - Removed adapter compatibility constants, private getter shims, and exporter friendship after migrating every in-tree caller to scoped enums and modern virtual methods.
 - Added const-correct adapter accessors and moved geometry conversion and binary export onto immutable adapter views.
+- Hardened direct polygon and polygon-run loading against null, empty, and structurally invalid records.
 
 ### Math and geometry utilities
 
@@ -60,8 +61,7 @@ Every phase must preserve these constraints:
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
 - Documentation audit contains no retired API references.
-- CI run `30167188257` passes Linux GCC Release, GCC/UBSan, Clang parser fuzzing, MSVC warnings-as-errors, MSVC Release, and MSVC AddressSanitizer.
-- CI reports non-failing Node.js deprecation annotations for `ilammy/msvc-dev-cmd@v1`; action maintenance remains tracked separately.
+- CI validation for the active branch is pending until it is pushed.
 
 ## Execution phases
 
@@ -217,6 +217,30 @@ Exit criteria:
 
 - Export and conversion require no mutable adapter pointers.
 - Mutable access remains available only through non-const geometry handles.
+- Strict, Release/Houdini, and AddressSanitizer matrices pass.
+
+### Phase 7 — Primitive loading safety
+
+**Status: complete locally.**
+
+Target files:
+
+- `src/HouGeo.cpp`
+- `tests/test_polygon_runs.cpp`
+
+Tasks:
+
+- Validate primitive definition arrays before object conversion and field access.
+- Route direct `Poly`, `Polygon_run`, compact run aliases, and legacy `run/Poly` data through schema-path guards.
+- Reject missing, non-array, empty, zero-vertex, and zero-primitive records before constructing adapters.
+- Validate polygon-run start offsets before topology traversal.
+- Add independent semantic round-trip tests for direct `Poly` and legacy `run/Poly` records.
+- Add malformed-record tests with precise `primitives[n].definition` and `primitives[n].data` diagnostics.
+
+Exit criteria:
+
+- Malformed primitive records produce diagnostics instead of null dereferences.
+- Direct polygon and all supported polygon-run encodings have independent regression coverage.
 - Strict, Release/Houdini, and AddressSanitizer matrices pass.
 
 ## Deferred work

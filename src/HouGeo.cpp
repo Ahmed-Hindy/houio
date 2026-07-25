@@ -1245,7 +1245,14 @@ namespace houio
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 				"HouGeo::loadPrimitive expected definition and data arrays", -1, ""});
 
-		json::ObjectPtr definition = toObject(primitive->array(0));
+		json::ArrayPtr definitionValues = primitive->array(0);
+		if( !definitionValues )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeo::loadPrimitive definition must be a flattened object", -1, "definition"});
+		json::ObjectPtr definition = toObject(definitionValues);
+		if( !definition )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
+				"HouGeo::loadPrimitive definition is invalid", -1, "definition"});
 		std::string primitiveType;
 		if( definition->contains("type") )
 			primitiveType = definition->get<std::string>("type", "");
@@ -1258,13 +1265,13 @@ namespace houio
 			withSchemaPath("data", [&]() { loadVolumePrimitive(toObject(primitive->array(1)), sharedPrimitiveData); });
 		else
 		if( primitiveType=="Poly" )
-			loadPolyPrimitive(toObject(primitive->array(1)));
+			withSchemaPath("data", [&]() { loadPolyPrimitive(toObject(primitive->array(1))); });
 		else
 		if( primitiveType=="Polygon_run" || primitiveType=="p_r" )
-			loadPolygonRun(toObject(primitive->array(1)), true);
+			withSchemaPath("data", [&]() { loadPolygonRun(toObject(primitive->array(1)), true); });
 		else
 		if( primitiveType=="PolygonCurve_run" || primitiveType=="c_r" )
-			loadPolygonRun(toObject(primitive->array(1)), false);
+			withSchemaPath("data", [&]() { loadPolygonRun(toObject(primitive->array(1)), false); });
 		else
 		if( primitiveType=="run" )
 		{
@@ -1273,7 +1280,10 @@ namespace houio
 					"HouGeo::loadPrimitive run record is missing runtype", -1, "definition.runtype"});
 			if( definition->get<std::string>( "runtype" ) == "Poly" )
 			{
-				loadPolyPrimitiveRun(definition, primitive->array(1));
+				withSchemaPath("data", [&]()
+				{
+					loadPolyPrimitiveRun(definition, primitive->array(1));
+				});
 				return;
 			}
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
@@ -1598,30 +1608,33 @@ namespace houio
 	// HouGeo::HouPoly ==================================================
 	void HouGeo::loadPolyPrimitive( json::ObjectPtr polygonObject )
 	{
-		HouPoly::Ptr polygonPrimitive = std::make_shared<HouPoly>();
-		polygonPrimitive->m_closed = polygonObject->get<bool>("closed", true);
-
+		if( !polygonObject )
+			throw std::invalid_argument( "HouGeo::loadPolyPrimitive received invalid polygon data" );
 		if( !m_topology )
 			throw std::runtime_error( "HouGeo::loadPolyPrimitive expects topology to be loaded already" );
+		if( !polygonObject->contains("vertex") )
+			throw std::runtime_error( "HouGeo::loadPolyPrimitive is missing the vertex array" );
 
-		if( polygonObject->contains("vertex") )
+		json::ArrayPtr topologyIndices = polygonObject->array("vertex");
+		if( !topologyIndices )
+			throw std::runtime_error( "HouGeo::loadPolyPrimitive vertex must be an array" );
+		// These values index the topology array rather than the point domain directly.
+		const int vertexCount = checkedArrayCount(topologyIndices,
+			"HouGeo::loadPolyPrimitive vertex array");
+		if( vertexCount <= 0 )
+			throw std::runtime_error( "HouGeo::loadPolyPrimitive polygon must contain vertices" );
+
+		HouPoly::Ptr polygonPrimitive = std::make_shared<HouPoly>();
+		polygonPrimitive->m_closed = polygonObject->get<bool>("closed", true);
+		polygonPrimitive->m_numPolys = 1;
+		polygonPrimitive->m_perPolyVertexCount.push_back(vertexCount);
+		polygonPrimitive->m_perPolyVertexListOffset.push_back(0);
+		for( int vertexIndex=0;vertexIndex<vertexCount;++vertexIndex )
 		{
-			json::ArrayPtr topologyIndices = polygonObject->array("vertex");
-			if( !topologyIndices )
-				throw std::runtime_error( "HouGeo::loadPolyPrimitive missing vertex array" );
-			// These values index the topology array rather than the point domain directly.
-			const int vertexCount = checkedArrayCount(topologyIndices,
-				"HouGeo::loadPolyPrimitive vertex array");
-			polygonPrimitive->m_numPolys = 1;
-			polygonPrimitive->m_perPolyVertexCount.push_back(vertexCount);
-			polygonPrimitive->m_perPolyVertexListOffset.push_back(0);
-			for( int vertexIndex=0;vertexIndex<vertexCount;++vertexIndex )
-			{
-				const int topologyIndex = topologyIndices->get<sint32>(vertexIndex);
-				if( topologyIndex < 0 || static_cast<size_t>(topologyIndex) >= m_topology->indexBuffer.size() )
-					throw std::runtime_error( "HouGeo::loadPolyPrimitive topology index out of range" );
-				polygonPrimitive->m_vertices.push_back(m_topology->indexBuffer[static_cast<size_t>(topologyIndex)]);
-			}
+			const int topologyIndex = topologyIndices->get<sint32>(vertexIndex);
+			if( topologyIndex < 0 || static_cast<size_t>(topologyIndex) >= m_topology->indexBuffer.size() )
+				throw std::runtime_error( "HouGeo::loadPolyPrimitive topology index out of range" );
+			polygonPrimitive->m_vertices.push_back(m_topology->indexBuffer[static_cast<size_t>(topologyIndex)]);
 		}
 
 		m_primitives.push_back( polygonPrimitive );
@@ -1637,6 +1650,8 @@ namespace houio
 		HouPoly::Ptr polygonRun = std::make_shared<HouPoly>();
 		polygonRun->m_numPolys = checkedArrayCount(runEntries,
 			"HouGeo::loadPolyPrimitiveRun entries");
+		if( polygonRun->m_numPolys <= 0 )
+			throw std::runtime_error( "HouGeo::loadPolyPrimitiveRun requires at least one entry" );
 		polygonRun->m_closed = true;
 		size_t vertexOffset = 0;
 		for( int primitiveIndex=0;primitiveIndex<polygonRun->m_numPolys;++primitiveIndex )
@@ -1649,6 +1664,8 @@ namespace houio
 				throw std::runtime_error( "HouGeo::loadPolyPrimitiveRun missing polygon vertices" );
 			const int vertexCount = checkedArrayCount(topologyIndices,
 				"HouGeo::loadPolyPrimitiveRun polygon vertices");
+			if( vertexCount <= 0 )
+				throw std::runtime_error( "HouGeo::loadPolyPrimitiveRun polygon must contain vertices" );
 			if( vertexOffset > static_cast<size_t>(std::numeric_limits<int>::max()) )
 				throw std::overflow_error( "HouGeo::loadPolyPrimitiveRun vertex offset exceeds int range" );
 			polygonRun->m_perPolyVertexCount.push_back(vertexCount);
@@ -1666,6 +1683,8 @@ namespace houio
 
 	void HouGeo::loadPolygonRun( json::ObjectPtr polygonRun, bool closed )
 	{
+		if( !polygonRun )
+			throw std::invalid_argument( "HouGeo::loadPolygonRun received invalid polygon-run data" );
 		if( !m_topology )
 			throw std::runtime_error( "HouGeo::loadPolygonRun expects topology to be loaded already" );
 
@@ -1682,8 +1701,10 @@ namespace houio
 		const int startVertex = polygonRun->get<int>(startVertexKey, -1);
 		const int expectedPrimitiveCount = polygonRun->get<int>(primitiveCountKey, -1);
 		json::ArrayPtr vertexCountData = polygonRun->array(hasRunLengthData ? runLengthKey : vertexCountsKey);
-		if( startVertex < 0 || expectedPrimitiveCount < 0 || !vertexCountData )
+		if( startVertex < 0 || expectedPrimitiveCount <= 0 || !vertexCountData )
 			throw std::runtime_error( "HouGeo::loadPolygonRun invalid run metadata" );
+		if( static_cast<size_t>(startVertex) > m_topology->indexBuffer.size() )
+			throw std::runtime_error( "HouGeo::loadPolygonRun start vertex exceeds topology" );
 		if( hasRunLengthData && (vertexCountData->size() % 2) != 0 )
 			throw std::runtime_error( "HouGeo::loadPolygonRun invalid run-length data" );
 		if( !hasRunLengthData && hasVertexCounts && vertexCountData->size() != expectedPrimitiveCount )
