@@ -4,14 +4,14 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `maintenance/modernization-audit`
+- Branch: `refactor/remove-opengl-buffer-state`
 - Baseline commit: `b13bdbd` (`master` after Phase 10).
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
 - Stacked PRs #25–#27 contain the assertion harness, scoped JSON enums, and tile-validation phases.
-- CI validation for the active audit branch is pending until it is pushed.
+- CI validation for the active OpenGL-state audit branch is pending until it is pushed.
 
 ## Modernization completed
 
@@ -155,7 +155,7 @@ Add fixture-backed support one record type at a time:
 
 ### Geometry
 
-- [ ] Remove OpenGL-specific buffer identifiers from the file-format library or isolate them in an optional module.
+- [x] Verify the file-format library contains no OpenGL-specific buffer identifiers and guard against their reintroduction.
 - [ ] Hide mutable implementation details where practical.
 - [ ] Make lossless and simplified geometry responsibilities explicit in type names and APIs.
 
