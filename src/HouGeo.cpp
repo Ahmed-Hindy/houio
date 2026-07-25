@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <limits>
+#include <numeric>
 #include <type_traits>
 
 
@@ -23,88 +24,156 @@ namespace houio
 			return static_cast<int>(count);
 		}
 
-		std::vector<int> expandPagedIntValues( json::ObjectPtr values, sint64 elementCount, const std::string& attributeName )
+		std::vector<int> expandPagedIntValues(
+			json::ObjectPtr values,
+			sint64 elementCount,
+			int tupleSize,
+			const std::string& attributeName)
 		{
 			if( !values )
 				throw std::runtime_error( "HouGeo::loadAttribute missing integer value object for attribute " + attributeName );
 			if( elementCount < 0 || elementCount > static_cast<sint64>(std::numeric_limits<int>::max()) )
 				throw std::length_error( "HouGeo::loadAttribute integer element count exceeds supported indexing for attribute "
 					+ attributeName );
-			if( values->get<int>("size", 1) != 1 )
-				throw std::runtime_error( "HouGeo::loadAttribute expected scalar integer values for attribute " + attributeName );
+			if( tupleSize <= 0 || values->get<int>("size", 1) != tupleSize )
+				throw std::runtime_error( "HouGeo::loadAttribute integer tuple size mismatch for attribute " + attributeName );
 
-			std::vector<int> result;
-			result.reserve(static_cast<size_t>(elementCount));
+			const size_t elementCountSize = static_cast<size_t>(elementCount);
+			const size_t tupleSizeValue = static_cast<size_t>(tupleSize);
+			if( elementCountSize != 0 && tupleSizeValue > std::numeric_limits<size_t>::max() / elementCountSize )
+				throw std::length_error( "HouGeo::loadAttribute integer tuple count overflow for attribute " + attributeName );
+			const size_t scalarCount = elementCountSize * tupleSizeValue;
+			if( scalarCount > static_cast<size_t>(std::numeric_limits<int>::max()) )
+				throw std::length_error( "HouGeo::loadAttribute integer scalar count exceeds supported indexing for attribute "
+					+ attributeName );
 
+			std::vector<int> result(scalarCount);
 			if( values->contains("arrays") )
 			{
 				json::ArrayPtr arrays = values->array("arrays");
-				if( !arrays || arrays->size() != 1 )
+				if( !arrays || arrays->size() != tupleSize )
 					throw std::runtime_error( "HouGeo::loadAttribute invalid integer component arrays for attribute " + attributeName );
-
-				json::ArrayPtr data = arrays->array(0);
-				if( !data || data->size() != elementCount )
-					throw std::runtime_error( "HouGeo::loadAttribute integer value count mismatch for attribute " + attributeName );
-				const int valueCount = static_cast<int>(elementCount);
-				for( int index=0;index<valueCount;++index )
-					result.push_back(data->get<int>(index));
+				for( int componentIndex=0;componentIndex<tupleSize;++componentIndex )
+				{
+					json::ArrayPtr componentValues = arrays->array(componentIndex);
+					if( !componentValues || componentValues->size() != elementCount )
+						throw std::runtime_error( "HouGeo::loadAttribute integer value count mismatch for attribute " + attributeName );
+					for( int elementIndex=0;elementIndex<static_cast<int>(elementCount);++elementIndex )
+					{
+						const size_t destinationIndex = static_cast<size_t>(elementIndex) * tupleSizeValue
+							+ static_cast<size_t>(componentIndex);
+						result[destinationIndex] = componentValues->get<int>(elementIndex);
+					}
+				}
 				return result;
 			}
 
 			if( !values->contains("rawpagedata") )
 				throw std::runtime_error( "HouGeo::loadAttribute missing integer payload for attribute " + attributeName );
-
 			json::ArrayPtr rawPageData = values->array("rawpagedata");
 			if( !rawPageData )
 				throw std::runtime_error( "HouGeo::loadAttribute invalid integer payload for attribute " + attributeName );
 
-			if( !values->contains("constantpageflags") )
-			{
-				if( rawPageData->size() != elementCount )
-					throw std::runtime_error( "HouGeo::loadAttribute integer value count mismatch for attribute " + attributeName );
-				const int valueCount = static_cast<int>(elementCount);
-				for( int index=0;index<valueCount;++index )
-					result.push_back(rawPageData->get<int>(index));
-				return result;
-			}
-
 			const int elementsPerPage = values->get<int>("pagesize", 0);
 			if( elementsPerPage <= 0 )
 				throw std::runtime_error( "HouGeo::loadAttribute invalid page size for attribute " + attributeName );
+			const size_t pageCount = elementCountSize == 0 ? 0
+				: (elementCountSize + static_cast<size_t>(elementsPerPage) - 1u)
+					/ static_cast<size_t>(elementsPerPage);
 
-			json::ArrayPtr flagsPerPack = values->array("constantpageflags");
-			if( !flagsPerPack || flagsPerPack->size() != 1 )
-				throw std::runtime_error( "HouGeo::loadAttribute invalid constant page flags for attribute " + attributeName );
-			json::ArrayPtr pageFlags = flagsPerPack->array(0);
-			const sint64 expectedPageCount = (elementCount + elementsPerPage - 1) / elementsPerPage;
-			if( !pageFlags || pageFlags->size() != expectedPageCount )
-				throw std::runtime_error( "HouGeo::loadAttribute constant page flag count mismatch for attribute " + attributeName );
-
-			sint64 dataIndex = 0;
-			sint64 elementsRemaining = elementCount;
-			for( sint64 pageIndex=0;pageIndex<expectedPageCount;++pageIndex )
+			std::vector<int> packing;
+			if( values->contains("packing") )
 			{
-				const sint64 pageElementCount = std::min<sint64>(elementsRemaining, elementsPerPage);
-				const bool constantPage = pageFlags->get<bool>(static_cast<int>(pageIndex));
-				if( constantPage )
+				json::ArrayPtr packingValues = values->array("packing");
+				const int packingCount = checkedArrayCount(packingValues,
+					"HouGeo::loadAttribute integer packing for attribute " + attributeName);
+				if( packingCount == 0 )
+					throw std::runtime_error( "HouGeo::loadAttribute integer packing cannot be empty for attribute " + attributeName );
+				for( int packingIndex=0;packingIndex<packingCount;++packingIndex )
 				{
-					if( dataIndex >= rawPageData->size() )
-						throw std::runtime_error( "HouGeo::loadAttribute constant page payload underrun for attribute " + attributeName );
-					const int value = rawPageData->get<int>(static_cast<int>(dataIndex++));
-					result.insert(result.end(), static_cast<size_t>(pageElementCount), value);
+					const int packSize = packingValues->get<int>(packingIndex);
+					if( packSize <= 0 )
+						throw std::runtime_error( "HouGeo::loadAttribute integer packing must be positive for attribute " + attributeName );
+					packing.push_back(packSize);
 				}
-				else
+			}
+			else
+			{
+				packing.push_back(tupleSize);
+			}
+			const int packedTupleSize = std::accumulate(packing.begin(), packing.end(), 0);
+			if( packedTupleSize != tupleSize )
+				throw std::runtime_error( "HouGeo::loadAttribute integer packing does not cover tuple size for attribute "
+					+ attributeName );
+
+			std::vector<std::vector<bool>> constantFlags(
+				packing.size(), std::vector<bool>(pageCount, false));
+			if( values->contains("constantpageflags") )
+			{
+				json::ArrayPtr flagsPerPack = values->array("constantpageflags");
+				if( !flagsPerPack || flagsPerPack->size() != static_cast<sint64>(packing.size()) )
+					throw std::runtime_error( "HouGeo::loadAttribute invalid constant page flags for attribute " + attributeName );
+				for( size_t packIndex=0;packIndex<packing.size();++packIndex )
 				{
-					if( dataIndex + pageElementCount > rawPageData->size() )
-						throw std::runtime_error( "HouGeo::loadAttribute varying page payload underrun for attribute " + attributeName );
-					for( sint64 pageOffset=0;pageOffset<pageElementCount;++pageOffset )
-						result.push_back(rawPageData->get<int>(static_cast<int>(dataIndex++)));
+					json::ArrayPtr pageFlags = flagsPerPack->array(static_cast<int>(packIndex));
+					if( !pageFlags || pageFlags->size() != static_cast<sint64>(pageCount) )
+						throw std::runtime_error( "HouGeo::loadAttribute constant page flag count mismatch for attribute "
+							+ attributeName );
+					for( size_t pageIndex=0;pageIndex<pageCount;++pageIndex )
+						constantFlags[packIndex][pageIndex] = pageFlags->get<bool>(static_cast<int>(pageIndex));
 				}
-				elementsRemaining -= pageElementCount;
 			}
 
-			if( dataIndex != rawPageData->size() || result.size() != static_cast<size_t>(elementCount) )
-				throw std::runtime_error( "HouGeo::loadAttribute integer page expansion mismatch for attribute " + attributeName );
+			size_t expectedRawCount = 0;
+			for( size_t pageIndex=0;pageIndex<pageCount;++pageIndex )
+			{
+				const size_t pageStart = pageIndex * static_cast<size_t>(elementsPerPage);
+				const size_t pageElementCount = std::min(
+					elementCountSize - pageStart, static_cast<size_t>(elementsPerPage));
+				for( size_t packIndex=0;packIndex<packing.size();++packIndex )
+				{
+					const size_t repeatedElements = constantFlags[packIndex][pageIndex] ? 1u : pageElementCount;
+					const size_t packSize = static_cast<size_t>(packing[packIndex]);
+					if( repeatedElements != 0 && packSize > std::numeric_limits<size_t>::max() / repeatedElements )
+						throw std::length_error( "HouGeo::loadAttribute integer page payload overflow for attribute "
+							+ attributeName );
+					const size_t packValueCount = repeatedElements * packSize;
+					if( packValueCount > std::numeric_limits<size_t>::max() - expectedRawCount )
+						throw std::length_error( "HouGeo::loadAttribute integer page payload overflow for attribute "
+							+ attributeName );
+					expectedRawCount += packValueCount;
+				}
+			}
+			if( rawPageData->size() != static_cast<sint64>(expectedRawCount) )
+				throw std::runtime_error( "HouGeo::loadAttribute integer page payload size mismatch for attribute "
+					+ attributeName );
+
+			size_t rawIndex = 0;
+			for( size_t pageIndex=0;pageIndex<pageCount;++pageIndex )
+			{
+				const size_t pageStart = pageIndex * static_cast<size_t>(elementsPerPage);
+				const size_t pageElementCount = std::min(
+					elementCountSize - pageStart, static_cast<size_t>(elementsPerPage));
+				size_t componentStart = 0;
+				for( size_t packIndex=0;packIndex<packing.size();++packIndex )
+				{
+					const size_t packSize = static_cast<size_t>(packing[packIndex]);
+					const bool constantPage = constantFlags[packIndex][pageIndex];
+					for( size_t pageElement=0;pageElement<pageElementCount;++pageElement )
+					{
+						const size_t sourceStart = rawIndex + (constantPage ? 0u : pageElement * packSize);
+						const size_t destinationStart = (pageStart + pageElement) * tupleSizeValue + componentStart;
+						for( size_t component=0;component<packSize;++component )
+							result[destinationStart + component] = rawPageData->get<int>(
+								static_cast<int>(sourceStart + component));
+					}
+					rawIndex += (constantPage ? 1u : pageElementCount) * packSize;
+					componentStart += packSize;
+				}
+			}
+			if( rawIndex != expectedRawCount )
+				throw std::runtime_error( "HouGeo::loadAttribute integer page expansion mismatch for attribute "
+					+ attributeName );
 			return result;
 		}
 
@@ -610,9 +679,20 @@ namespace houio
 
 	std::string HouGeo::HouAttribute::stringValue(int index) const
 	{
-		if (index < 0 || static_cast<size_t>(index) >= string_values_.size())
-			throw std::out_of_range("HouAttribute string index is out of range");
-		return string_values_[static_cast<size_t>(index)];
+		return stringValue(index, 0);
+	}
+
+	std::string HouGeo::HouAttribute::stringValue(int element_index, int component_index) const
+	{
+		if (element_index < 0 || element_index >= element_count_)
+			throw std::out_of_range("HouAttribute string element index is out of range");
+		if (component_index < 0 || component_index >= tuple_size_.value())
+			throw std::out_of_range("HouAttribute string component index is out of range");
+		const size_t flattened_index = static_cast<size_t>(element_index) * tuple_size_.asSize()
+			+ static_cast<size_t>(component_index);
+		if (flattened_index >= string_values_.size())
+			throw std::out_of_range("HouAttribute string tuple storage is inconsistent");
+		return string_values_[flattened_index];
 	}
 
 	std::shared_ptr<json::Object> HouGeo::HouAttribute::dictionaryValue(int index) const
@@ -1147,17 +1227,21 @@ namespace houio
 			for( int stringIndex=0;stringIndex<stringCount;++stringIndex )
 				stringTable.push_back(stringsArray->get<std::string>(stringIndex));
 
+			const AttributeAdapter::TupleSize tupleSize(attrData->get<int>("size", 1));
+			const size_t scalarCount = checkedProduct(
+				static_cast<size_t>(elementCount), tupleSize.asSize(), "String attribute value count");
 			attr->name_ = attrName;
 			attr->type_ = attrType;
 			attr->storage_ = AttributeAdapter::Storage::int32;
-			attr->tuple_size_ = AttributeAdapter::TupleSize(1);
+			attr->tuple_size_ = tupleSize;
 
 			if( attrData->contains("indices") )
 			{
 				json::ObjectPtr indices = toObject(attrData->array("indices"));
-				const std::vector<int> indexValues = expandPagedIntValues(indices, elementCount, attrName);
+				const std::vector<int> indexValues = expandPagedIntValues(
+					indices, elementCount, tupleSize.value(), attrName);
 
-				attr->string_values_.reserve(static_cast<size_t>(elementCount));
+				attr->string_values_.reserve(scalarCount);
 				for( int stringIndex : indexValues )
 				{
 					if( stringIndex == -1 )
@@ -1170,16 +1254,18 @@ namespace houio
 					attr->string_values_.push_back(stringTable[static_cast<size_t>(stringIndex)]);
 				}
 			}
-			else if( stringTable.size() == static_cast<size_t>(elementCount) )
+			else if( stringTable.size() == scalarCount )
 				attr->string_values_ = stringTable;
-			else if( stringTable.size() == 1 && elementCount > 0 )
-				attr->string_values_.assign(static_cast<size_t>(elementCount), stringTable.front());
-			else if( elementCount == 0 )
+			else if( stringTable.size() == 1 && scalarCount > 0 )
+				attr->string_values_.assign(scalarCount, stringTable.front());
+			else if( scalarCount == 0 )
 				attr->string_values_.clear();
 			else
 				throw std::runtime_error( "HouGeo::loadAttribute cannot map string table to elements for attribute " + attrName );
 
-			attr->element_count_ = static_cast<int>(attr->string_values_.size());
+			if( attr->string_values_.size() != scalarCount )
+				throw std::runtime_error( "HouGeo::loadAttribute string tuple storage mismatch for attribute " + attrName );
+			attr->element_count_ = static_cast<int>(elementCount);
 		}else if( attrType == AttributeAdapter::Type::dictionary )
 		{
 			json::ArrayPtr dictionaries = attrData->array("dicts");
@@ -1204,7 +1290,7 @@ namespace houio
 			if( attrData->contains("indices") )
 			{
 				json::ObjectPtr indices = toObject(attrData->array("indices"));
-				const std::vector<int> indexValues = expandPagedIntValues(indices, elementCount, attrName);
+				const std::vector<int> indexValues = expandPagedIntValues(indices, elementCount, 1, attrName);
 				for( int dictionaryIndex : indexValues )
 				{
 					if( dictionaryIndex == -1 )

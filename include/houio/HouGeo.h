@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <map>
 #include <memory>
 #include <span>
@@ -36,6 +37,7 @@ namespace houio
             [[nodiscard]] std::vector<int> packing() const override;
             [[nodiscard]] int elementCount() const override;
             [[nodiscard]] std::string stringValue(int index) const override;
+            [[nodiscard]] std::string stringValue(int element_index, int component_index) const override;
             [[nodiscard]] std::shared_ptr<json::Object> dictionaryValue(int index) const override;
             [[nodiscard]] RawDataView rawData() const override;
 
@@ -90,13 +92,25 @@ namespace houio
 
             void setStringValues(std::vector<std::string> values)
             {
+                setStringValues(std::move(values), TupleSize(1));
+            }
+
+            void setStringValues(std::vector<std::string> values, TupleSize tuple_size)
+            {
+                const std::size_t component_count = tuple_size.asSize();
+                if (values.size() % component_count != 0)
+                    throw std::invalid_argument("HouAttribute string values do not form complete tuples");
+                const std::size_t element_count = values.size() / component_count;
+                if (element_count > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+                    throw std::length_error("HouAttribute string element count exceeds int range");
+
                 string_values_ = std::move(values);
                 dictionary_values_.clear();
                 numeric_attribute_.reset();
                 type_ = Type::string;
                 storage_ = Storage::int32;
-                tuple_size_ = TupleSize(1);
-                element_count_ = static_cast<int>(string_values_.size());
+                tuple_size_ = tuple_size;
+                element_count_ = static_cast<int>(element_count);
             }
 
             [[nodiscard]] const std::vector<std::string>& stringValues() const noexcept

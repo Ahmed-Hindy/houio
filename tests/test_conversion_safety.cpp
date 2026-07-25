@@ -279,6 +279,33 @@ int verifyAttributeAndStringBounds()
     catch (const std::out_of_range&)
     {
     }
+
+    using TupleSize = houio::HouGeoAdapter::AttributeAdapter::TupleSize;
+    strings.setStringValues({"a0", "a1", "b0", "b1"}, TupleSize(2));
+    if (strings.elementCount() != 2 || strings.tupleSize().value() != 2
+        || strings.stringValue(0, 0) != "a0" || strings.stringValue(0, 1) != "a1"
+        || strings.stringValue(1, 0) != "b0" || strings.stringValue(1, 1) != "b1")
+    {
+        return fail("HouAttribute did not preserve string tuple storage");
+    }
+    try
+    {
+        static_cast<void>(strings.stringValue(0, 2));
+        return fail("HouAttribute accepted an out-of-range string component");
+    }
+    catch (const std::out_of_range&)
+    {
+    }
+    try
+    {
+        strings.setStringValues({"incomplete", "tuple", "data"}, TupleSize(2));
+        return fail("HouAttribute accepted incomplete string tuples");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+    if (strings.elementCount() != 2 || strings.stringValue(1, 1) != "b1")
+        return fail("failed string tuple assignment partially mutated HouAttribute");
     return 0;
 }
 }

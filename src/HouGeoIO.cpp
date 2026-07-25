@@ -1203,15 +1203,25 @@ namespace houio
 			std::map<std::string, sint32> stringLookup;
 			std::vector<std::string> stringTable;
 			std::vector<sint32> stringIndices;
-			stringTable.reserve(static_cast<size_t>(elementCount));
-			stringIndices.reserve(static_cast<size_t>(elementCount));
+			stringTable.reserve(scalar_count);
+			stringIndices.reserve(scalar_count);
 			for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
 			{
-				const std::string value = attribute->stringValue(elementIndex);
-				auto insertion = stringLookup.emplace(value, static_cast<sint32>(stringTable.size()));
-				if( insertion.second )
-					stringTable.push_back(value);
-				stringIndices.push_back(insertion.first->second);
+				for( int componentIndex=0;componentIndex<sourceTupleSize.value();++componentIndex )
+				{
+					const std::string value = attribute->stringValue(elementIndex, componentIndex);
+					auto existing = stringLookup.find(value);
+					if( existing == stringLookup.end() )
+					{
+						if( stringTable.size() > static_cast<size_t>(std::numeric_limits<sint32>::max()) )
+							throw std::length_error( "HouGeoIO::exportAttribute string table exceeds int32 range for attribute "
+								+ name );
+						const sint32 stringIndex = static_cast<sint32>(stringTable.size());
+						stringTable.push_back(value);
+						existing = stringLookup.emplace(value, stringIndex).first;
+					}
+					stringIndices.push_back(existing->second);
+				}
 			}
 
 			writer.jsonString( "strings" );
@@ -1223,7 +1233,7 @@ namespace houio
 			writer.jsonString( "indices" );
 			writer.jsonBeginArray();
 			writer.jsonString( "size" );
-			writer.jsonInt32( 1 );
+			writer.jsonInt32( exportTupleSize );
 			writer.jsonString( "storage" );
 			writer.jsonString( "int32" );
 			writer.jsonString( "pagesize" );

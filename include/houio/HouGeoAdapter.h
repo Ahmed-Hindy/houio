@@ -126,6 +126,7 @@ namespace houio
             [[nodiscard]] virtual std::vector<int> packing() const;
             [[nodiscard]] virtual int elementCount() const;
             [[nodiscard]] virtual std::string stringValue(int index) const = 0;
+            [[nodiscard]] virtual std::string stringValue(int element_index, int component_index) const;
             [[nodiscard]] virtual std::shared_ptr<json::Object> dictionaryValue(int index) const;
             [[nodiscard]] virtual RawDataView rawData() const;
 

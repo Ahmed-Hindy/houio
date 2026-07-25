@@ -53,6 +53,21 @@ const char* mixedPolygonGeometry()
                     ]
                 ],
                 [
+                    ["scope", "public", "type", "string", "name", "varmap"],
+                    [
+                        "size", 4,
+                        "storage", "int32",
+                        "strings", ["Cd -> CD", "weight -> WEIGHT", "id -> ID", "label -> LABEL"],
+                        "indices", [
+                            "size", 4,
+                            "storage", "int32",
+                            "pagesize", 1024,
+                            "constantpageflags", [[true]],
+                            "rawpagedata", [0, 1, 2, 3]
+                        ]
+                    ]
+                ],
+                [
                     ["scope", "public", "type", "numeric", "name", "version"],
                     [
                         "size", 1,
@@ -246,6 +261,16 @@ int verifyMixedGeometry(const houio::HouGeo::Ptr& geometry)
     if (!fixture || fixture->stringValue(0) != "polygon_runs")
     {
         return fail("global string attribute was not preserved");
+    }
+
+    const auto varmap = geometry->globalAttribute("varmap");
+    if (!varmap || varmap->elementCount() != 1 || varmap->tupleSize().value() != 4
+        || varmap->stringValue(0, 0) != "Cd -> CD"
+        || varmap->stringValue(0, 1) != "weight -> WEIGHT"
+        || varmap->stringValue(0, 2) != "id -> ID"
+        || varmap->stringValue(0, 3) != "label -> LABEL")
+    {
+        return fail("global string tuple attribute was not preserved");
     }
 
     const auto version = geometry->globalAttribute("version");

@@ -34,6 +34,15 @@ namespace houio
         return {};
     }
 
+    std::string HouGeoAdapter::AttributeAdapter::stringValue(
+        int element_index,
+        int component_index) const
+    {
+        if (component_index != 0)
+            throw std::out_of_range("AttributeAdapter string component is out of range");
+        return stringValue(element_index);
+    }
+
     std::shared_ptr<json::Object> HouGeoAdapter::AttributeAdapter::dictionaryValue(int) const
     {
         return nullptr;
