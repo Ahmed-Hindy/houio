@@ -365,8 +365,8 @@ namespace houio::math
             for (std::size_t row = 0; row < dimension; ++row)
             {
                 for (std::size_t column = 0; column < dimension; ++column)
-                    augmented[row][column] = (*this)(row, column);
-                augmented[row][dimension + row] = T{1};
+                    augmented.at(row).at(column) = (*this)(row, column);
+                augmented.at(row).at(dimension + row) = T{1};
             }
 
             const T tolerance = pivotTolerance();
@@ -376,30 +376,30 @@ namespace houio::math
                 std::size_t pivot_row = pivot_column;
                 for (std::size_t candidate = pivot_column + 1; candidate < dimension; ++candidate)
                 {
-                    if (abs(augmented[candidate][pivot_column])
-                        > abs(augmented[pivot_row][pivot_column]))
+                    if (abs(augmented.at(candidate).at(pivot_column))
+                        > abs(augmented.at(pivot_row).at(pivot_column)))
                     {
                         pivot_row = candidate;
                     }
                 }
-                if (abs(augmented[pivot_row][pivot_column]) <= tolerance)
+                if (abs(augmented.at(pivot_row).at(pivot_column)) <= tolerance)
                     throw std::domain_error("Matrix44 is singular");
                 if (pivot_row != pivot_column)
-                    std::swap(augmented[pivot_row], augmented[pivot_column]);
+                    std::swap(augmented.at(pivot_row), augmented.at(pivot_column));
 
-                const T pivot = augmented[pivot_column][pivot_column];
-                for (T& value : augmented[pivot_column])
+                const T pivot = augmented.at(pivot_column).at(pivot_column);
+                for (T& value : augmented.at(pivot_column))
                     value /= pivot;
 
                 for (std::size_t row = 0; row < dimension; ++row)
                 {
                     if (row == pivot_column)
                         continue;
-                    const T factor = augmented[row][pivot_column];
+                    const T factor = augmented.at(row).at(pivot_column);
                     for (std::size_t column = 0; column < dimension * 2; ++column)
                     {
-                        augmented[row][column]
-                            -= factor * augmented[pivot_column][column];
+                        augmented.at(row).at(column)
+                            -= factor * augmented.at(pivot_column).at(column);
                     }
                 }
             }
@@ -407,7 +407,7 @@ namespace houio::math
             for (std::size_t row = 0; row < dimension; ++row)
             {
                 for (std::size_t column = 0; column < dimension; ++column)
-                    (*this)(row, column) = augmented[row][dimension + column];
+                    (*this)(row, column) = augmented.at(row).at(dimension + column);
             }
         }
 

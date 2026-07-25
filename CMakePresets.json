@@ -41,6 +41,20 @@
       }
     },
     {
+      "name": "windows-msvc-analysis",
+      "displayName": "Windows MSVC Static Analysis",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-msvc-analysis",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HOUIO_BUILD_TESTS": "OFF",
+        "HOUIO_BUILD_EXAMPLES": "OFF",
+        "HOUIO_BUILD_TOOLS": "OFF",
+        "HOUIO_WARNINGS_AS_ERRORS": "ON",
+        "HOUIO_ENABLE_MSVC_ANALYSIS": "ON"
+      }
+    },
+    {
       "name": "windows-msvc-asan",
       "displayName": "Windows MSVC AddressSanitizer",
       "generator": "Ninja",
@@ -102,6 +116,10 @@
     {
       "name": "windows-msvc-werror",
       "configurePreset": "windows-msvc-werror"
+    },
+    {
+      "name": "windows-msvc-analysis",
+      "configurePreset": "windows-msvc-analysis"
     },
     {
       "name": "windows-msvc-asan",

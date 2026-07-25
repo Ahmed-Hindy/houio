@@ -973,8 +973,8 @@ namespace houio
 			if (element_count < 0)
 				throw std::length_error("JSONReader::jsonUniformArray received a negative element count");
 			const size_t count = static_cast<size_t>(element_count);
-			if (count > std::numeric_limits<size_t>::max() / sizeof(T)
-				|| count > std::numeric_limits<size_t>::max() / sizeof(Source))
+			constexpr size_t largest_element_size = sizeof(T) > sizeof(Source) ? sizeof(T) : sizeof(Source);
+			if (count > std::numeric_limits<size_t>::max() / largest_element_size)
 			{
 				throw std::length_error("JSONReader::jsonUniformArray allocation size overflow");
 			}

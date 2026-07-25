@@ -94,8 +94,8 @@ Priority levels:
 - [x] Resolve remaining anonymous-union, parser, and dense-field warnings where API compatibility permits.
 - [x] Remove unreachable code warnings in the JSON implementation.
 - [x] Add a strict warnings-as-errors CI job after the warning baseline is clean.
-- [ ] Replace or update `ilammy/msvc-dev-cmd@v1` before GitHub removes forced Node.js 24 compatibility.
-- [ ] Add static-analysis configuration.
+- [x] Replace the deprecated Node-based MSVC environment action with direct `vswhere`/`VsDevCmd.bat` initialization.
+- [x] Add an error-clean native MSVC `/analyze` configuration and CI preset.
 
 ### Public API
 
