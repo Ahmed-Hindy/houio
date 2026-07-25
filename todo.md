@@ -46,6 +46,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Define and test normalized-local, voxel-center, and row-vector field transform conventions.
 - [x] Make field transform and bound updates strongly exception-safe.
 - [x] Report voxel spacing from transformed basis-vector lengths.
+- [x] Make concrete JSON handlers and test adapters explicit `final` classes with complete `override` declarations.
+- [x] Complete the bounded `noexcept` audit without annotating allocating or checked-access APIs incorrectly.
 
 ## Modernization next
 
@@ -175,7 +177,7 @@ Add fixture-backed support one record type at a time:
 - [x] Replace typedef-style aliases with `using` declarations.
 - [x] Use `nullptr` consistently.
 - [x] Use scoped enums in public headers where source compatibility permits.
-- [ ] Add `override`, `final`, and `noexcept` where correct.
+- [x] Add `override`, `final`, and `noexcept` where correct.
 - [ ] Apply const-correctness consistently.
 - [ ] Use `std::span` or equivalent views for non-owning ranges.
 - [ ] Remove obsolete commented-out implementation blocks.

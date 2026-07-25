@@ -511,6 +511,32 @@ Exit criteria:
 - Failed transform or bound updates leave the previous field state unchanged.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
+### Phase 18 — Explicit hierarchy and exception contracts
+
+**Status: complete locally.**
+
+Target files:
+
+- `include/houio/json.h`
+- `tests/test_binary_json.cpp`
+- `tests/test_export_safety.cpp`
+- roadmap documents
+
+Tasks:
+
+- Remove redundant `virtual` specifiers from concrete JSON writer overrides.
+- Add missing `override` declarations to every `JSONLogger` handler implementation.
+- Keep concrete JSON handlers `final` and enforce that contract at compile time.
+- Mark local adapter and stream-buffer test doubles `final`.
+- Audit public non-throwing accessors and retain `noexcept` only where allocation, checked access, user-defined operations, or stream work cannot invalidate the guarantee.
+
+Exit criteria:
+
+- Every concrete JSON handler implementation is compiler-checked as an override.
+- Concrete JSON handlers and test doubles cannot be accidentally subclassed.
+- No broad or mechanically unsafe `noexcept` annotations are introduced.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
 ## Deferred work
 
 The following remain separate from this modernization branch unless required by a discovered defect:

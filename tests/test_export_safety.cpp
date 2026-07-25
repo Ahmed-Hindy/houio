@@ -11,7 +11,7 @@
 
 namespace
 {
-class DictionaryAttributeAdapter : public houio::HouGeoAdapter::AttributeAdapter
+class DictionaryAttributeAdapter final : public houio::HouGeoAdapter::AttributeAdapter
 {
 public:
     DictionaryAttributeAdapter()
@@ -63,7 +63,7 @@ private:
     std::shared_ptr<houio::json::Object> dictionary_;
 };
 
-class DictionaryGeometryAdapter : public houio::HouGeoAdapter
+class DictionaryGeometryAdapter final : public houio::HouGeoAdapter
 {
 public:
     DictionaryGeometryAdapter()
@@ -105,7 +105,7 @@ private:
     AttributeAdapter::Ptr attribute_;
 };
 
-class RejectingStreamBuffer : public std::streambuf
+class RejectingStreamBuffer final : public std::streambuf
 {
 protected:
     std::streamsize xsputn(const char*, std::streamsize) override

@@ -385,22 +385,21 @@ namespace houio
 			explicit BinaryWriter(std::ostream& output);
 
 			bool jsonMagic();
-			virtual void                               jsonBeginArray()override;
-			virtual void                                 jsonEndArray()override;
-			virtual void                                 jsonBeginMap()override;
-			virtual void                                   jsonEndMap()override;
-			virtual void                                   jsonNull()override;
-			virtual void         jsonString( const std::string &value )override;
-			virtual void              jsonKey( const std::string &key )override;
-			virtual void                  jsonBool( const bool &value )override;
-			virtual void                 jsonInt( const sint64 &value )override;
-			virtual void                jsonUInt8( const ubyte &value )override;
-			virtual void                 jsonInt8( const sbyte &value )override;
-			virtual void               jsonInt32( const sint32 &value )override;
-			virtual void               jsonInt64( const sint64 &value )override;
-
-			virtual void              jsonReal32( const real32 &value )override;
-			virtual void              jsonReal64( const real64 &value )override;
+			void jsonBeginArray() override;
+			void jsonEndArray() override;
+			void jsonBeginMap() override;
+			void jsonEndMap() override;
+			void jsonNull() override;
+			void jsonString(const std::string& value) override;
+			void jsonKey(const std::string& key) override;
+			void jsonBool(const bool& value) override;
+			void jsonInt(const sint64& value) override;
+			void jsonUInt8(const ubyte& value) override;
+			void jsonInt8(const sbyte& value) override;
+			void jsonInt32(const sint32& value) override;
+			void jsonInt64(const sint64& value) override;
+			void jsonReal32(const real32& value) override;
+			void jsonReal64(const real64& value) override;
 
 
 			template<typename T>
@@ -485,22 +484,21 @@ namespace houio
 		public:
 			explicit ASCIIWriter(std::ostream& output);
 
-			virtual void                               jsonBeginArray()override;
-			virtual void                                 jsonEndArray()override;
-			virtual void                                 jsonBeginMap()override;
-			virtual void                                   jsonEndMap()override;
-			virtual void                                   jsonNull()override;
-			virtual void         jsonString( const std::string &value )override;
-			virtual void              jsonKey( const std::string &key )override;
-			virtual void                  jsonBool( const bool &value )override;
-			virtual void                 jsonInt( const sint64 &value )override;
-			virtual void                jsonUInt8( const ubyte &value )override;
-			virtual void                 jsonInt8( const sbyte &value )override;
-			virtual void               jsonInt32( const sint32 &value )override;
-			virtual void               jsonInt64( const sint64 &value )override;
-
-			virtual void              jsonReal32( const real32 &value )override;
-			virtual void              jsonReal64( const real64 &value )override;
+			void jsonBeginArray() override;
+			void jsonEndArray() override;
+			void jsonBeginMap() override;
+			void jsonEndMap() override;
+			void jsonNull() override;
+			void jsonString(const std::string& value) override;
+			void jsonKey(const std::string& key) override;
+			void jsonBool(const bool& value) override;
+			void jsonInt(const sint64& value) override;
+			void jsonUInt8(const ubyte& value) override;
+			void jsonInt8(const sbyte& value) override;
+			void jsonInt32(const sint32& value) override;
+			void jsonInt64(const sint64& value) override;
+			void jsonReal32(const real32& value) override;
+			void jsonReal64(const real64& value) override;
 
 
 			void                               write( const std::string &text );
@@ -536,70 +534,70 @@ namespace houio
 					out << "\t";std::flush(out);
 			}
 
-			virtual void jsonBeginArray()
+			void jsonBeginArray() override
 			{
 				indent();
 				out << "jsonBeginArray\n";std::flush(out);
 				++indentLevel;
 			}
 
-			virtual void jsonEndArray()
+			void jsonEndArray() override
 			{
 				--indentLevel;
 				indent();
 				out << "jsonEndArray\n";std::flush(out);
 			}
 
-			virtual void jsonString( const std::string &value )
+			void jsonString(const std::string& value) override
 			{
 				indent();
 				out << "jsonString " << value << "\n";std::flush(out);
 			}
 
-			virtual void jsonKey( const std::string &key )
+			void jsonKey(const std::string& key) override
 			{
 				indent();
 				out << "jsonKey " << key << "\n";std::flush(out);
 			}
 
-			virtual void jsonBool( const bool &value )
+			void jsonBool(const bool& value) override
 			{
 				indent();
 				out << "jsonBool " << value << "\n";std::flush(out);
 			}
 
-			virtual void jsonInt32( const sint32 &value )
+			void jsonInt32(const sint32& value) override
 			{
 				indent();
 				out << "jsonInt32 " << value << "\n";std::flush(out);
 			}
 
-			virtual void jsonInt64( const sint64 &value )
+			void jsonInt64(const sint64& value) override
 			{
 				indent();
 				out << "jsonInt64 " << value << "\n";std::flush(out);
 			}
 
-			virtual void jsonReal32( const real32 &value )
+			void jsonReal32(const real32& value) override
 			{
 				indent();
 				out << "jsonReal32 " << value << "\n";std::flush(out);
 			}
 
-			virtual void jsonReal64( const real64 &value )
+			void jsonReal64(const real64& value) override
 			{
 				indent();
 				out << "jsonReal64 " << value << "\n";std::flush(out);
 			}
 
-			virtual void jsonBeginMap()
+			void jsonBeginMap() override
 			{
 				indent();
 				out << "jsonBeginMap\n";std::flush(out);
 				++indentLevel;
 			}
 
-			virtual void jsonEndMap()
+			void jsonEndMap() override
 			{
 				--indentLevel;
 				indent();
