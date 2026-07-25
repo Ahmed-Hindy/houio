@@ -112,7 +112,15 @@ foreach(header_path IN LISTS public_headers)
 endforeach()
 
 file(READ "${HOUIO_SOURCE_DIR}/include/houio/Field.h" field_header)
-foreach(retired_name IN ITEMS "sample(" "lvalue(" "getResolution(" "getVoxelSize(")
+foreach(retired_name IN ITEMS
+    "sample("
+    "lvalue("
+    "getResolution("
+    "getVoxelSize("
+    "static Ptr load("
+    "void store("
+    "void storeWithoutBoundingBox("
+)
     string(FIND "${field_header}" "${retired_name}" retired_position)
     if(NOT retired_position EQUAL -1)
         message(FATAL_ERROR "Field public API reintroduced retired name ${retired_name}")

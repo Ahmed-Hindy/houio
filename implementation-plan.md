@@ -2,7 +2,7 @@
 
 ## Scope
 
-This plan tracks the staged modernization work through branch `refactor/remove-opengl-buffer-state`, based on `origin/master` commit `b13bdbd` and stacked Phases 11–14.
+This plan tracks the staged modernization work through branch `refactor/separate-field-io`, based on `origin/master` commit `b13bdbd` and stacked Phases 11–15.
 
 The objective is to modernize the retained HouIO core without changing supported file-format behavior, Houdini interoperability, package layout, or documented row-vector matrix semantics. Compatibility aliases are removed only after every in-tree caller has migrated and regression guards are in place.
 
@@ -430,7 +430,7 @@ Exit criteria:
 
 ### Phase 15 — Remove OpenGL-specific core state
 
-**Status: complete locally; active branch.**
+**Status: complete locally; PR #29 open and stacked on #28.**
 
 Target files:
 
@@ -452,6 +452,34 @@ Exit criteria:
 - The core library remains rendering-API independent.
 - CPU-side topology naming is not incorrectly treated as graphics-resource state.
 - Regression guards and all validation matrices pass.
+
+### Phase 16 — Separate field persistence
+
+**Status: complete locally; active branch.**
+
+Target files:
+
+- `include/houio/Field.h`
+- `include/houio/FieldIO.h`
+- `src/Field.cpp`
+- `tests/test_volumes.cpp`
+- `tests/check_retired_sources.cmake`
+
+Tasks:
+
+- Remove custom binary load/store members and storage-type state from the `Field<T>` container.
+- Introduce nonmember `loadField`, `storeField`, and `storeFieldWithoutBoundingBox` APIs in a dedicated header.
+- Preserve the existing on-disk type codes and binary layout.
+- Return explicit write success instead of silently ignoring file-open and output failures.
+- Migrate in-tree persistence tests and retain malformed/truncated-file rejection.
+- Guard against reintroducing persistence members into `Field<T>`.
+
+Exit criteria:
+
+- `Field<T>` owns sampling, transforms, and voxel storage but no custom persistence policy.
+- Existing field files remain readable and writable with unchanged type codes and layout.
+- The compact no-bounds writer has direct regression coverage.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work
 
