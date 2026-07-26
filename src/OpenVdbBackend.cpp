@@ -120,10 +120,11 @@ namespace houio
             {
                 for( auto iterator = file.beginName(); iterator != file.endName(); ++iterator )
                 {
-                    openvdb::GridBase::Ptr candidate = file.readGrid(iterator.gridName());
-                    if( candidate && candidate->isType<openvdb::FloatGrid>() )
+                    openvdb::GridBase::Ptr probe =
+                        file.readGridMetadata(iterator.gridName());
+                    if( probe && probe->isType<openvdb::FloatGrid>() )
                     {
-                        baseGrid = std::move(candidate);
+                        baseGrid = file.readGrid(iterator.gridName());
                         break;
                     }
                 }
@@ -281,12 +282,13 @@ namespace houio
             }
 
             openvdb::FloatGrid::Accessor accessor = vdbGrid->getAccessor();
-            for( const SparseFloatVoxel& voxel : grid.activeVoxels() )
-            {
-                accessor.setValueOn(
-                    openvdb::Coord(voxel.index.x, voxel.index.y, voxel.index.z),
-                    voxel.value);
-            }
+            grid.forEachActiveVoxel(
+                [&](const SparseFloatVoxel& voxel)
+                {
+                    accessor.setValueOn(
+                        openvdb::Coord(voxel.index.x, voxel.index.y, voxel.index.z),
+                        voxel.value);
+                });
 
             openvdb::GridPtrVec grids;
             grids.push_back(vdbGrid);

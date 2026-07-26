@@ -45,6 +45,8 @@ int main()
     houio::SparseFloatGrid sparseGrid(0.0f);
     sparseGrid.setVoxel(houio::math::V3i(1, 2, 3), 4.0f);
     const houio::OpenVdbBackendInfo openVdb = houio::OpenVdbBackend::info();
+    const bool openVdbMetadataIsValid =
+        openVdb.compiled ? !openVdb.version.empty() : openVdb.version.empty();
     if (!readResult || readResult.value->primitiveCount() != 1
         || !packedCapability || !packedCapability->writable
         || !fragmentCapability || !fragmentCapability->writable
@@ -52,6 +54,7 @@ int main()
         || !sequenceCapability || !sequenceCapability->writable
         || !vdbCapability || !vdbCapability->writable
         || sparseGrid.activeVoxelCount() != 1
+        || !openVdbMetadataIsValid
         || openVdb.detail.empty())
     {
         std::cerr << "failed to import geometry through installed HouIO package\n";

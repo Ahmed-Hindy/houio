@@ -1010,15 +1010,15 @@ Goals:
 
 ### Phase 36 — Native sparse OpenVDB primitives
 
-**Status: lossless opaque native-payload preservation complete; tree construction/editing remains open.**
+**Status: lossless opaque native-payload preservation, dependency-neutral sparse FloatGrid editing, and optional native `.vdb` FloatGrid I/O complete; Houdini-native payload generation remains open.**
 
 Goals:
 
 - Model native sparse OpenVDB primitive records without forced dense conversion.
 - Preserve Houdini's serialized native payload, including grid class, value type, transform, metadata, active topology, and sparse values, during file round trips.
-- Keep OpenVDB tree construction/editing optional at build and package time.
+- Keep native OpenVDB file I/O and Houdini payload generation optional at build and package time.
 - Provide dependency-neutral sparse FloatGrid editing in every build and native `.vdb` FloatGrid I/O when OpenVDB is enabled.
-- Report that direct live-HOM native VDB creation remains unavailable until sparse grids can be converted into Houdini's serialized primitive payload.
+- Generate Houdini's serialized native VDB primitive payload from sparse grids before enabling direct live-HOM native VDB creation.
 
 ## Deferred work
 

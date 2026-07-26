@@ -8,6 +8,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 int main()
 {
@@ -58,6 +59,20 @@ int main()
     {
         return houio::test::fail("active voxel traversal is not deterministic");
     }
+    std::vector<houio::SparseFloatVoxel> traversedVoxels;
+    grid.forEachActiveVoxel(
+        [&](const houio::SparseFloatVoxel& voxel) { traversedVoxels.push_back(voxel); });
+    if( traversedVoxels.size() != voxels.size() )
+        return houio::test::fail("zero-copy active voxel traversal lost entries");
+    for( std::size_t index = 0; index < voxels.size(); ++index )
+    {
+        if( traversedVoxels[index].index != voxels[index].index
+            || traversedVoxels[index].value != voxels[index].value )
+        {
+            return houio::test::fail(
+                "zero-copy active voxel traversal changed ordering or values");
+        }
+    }
 
     if( !grid.eraseVoxel(houio::math::V3i(0, 0, 0))
         || grid.eraseVoxel(houio::math::V3i(0, 0, 0))
@@ -104,11 +119,21 @@ int main()
     std::filesystem::remove(vdbPath, removeError);
     if( !readResult || readResult.value.name() != "density"
         || readResult.value.gridClass() != houio::SparseGridClass::fog_volume
+        || readResult.value.background() != grid.background()
         || readResult.value.activeVoxelCount() != grid.activeVoxelCount()
         || readResult.value.indexToWorld().ma != grid.indexToWorld().ma )
     {
         return houio::test::fail(
             "compiled OpenVDB FloatGrid round-trip changed grid metadata");
+    }
+    for( const houio::SparseFloatVoxel& voxel : grid.activeVoxels() )
+    {
+        if( !readResult.value.isActive(voxel.index)
+            || readResult.value.value(voxel.index) != voxel.value )
+        {
+            return houio::test::fail(
+                "compiled OpenVDB FloatGrid round-trip changed voxel topology or values");
+        }
     }
 #else
     if( backend.compiled || !backend.version.empty() )

@@ -59,6 +59,13 @@ namespace houio
         [[nodiscard]] std::optional<SparseIndexBounds> activeBounds() const noexcept;
         [[nodiscard]] std::vector<SparseFloatVoxel> activeVoxels() const;
 
+        template<typename Callable>
+        void forEachActiveVoxel(Callable&& callable) const
+        {
+            for( const auto& [index, value] : voxels_ )
+                callable(SparseFloatVoxel{index, value});
+        }
+
     private:
         struct IndexLess
         {
