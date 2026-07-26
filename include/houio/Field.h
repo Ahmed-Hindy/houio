@@ -36,7 +36,7 @@ namespace houio
             math::Box3f bound,
             T initial_value = T());
         template<typename Source>
-        [[nodiscard]] static Ptr create(const typename Field<Source>::Ptr& source);
+        [[nodiscard]] static Ptr create(const Field<Source>& source);
 
         Field();
 
@@ -108,13 +108,10 @@ namespace houio
 
     template<typename T>
     template<typename Source>
-    typename Field<T>::Ptr Field<T>::create(const typename Field<Source>::Ptr& source)
+    typename Field<T>::Ptr Field<T>::create(const Field<Source>& source)
     {
-        if (!source)
-            throw std::invalid_argument("Field::create received a null source");
-
-        auto destination = Field<T>::create(source->resolution(), source->bound());
-        const std::span<const Source> source_values = source->values();
+        auto destination = Field<T>::create(source.resolution(), source.bound());
+        const std::span<const Source> source_values = source.values();
         std::span<T> destination_values = destination->values();
         if (source_values.size() != destination_values.size())
             throw std::runtime_error("Field conversion produced inconsistent storage sizes");

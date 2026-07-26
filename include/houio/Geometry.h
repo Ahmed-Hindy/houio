@@ -118,9 +118,12 @@ namespace houio
         [[nodiscard]] static Ptr createLine(
             const math::V3f& point0,
             const math::V3f& point1);
-        [[nodiscard]] static Ptr merge(const std::vector<Ptr>& geometries);
+        [[nodiscard]] static Ptr merge(std::span<const Ptr> geometries);
+        [[nodiscard]] static Ptr merge(std::span<const ConstPtr> geometries);
 
     private:
+        template<typename Pointer>
+        [[nodiscard]] static Ptr mergeRange(std::span<const Pointer> geometries);
         [[nodiscard]] static unsigned int fixedVertexCount(PrimitiveType primitive_type);
         void appendFixedPrimitive(std::span<const Index> point_indices);
 

@@ -553,6 +553,31 @@ bool nearlyEqual(
     return true;
 }
 
+int verifyConstFieldConversion()
+{
+    houio::ScalarField source;
+    source.resize(2, 2, 1);
+    source.setBound(houio::math::Box3f(-2.0f, -1.0f, 3.0f, 2.0f, 5.0f, 7.0f));
+    source.voxel(0, 0, 0) = 1.25f;
+    source.voxel(1, 0, 0) = -2.5f;
+    source.voxel(0, 1, 0) = 3.75f;
+    source.voxel(1, 1, 0) = 8.5f;
+
+    const houio::ScalarField& immutable_source = source;
+    const houio::Fieldd::Ptr converted = houio::Fieldd::create(immutable_source);
+    if (!converted || converted->resolution() != source.resolution()
+        || !nearlyEqual(converted->bound().minPoint, source.bound().minPoint)
+        || !nearlyEqual(converted->bound().maxPoint, source.bound().maxPoint)
+        || std::abs(converted->voxel(0, 0, 0) - 1.25) > 1.0e-12
+        || std::abs(converted->voxel(1, 0, 0) + 2.5) > 1.0e-12
+        || std::abs(converted->voxel(0, 1, 0) - 3.75) > 1.0e-12
+        || std::abs(converted->voxel(1, 1, 0) - 8.5) > 1.0e-12)
+    {
+        return fail("const field conversion did not preserve metadata and values");
+    }
+    return 0;
+}
+
 int verifyScalarFieldSampling()
 {
     houio::ScalarField field;
@@ -845,6 +870,10 @@ int main()
         return result;
     }
     if (const int result = verifyFieldStorage(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyConstFieldConversion(); result != 0)
     {
         return result;
     }

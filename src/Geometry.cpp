@@ -858,11 +858,12 @@ namespace houio
         return geometry;
     }
 
-    Geometry::Ptr Geometry::merge(const std::vector<Ptr>& geometries)
+    template<typename Pointer>
+    Geometry::Ptr Geometry::mergeRange(std::span<const Pointer> geometries)
     {
         if (geometries.empty())
             return nullptr;
-        const Ptr& reference = geometries.front();
+        const ConstPtr reference = geometries.front();
         if (!reference)
             throw std::invalid_argument("Geometry::merge received a null geometry");
 
@@ -870,7 +871,7 @@ namespace houio
         const std::vector<std::string> attribute_names = reference->attributeNames();
         for (const std::string& name : attribute_names)
         {
-            const Attribute::Ptr source = reference->attribute(name);
+            const Attribute::CPtr source = reference->attribute(name);
             if (!source)
                 throw std::runtime_error("Geometry::merge reference contains a null attribute");
             result->setAttribute(
@@ -880,8 +881,9 @@ namespace houio
                     source->elementComponentType()));
         }
 
-        for (const Ptr& geometry : geometries)
+        for (const Pointer& geometry_pointer : geometries)
         {
+            const ConstPtr geometry = geometry_pointer;
             if (!geometry)
                 throw std::invalid_argument("Geometry::merge received a null geometry");
             if (geometry->primitiveType() != reference->primitiveType())
@@ -901,7 +903,7 @@ namespace houio
 
             for (const std::string& name : attribute_names)
             {
-                const Attribute::Ptr source = geometry->attribute(name);
+                const Attribute::CPtr source = geometry->attribute(name);
                 const Attribute::Ptr destination = result->attribute(name);
                 if (!source || !destination)
                     throw std::runtime_error("Geometry::merge encountered a missing attribute");
@@ -937,5 +939,15 @@ namespace houio
             }
         }
         return result;
+    }
+
+    Geometry::Ptr Geometry::merge(std::span<const Ptr> geometries)
+    {
+        return mergeRange(geometries);
+    }
+
+    Geometry::Ptr Geometry::merge(std::span<const ConstPtr> geometries)
+    {
+        return mergeRange(geometries);
     }
 }
