@@ -2,6 +2,7 @@
 
 #include "TestSupport.h"
 
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <limits>
@@ -39,6 +40,18 @@ int verifyDeclaredPointCount()
         || diagnostics.front().path != "attributes.pointattributes.P")
     {
         return fail("point-only conversion without P did not produce a structured diagnostic");
+    }
+
+    const houio::GeometryConversionResult detailed =
+        houio::HouGeoIO::convertToGeometryResult(
+            geometry, houio::HouGeoAdapter::Primitive::ConstPtr());
+    if (detailed || detailed.report.sourcePointCount != 3
+        || detailed.report.outputPointCount != 0
+        || detailed.diagnostics.size() != 1
+        || detailed.diagnostics.front().category != houio::DiagnosticCategory::schema
+        || detailed.diagnostics.front().path != "attributes.pointattributes.P")
+    {
+        return fail("conversion result did not preserve failure diagnostics and partial report data");
     }
     return 0;
 }
@@ -185,6 +198,17 @@ int verifyNonNumericAttributesAreSkipped()
                         "indices", ["size", 1, "storage", "int32", "arrays", [[0, 0, 0]]]
                     ]
                 ]
+            ],
+            "globalattributes", [
+                [
+                    ["type", "string", "name", "global_meta"],
+                    [
+                        "size", 1,
+                        "storage", "int32",
+                        "strings", ["scene"],
+                        "indices", ["size", 1, "storage", "int32", "arrays", [[0]]]
+                    ]
+                ]
             ]
         ],
         "primitives", [[["type", "Poly"], ["vertex", [0, 1, 2], "closed", true]]]
@@ -198,6 +222,15 @@ int verifyNonNumericAttributesAreSkipped()
     const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
     if (primitives.size() != 1)
         return fail("dictionary-attribute conversion fixture lost its polygon");
+
+    auto primitiveMetadata = std::make_shared<houio::HouGeo::HouAttribute>();
+    primitiveMetadata->setName("primitive_meta");
+    primitiveMetadata->setStringValues({"triangle"});
+    geometry->setPrimitiveAttribute("primitive_meta", primitiveMetadata);
+
+    geometry->setPointGroup("selected_points", {true, false, false});
+    geometry->setVertexGroup("selected_vertices", {true, false, false});
+    geometry->setPrimitiveGroup("selected_primitives", {true});
 
     houio::DiagnosticList diagnostics;
     houio::Geometry::Ptr converted = houio::HouGeoIO::convertToGeometry(
@@ -221,6 +254,123 @@ int verifyNonNumericAttributesAreSkipped()
     }
     if (!pointWarning || !vertexWarning)
         return fail("non-numeric attributes were not reported as skipped");
+
+    const houio::GeometryConversionResult detailed =
+        houio::HouGeoIO::convertToGeometryResult(geometry, primitives.front());
+    const auto contains = [](const std::vector<std::string>& values, const std::string& expected)
+    {
+        return std::find(values.begin(), values.end(), expected) != values.end();
+    };
+    if (!detailed || detailed.report.sourcePointCount != 3
+        || detailed.report.outputPointCount != 3
+        || detailed.report.splitSourcePointCount != 0
+        || detailed.report.duplicatedPointCount != 0
+        || !detailed.report.windingReversed
+        || !contains(detailed.report.skippedPointAttributes, "point_meta")
+        || !contains(detailed.report.skippedVertexAttributes, "vertex_meta")
+        || !contains(detailed.report.skippedPrimitiveAttributes, "primitive_meta")
+        || !contains(detailed.report.skippedGlobalAttributes, "global_meta")
+        || !contains(detailed.report.droppedPointGroups, "selected_points")
+        || !contains(detailed.report.droppedVertexGroups, "selected_vertices")
+        || !contains(detailed.report.droppedPrimitiveGroups, "selected_primitives"))
+    {
+        return fail("structured conversion result did not report successful losses");
+    }
+    return 0;
+}
+
+int verifyPointSplitReport()
+{
+    const std::string document = R"JSON([
+        "pointcount", 4,
+        "vertexcount", 6,
+        "primitivecount", 2,
+        "topology", ["pointref", ["indices", [0, 1, 2, 0, 2, 3]]],
+        "attributes", [
+            "pointattributes", [
+                [
+                    ["type", "numeric", "name", "P"],
+                    ["size", 3, "storage", "fpreal32", "values", [
+                        "size", 3,
+                        "storage", "fpreal32",
+                        "tuples", [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]]
+                    ]]
+                ]
+            ],
+            "vertexattributes", [
+                [
+                    ["type", "numeric", "name", "uv"],
+                    ["size", 2, "storage", "fpreal32", "values", [
+                        "size", 2,
+                        "storage", "fpreal32",
+                        "tuples", [[0, 0], [1, 0], [1, 1], [0.5, 0.5], [1, 1], [0, 1]]
+                    ]]
+                ]
+            ]
+        ],
+        "primitives", [[
+            ["type", "Polygon_run"],
+            ["startvertex", 0, "nprimitives", 2, "nvertices_rle", [3, 2]]
+        ]]
+    ])JSON";
+
+    std::istringstream input(document);
+    const houio::HouGeo::Ptr geometry = houio::HouGeoIO::import(input);
+    if (!geometry)
+        return fail("point-split conversion fixture did not import");
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
+    if (primitives.size() != 1)
+        return fail("point-split conversion fixture lost its polygon run");
+
+    const houio::GeometryConversionResult result =
+        houio::HouGeoIO::convertToGeometryResult(geometry, primitives.front());
+    if (!result || result.report.sourcePointCount != 4
+        || result.report.outputPointCount != 5
+        || result.report.splitSourcePointCount != 1
+        || result.report.duplicatedPointCount != 1
+        || !result.report.windingReversed
+        || result.value->primitiveCount() != 2
+        || result.value->indexBuffer().size() != 6)
+    {
+        return fail("conversion result did not report face-varying point duplication");
+    }
+    return 0;
+}
+
+int verifyOversizedIntegerPackingRejection()
+{
+    const std::string document = R"JSON([
+        "pointcount", 1,
+        "vertexcount", 0,
+        "primitivecount", 0,
+        "attributes", [
+            "pointattributes", [
+                [
+                    ["type", "string", "name", "label"],
+                    [
+                        "size", 1,
+                        "storage", "int32",
+                        "strings", ["value"],
+                        "indices", [
+                            "size", 1,
+                            "storage", "int32",
+                            "pagesize", 1,
+                            "packing", [2147483647, 2147483647, 3],
+                            "constantpageflags", [[true], [true], [true]],
+                            "rawpagedata", [0, 0, 0]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ])JSON";
+
+    std::istringstream input(document);
+    houio::DiagnosticList diagnostics;
+    if (houio::HouGeoIO::import(input, &diagnostics))
+        return fail("oversized integer packing was accepted");
+    if (diagnostics.empty() || diagnostics.back().category != houio::DiagnosticCategory::schema)
+        return fail("oversized integer packing did not produce a schema diagnostic");
     return 0;
 }
 
@@ -329,6 +479,14 @@ int main()
         return result;
     }
     if (const int result = verifyNonNumericAttributesAreSkipped(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyPointSplitReport(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyOversizedIntegerPackingRejection(); result != 0)
     {
         return result;
     }

@@ -158,6 +158,38 @@ bool roundtripOnce(const houio::HouGeoAdapter::Ptr& source)
            && imported->primitiveCount() == 0;
 }
 
+int verifyNonNumericPositionNameRoundtrip()
+{
+    auto attribute = std::make_shared<houio::HouGeo::HouAttribute>();
+    attribute->setName("P");
+    attribute->setStringValues(
+        {"left", "center", "right"},
+        houio::HouGeoAdapter::AttributeAdapter::TupleSize(3));
+
+    houio::HouGeo::Ptr source = houio::HouGeo::create();
+    source->setPointAttribute(attribute);
+
+    std::ostringstream output(std::ios::out | std::ios::binary);
+    if (!houio::HouGeoIO::exportGeometry(output, source, true))
+        return fail("non-numeric P attribute export failed");
+
+    std::istringstream input(output.str(), std::ios::in | std::ios::binary);
+    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
+    const auto importedAttribute = imported ? imported->pointAttribute("P")
+                                            : houio::HouGeoAdapter::AttributeAdapter::Ptr();
+    if (!importedAttribute
+        || importedAttribute->type() != houio::HouGeoAdapter::AttributeAdapter::Type::string
+        || importedAttribute->tupleSize().value() != 3
+        || importedAttribute->elementCount() != 1
+        || importedAttribute->stringValue(0, 0) != "left"
+        || importedAttribute->stringValue(0, 1) != "center"
+        || importedAttribute->stringValue(0, 2) != "right")
+    {
+        return fail("non-numeric P attribute metadata changed during export");
+    }
+    return 0;
+}
+
 int verifyAdapterDictionaryExport()
 {
     auto source = std::make_shared<DictionaryGeometryAdapter>();
@@ -312,6 +344,10 @@ int main()
 {
     const houio::HouGeoAdapter::Ptr validGeometry = createPointGeometry();
 
+    if (const int result = verifyNonNumericPositionNameRoundtrip(); result != 0)
+    {
+        return result;
+    }
     if (const int result = verifyAdapterDictionaryExport(); result != 0)
     {
         return result;

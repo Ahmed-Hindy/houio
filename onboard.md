@@ -239,7 +239,7 @@ Topology values are point indices. Primitive records refer to topology ranges, n
 
 ### Position attribute
 
-`P` is required for simplified mesh conversion. The Houdini-oriented model may contain valid data without a simplified `Geometry` result.
+`P` is required for simplified mesh conversion. The Houdini-oriented model may contain valid data without a simplified `Geometry` result. Use `HouGeoIO::convertToGeometryResult` when a caller needs explicit split, skipped-attribute, dropped-group, winding, and failure diagnostics.
 
 ### Volumes
 
@@ -273,6 +273,7 @@ Before opening a pull request:
 - [Contributing](CONTRIBUTING.md)
 - [Compatibility matrix](docs/compatibility.md)
 - [Fixture generation and validation](docs/fixtures.md)
+- [Performance baselines](docs/benchmarks.md)
 - [Experimental field persistence format](docs/field-format.md)
 - [Versioning and release policy](docs/versioning.md)
 - [Houdini package](docs/houdini-package.md)

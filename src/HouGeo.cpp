@@ -89,20 +89,28 @@ namespace houio
 					"HouGeo::loadAttribute integer packing for attribute " + attributeName);
 				if( packingCount == 0 )
 					throw std::runtime_error( "HouGeo::loadAttribute integer packing cannot be empty for attribute " + attributeName );
+				size_t packedTupleSize = 0;
 				for( int packingIndex=0;packingIndex<packingCount;++packingIndex )
 				{
 					const int packSize = packingValues->get<int>(packingIndex);
 					if( packSize <= 0 )
 						throw std::runtime_error( "HouGeo::loadAttribute integer packing must be positive for attribute " + attributeName );
+					const size_t packSizeValue = static_cast<size_t>(packSize);
+					if( packedTupleSize > tupleSizeValue || packSizeValue > tupleSizeValue - packedTupleSize )
+						throw std::runtime_error( "HouGeo::loadAttribute integer packing exceeds tuple size for attribute "
+							+ attributeName );
+					packedTupleSize += packSizeValue;
 					packing.push_back(packSize);
 				}
+				if( packedTupleSize != tupleSizeValue )
+					throw std::runtime_error( "HouGeo::loadAttribute integer packing does not cover tuple size for attribute "
+						+ attributeName );
 			}
 			else
 			{
 				packing.push_back(tupleSize);
 			}
-			const int packedTupleSize = std::accumulate(packing.begin(), packing.end(), 0);
-			if( packedTupleSize != tupleSize )
+			if( std::accumulate(packing.begin(), packing.end(), size_t{0}) != tupleSizeValue )
 				throw std::runtime_error( "HouGeo::loadAttribute integer packing does not cover tuple size for attribute "
 					+ attributeName );
 

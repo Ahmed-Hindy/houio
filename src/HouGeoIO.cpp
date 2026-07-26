@@ -323,13 +323,31 @@ namespace houio
 		HouGeo::ConstPtr houGeo,
 		HouGeoAdapter::Primitive::ConstPtr houPrim )
 	{
-		return convertToGeometry(houGeo, houPrim, nullptr);
+		return convertToGeometry(houGeo, houPrim, nullptr, nullptr);
 	}
 
 	Geometry::Ptr HouGeoIO::convertToGeometry(
 		HouGeo::ConstPtr houGeo,
 		HouGeoAdapter::Primitive::ConstPtr houPrim,
 		DiagnosticList *diagnostics )
+	{
+		return convertToGeometry(houGeo, houPrim, diagnostics, nullptr);
+	}
+
+	GeometryConversionResult HouGeoIO::convertToGeometryResult(
+		HouGeo::ConstPtr houGeo,
+		HouGeoAdapter::Primitive::ConstPtr houPrim )
+	{
+		GeometryConversionResult result;
+		result.value = convertToGeometry(houGeo, houPrim, &result.diagnostics, &result.report);
+		return result;
+	}
+
+	Geometry::Ptr HouGeoIO::convertToGeometry(
+		HouGeo::ConstPtr houGeo,
+		HouGeoAdapter::Primitive::ConstPtr houPrim,
+		DiagnosticList *diagnostics,
+		GeometryConversionReport *report )
 	{
 		try
 		{
@@ -343,6 +361,15 @@ namespace houio
 		const sint64 numVertices = houGeo->vertexCount();
 		const size_t pointCount = checkedConversionCount(numPoints, "Point count");
 		const size_t vertexCount = checkedConversionCount(numVertices, "Vertex count");
+		if( report )
+		{
+			report->sourcePointCount = pointCount;
+			report->skippedPrimitiveAttributes = houGeo->primitiveAttributeNames();
+			report->skippedGlobalAttributes = houGeo->globalAttributeNames();
+			report->droppedPointGroups = houGeo->pointGroupNames();
+			report->droppedVertexGroups = houGeo->vertexGroupNames();
+			report->droppedPrimitiveGroups = houGeo->primitiveGroupNames();
+		}
 
 		// we only support geometry with non mixed primitives (e.g. triangles only)
 		// this code checks if that is the case...
@@ -422,6 +449,8 @@ namespace houio
 			validateDomainAttribute(houAttr, numPoints, attributePath);
 			if( houAttr->type() != HouGeoAdapter::AttributeAdapter::Type::numeric )
 			{
+				if( report )
+					report->skippedPointAttributes.push_back(attrName);
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry skips non-numeric point attribute " + attrName,
 					-1, attributePath});
@@ -536,9 +565,13 @@ namespace houio
 					raw_data.bytes(), houAttr->elementCount());
 			}
 			else
+			{
+				if( report )
+					report->skippedPointAttributes.push_back(attrName);
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry cannot convert point attribute " + attrName,
 					-1, "attributes.pointattributes." + attrName});
+			}
 
 			if( attr )
 				result->setAttribute(attrName, attr);
@@ -561,6 +594,8 @@ namespace houio
 			validateDomainAttribute(houAttr, numVertices, attributePath);
 			if( houAttr->type() != HouGeoAdapter::AttributeAdapter::Type::numeric )
 			{
+				if( report )
+					report->skippedVertexAttributes.push_back(attrName);
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry skips non-numeric vertex attribute " + attrName,
 					-1, attributePath});
@@ -633,6 +668,8 @@ namespace houio
 
 			if( !attr )
 			{
+				if( report )
+					report->skippedVertexAttributes.push_back(attrName);
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry cannot convert vertex attribute " + attrName,
 					-1, "attributes.vertexattributes." + attrName});
@@ -707,6 +744,11 @@ namespace houio
 			}
 			if( globalVertexIndex != vertexCount )
 				throw std::runtime_error( "Polygon traversal did not consume the complete vertex domain" );
+			if( report )
+			{
+				report->splitSourcePointCount = static_cast<size_t>(
+					std::count(pointsToSplit.begin(), pointsToSplit.end(), true));
+			}
 
 			globalVertexIndex = 0;
 			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
@@ -725,7 +767,11 @@ namespace houio
 					unsigned int finalPointIndex = static_cast<unsigned int>(pointIndex);
 
 					if( pointsToSplit[pointIndex] && pointsInitialized[pointIndex] )
+					{
 						finalPointIndex = result->duplicatePoint(finalPointIndex);
+						if( report )
+							++report->duplicatedPointCount;
+					}
 					else if( !pointsInitialized[pointIndex] )
 						pointsInitialized[pointIndex] = true;
 
@@ -753,6 +799,15 @@ namespace houio
 
 			// Houdini polygons are clockwise; the convenience geometry expects counter-clockwise order.
 			result->reverse();
+			if( report )
+				report->windingReversed = true;
+		}
+		if( report )
+		{
+			const Attribute::CPtr outputPositions = result->attribute("P");
+			report->outputPointCount = outputPositions
+				? static_cast<size_t>(outputPositions->numElements())
+				: 0u;
 		}
 			return result;
 		}
@@ -1079,7 +1134,8 @@ namespace houio
 		const HouGeoAdapter::AttributeAdapter::Storage attribute_storage = attribute->storage();
 		const HouGeoAdapter::AttributeAdapter::TupleSize sourceTupleSize = attribute->tupleSize();
 		const std::string name = attribute->name();
-		const bool promotePosition = name == "P" && sourceTupleSize.value() == 3;
+		const bool promotePosition = attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric
+			&& name == "P" && sourceTupleSize.value() == 3;
 		const int exportTupleSize = promotePosition ? 4 : sourceTupleSize.value();
 		const int elementCount = attribute->elementCount();
 		if (elementCount < 0)
@@ -1100,7 +1156,8 @@ namespace houio
 		if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric && !storageName )
 			throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported storage for attribute " + name );
 
-		if( name == "P" && exportTupleSize != 4 )
+		if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric
+			&& name == "P" && exportTupleSize != 4 )
 			throw std::runtime_error( "HouGeoIO::exportAttribute: P must contain either three or four components" );
 
 		writer.jsonBeginArray();
@@ -1203,7 +1260,6 @@ namespace houio
 			std::map<std::string, sint32> stringLookup;
 			std::vector<std::string> stringTable;
 			std::vector<sint32> stringIndices;
-			stringTable.reserve(scalar_count);
 			stringIndices.reserve(scalar_count);
 			for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
 			{

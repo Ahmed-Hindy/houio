@@ -11,7 +11,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Generated fixtures, the large Crag asset, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Current branch completes field/API cleanup, Houdini 20.0 producer compatibility, indexed string tuples, and maintained project contracts.
+- Current branch completes field/API cleanup, Houdini 20.0 producer compatibility, indexed string tuples, maintained project contracts, const/range APIs, benchmarks, and structured conversion reporting.
 
 ## Modernization completed
 
@@ -53,6 +53,9 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Validate multi-page string indices and Houdini 20.0 `varmap` tuple encoding.
 - [x] Run fixture, large-asset, and package matrices across Houdini 20.0, 20.5, 21.0, and 22.0.
 - [x] Define maintained compatibility, fixture, contribution, versioning, and experimental field-format contracts.
+- [x] Make field conversion read from immutable source references and make geometry merge accept non-owning mutable/immutable pointer spans.
+- [x] Add opt-in dependency-free baselines for numeric attributes, topology generation/traversal, and dense-volume import.
+- [x] Add a structured simplified-conversion result that reports splits, duplicates, skipped attributes, dropped groups, winding changes, and diagnostics.
 
 ## Modernization next
 
@@ -137,7 +140,7 @@ Priority levels:
 - [ ] Support mixed primitive groups.
 - [ ] Support arbitrary n-gons in simplified conversion or return multiple geometry objects.
 - [ ] Preserve face-varying attributes without forced point duplication.
-- [ ] Add a conversion result that reports splits, losses, and unsupported data.
+- [x] Add a conversion result that reports splits, losses, and unsupported data.
 
 ### Primitive records
 
@@ -183,16 +186,16 @@ Add fixture-backed support one record type at a time:
 - [x] Use `nullptr` consistently.
 - [x] Use scoped enums in public headers where source compatibility permits.
 - [x] Add `override`, `final`, and `noexcept` where correct.
-- [ ] Apply const-correctness consistently.
-- [ ] Use `std::span` or equivalent views for non-owning ranges.
+- [x] Apply const-correctness consistently across the maintained field, geometry, adapter, and export surfaces.
+- [x] Use `std::span` or equivalent views for maintained contiguous non-owning ranges; retain `vector<bool>` only where its proxy storage prevents a safe span.
 - [x] Remove obsolete commented-out implementation blocks.
 
 ## P3 — Performance
 
 - [ ] Measure memory amplification from input stream to JSON tree to `HouGeo`.
-- [ ] Benchmark large numeric attributes.
-- [ ] Benchmark large topology arrays.
-- [ ] Benchmark dense-volume imports.
+- [x] Benchmark large numeric attributes.
+- [x] Benchmark large topology arrays.
+- [x] Benchmark dense-volume imports.
 - [ ] Avoid per-element `Value` allocations for large arrays.
 - [ ] Preserve uniform arrays through semantic loading where possible.
 - [ ] Evaluate direct semantic handlers that bypass the generic JSON tree.

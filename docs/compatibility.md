@@ -95,7 +95,7 @@ Use `HouGeo` or `HouGeoAdapter` when Houdini domain fidelity matters. The simpli
 - Arbitrary n-gons are not promised by the simplified representation.
 - Native sparse volumes and unsupported primitive records are not converted implicitly.
 
-A future conversion-result API is expected to report splits, unsupported records, and intentional losses explicitly. Until then, callers that require faithful round trips should stay on the Houdini-oriented model.
+`HouGeoIO::convertToGeometryResult` reports source/output point counts, distinct split source points, duplicated points, winding reversal, skipped point/vertex/primitive/global attributes, dropped groups, and structured diagnostics for unsupported or invalid data. Callers that require faithful round trips should still stay on the Houdini-oriented model rather than treating a clean simplified conversion as proof that every domain was preserved.
 
 ## VDB bridge scope
 

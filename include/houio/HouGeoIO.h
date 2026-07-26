@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <iosfwd>
 #include <map>
 #include <span>
@@ -13,6 +14,34 @@
 namespace houio
 {
     class GeometryIO;
+
+    struct GeometryConversionReport
+    {
+        std::size_t sourcePointCount = 0;
+        std::size_t outputPointCount = 0;
+        std::size_t splitSourcePointCount = 0;
+        std::size_t duplicatedPointCount = 0;
+        bool windingReversed = false;
+        std::vector<std::string> skippedPointAttributes;
+        std::vector<std::string> skippedVertexAttributes;
+        std::vector<std::string> skippedPrimitiveAttributes;
+        std::vector<std::string> skippedGlobalAttributes;
+        std::vector<std::string> droppedPointGroups;
+        std::vector<std::string> droppedVertexGroups;
+        std::vector<std::string> droppedPrimitiveGroups;
+    };
+
+    struct GeometryConversionResult
+    {
+        Geometry::Ptr value;
+        DiagnosticList diagnostics;
+        GeometryConversionReport report;
+
+        [[nodiscard]] explicit operator bool() const noexcept
+        {
+            return static_cast<bool>(value);
+        }
+    };
 
     class HouGeoIO final
     {
@@ -50,6 +79,9 @@ namespace houio
             HouGeo::ConstPtr houdini_geometry,
             HouGeoAdapter::Primitive::ConstPtr primitive,
             DiagnosticList* diagnostics);
+        [[nodiscard]] static GeometryConversionResult convertToGeometryResult(
+            HouGeo::ConstPtr houdini_geometry,
+            HouGeoAdapter::Primitive::ConstPtr primitive);
 
         [[nodiscard]] static bool exportVolume(
             const std::string& filename,
@@ -72,6 +104,11 @@ namespace houio
         HouGeoIO() = delete;
         friend class GeometryIO;
 
+        [[nodiscard]] static Geometry::Ptr convertToGeometry(
+            HouGeo::ConstPtr houdini_geometry,
+            HouGeoAdapter::Primitive::ConstPtr primitive,
+            DiagnosticList* diagnostics,
+            GeometryConversionReport* report);
         [[nodiscard]] static HouGeo::Ptr adaptVolume(ScalarField::Ptr volume);
         [[nodiscard]] static HouGeo::Ptr adaptGeometry(Geometry::Ptr geometry);
 

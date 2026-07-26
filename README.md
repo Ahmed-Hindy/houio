@@ -114,6 +114,29 @@ if (!result)
 houio::Geometry::Ptr mesh = result.value;
 ```
 
+For explicit split and loss reporting, convert one Houdini-oriented primitive directly:
+
+```cpp
+const auto source = houio::GeometryIO::readHouGeo("mesh.bgeo");
+if (!source || source.value->primitives().empty())
+    return;
+
+const houio::GeometryConversionResult conversion =
+    houio::HouGeoIO::convertToGeometryResult(
+        source.value,
+        source.value->primitives().front());
+if (!conversion)
+{
+    // Inspect conversion.diagnostics.
+    return;
+}
+
+houio::Geometry::Ptr mesh = conversion.value;
+const std::size_t duplicated_points = conversion.report.duplicatedPointCount;
+```
+
+The report also lists skipped point, vertex, primitive, and global attributes; dropped groups; source/output point counts; split source points; and winding reversal.
+
 ### Read all dense scalar volumes
 
 ```cpp
@@ -277,6 +300,16 @@ cmake --build --preset linux-clang-fuzzer
 ./build/linux-clang-fuzzer/houio_fuzz_parser -runs=2000 -max_len=512 -timeout=5
 ```
 
+Opt-in performance baselines:
+
+```powershell
+cmake --preset windows-msvc-benchmarks
+cmake --build --preset windows-msvc-benchmarks
+.\build\windows-msvc-benchmarks\houio_benchmarks.exe
+```
+
+See [Performance baselines](docs/benchmarks.md) for methodology and workload controls.
+
 ## Documentation
 
 - [Architecture](architecture.md)
@@ -284,6 +317,7 @@ cmake --build --preset linux-clang-fuzzer
 - [Contributing](CONTRIBUTING.md)
 - [Compatibility matrix](docs/compatibility.md)
 - [Fixture generation and validation](docs/fixtures.md)
+- [Performance baselines](docs/benchmarks.md)
 - [Experimental field persistence format](docs/field-format.md)
 - [Versioning and release policy](docs/versioning.md)
 - [Houdini package](docs/houdini-package.md)

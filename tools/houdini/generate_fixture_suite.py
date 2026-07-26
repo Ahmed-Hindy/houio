@@ -183,10 +183,18 @@ def build_paged_attributes_geometry() -> hou.Geometry:
     constant_attribute = geometry.addAttrib(hou.attribType.Point, "page_constant", 0.0)
     varying_attribute = geometry.addAttrib(hou.attribType.Point, "page_id", 0)
     string_attribute = geometry.addAttrib(hou.attribType.Point, "page_label", "")
+    string_tuple_attribute = geometry.addAttrib(
+        hou.attribType.Point, "page_label_pair", ("", "")
+    )
     for point_index, point in enumerate(points):
-        point.setAttribValue(constant_attribute, float(point_index // 1024 + 1))
+        page_index = point_index // 1024
+        point.setAttribValue(constant_attribute, float(page_index + 1))
         point.setAttribValue(varying_attribute, point_index * 3 - 17)
-        point.setAttribValue(string_attribute, f"page_{point_index // 1024}")
+        point.setAttribValue(string_attribute, f"page_{page_index}")
+        point.setAttribValue(
+            string_tuple_attribute,
+            (f"page_{page_index}", f"point_{point_index}"),
+        )
     return geometry
 
 

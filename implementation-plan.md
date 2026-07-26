@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The large Crag round trip and Houdini package matrix pass in all four maintained versions.
 - Documentation audit contains no retired API references and now records compatibility, fixture, contribution, field-format, and versioning contracts.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Phases 17–20 are complete locally on the active branch; CI validation is pending publication.
+- Phases 17–23 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
 
 ## Execution phases
 
@@ -606,6 +606,103 @@ Exit criteria:
 - The Crag asset preserves exact topology, exact tested integer/string attributes, and zero tested numeric drift in all four versions.
 - The generated Houdini package passes headlessly in all four versions.
 - Compatibility claims and experimental-format status are documented and executable.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 21 — Const source and non-owning range completion
+
+**Status: complete.**
+
+Target files:
+
+- `include/houio/Field.h`
+- `include/houio/Geometry.h`
+- `src/Geometry.cpp`
+- `tests/test_geometry_container.cpp`
+- `tests/test_volumes.cpp`
+- `tests/check_retired_sources.cmake`
+- roadmap documents
+
+Tasks:
+
+- Replace field conversion from a mutable shared pointer with a const source reference.
+- Preserve field resolution, bound, and values when converting from an immutable source.
+- Replace `Geometry::merge(const std::vector<Ptr>&)` with non-owning span overloads for mutable and immutable shared pointers.
+- Internally convert every merge source to `Geometry::ConstPtr` before reading attributes or topology.
+- Exercise both span overloads with fixed-size arrays.
+- Guard against the retired mutable-pointer field conversion and vector-coupled merge signatures.
+- Retain `vector<bool>` group membership APIs because its proxy representation cannot form a safe contiguous `std::span<bool>`.
+- Retain output vectors where the callee owns resizing or produces storage for the caller.
+
+Exit criteria:
+
+- Field conversion requires no mutable source handle and has no nullable input state.
+- Geometry merging accepts caller-owned contiguous ranges without requiring a `std::vector`.
+- Both mutable and immutable geometry pointer ranges merge identically.
+- Remaining vector references have an explicit ownership or proxy-storage reason.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 22 — Opt-in performance baselines
+
+**Status: complete.**
+
+Target files:
+
+- `CMakeLists.txt`
+- `CMakePresets.json`
+- `benchmarks/houio_benchmarks.cpp`
+- `docs/benchmarks.md`
+- README and roadmap documents
+
+Tasks:
+
+- Add `HOUIO_BUILD_BENCHMARKS` as an opt-in build feature with no external dependency.
+- Add a warnings-as-errors MSVC benchmark preset.
+- Measure typed three-component numeric attribute writes and reads.
+- Measure checked triangle-grid generation and complete index traversal.
+- Measure in-memory constant dense-volume import through `HouGeoIO`.
+- Run every workload repeatedly and report median time, throughput, and an observable checksum.
+- Add configurable workload sizes and CSV output.
+- Keep timing thresholds out of CTest and CI to avoid hardware-dependent failures.
+- Document repeatable comparison methodology and explicitly retain peak-memory amplification as open work.
+
+Exit criteria:
+
+- The benchmark target builds cleanly under MSVC `/W4 /WX`.
+- Reduced smoke workloads execute all three baselines successfully.
+- Default workloads are configurable without source changes.
+- Benchmark results are clearly separated from correctness tests and compatibility claims.
+- Existing strict, Release/Houdini, AddressSanitizer, and static-analysis matrices remain green.
+
+### Phase 23 — Structured simplified-conversion reporting
+
+**Status: complete.**
+
+Target files:
+
+- `include/houio/HouGeoIO.h`
+- `src/HouGeoIO.cpp`
+- `tests/test_conversion_safety.cpp`
+- README, compatibility, onboarding, and roadmap documents
+
+Tasks:
+
+- Add `GeometryConversionReport` and `GeometryConversionResult` without removing existing convenience conversions.
+- Preserve structured diagnostics in the result for conversion failures.
+- Record source and output point counts.
+- Record distinct source points requiring face-varying splits and the actual number of duplicated output points.
+- Record skipped point, vertex, primitive, and global attributes.
+- Record dropped point, vertex, and primitive groups.
+- Record Houdini-to-simplified winding reversal.
+- Exercise a successful conversion with non-numeric attributes, unsupported simplified domains, and groups.
+- Exercise a real two-triangle UV seam that duplicates one shared point.
+- Exercise a schema failure that returns diagnostics and partial report metadata.
+
+Exit criteria:
+
+- Successful lossy conversions expose every currently known simplified-model loss category.
+- Face-varying point splitting is quantified deterministically.
+- Failed conversions return no geometry but preserve diagnostics and available source metadata.
+- Existing `convertToGeometry` overloads retain their behavior.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work
