@@ -70,7 +70,7 @@ A capability is:
 - `recognized`: the family is known but its adapter or fixture-backed schema is incomplete.
 - `unavailable`: the feature requires a backend that is not present.
 
-Embedded `PackedGeometry`, named `PackedFragment`, and opaque native VDB payload preservation are supported. Packed disk primitives and OpenVDB-backed sparse-tree construction/editing remain separate additions. `houio inspect` reports separate counts for packed geometry, packed fragments, and native VDB records.
+Embedded `PackedGeometry`, named `PackedFragment`, external `PackedDisk` references, and opaque native VDB payload preservation are supported. Packed disk sequences and OpenVDB-backed sparse-tree construction/editing remain separate additions. `houio inspect` reports separate counts for packed geometry, packed fragments, packed disks, and native VDB records.
 
 ## Runtime diagnostics
 

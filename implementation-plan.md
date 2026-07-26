@@ -65,14 +65,14 @@ Every phase must preserve these constraints:
 
 ## Current validation status
 
-- Current exact source: MSVC warnings-as-errors CTest suite passes **56/56**.
-- Current exact source: full Release/Houdini matrix passes **56/56**.
+- Current exact source: MSVC warnings-as-errors CTest suite passes **57/57**.
+- Current exact source: full Release/Houdini matrix passes **57/57**.
 - Current exact source: Windows AddressSanitizer matrix passes **24/24**.
 - MSVC native static analysis is error-clean.
-- The 17-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
-- Documentation records the primary Writer/CLI/HOM workflow, packed geometry support, native VDB payload preservation, and remaining backend limitations.
+- The 18-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Documentation records the primary Writer/CLI/HOM workflow, packed geometry/fragment/disk support, native VDB payload preservation, and remaining backend limitations.
 - Phases 11–31 are merged into `master` through PRs #31 and #32.
-- Phases 32–34 are complete and merged. Phase 35 supports embedded PackedGeometry and named PackedFragment records; packed disk records remain open. Phase 36 supports lossless opaque native VDB payload preservation.
+- Phases 32–34 are complete and merged. Phase 35 supports embedded PackedGeometry, named PackedFragment, and external PackedDisk records; PackedDiskSequence remains open. Phase 36 supports lossless opaque native VDB payload preservation.
 
 ## Execution phases
 
@@ -999,12 +999,12 @@ Exit criteria:
 
 ### Phase 35 — Packed primitive family
 
-**Status: embedded `PackedGeometry` and named `PackedFragment` complete; packed disk records remain open.**
+**Status: embedded `PackedGeometry`, named `PackedFragment`, and external `PackedDisk` complete; packed disk sequences remain open.**
 
 Goals:
 
 - Add fixture-backed packed geometry support first.
-- Extend the same primitive-family abstraction to named packed fragments and packed disk primitives.
+- Extend the same primitive-family abstraction to named packed fragments, packed disk primitives, and later packed disk sequences.
 - Preserve transforms, intrinsic metadata, source references, attributes, and groups where represented by the format.
 - Reject unsupported packed payload variants with structured diagnostics rather than flattening silently.
 
@@ -1023,7 +1023,7 @@ Goals:
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
 
-- Packed disk primitives and additional primitive-record families.
+- Packed disk sequences and additional primitive-record families.
 - Lossless point/vertex-domain redesign.
 - OpenVDB-backed sparse-tree construction and editing APIs.
 - Performance architecture changes that bypass the JSON tree.
