@@ -10,7 +10,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - Current exact source: Windows AddressSanitizer passes **24/24** and MSVC native analysis is error-clean.
 - Full Release/Houdini validation passes **57/57**.
 - Direct custom writing, the 18-fixture matrix, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
-- The active branch completes the packed-reference family with `PackedDiskSequence` file, manifest, direct-HOM, CLI, fixture, and compatibility support.
+- The active stacked branch establishes dependency-neutral sparse FloatGrid editing, optional OpenVDB package discovery, native `.vdb` FloatGrid I/O, diagnostics, and installed-package propagation.
 
 ## Modernization completed
 
@@ -97,7 +97,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add packed disk primitives with authored paths, expansion metadata, transforms, flags, direct HOM extraction, and four-version fixtures.
 - [x] Add packed disk sequences with explicit sample lists, fractional index, wrap modes, direct HOM extraction, and four-version fixtures.
 - [x] Preserve native sparse VDB primitive payloads without forced densification during file round trips.
-- [ ] Add an optional OpenVDB backend for native sparse-tree construction and editing from live HOM data.
+- [x] Add a dependency-neutral sparse FloatGrid model and optional OpenVDB `.vdb` FloatGrid backend.
+- [ ] Generate native Houdini VDB primitive payloads from the sparse-grid model and wire live HOM extraction.
 - [ ] Continue with curves, instancing, height fields, and other observed records one family at a time.
 
 ## Modernization completed follow-up
@@ -207,7 +208,8 @@ Add fixture-backed support one record type at a time:
 - [ ] Add vector-field support where represented by multiple volumes or tuple data.
 - [ ] Support additional observed compression types.
 - [ ] Investigate additional outer wrappers only when representative fixtures are available.
-- [ ] Define an optional public OpenVDB adapter with sparse-grid preservation.
+- [x] Define an optional public OpenVDB adapter with sparse FloatGrid preservation.
+- [ ] Add active tile, nonlinear transform, integer-grid, and vector-grid support.
 
 ## P2 — Data model
 

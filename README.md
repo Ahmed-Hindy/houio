@@ -43,6 +43,7 @@ HouIO currently supports:
 - External `PackedDisk` references with authored filename, expansion frame/policy, pivot, transform, viewport LOD, and packed flags
 - `PackedDiskSequence` records with explicit sample lists, fractional index, wrap mode, pivot, transform, and viewport metadata
 - Native sparse VDB primitive payloads through lossless opaque file round trips
+- Dependency-neutral sparse FloatGrid editing, with optional native `.vdb` FloatGrid I/O when built against OpenVDB
 - SCF compression through C-Blosc
 
 The simplified `Geometry` API is intentionally render-oriented and may split points at vertex-attribute discontinuities. It supports fixed-size point, line, triangle, and quad sets plus one arbitrary n-gon; multiple variable-size polygons remain a Houdini-oriented-model concern. Use `HouGeo` and `HouGeoAdapter` when domain fidelity matters.
@@ -53,13 +54,13 @@ Not currently supported by the standalone C++ model:
 
 - Agents and crowds
 - Height fields
-- Creating or editing native OpenVDB trees without an optional OpenVDB backend
+- Active OpenVDB tiles, nonlinear transforms, and non-float native grid construction
 - Direct HOM extraction of native VDB trees; file-level native VDB payloads are preserved
 - Vector VDB construction and editing
 - NURBS and Bezier primitives
 - Instancing records
 
-The primary Houdini workflow extracts supported live geometry directly through HOM into the HouIO-owned `houio.hom/1` manifest and invokes the custom C++ writer. It does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`. Polygons, dense scalar volumes, embedded `hou.PackedGeometry`, external `PackedDisk` references, `PackedDiskSequence` references, maintained attribute domains, and groups are supported. Packed-disk filenames and expansion policies are retained without opening, copying, or embedding the referenced file. `PackedFragment` is supported by the file reader/writer and explicit manifests, but direct extraction from a standalone `hou.PackedFragment` is unavailable because HOM exposes its fragment metadata without the embedded source detail. Native VDB records are preserved losslessly when HouIO reads and rewrites an existing GEO/BGEO file; constructing a native sparse tree from a live HOM VDB remains a separate optional-backend task.
+The primary Houdini workflow extracts supported live geometry directly through HOM into the HouIO-owned `houio.hom/1` manifest and invokes the custom C++ writer. It does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`. Polygons, dense scalar volumes, embedded `hou.PackedGeometry`, external `PackedDisk` references, `PackedDiskSequence` references, maintained attribute domains, and groups are supported. Packed-disk filenames and expansion policies are retained without opening, copying, or embedding the referenced file. `PackedFragment` is supported by the file reader/writer and explicit manifests, but direct extraction from a standalone `hou.PackedFragment` is unavailable because HOM exposes its fragment metadata without the embedded source detail. Native VDB records are preserved losslessly when HouIO reads and rewrites an existing GEO/BGEO file. `SparseFloatGrid` provides dependency-neutral sparse editing, and an opt-in OpenVDB build adds native `.vdb` FloatGrid I/O. Constructing Houdini-native VDB primitive payloads from live HOM data remains a later integration step.
 
 ## Build
 
@@ -68,6 +69,7 @@ Requirements:
 - CMake 3.24 or newer
 - A C++20 compiler
 - Visual Studio 2022 on Windows, or GCC/Clang on Linux
+- Optional: an OpenVDB package exposing `OpenVDB::openvdb` when configuring with `HOUIO_ENABLE_OPENVDB=ON`
 
 Windows Debug:
 
@@ -92,6 +94,15 @@ cmake --preset linux-gcc-release
 cmake --build --preset linux-gcc-release
 ctest --preset linux-gcc-release
 ```
+
+Optional OpenVDB backend:
+
+```powershell
+cmake -S . -B build/openvdb -DHOUIO_ENABLE_OPENVDB=ON
+cmake --build build/openvdb --config Release
+```
+
+See [docs/openvdb-backend.md](docs/openvdb-backend.md) for the current FloatGrid boundary and dependency contract.
 
 ## C++ API
 

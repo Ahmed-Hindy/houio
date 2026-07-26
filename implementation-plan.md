@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The 18-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Documentation records the primary Writer/CLI/HOM workflow, packed geometry/fragment/disk support, native VDB payload preservation, and remaining backend limitations.
 - Phases 11–31 are merged into `master` through PRs #31 and #32.
-- Phases 32–34 are complete and merged. Phase 35 supports embedded PackedGeometry, named PackedFragment, external PackedDisk, and PackedDiskSequence records. Phase 36 supports lossless opaque native VDB payload preservation; optional sparse-tree construction/editing remains open.
+- Phases 32–34 are complete and merged. Phase 35 supports embedded PackedGeometry, named PackedFragment, external PackedDisk, and PackedDiskSequence records. Phase 36 preserves opaque native VDB payloads and now includes dependency-neutral sparse FloatGrid editing plus optional native `.vdb` FloatGrid I/O; Houdini-native payload generation remains open.
 
 ## Execution phases
 
@@ -1016,8 +1016,9 @@ Goals:
 
 - Model native sparse OpenVDB primitive records without forced dense conversion.
 - Preserve Houdini's serialized native payload, including grid class, value type, transform, metadata, active topology, and sparse values, during file round trips.
-- Keep future OpenVDB tree construction/editing optional at build and package time.
-- Report that direct live-HOM native VDB creation is unavailable until an optional OpenVDB backend exists.
+- Keep OpenVDB tree construction/editing optional at build and package time.
+- Provide dependency-neutral sparse FloatGrid editing in every build and native `.vdb` FloatGrid I/O when OpenVDB is enabled.
+- Report that direct live-HOM native VDB creation remains unavailable until sparse grids can be converted into Houdini's serialized primitive payload.
 
 ## Deferred work
 
@@ -1025,7 +1026,8 @@ The following remain separate from the active product-facing phases unless requi
 
 - Additional primitive-record families after the packed-reference family.
 - Lossless point/vertex-domain redesign.
-- OpenVDB-backed sparse-tree construction and editing APIs.
+- [x] Dependency-neutral sparse FloatGrid construction/editing and optional OpenVDB `.vdb` I/O.
+- [ ] Native Houdini VDB payload generation from sparse grids.
 - Performance architecture changes that bypass the JSON tree.
 - Project-wide licensing and third-party provenance resolution.
 

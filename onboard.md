@@ -281,7 +281,7 @@ Embedded `PackedGeometry` records preserve their shared HouGeo payload, topology
 
 ### VDB
 
-The Houdini-oriented model preserves existing native VDB primitive payloads opaquely and losslessly during file round trips. This does not expose OpenVDB tree editing. Direct live-HOM native VDB writing still requires an optional OpenVDB construction backend because HOM does not expose the serialized sparse payload.
+The Houdini-oriented model preserves existing native VDB primitive payloads opaquely and losslessly during file round trips. `SparseFloatGrid` provides dependency-neutral sparse voxel editing, and an opt-in OpenVDB build adds native `.vdb` FloatGrid I/O. Direct live-HOM native VDB writing still requires conversion from that model into Houdini's serialized primitive payload because HOM does not expose the payload directly.
 
 ### SCF
 
