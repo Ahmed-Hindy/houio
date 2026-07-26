@@ -18,6 +18,7 @@ namespace houio
         packed_geometry,
         packed_fragment,
         packed_disk,
+        packed_disk_sequence,
         sparse_openvdb
     };
 

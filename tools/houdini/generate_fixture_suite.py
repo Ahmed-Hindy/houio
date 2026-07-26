@@ -524,6 +524,40 @@ def build_packed_disk_geometry(output_directory: Path) -> hou.Geometry:
     return geometry
 
 
+def build_packed_disk_sequence_geometry(output_directory: Path) -> hou.Geometry:
+    """Build one external PackedDiskSequence and its sample files."""
+    for frame, x_position in enumerate((1.0, 2.0, 3.0), start=1):
+        payload = hou.Geometry()
+        point = payload.createPoint()
+        point.setPosition((x_position, 0.0, 0.0))
+        payload.saveToFile(str(output_directory / f"packed_sequence.{frame:04d}.bgeo"))
+
+    obj = hou.node("/obj")
+    if obj is None:
+        raise RuntimeError("Houdini object context is unavailable")
+    container = obj.createNode("geo", "houio_packed_sequence_fixture")
+    for child in container.children():
+        child.destroy()
+    file_node = container.createNode("file", "packed_sequence")
+    file_node.parm("file").set(str(output_directory / "packed_sequence.$F4.bgeo"))
+    file_node.parm("loadtype").set("packedseq")
+    file_node.parm("packexpanded").set(0)
+    file_node.parm("f1").set(1)
+    file_node.parm("f2").set(3)
+    file_node.parm("index").set(1.25)
+    file_node.parm("wrap").set("mirror")
+    file_node.parm("viewportlod").set("box")
+    file_node.cook(force=True)
+    geometry = file_node.geometry().freeze()
+    container.destroy()
+    primitive = geometry.prims()[0]
+    primitive.setIntrinsicValue("pivot", (0.25, -0.5, 1.0))
+    kind_attribute = geometry.addAttrib(hou.attribType.Prim, "kind", "")
+    primitive.setAttribValue(kind_attribute, "sequence")
+    geometry.createPrimGroup("packed_sequences").add(primitive)
+    return geometry
+
+
 def build_primitive_groups_geometry() -> hou.Geometry:
     """Build overlapping point, vertex, and primitive groups.
 
@@ -626,6 +660,7 @@ def main() -> int:
         ("packed_geometry", build_packed_geometry, ()),
         ("packed_fragment", build_packed_fragment_geometry, ()),
         ("packed_disk", lambda: build_packed_disk_geometry(output_directory), ()),
+        ("packed_disk_sequence", lambda: build_packed_disk_sequence_geometry(output_directory), ()),
         ("primitive_groups", build_primitive_groups_geometry, ()),
     )
 

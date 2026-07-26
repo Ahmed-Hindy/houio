@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -1158,6 +1159,14 @@ namespace houio
 							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
 						++topologyVertexOffset;
 					}
+					else if( auto packedDiskSequence = std::dynamic_pointer_cast<const HouGeoAdapter::PackedDiskSequencePrimitive>(primitive) )
+					{
+						if( !exportPrimitive(context, packedDiskSequence) )
+							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a packed disk sequence primitive" );
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
 					else if( auto packedDisk = std::dynamic_pointer_cast<const HouGeoAdapter::PackedDiskPrimitive>(primitive) )
 					{
 						if( !exportPrimitive(context, packedDisk) )
@@ -1901,6 +1910,85 @@ namespace houio
 		writer.jsonInt32(packedDisk->topologyVertex());
 		writer.jsonString("viewportlod");
 		writer.jsonString(packedDisk->viewportLod());
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		return true;
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::PackedDiskSequencePrimitive::ConstPtr packedDiskSequence )
+	{
+		if( !packedDiskSequence || packedDiskSequence->topologyVertex() < 0
+			|| !std::isfinite(packedDiskSequence->index()) )
+		{
+			return false;
+		}
+		const std::vector<std::string> filenames = packedDiskSequence->filenames();
+		if( filenames.empty()
+			|| std::any_of(filenames.begin(), filenames.end(),
+				[](const std::string &filename) { return filename.empty(); }) )
+		{
+			return false;
+		}
+
+		const char *wrap = nullptr;
+		switch( packedDiskSequence->wrapMode() )
+		{
+		case HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::cycle:
+			wrap = "cycle";
+			break;
+		case HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::clamp:
+			wrap = "clamp";
+			break;
+		case HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::strict:
+			wrap = "strict";
+			break;
+		case HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::mirror:
+			wrap = "mirror";
+			break;
+		}
+		if( !wrap )
+			return false;
+
+		json::BinaryWriter &writer = context.writer;
+		const math::V3f pivot = packedDiskSequence->pivot();
+		const math::M33f transform = packedDiskSequence->transform();
+
+		writer.jsonBeginArray();
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString("PackedDiskSequence");
+		writer.jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonString("parameters");
+		writer.jsonBeginMap();
+		writer.jsonKey("filenames");
+		writer.jsonBeginArray();
+		for( const std::string &filename : filenames )
+			writer.jsonString(filename);
+		writer.jsonEndArray();
+		writer.jsonKey("index");
+		writer.jsonReal32(packedDiskSequence->index());
+		writer.jsonKey("pointinstancetransform");
+		writer.jsonInt32(packedDiskSequence->pointInstanceTransform() ? 1 : 0);
+		writer.jsonKey("wrap");
+		writer.jsonString(wrap);
+		writer.jsonEndMap();
+		writer.jsonString("pivot");
+		writer.jsonBeginArray();
+		writer.jsonReal32(pivot.x);
+		writer.jsonReal32(pivot.y);
+		writer.jsonReal32(pivot.z);
+		writer.jsonEndArray();
+		writer.jsonString("transform");
+		writer.jsonBeginArray();
+		for( const real32 value : transform.ma )
+			writer.jsonReal32(value);
+		writer.jsonEndArray();
+		writer.jsonString("vertex");
+		writer.jsonInt32(packedDiskSequence->topologyVertex());
+		writer.jsonString("viewportlod");
+		writer.jsonString(packedDiskSequence->viewportLod());
 		writer.jsonEndArray();
 		writer.jsonEndArray();
 		return true;

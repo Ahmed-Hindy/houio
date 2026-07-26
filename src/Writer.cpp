@@ -91,6 +91,9 @@ namespace houio
             {WriterDataType::packed_disk, WriterCapabilityLevel::supported,
                 true, true, "packed_disk",
                 "External PackedDisk references with authored filename, expansion policy, transform, pivot, and flags."},
+            {WriterDataType::packed_disk_sequence, WriterCapabilityLevel::supported,
+                true, true, "packed_disk_sequence",
+                "Ordered PackedDiskSequence sample references with fractional index, wrap mode, transform, and viewport metadata."},
             {WriterDataType::sparse_openvdb, WriterCapabilityLevel::supported,
                 true, true, "sparse_openvdb",
                 "Lossless opaque Houdini VDB payload pass-through; tree creation and editing require an optional OpenVDB backend."}

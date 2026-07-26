@@ -298,7 +298,7 @@ namespace
         return 0;
     }
 
-    int verifyUnsupportedRecord(const std::filesystem::path &directory)
+    int verifyPackedDiskSequenceManifest(const std::filesystem::path &directory)
     {
         const std::filesystem::path path = directory / "packed_disk_sequence.json";
         writeText(path, R"JSON({
@@ -307,7 +307,15 @@ namespace
             "vertex_count":1,
             "primitive_count":1,
             "topology":[0],
-            "primitives":[{"type":"packed_disk_sequence","vertex_offset":0}],
+            "primitives":[{
+                "type":"packed_disk_sequence","vertex_offset":0,
+                "filenames":["cache.0001.bgeo","cache.0002.bgeo","cache.0003.bgeo"],
+                "index":1.5,"wrap":"mirror",
+                "pivot":[0.25,0.5,0.75],
+                "transform":[2,0,0,0,3,0,0,0,4],
+                "viewport_lod":"box",
+                "point_instance_transform":true
+            }],
             "attributes":{
                 "point":[{
                     "name":"P","kind":"numeric","storage":"float32",
@@ -315,6 +323,35 @@ namespace
                 }],
                 "vertex":[],"primitive":[],"global":[]
             }
+        })JSON");
+        const auto result = houio::HomManifest::read(path);
+        if( !result || result.value->primitiveCount() != 1 )
+            return fail("packed disk sequence manifest failed to load");
+        const auto sequence =
+            std::dynamic_pointer_cast<houio::HouGeo::HouPackedDiskSequence>(
+                result.value->primitives().front());
+        if( !sequence || sequence->filenames().size() != 3
+            || sequence->index() != 1.5f
+            || sequence->wrapMode()
+                != houio::HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::mirror
+            || sequence->viewportLod() != "box"
+            || !sequence->pointInstanceTransform() )
+        {
+            return fail("packed disk sequence manifest lost metadata");
+        }
+        return 0;
+    }
+
+    int verifyUnsupportedRecord(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path path = directory / "unsupported_curve.json";
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1","point_count":1,"vertex_count":1,
+            "primitive_count":1,"topology":[0],
+            "primitives":[{"type":"nurbs_curve","vertex_offset":0}],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
         })JSON");
         const auto result = houio::HomManifest::read(path);
         if( result
@@ -343,6 +380,8 @@ int main()
     if( const int result = verifyPackedFragmentManifest(directory); result != 0 )
         return result;
     if( const int result = verifyPackedDiskManifest(directory); result != 0 )
+        return result;
+    if( const int result = verifyPackedDiskSequenceManifest(directory); result != 0 )
         return result;
     if( const int result = verifyUnsupportedRecord(directory); result != 0 )
         return result;

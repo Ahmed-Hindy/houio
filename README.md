@@ -41,6 +41,7 @@ HouIO currently supports:
 - Embedded `PackedGeometry` records with shared geometry, pivot, transform, viewport LOD, and instancing/folder flags
 - Named `PackedFragment` records with embedded geometry, fragment identity, local bounds, pivot, transform, and viewport metadata
 - External `PackedDisk` references with authored filename, expansion frame/policy, pivot, transform, viewport LOD, and packed flags
+- `PackedDiskSequence` records with explicit sample lists, fractional index, wrap mode, pivot, transform, and viewport metadata
 - Native sparse VDB primitive payloads through lossless opaque file round trips
 - SCF compression through C-Blosc
 
@@ -50,7 +51,6 @@ The simplified `Geometry` API is intentionally render-oriented and may split poi
 
 Not currently supported by the standalone C++ model:
 
-- Packed disk sequences
 - Agents and crowds
 - Height fields
 - Creating or editing native OpenVDB trees without an optional OpenVDB backend
@@ -59,7 +59,7 @@ Not currently supported by the standalone C++ model:
 - NURBS and Bezier primitives
 - Instancing records
 
-The primary Houdini workflow extracts supported live geometry directly through HOM into the HouIO-owned `houio.hom/1` manifest and invokes the custom C++ writer. It does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`. Polygons, dense scalar volumes, embedded `hou.PackedGeometry`, external `PackedDisk` references, maintained attribute domains, and groups are supported. Packed-disk filenames and expansion policies are retained without opening, copying, or embedding the referenced file. `PackedFragment` is supported by the file reader/writer and explicit manifests, but direct extraction from a standalone `hou.PackedFragment` is unavailable because HOM exposes its fragment metadata without the embedded source detail. Native VDB records are preserved losslessly when HouIO reads and rewrites an existing GEO/BGEO file; constructing a native sparse tree from a live HOM VDB remains a separate optional-backend task.
+The primary Houdini workflow extracts supported live geometry directly through HOM into the HouIO-owned `houio.hom/1` manifest and invokes the custom C++ writer. It does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`. Polygons, dense scalar volumes, embedded `hou.PackedGeometry`, external `PackedDisk` references, `PackedDiskSequence` references, maintained attribute domains, and groups are supported. Packed-disk filenames and expansion policies are retained without opening, copying, or embedding the referenced file. `PackedFragment` is supported by the file reader/writer and explicit manifests, but direct extraction from a standalone `hou.PackedFragment` is unavailable because HOM exposes its fragment metadata without the embedded source detail. Native VDB records are preserved losslessly when HouIO reads and rewrites an existing GEO/BGEO file; constructing a native sparse tree from a live HOM VDB remains a separate optional-backend task.
 
 ## Build
 

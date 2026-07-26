@@ -275,6 +275,37 @@ def primitive_summary(geometry: hou.Geometry) -> list[dict[str, Any]]:
             if "packedtypename" in primitive.intrinsicNames()
             else primitive.type().name()
         )
+        if packed_type_name == "PackedDiskSequence":
+            filenames = [str(value) for value in primitive.intrinsicValue("filenames")]
+            referenced = []
+            for filename in filenames:
+                sample = hou.Geometry()
+                sample.loadFromFile(filename)
+                referenced.append(
+                    {
+                        "point_count": len(sample.points()),
+                        "primitive_count": len(sample.prims()),
+                        "positions": [list(point.position()) for point in sample.points()],
+                    }
+                )
+            summaries.append(
+                {
+                    "type": packed_type_name,
+                    "closed": None,
+                    "points": [vertex.point().number() for vertex in primitive.vertices()],
+                    "filenames": filenames,
+                    "index": float(primitive.intrinsicValue("index")),
+                    "wrap": str(primitive.intrinsicValue("wrap")),
+                    "pivot": list(primitive.intrinsicValue("pivot")),
+                    "transform": list(primitive.intrinsicValue("transform")),
+                    "viewport_lod": str(primitive.intrinsicValue("viewportlod")),
+                    "point_instance_transform": int(
+                        primitive.intrinsicValue("pointinstancetransform")
+                    ),
+                    "referenced": referenced,
+                }
+            )
+            continue
         if packed_type_name == "PackedDisk":
             resolved_filename = str(primitive.intrinsicValue("filename"))
             referenced = hou.Geometry()

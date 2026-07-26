@@ -252,6 +252,7 @@ namespace
         std::size_t packedGeometryRecords = 0;
         std::size_t packedFragmentRecords = 0;
         std::size_t packedDiskRecords = 0;
+        std::size_t packedDiskSequenceRecords = 0;
         std::size_t nativeVdbRecords = 0;
         for( const houio::HouGeoAdapter::Primitive::Ptr &primitive : result.value->primitives() )
         {
@@ -265,6 +266,8 @@ namespace
                 ++packedGeometryRecords;
             else if( std::dynamic_pointer_cast<houio::HouGeoAdapter::PackedDiskPrimitive>(primitive) )
                 ++packedDiskRecords;
+            else if( std::dynamic_pointer_cast<houio::HouGeoAdapter::PackedDiskSequencePrimitive>(primitive) )
+                ++packedDiskSequenceRecords;
             else if( std::dynamic_pointer_cast<houio::HouGeoAdapter::NativeVdbPrimitive>(primitive) )
                 ++nativeVdbRecords;
         }
@@ -281,6 +284,7 @@ namespace
                 << ",\"packed_geometry_records\":" << packedGeometryRecords
                 << ",\"packed_fragment_records\":" << packedFragmentRecords
                 << ",\"packed_disk_records\":" << packedDiskRecords
+                << ",\"packed_disk_sequence_records\":" << packedDiskSequenceRecords
                 << ",\"native_vdb_records\":" << nativeVdbRecords
                 << ",\"point_attributes\":";
             printStringArray(result.value->pointAttributeNames());
@@ -312,6 +316,7 @@ namespace
                 << "packed_geometry_records=" << packedGeometryRecords << '\n'
                 << "packed_fragment_records=" << packedFragmentRecords << '\n'
                 << "packed_disk_records=" << packedDiskRecords << '\n'
+                << "packed_disk_sequence_records=" << packedDiskSequenceRecords << '\n'
                 << "native_vdb_records=" << nativeVdbRecords << '\n';
             printDiagnostics(result.diagnostics, false);
         }

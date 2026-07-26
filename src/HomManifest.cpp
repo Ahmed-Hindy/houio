@@ -545,6 +545,65 @@ namespace houio
                     geometry->addPrimitive(
                         std::static_pointer_cast<HouGeoAdapter::PackedDiskPrimitive>(packed));
                 }
+                else if( type == "packed_disk_sequence" )
+                {
+                    json::ArrayPtr filenameValues =
+                        requireArray(definition, "filenames", path);
+                    if( filenameValues->size() <= 0 )
+                        failManifest(DiagnosticCategory::schema,
+                            "Packed disk sequence requires at least one filename",
+                            path + ".filenames");
+                    const int filenameCount = checkedCount(
+                        filenameValues->size(), path + ".filenames");
+                    std::vector<std::string> filenames;
+                    filenames.reserve(static_cast<std::size_t>(filenameCount));
+                    for( int filenameIndex = 0; filenameIndex < filenameCount; ++filenameIndex )
+                    {
+                        const std::string filename =
+                            filenameValues->get<std::string>(filenameIndex);
+                        if( filename.empty() )
+                            failManifest(DiagnosticCategory::schema,
+                                "Packed disk sequence filename cannot be empty",
+                                path + ".filenames["
+                                    + std::to_string(filenameIndex) + "]");
+                        filenames.push_back(filename);
+                    }
+
+                    const std::string wrap =
+                        definition->get<std::string>("wrap", "cycle");
+                    HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode wrapMode;
+                    if( wrap == "cycle" )
+                        wrapMode = HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::cycle;
+                    else if( wrap == "clamp" )
+                        wrapMode = HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::clamp;
+                    else if( wrap == "strict" )
+                        wrapMode = HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::strict;
+                    else if( wrap == "mirror" )
+                        wrapMode = HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::mirror;
+                    else
+                        failManifest(DiagnosticCategory::schema,
+                            "Packed disk sequence wrap mode is invalid",
+                            path + ".wrap");
+
+                    auto packed = std::make_shared<HouGeo::HouPackedDiskSequence>();
+                    packed->setTopologyVertex(vertexOffset);
+                    packed->setFilenames(std::move(filenames));
+                    packed->setIndex(definition->get<real32>("index", 0.0f));
+                    packed->setWrapMode(wrapMode);
+                    packed->setPivot(parseVector3(
+                        requireArray(definition, "pivot", path),
+                        path + ".pivot"));
+                    packed->setTransform(parseMatrix33(
+                        requireArray(definition, "transform", path),
+                        path + ".transform"));
+                    packed->setViewportLod(
+                        definition->get<std::string>("viewport_lod", "full"));
+                    packed->setPointInstanceTransform(
+                        definition->get<bool>("point_instance_transform", false));
+                    geometry->addPrimitive(
+                        std::static_pointer_cast<
+                            HouGeoAdapter::PackedDiskSequencePrimitive>(packed));
+                }
                 else if( type == "dense_volume" )
                 {
                     const json::ArrayPtr resolutionValues = requireArray(
