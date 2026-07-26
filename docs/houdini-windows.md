@@ -151,13 +151,16 @@ Reports:
 
 - Houdini version
 - Package root
-- Converter path
+- Primary writer path and `houio diagnose --json` result
+- Compatibility converter path
 - C-Blosc path
 - Existence checks for each runtime dependency
 
 ## VDB workflow
 
-The standalone C++ model does not store sparse OpenVDB trees. The HOM bridge supports bounded 32-bit Float grids by converting them explicitly:
+HouIO preserves existing native Houdini VDB primitive payloads losslessly during file-to-file GEO/BGEO/SCF round trips. The payload remains opaque because the library does not link OpenVDB, so sparse-tree editing and live-HOM native VDB creation are not available yet.
+
+The compatibility bridge also supports bounded 32-bit Float grids by converting them explicitly:
 
 - SDF grids become dense iso volumes.
 - Fog grids become dense smoke volumes.
@@ -229,9 +232,9 @@ Restart Houdini after uninstalling.
 
 Check the package JSON and `PYTHONPATH`, then restart Houdini.
 
-### Converter is missing
+### Writer or converter is missing
 
-Rebuild the Release preset and verify `HOUIO_CONVERT_EXECUTABLE`.
+Rebuild the Release preset. Verify `HOUIO_EXECUTABLE` for the primary custom writer and `HOUIO_CONVERT_EXECUTABLE` for compatibility workflows.
 
 ### `.bgeo.sc` fails
 
@@ -239,7 +242,7 @@ Verify that `HOUIO_BLOSC_LIBRARY` expands to the active Houdini installation's `
 
 ### VDB conversion uses too much memory
 
-Reduce grid resolution or avoid dense conversion. HouIO is not a sparse-grid processing library.
+Use file-to-file native VDB pass-through when possible. The compatibility live-HOM conversion path densifies the grid; reduce its resolution or wait for the optional OpenVDB construction backend.
 
 ### Round Trip node times out
 

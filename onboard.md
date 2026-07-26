@@ -1,8 +1,8 @@
 # Developer onboarding
 
-HouIO is a C++20 geometry I/O library with a command-line converter and an optional Houdini 20.0+ package.
+HouIO is a C++20 custom Houdini geometry writer/reader with a primary CLI and an optional Houdini 20.0+ package.
 
-Start with the public `GeometryIO` API. Move into parser or schema internals only when the task requires it.
+Start with the public `Writer` facade for serialization and `GeometryIO` for reading or advanced format control. Move into parser or schema internals only when the task requires it.
 
 ## Requirements
 
@@ -20,6 +20,18 @@ Linux development:
 - Ninja
 
 ## Build and test
+
+The Windows developer entry point exposes the maintained workflows:
+
+```powershell
+.\tools\dev.ps1 help
+.\tools\dev.ps1 build
+.\tools\dev.ps1 test
+.\tools\dev.ps1 fixtures
+.\tools\dev.ps1 package
+.\tools\dev.ps1 benchmarks
+.\tools\dev.ps1 validate-all
+```
 
 Windows Debug:
 
@@ -63,20 +75,34 @@ ctest --preset linux-gcc-ubsan
 
 ## Recommended reading order
 
-1. `include/houio/GeometryIO.h`
-2. `tests/test_geometry_io.cpp`
-3. `include/houio/HouGeo.h`
-4. `src/HouGeo.cpp`
-5. `include/houio/json.h`
-6. `src/json.cpp`
-7. `include/houio/HouGeoAdapter.h`
-8. `python/houio_hom/bridge.py`
+1. `include/houio/Writer.h`
+2. `tests/test_writer.cpp`
+3. `include/houio/GeometryIO.h`
+4. `include/houio/HomManifest.h`
+5. `include/houio/HouGeo.h`
+6. `src/HouGeo.cpp`
+7. `include/houio/json.h`
+8. `src/json.cpp`
+9. `include/houio/HouGeoAdapter.h`
+10. `python/houio_hom/manifest.py`
+11. `python/houio_hom/bridge.py`
 
 This sequence moves from the supported public facade into schema decoding, binary parsing, export adapters, and Houdini integration.
 
 ## Core API model
 
-Use `GeometryIO` for path-based work:
+Use `Writer` as the primary custom serialization facade:
+
+```cpp
+houio::GeometryWriteOptions options;
+options.atomicReplace = true;
+const houio::WriteResult result = houio::Writer::write(
+    "asset.bgeo.sc",
+    geometry,
+    options);
+```
+
+Use `GeometryIO` for path-based reads and lower-level format operations:
 
 ```cpp
 const auto result = houio::GeometryIO::readHouGeo("asset.bgeo.sc");
@@ -99,11 +125,15 @@ Choose the representation deliberately. `<houio/GeometryModels.h>` also exposes 
 
 ## Debugging a file
 
-Start with the converter:
+Start with the primary CLI:
 
 ```powershell
-.\build\windows-msvc-debug\houio_convert.exe input.bgeo output.bgeo
+.\build\windows-msvc-debug\houio.exe inspect input.bgeo --json
+.\build\windows-msvc-debug\houio.exe validate input.bgeo
+.\build\windows-msvc-debug\houio.exe write input.bgeo output.bgeo.sc
 ```
+
+`houio_convert.exe input output` remains available for compatibility.
 
 Use the inspection tools when you need parser or schema detail:
 
@@ -245,9 +275,13 @@ Topology values are point indices. Primitive records refer to topology ranges, n
 
 `readVolume()` returns the first dense scalar volume and warns when more are present. Use `readVolumes()` when every volume must be retained.
 
+### Packed geometry
+
+Embedded `PackedGeometry` records preserve their shared HouGeo payload, topology vertex, pivot, transform, viewport LOD, and instancing/folder flags. Packed fragments and packed disk records remain separate fixture-backed additions.
+
 ### VDB
 
-The standalone library does not store sparse OpenVDB trees. The Houdini bridge performs explicit Float SDF or Fog conversion through dense volumes.
+The Houdini-oriented model preserves existing native VDB primitive payloads opaquely and losslessly during file round trips. This does not expose OpenVDB tree editing. Direct live-HOM native VDB writing still requires an optional OpenVDB construction backend because HOM does not expose the serialized sparse payload.
 
 ### SCF
 
@@ -272,6 +306,7 @@ Before opening a pull request:
 - [Architecture](architecture.md)
 - [Contributing](CONTRIBUTING.md)
 - [Compatibility matrix](docs/compatibility.md)
+- [Command-line interface](docs/cli.md)
 - [Fixture generation and validation](docs/fixtures.md)
 - [Performance baselines](docs/benchmarks.md)
 - [Experimental field persistence format](docs/field-format.md)

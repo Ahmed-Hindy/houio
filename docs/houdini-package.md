@@ -2,8 +2,9 @@
 
 The Windows archive contains:
 
-- `houio_convert.exe`
-- The `houio_hom` Python bridge
+- `houio.exe`, the primary custom-writer CLI
+- `houio_convert.exe`, the compatibility converter
+- The `houio_hom` direct HOM extraction bridge
 - Shelf and Tab-menu tools
 - Package diagnostics
 - A transient bootstrap script
@@ -110,13 +111,13 @@ Inside the bootstrapped Houdini session:
 1. Create a Geometry object and enter its SOP network.
 2. Create and select a Box SOP.
 3. Run **Tab > HouIO > Package Diagnostics**.
-4. Confirm the package root, converter, and C-Blosc checks pass.
-5. Run **Tab > HouIO > HouIO Round Trip**.
-6. Confirm the created node cooks without errors or warnings.
-7. Compare point and primitive counts with the source Box.
-8. Disable **Enabled** and confirm geometry passes through unchanged.
-9. Use **Convert Geometry File** to write `.bgeo.sc`.
-10. Load the result with a File SOP.
+4. Confirm the package root, writer, converter, and C-Blosc checks pass.
+5. Run **Tab > HouIO > Write Selected Geometry** and choose a `.bgeo.sc` destination.
+6. Load the result with a File SOP and compare attributes, groups, points, and primitives.
+7. Run **Tab > HouIO > HouIO Round Trip**.
+8. Confirm the created node cooks without errors or warnings.
+9. Disable **Enabled** and confirm geometry passes through unchanged.
+10. Use **Convert Geometry File** for compatibility file-to-file conversion.
 
 Repeat the test in each Houdini version you intend to support.
 
@@ -154,6 +155,12 @@ Houdini 22 can install the ZIP directly through **Inspectors > Package Browser**
 
 Open a SOP network and press **Tab > HouIO**.
 
+### Write Selected Geometry
+
+Writes the selected cooked SOP through direct HOM extraction and HouIO's custom C++ serializer. The primary path does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`.
+
+Supported live records include polygons, dense scalar volumes, and embedded `hou.PackedGeometry`, together with maintained point, vertex, primitive, and global attributes and groups.
+
 ### HouIO Round Trip
 
 Creates a configured Python SOP after the selected SOP.
@@ -171,19 +178,19 @@ Converts `.geo`, `.bgeo`, or `.bgeo.sc` through the bundled executable.
 
 ### Package Diagnostics
 
-Reports the active package root, Houdini version, converter path, C-Blosc path, and runtime existence checks.
+Reports the active package root, Houdini version, primary writer path and `houio diagnose --json` result, compatibility converter path, C-Blosc path, and runtime existence checks.
 
 ## Supported data
 
-The package supports HouIO's polygon, numeric/string/dictionary attribute, group, and dense scalar-volume model. Houdini Volume Visualization detail metadata is preserved in both the scalar-attribute layout used by Houdini 20.x and the dictionary layout used by Houdini 21.x and newer.
+The package supports HouIO's polygon, embedded `PackedGeometry`, numeric/string/dictionary attribute, group, and dense scalar-volume model. Houdini Volume Visualization detail metadata is preserved in both the scalar-attribute layout used by Houdini 20.x and the dictionary layout used by Houdini 21.x and newer.
 
-The Houdini bridge also accepts bounded 32-bit Float SDF and Fog VDB grids by converting them to dense volumes. VDB class is retained through the `houio_vdb_class` attribute and restored on output.
+Existing native VDB primitive payloads are preserved losslessly by file-to-file HouIO round trips. Direct live-HOM writing of native VDB trees is not yet available because HOM does not expose the serialized sparse payload and HouIO does not yet link an optional OpenVDB construction backend. The compatibility round-trip path can still densify supported Float SDF/Fog grids and restore their class.
 
-Unsupported examples include packed primitives, agents, height fields, vector VDB grids, and native sparse VDB preservation.
+Unsupported examples include packed fragments, packed disk primitives, agents, height fields, live native-VDB construction, and vector VDB construction/editing.
 
 ## Runtime model
 
-The package does not load a HouIO extension into Houdini. It imports Python code and starts `houio_convert.exe` as a separate process.
+The package does not load a HouIO extension or HDK plug-in into Houdini. It imports Python code, extracts supported data into the HouIO-owned `houio.hom/1` manifest, and starts `houio.exe` as a separate custom-writer process. `houio_convert.exe` remains bundled for compatibility workflows.
 
 `.bgeo.sc` support resolves C-Blosc from the active Houdini installation through `$HFS/bin/blosc.dll`.
 
