@@ -746,6 +746,11 @@ namespace houio
 		return indexBuffer;
 	}
 
+	std::span<const int> HouGeo::HouTopology::indexView() const noexcept
+	{
+		return indexBuffer;
+	}
+
 	void HouGeo::HouTopology::appendIndices(std::span<const int> indices)
 	{
 		indexBuffer.insert(indexBuffer.end(), indices.begin(), indices.end());

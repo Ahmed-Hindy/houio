@@ -60,6 +60,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Validate programmatic group domains and preserve primitive groups spanning mixed polygon and dense-volume records.
 - [x] Audit maintained containers and confirm active implementation storage is private behind validated APIs or immutable views.
 - [x] Add installed `HoudiniGeometry` and `SimplifiedMesh` aliases that make model responsibilities explicit without breaking established class names.
+- [x] Add an optional immutable topology view and remove the unconditional topology-vector copy from faithful export.
 
 ## Modernization next
 

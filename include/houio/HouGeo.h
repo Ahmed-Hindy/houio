@@ -172,6 +172,7 @@ namespace houio
             HouTopology();
 
             [[nodiscard]] std::vector<int> indexValues() const override;
+            [[nodiscard]] std::span<const int> indexView() const noexcept override;
             void appendIndices(std::span<const int> indices) override;
             [[nodiscard]] sint64 indexCount() const override;
 

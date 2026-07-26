@@ -34,6 +34,11 @@ namespace houio
         return {};
     }
 
+    std::span<const int> HouGeoAdapter::Topology::indexView() const noexcept
+    {
+        return {};
+    }
+
     int HouGeoAdapter::AttributeAdapter::elementCount() const
     {
         return 0;

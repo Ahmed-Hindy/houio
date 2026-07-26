@@ -1359,11 +1359,25 @@ namespace houio
 			return false;
 		json::BinaryWriter &writer = context.writer;
 
-		const std::vector<int> topology_indices = topology->indexValues();
-		std::vector<sint32> indices(topology_indices.begin(), topology_indices.end());
+		const sint64 declaredIndexCount = topology->indexCount();
+		if( declaredIndexCount < 0
+			|| static_cast<uint64>(declaredIndexCount) > std::numeric_limits<size_t>::max() )
+		{
+			throw std::length_error( "HouGeoIO::exportTopology index count exceeds addressable storage" );
+		}
+		const size_t expectedIndexCount = static_cast<size_t>(declaredIndexCount);
+		std::vector<int> copiedIndices;
+		std::span<const int> topologyIndices = topology->indexView();
+		if( topologyIndices.size() != expectedIndexCount )
+		{
+			copiedIndices = topology->indexValues();
+			if( copiedIndices.size() != expectedIndexCount )
+				throw std::runtime_error( "HouGeoIO::exportTopology index data does not match indexCount" );
+			topologyIndices = copiedIndices;
+		}
 
 		bool requires32BitIndices = false;
-		for( const sint32 index : indices )
+		for( const int index : topologyIndices )
 		{
 			if( index < 0 )
 				throw std::runtime_error( "HouGeoIO::exportTopology cannot export negative point indices" );
@@ -1376,13 +1390,15 @@ namespace houio
 		writer.jsonString( "indices" );
 		if( requires32BitIndices )
 		{
-			writer.jsonUniformArray<sint32>(indices);
+			static_assert(std::is_same_v<int, sint32>);
+			writer.jsonUniformArray<sint32>(
+				std::span<const sint32>(topologyIndices.data(), topologyIndices.size()));
 		}
 		else
 		{
 			std::vector<sint16> compactIndices;
-			compactIndices.reserve(indices.size());
-			for( const sint32 index : indices )
+			compactIndices.reserve(topologyIndices.size());
+			for( const int index : topologyIndices )
 				compactIndices.push_back(static_cast<sint16>(index));
 			writer.jsonUniformArray<sint16>(compactIndices);
 		}

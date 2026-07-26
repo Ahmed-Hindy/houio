@@ -148,6 +148,9 @@ namespace houio
             virtual ~Topology() = default;
 
             [[nodiscard]] virtual std::vector<int> indexValues() const = 0;
+            /// Optional immutable view used to avoid copying topology during export.
+            /// The default empty view preserves compatibility with existing adapters.
+            [[nodiscard]] virtual std::span<const int> indexView() const noexcept;
             virtual void appendIndices(std::span<const int> indices) = 0;
             [[nodiscard]] virtual sint64 indexCount() const = 0;
         };

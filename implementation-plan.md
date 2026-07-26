@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The large Crag round trip and Houdini package matrix pass in all four maintained versions.
 - Documentation audit contains no retired API references and now records compatibility, fixture, contribution, field-format, and versioning contracts.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Phases 17–26 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
+- Phases 17–27 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
 
 ## Execution phases
 
@@ -788,6 +788,38 @@ Exit criteria:
 - Public type names communicate which model is Houdini-oriented and which is simplified.
 - Existing source remains compatible.
 - The new header is installed and usable through `find_package(houio)`.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 27 — Zero-copy topology export view
+
+**Status: complete.**
+
+Target files:
+
+- `include/houio/HouGeoAdapter.h`
+- `include/houio/HouGeo.h`
+- `src/HouGeoAdapter.cpp`
+- `src/HouGeo.cpp`
+- `src/HouGeoIO.cpp`
+- `tests/test_export_safety.cpp`
+- roadmap documents
+
+Tasks:
+
+- Add an optional immutable topology index view to the adapter contract.
+- Keep `indexValues()` as the required compatibility API for existing custom adapters.
+- Expose `HouTopology` owned indices directly through the immutable view.
+- Validate that the selected view or fallback copy matches `indexCount()`.
+- Write 32-bit topology arrays directly from the immutable view.
+- Retain 16-bit compaction where every index fits.
+- Test that view-enabled adapters perform no `indexValues()` copy.
+- Test that legacy adapters without a view perform one fallback copy and preserve values.
+
+Exit criteria:
+
+- Faithful `HouTopology` export no longer allocates a full duplicate 32-bit index vector.
+- Existing custom topology adapters remain source-compatible.
+- Index count mismatches and negative indices remain rejected.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work
