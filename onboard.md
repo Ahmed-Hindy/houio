@@ -275,9 +275,9 @@ Topology values are point indices. Primitive records refer to topology ranges, n
 
 `readVolume()` returns the first dense scalar volume and warns when more are present. Use `readVolumes()` when every volume must be retained.
 
-### Packed geometry
+### Packed primitives
 
-Embedded `PackedGeometry` records preserve their shared HouGeo payload, topology vertex, pivot, transform, viewport LOD, and instancing/folder flags. Packed fragments and packed disk records remain separate fixture-backed additions.
+Embedded `PackedGeometry` records preserve their shared HouGeo payload, topology vertex, pivot, transform, viewport LOD, and instancing/folder flags. Named `PackedFragment` records additionally preserve fragment attribute/name and local cached bounds. Packed disk records remain a separate fixture-backed addition. Direct HOM extraction of an existing `hou.PackedFragment` is unavailable because HOM does not expose its embedded source detail.
 
 ### VDB
 

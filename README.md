@@ -39,6 +39,7 @@ HouIO currently supports:
 - `Poly`, `Polygon_run`, and `PolygonCurve_run`
 - Dense scalar volumes
 - Embedded `PackedGeometry` records with shared geometry, pivot, transform, viewport LOD, and instancing/folder flags
+- Named `PackedFragment` records with embedded geometry, fragment identity, local bounds, pivot, transform, and viewport metadata
 - Native sparse VDB primitive payloads through lossless opaque file round trips
 - SCF compression through C-Blosc
 
@@ -48,7 +49,7 @@ The simplified `Geometry` API is intentionally render-oriented and may split poi
 
 Not currently supported by the standalone C++ model:
 
-- Packed fragments and packed disk primitives
+- Packed disk primitives
 - Agents and crowds
 - Height fields
 - Creating or editing native OpenVDB trees without an optional OpenVDB backend
@@ -57,7 +58,7 @@ Not currently supported by the standalone C++ model:
 - NURBS and Bezier primitives
 - Instancing records
 
-The primary Houdini workflow extracts supported live geometry directly through HOM into the HouIO-owned `houio.hom/1` manifest and invokes the custom C++ writer. It does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`. Polygons, dense scalar volumes, embedded `hou.PackedGeometry`, maintained attribute domains, and groups are supported. Native VDB records are preserved losslessly when HouIO reads and rewrites an existing GEO/BGEO file; constructing a native sparse tree from a live HOM VDB remains a separate optional-backend task.
+The primary Houdini workflow extracts supported live geometry directly through HOM into the HouIO-owned `houio.hom/1` manifest and invokes the custom C++ writer. It does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`. Polygons, dense scalar volumes, embedded `hou.PackedGeometry`, maintained attribute domains, and groups are supported. `PackedFragment` is supported by the file reader/writer and explicit manifests, but direct extraction from a standalone `hou.PackedFragment` is unavailable because HOM exposes its fragment metadata without the embedded source detail. Native VDB records are preserved losslessly when HouIO reads and rewrites an existing GEO/BGEO file; constructing a native sparse tree from a live HOM VDB remains a separate optional-backend task.
 
 ## Build
 

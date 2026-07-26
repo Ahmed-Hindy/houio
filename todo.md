@@ -4,13 +4,13 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `feat/primary-interface-tooling-ux`
-- Baseline commit: `31a8e82` (`master` after merged modernization PR #32).
-- Current exact source: MSVC warnings-as-errors suite passes **24/24**.
+- Branch: `feat/packed-fragment-support`
+- Baseline commit: `aa69891` (`master` after merged PR #34).
+- Current exact source: MSVC warnings-as-errors suite passes **56/56**.
 - Current exact source: Windows AddressSanitizer passes **24/24** and MSVC native analysis is error-clean.
-- Full Release/Houdini validation passes **55/55**.
-- Direct custom writing, the 16-fixture matrix, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
-- The active branch completes the primary write facade, multi-command CLI, direct HOM custom-writer workflow, embedded PackedGeometry, and native VDB payload preservation.
+- Full Release/Houdini validation passes **56/56**.
+- Direct custom writing, the 17-fixture matrix, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- The active branch adds fixture-backed named `PackedFragment` records across the file model, explicit HOM manifest, CLI, fixtures, and compatibility documentation.
 
 ## Modernization completed
 
@@ -93,7 +93,8 @@ The long-term roadmap remains below. The active modernization program is summari
 ### Data-type expansion after the product surface
 
 - [x] Add fixture-backed embedded `PackedGeometry` support, including direct HOM extraction.
-- [ ] Add packed fragments and packed disk primitives.
+- [x] Add named packed fragments with fragment identity, bounds, transforms, shared payloads, and four-version fixtures.
+- [ ] Add packed disk primitives.
 - [x] Preserve native sparse VDB primitive payloads without forced densification during file round trips.
 - [ ] Add an optional OpenVDB backend for native sparse-tree construction and editing from live HOM data.
 - [ ] Continue with curves, instancing, height fields, and other observed records one family at a time.
@@ -188,7 +189,7 @@ Priority levels:
 Add fixture-backed support one record type at a time:
 
 - [x] Embedded packed geometry
-- [ ] Packed fragments
+- [x] Named packed fragments
 - [ ] Packed disk primitives
 - [ ] NURBS and Bezier curves
 - [ ] Spheres and tubes
