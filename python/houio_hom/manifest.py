@@ -292,6 +292,27 @@ def _primitive_manifest(primitive: hou.Prim) -> dict[str, Any]:
         if "packedtypename" in primitive.intrinsicNames()
         else type_name
     )
+    if packed_type_name == "PackedDiskSequence":
+        filenames = [str(value) for value in primitive.intrinsicValue("filenames")]
+        if not filenames or any(not filename for filename in filenames):
+            raise UnsupportedHOMDataError(
+                "hou.PackedPrim PackedDiskSequence has no valid sample filenames"
+            )
+        return {
+            "type": "packed_disk_sequence",
+            "vertex_offset": vertex_offset,
+            "filenames": filenames,
+            "index": float(primitive.intrinsicValue("index")),
+            "wrap": str(primitive.intrinsicValue("wrap")),
+            "pivot": [float(value) for value in primitive.intrinsicValue("pivot")],
+            "transform": [
+                float(value) for value in primitive.intrinsicValue("transform")
+            ],
+            "viewport_lod": str(primitive.intrinsicValue("viewportlod")),
+            "point_instance_transform": bool(
+                primitive.intrinsicValue("pointinstancetransform")
+            ),
+        }
     if packed_type_name == "PackedDisk":
         authored_filename = str(primitive.intrinsicValue("unexpandedfilename"))
         if not authored_filename:
@@ -368,7 +389,8 @@ def _primitive_manifest(primitive: hou.Prim) -> dict[str, Any]:
     if "Packed" in packed_type_name or "packed" in packed_type_name:
         raise UnsupportedHOMDataError(
             f"Packed primitive {packed_type_name!r} is recognized, but direct HOM extraction "
-            "supports embedded hou.PackedGeometry and PackedDisk references; "
+            "supports embedded hou.PackedGeometry, PackedDisk references, and "
+            "PackedDiskSequence references; "
             "PackedFragment is supported at the file and explicit-manifest layers"
         )
     raise UnsupportedHOMDataError(

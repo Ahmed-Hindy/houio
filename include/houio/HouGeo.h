@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <limits>
 #include <map>
 #include <memory>
@@ -431,6 +432,62 @@ namespace houio
             friend class HouGeo;
         };
 
+        class HouPackedDiskSequence final : public PackedDiskSequencePrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouPackedDiskSequence>;
+            using ConstPtr = std::shared_ptr<const HouPackedDiskSequence>;
+
+            [[nodiscard]] int topologyVertex() const override;
+            [[nodiscard]] std::vector<std::string> filenames() const override;
+            [[nodiscard]] real32 index() const override;
+            [[nodiscard]] WrapMode wrapMode() const override;
+            [[nodiscard]] math::V3f pivot() const override;
+            [[nodiscard]] math::M33f transform() const override;
+            [[nodiscard]] std::string viewportLod() const override;
+            [[nodiscard]] bool pointInstanceTransform() const override;
+
+            void setTopologyVertex(int topology_vertex) noexcept
+            {
+                topology_vertex_ = topology_vertex;
+            }
+            void setFilenames(std::vector<std::string> filenames)
+            {
+                if (filenames.empty())
+                    throw std::invalid_argument("HouPackedDiskSequence requires at least one filename");
+                if (std::any_of(filenames.begin(), filenames.end(),
+                        [](const std::string& filename) { return filename.empty(); }))
+                {
+                    throw std::invalid_argument("HouPackedDiskSequence filenames cannot be empty");
+                }
+                filenames_ = std::move(filenames);
+            }
+            void setIndex(real32 index) noexcept { index_ = index; }
+            void setWrapMode(WrapMode mode) noexcept { wrap_mode_ = mode; }
+            void setPivot(const math::V3f& pivot) noexcept { pivot_ = pivot; }
+            void setTransform(const math::M33f& transform) noexcept { transform_ = transform; }
+            void setViewportLod(std::string viewport_lod)
+            {
+                viewport_lod_ = viewport_lod.empty() ? "full" : std::move(viewport_lod);
+            }
+            void setPointInstanceTransform(bool enabled) noexcept
+            {
+                point_instance_transform_ = enabled;
+            }
+
+        private:
+            int topology_vertex_ = -1;
+            std::vector<std::string> filenames_;
+            real32 index_ = 0.0f;
+            WrapMode wrap_mode_ = WrapMode::cycle;
+            math::V3f pivot_{0.0f};
+            math::M33f transform_ = math::M33f::identity();
+            std::string viewport_lod_ = "full";
+            bool point_instance_transform_ = false;
+
+            friend class HouGeo;
+        };
+
         class HouVdb final : public NativeVdbPrimitive
         {
         public:
@@ -528,6 +585,7 @@ namespace houio
         void addPrimitive(PackedGeometryPrimitive::Ptr packed_geometry);
         void addPrimitive(PackedFragmentPrimitive::Ptr packed_fragment);
         void addPrimitive(PackedDiskPrimitive::Ptr packed_disk);
+        void addPrimitive(PackedDiskSequencePrimitive::Ptr packed_disk_sequence);
         void addPrimitive(NativeVdbPrimitive::Ptr native_vdb);
         void addPrimitive(PolyPrimitive::Ptr polygon);
         void setTopology(HouTopology::Ptr topology);
@@ -594,6 +652,7 @@ namespace houio
             json::ObjectPtr packed_fragment,
             SharedPrimitiveData& shared_primitive_data);
         void loadPackedDiskPrimitive(json::ObjectPtr packed_disk);
+        void loadPackedDiskSequencePrimitive(json::ObjectPtr packed_disk_sequence);
         void loadNativeVdbPrimitive(json::ObjectPtr native_vdb);
         void loadPolyPrimitive(json::ObjectPtr polygon_object);
         void loadPolyPrimitiveRun(

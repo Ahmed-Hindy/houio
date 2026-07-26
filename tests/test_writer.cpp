@@ -250,6 +250,44 @@ namespace
             return fail("Packed disk transform or flags changed");
         }
 
+        houio::HouGeo::Ptr sequenceGeometry = createHouGeo();
+        auto sequenceTopology = std::make_shared<houio::HouGeo::HouTopology>();
+        sequenceTopology->appendIndex(0);
+        sequenceGeometry->setTopology(sequenceTopology);
+        auto sequence = std::make_shared<houio::HouGeo::HouPackedDiskSequence>();
+        sequence->setTopologyVertex(0);
+        sequence->setFilenames({"cache.0001.bgeo", "cache.0002.bgeo", "cache.0003.bgeo"});
+        sequence->setIndex(1.25f);
+        sequence->setWrapMode(
+            houio::HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::mirror);
+        sequence->setPivot(houio::math::V3f(0.25f, -0.5f, 1.0f));
+        sequence->setViewportLod("box");
+        sequence->setPointInstanceTransform(true);
+        sequenceGeometry->addPrimitive(
+            std::static_pointer_cast<houio::HouGeoAdapter::PackedDiskSequencePrimitive>(sequence));
+        const std::filesystem::path sequencePath = directory / "packed_disk_sequence.bgeo";
+        if( !houio::Writer::write(
+                sequencePath,
+                std::static_pointer_cast<houio::HouGeoAdapter>(sequenceGeometry)) )
+        {
+            return fail("Writer failed to serialize packed disk sequence");
+        }
+        const auto sequenceResult = houio::GeometryIO::readHouGeo(sequencePath);
+        if( !sequenceResult || sequenceResult.value->primitiveCount() != 1 )
+            return fail("Packed disk sequence did not round-trip");
+        const auto sequencePrimitive =
+            std::dynamic_pointer_cast<houio::HouGeo::HouPackedDiskSequence>(
+                sequenceResult.value->primitives().front());
+        if( !sequencePrimitive
+            || sequencePrimitive->filenames()
+                != std::vector<std::string>{"cache.0001.bgeo", "cache.0002.bgeo", "cache.0003.bgeo"}
+            || sequencePrimitive->index() != 1.25f
+            || sequencePrimitive->wrapMode()
+                != houio::HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode::mirror )
+        {
+            return fail("Packed disk sequence metadata changed");
+        }
+
         houio::HouGeo::Ptr vdbGeometry = createHouGeo();
         auto vdbTopology = std::make_shared<houio::HouGeo::HouTopology>();
         vdbTopology->appendIndex(0);
@@ -341,6 +379,13 @@ namespace
             || !disk->readable || !disk->writable )
         {
             return fail("Packed disk capability contract is incorrect");
+        }
+        const auto sequence = houio::Writer::capability(
+            houio::WriterDataType::packed_disk_sequence);
+        if( !sequence || sequence->level != houio::WriterCapabilityLevel::supported
+            || !sequence->readable || !sequence->writable )
+        {
+            return fail("Packed disk sequence capability contract is incorrect");
         }
         const auto vdb = houio::Writer::capability(
             houio::WriterDataType::sparse_openvdb);

@@ -268,6 +268,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
         packed_geometry
         packed_fragment
         packed_disk
+        packed_disk_sequence
         primitive_groups
     )
 

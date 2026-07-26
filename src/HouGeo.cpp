@@ -582,6 +582,13 @@ namespace houio
 		m_primitives.push_back(std::move(packedDisk));
 	}
 
+	void HouGeo::addPrimitive( PackedDiskSequencePrimitive::Ptr packedDiskSequence )
+	{
+		if( !packedDiskSequence )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null packed disk sequence" );
+		m_primitives.push_back(std::move(packedDiskSequence));
+	}
+
 	void HouGeo::addPrimitive( NativeVdbPrimitive::Ptr nativeVdb )
 	{
 		if( !nativeVdb )
@@ -1512,6 +1519,9 @@ namespace houio
 		if( primitiveType=="PackedDisk" )
 			withSchemaPath("data", [&]() { loadPackedDiskPrimitive(toObject(primitive->array(1))); });
 		else
+		if( primitiveType=="PackedDiskSequence" )
+			withSchemaPath("data", [&]() { loadPackedDiskSequencePrimitive(toObject(primitive->array(1))); });
+		else
 		if( primitiveType=="VDB" )
 			withSchemaPath("data", [&]() { loadNativeVdbPrimitive(toObject(primitive->array(1))); });
 		else
@@ -1851,6 +1861,113 @@ namespace houio
 		m_primitives.push_back(std::move(result));
 	}
 
+	void HouGeo::loadPackedDiskSequencePrimitive( json::ObjectPtr packedDiskSequence )
+	{
+		if( !packedDiskSequence )
+			throw std::invalid_argument(
+				"HouGeo::loadPackedDiskSequencePrimitive received null data" );
+		json::ObjectPtr parameters = packedDiskSequence->object("parameters");
+		if( !parameters )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedDiskSequence primitive is missing parameters",
+				-1, "parameters"});
+
+		json::ArrayPtr filenameValues = parameters->array("filenames");
+		if( !filenameValues || filenameValues->size() <= 0 )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedDiskSequence requires at least one filename",
+				-1, "parameters.filenames"});
+		const int filenameCount = checkedArrayCount(
+			filenameValues, "PackedDiskSequence filenames");
+		std::vector<std::string> filenames;
+		filenames.reserve(static_cast<std::size_t>(filenameCount));
+		for( int index = 0; index < filenameCount; ++index )
+		{
+			const std::string filename = filenameValues->get<std::string>(index);
+			if( filename.empty() )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedDiskSequence filename cannot be empty",
+					-1, "parameters.filenames[" + std::to_string(index) + "]"});
+			filenames.push_back(filename);
+		}
+
+		const int topologyVertex = packedDiskSequence->get<int>("vertex", -1);
+		if( topologyVertex < 0 || !m_topology
+			|| static_cast<sint64>(topologyVertex) >= m_topology->indexCount() )
+		{
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedDiskSequence topology vertex is outside vertexcount",
+				-1, "vertex"});
+		}
+
+		math::V3f pivot(0.0f);
+		json::ArrayPtr pivotValues = packedDiskSequence->array("pivot");
+		if( pivotValues )
+		{
+			if( pivotValues->size() != 3 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedDiskSequence pivot requires three values", -1, "pivot"});
+			pivot = math::V3f(
+				pivotValues->get<real32>(0),
+				pivotValues->get<real32>(1),
+				pivotValues->get<real32>(2));
+		}
+
+		math::M33f transform = math::M33f::identity();
+		json::ArrayPtr transformValues = packedDiskSequence->array("transform");
+		if( transformValues )
+		{
+			if( transformValues->size() != 9 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedDiskSequence transform requires nine values", -1, "transform"});
+			transform = math::M33f(
+				transformValues->get<real32>(0),
+				transformValues->get<real32>(1),
+				transformValues->get<real32>(2),
+				transformValues->get<real32>(3),
+				transformValues->get<real32>(4),
+				transformValues->get<real32>(5),
+				transformValues->get<real32>(6),
+				transformValues->get<real32>(7),
+				transformValues->get<real32>(8));
+		}
+
+		const std::string wrap = parameters->get<std::string>("wrap", "cycle");
+		PackedDiskSequencePrimitive::WrapMode wrapMode;
+		if( wrap == "cycle" )
+			wrapMode = PackedDiskSequencePrimitive::WrapMode::cycle;
+		else if( wrap == "clamp" )
+			wrapMode = PackedDiskSequencePrimitive::WrapMode::clamp;
+		else if( wrap == "strict" )
+			wrapMode = PackedDiskSequencePrimitive::WrapMode::strict;
+		else if( wrap == "mirror" )
+			wrapMode = PackedDiskSequencePrimitive::WrapMode::mirror;
+		else
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedDiskSequence wrap mode is invalid",
+				-1, "parameters.wrap"});
+
+		auto result = std::make_shared<HouPackedDiskSequence>();
+		result->topology_vertex_ = topologyVertex;
+		result->filenames_ = std::move(filenames);
+		result->index_ = parameters->get<real32>("index", 0.0f);
+		result->wrap_mode_ = wrapMode;
+		result->pivot_ = pivot;
+		result->transform_ = transform;
+		result->viewport_lod_ =
+			packedDiskSequence->get<std::string>("viewportlod", "full");
+		result->point_instance_transform_ =
+			parameters->get<int>("pointinstancetransform", 0) != 0;
+		m_primitives.push_back(std::move(result));
+	}
+
 	void HouGeo::loadNativeVdbPrimitive( json::ObjectPtr nativeVdb )
 	{
 		if( !nativeVdb )
@@ -1924,6 +2041,49 @@ namespace houio
 	bool HouGeo::HouPackedDisk::treatAsFolder() const
 	{
 		return treat_as_folder_;
+	}
+
+	// HouGeo::HouPackedDiskSequence =====================================
+
+	int HouGeo::HouPackedDiskSequence::topologyVertex() const
+	{
+		return topology_vertex_;
+	}
+
+	std::vector<std::string> HouGeo::HouPackedDiskSequence::filenames() const
+	{
+		return filenames_;
+	}
+
+	real32 HouGeo::HouPackedDiskSequence::index() const
+	{
+		return index_;
+	}
+
+	HouGeoAdapter::PackedDiskSequencePrimitive::WrapMode
+	HouGeo::HouPackedDiskSequence::wrapMode() const
+	{
+		return wrap_mode_;
+	}
+
+	math::V3f HouGeo::HouPackedDiskSequence::pivot() const
+	{
+		return pivot_;
+	}
+
+	math::M33f HouGeo::HouPackedDiskSequence::transform() const
+	{
+		return transform_;
+	}
+
+	std::string HouGeo::HouPackedDiskSequence::viewportLod() const
+	{
+		return viewport_lod_;
+	}
+
+	bool HouGeo::HouPackedDiskSequence::pointInstanceTransform() const
+	{
+		return point_instance_transform_;
 	}
 
 	int HouGeo::HouVdb::topologyVertex() const

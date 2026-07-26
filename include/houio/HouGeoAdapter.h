@@ -170,6 +170,7 @@ namespace houio
                 packed_geometry,
                 packed_fragment,
                 packed_disk,
+                packed_disk_sequence,
                 native_vdb,
             };
 
@@ -236,6 +237,30 @@ namespace houio
             [[nodiscard]] virtual std::string viewportLod() const;
             [[nodiscard]] virtual bool pointInstanceTransform() const;
             [[nodiscard]] virtual bool treatAsFolder() const;
+        };
+
+        class PackedDiskSequencePrimitive : public Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<PackedDiskSequencePrimitive>;
+            using ConstPtr = std::shared_ptr<const PackedDiskSequencePrimitive>;
+
+            enum class WrapMode
+            {
+                cycle,
+                clamp,
+                strict,
+                mirror,
+            };
+
+            [[nodiscard]] virtual int topologyVertex() const = 0;
+            [[nodiscard]] virtual std::vector<std::string> filenames() const = 0;
+            [[nodiscard]] virtual real32 index() const;
+            [[nodiscard]] virtual WrapMode wrapMode() const;
+            [[nodiscard]] virtual math::V3f pivot() const;
+            [[nodiscard]] virtual math::M33f transform() const;
+            [[nodiscard]] virtual std::string viewportLod() const;
+            [[nodiscard]] virtual bool pointInstanceTransform() const;
         };
 
         class NativeVdbPrimitive : public Primitive
