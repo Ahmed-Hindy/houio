@@ -19,7 +19,7 @@ The minimum supported Houdini line is 20.0. Compatibility is established by the 
 
 ## What the fixture matrix validates
 
-The generated suite contains 14 deterministic fixtures and compares the source and HouIO output inside each supported Houdini version. It validates:
+The generated suite contains 16 deterministic fixtures and compares the source and HouIO output inside each supported Houdini version. It validates:
 
 - Empty and point-only geometry.
 - Point, vertex, primitive, and global attribute domains.
@@ -32,6 +32,8 @@ The generated suite contains 14 deterministic fixtures and compares the source a
 - Vertex UV seams.
 - Point, vertex, and primitive groups.
 - Dense scalar-volume resolution, transform, position, and voxel values.
+- Embedded `PackedGeometry` payloads, pivot, transform, viewport LOD, and packed flags.
+- Native VDB active bounds, values, grid class, value type, transform, and visualization metadata.
 - BGEO and SCF round trips.
 
 Every current fixture has an empty `known_losses` list, so the maintained matrix requires exact agreement for every field the validator compares.
@@ -65,6 +67,8 @@ The Houdini-oriented `HouGeo` model currently supports:
 - `Polygon_run`.
 - `PolygonCurve_run`.
 - Dense scalar `Volume` records.
+- Embedded `PackedGeometry` records and shared geometry payloads.
+- Native `VDB` records through opaque serialized-payload preservation.
 - Point, vertex, primitive, and global attributes.
 - Unordered point, vertex, and primitive groups, including primitive groups spanning mixed polygon and dense-volume records.
 - Indexed string and dictionary data used by the covered fixtures.
@@ -76,12 +80,12 @@ SCF outer compression is supported through a compatible C-Blosc runtime.
 
 The standalone C++ model does not currently preserve these records:
 
-- Packed geometry, packed fragments, and packed disk primitives.
+- Packed fragments and packed disk primitives.
 - NURBS and Bezier curves.
 - Spheres, tubes, tetrahedra, and height fields.
 - Agents, crowds, and instancing records.
-- Native sparse OpenVDB trees.
-- Vector VDB grids.
+- Constructed or edited OpenVDB sparse trees without an optional OpenVDB backend; existing native VDB payloads are preserved.
+- Vector VDB construction and editing.
 - Additional volume tile-compression encodings not represented by maintained fixtures.
 
 Unsupported recognized input should produce an `unsupported_input` diagnostic rather than silent data loss.
@@ -95,13 +99,16 @@ Use `HouGeo` (`HoudiniGeometry`) or `HouGeoAdapter` when Houdini domain fidelity
 - Mixed primitive families are not silently collapsed into one mesh.
 - One arbitrary n-gon is supported; multiple variable-size polygons are not represented by a single `SimplifiedMesh`.
 - Open polygons with three or more vertices become closed simplified faces; `GeometryConversionReport::polygonClosureLost` and a conversion warning expose that loss.
-- Native sparse volumes and unsupported primitive records are not converted implicitly.
+- Native VDB payloads are retained by the Houdini-oriented model but are not converted into a simplified mesh.
+- Unsupported primitive records are not converted implicitly.
 
 `HouGeoIO::convertToGeometryResult` reports source/output point counts, distinct split source points, duplicated points, winding reversal, skipped point/vertex/primitive/global attributes, dropped groups, and structured diagnostics for unsupported or invalid data. Callers that require faithful round trips should still stay on the Houdini-oriented model rather than treating a clean simplified conversion as proof that every domain was preserved.
 
-## VDB bridge scope
+## VDB scope
 
-The standalone library does not link to OpenVDB or preserve sparse trees. The Houdini Python bridge can explicitly convert supported Float SDF and Fog grids to dense scalar volumes, process them through HouIO, and restore the VDB class on output. This is a bridge workflow, not native sparse-grid support in the C++ data model.
+The standalone library does not link to OpenVDB, but it recognizes native Houdini `VDB` records and preserves their serialized sparse payload opaquely during GEO/BGEO/SCF round trips. This retains active topology, values, transform, class, value type, and metadata without densification. It does not expose sparse-tree construction or editing.
+
+The direct HOM manifest cannot currently create that native payload because HOM does not expose the serialized tree. The compatibility bridge can still convert supported Float SDF/Fog grids through dense volumes. A future optional OpenVDB backend is required for native live-session tree construction.
 
 ## Distribution status
 

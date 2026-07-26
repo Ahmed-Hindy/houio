@@ -1,0 +1,270 @@
+#include <houio/Writer.h>
+
+#include "TestSupport.h"
+
+#include <filesystem>
+#include <fstream>
+#include <memory>
+#include <string>
+
+namespace
+{
+    using houio::test::fail;
+
+    houio::HouGeo::Ptr createHouGeo()
+    {
+        houio::Attribute::Ptr positions = houio::Attribute::createV4f();
+        positions->appendElement(houio::math::V4f(1.0f, 2.0f, 3.0f, 1.0f));
+        houio::HouGeo::Ptr geometry = houio::HouGeo::create();
+        geometry->setPointAttribute(
+            std::make_shared<houio::HouGeo::HouAttribute>("P", positions));
+        return geometry;
+    }
+
+    bool containsMessage(const houio::DiagnosticList &diagnostics, const std::string &needle)
+    {
+        for( const houio::Diagnostic &diagnostic : diagnostics )
+        {
+            if( diagnostic.message.find(needle) != std::string::npos )
+                return true;
+        }
+        return false;
+    }
+
+    int verifyRequestValidation()
+    {
+        const houio::WriteResult emptyDestination = houio::Writer::write(houio::WriteRequest{});
+        if( emptyDestination || !containsMessage(emptyDestination.diagnostics, "destination") )
+            return fail("Writer did not reject an empty destination");
+
+        houio::WriteRequest emptySource;
+        emptySource.destination = "unused.bgeo";
+        const houio::WriteResult result = houio::Writer::write(emptySource);
+        if( result || !containsMessage(result.diagnostics, "source") )
+            return fail("Writer did not reject an empty source");
+        return 0;
+    }
+
+    int verifyHouGeoWrite(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path path = directory / "nested" / "points.bgeo";
+        const houio::WriteResult result = houio::Writer::write(
+            path, std::static_pointer_cast<houio::HouGeoAdapter>(createHouGeo()));
+        if( !result )
+            return fail("Writer failed to serialize HouGeo");
+        const auto readResult = houio::GeometryIO::readHouGeo(path);
+        if( !readResult || readResult.value->pointCount() != 1 )
+            return fail("Writer HouGeo output did not round-trip");
+        return 0;
+    }
+
+    int verifyWritePolicies(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path existing = directory / "existing.bgeo";
+        if( !houio::Writer::write(
+                existing, std::static_pointer_cast<houio::HouGeoAdapter>(createHouGeo())) )
+        {
+            return fail("Writer could not create overwrite-policy fixture");
+        }
+
+        houio::GeometryWriteOptions noOverwrite;
+        noOverwrite.overwriteExisting = false;
+        const houio::WriteResult rejected = houio::Writer::write(
+            existing,
+            std::static_pointer_cast<houio::HouGeoAdapter>(createHouGeo()),
+            noOverwrite);
+        if( rejected || !containsMessage(rejected.diagnostics, "already exists") )
+            return fail("Writer did not enforce no-overwrite policy");
+        if( !houio::GeometryIO::readHouGeo(existing) )
+            return fail("No-overwrite failure damaged the existing output");
+
+        houio::GeometryWriteOptions noDirectories;
+        noDirectories.createParentDirectories = false;
+        const houio::WriteResult missingDirectory = houio::Writer::write(
+            directory / "missing" / "points.bgeo",
+            std::static_pointer_cast<houio::HouGeoAdapter>(createHouGeo()),
+            noDirectories);
+        if( missingDirectory || !containsMessage(missingDirectory.diagnostics, "does not exist") )
+            return fail("Writer did not enforce parent-directory policy");
+        return 0;
+    }
+
+    int verifyConvenienceSources(const std::filesystem::path &directory)
+    {
+        houio::Geometry::Ptr mesh = houio::Geometry::createPointGeometry();
+        mesh->attribute("P")->appendElement(houio::math::V3f(4.0f, 5.0f, 6.0f));
+        const std::filesystem::path meshPath = directory / "mesh.bgeo";
+        if( !houio::Writer::write(meshPath, mesh) )
+            return fail("Writer failed to adapt simplified mesh source");
+        const auto meshResult = houio::GeometryIO::readHouGeo(meshPath);
+        if( !meshResult || meshResult.value->pointCount() != 1 )
+            return fail("Simplified mesh source did not round-trip");
+
+        houio::ScalarField::Ptr field = houio::ScalarField::create(houio::math::V3i(1, 1, 1));
+        field->voxel(0, 0, 0) = 7.0f;
+        const std::filesystem::path volumePath = directory / "volume.bgeo";
+        if( !houio::Writer::write(volumePath, field) )
+            return fail("Writer failed to adapt dense scalar volume source");
+        const auto volumeResult = houio::GeometryIO::readVolume(volumePath);
+        if( !volumeResult || volumeResult.value->voxel(0, 0, 0) != 7.0f )
+            return fail("Dense scalar volume source did not round-trip");
+        return 0;
+    }
+
+    int verifyAdvancedPrimitiveSources(const std::filesystem::path &directory)
+    {
+        houio::HouGeo::Ptr embedded = createHouGeo();
+        houio::HouGeo::Ptr packedGeometry = createHouGeo();
+        auto packedTopology = std::make_shared<houio::HouGeo::HouTopology>();
+        packedTopology->appendIndex(0);
+        packedGeometry->setTopology(packedTopology);
+        auto packed = std::make_shared<houio::HouGeo::HouPackedGeometry>();
+        packed->setEmbeddedGeometry(embedded);
+        packed->setTopologyVertex(0);
+        packed->setPivot(houio::math::V3f(0.25f, 0.5f, 0.75f));
+        packed->setTreatAsFolder(true);
+        packedGeometry->addPrimitive(
+            std::static_pointer_cast<houio::HouGeoAdapter::PackedGeometryPrimitive>(packed));
+
+        const std::filesystem::path packedPath = directory / "packed.bgeo";
+        if( !houio::Writer::write(
+                packedPath,
+                std::static_pointer_cast<houio::HouGeoAdapter>(packedGeometry)) )
+        {
+            return fail("Writer failed to serialize packed geometry");
+        }
+        const auto packedResult = houio::GeometryIO::readHouGeo(packedPath);
+        if( !packedResult || packedResult.value->primitiveCount() != 1 )
+            return fail("Packed geometry output did not round-trip");
+        const auto packedPrimitive = std::dynamic_pointer_cast<houio::HouGeo::HouPackedGeometry>(
+            packedResult.value->primitives().front());
+        if( !packedPrimitive )
+            return fail("Packed geometry record changed type");
+        if( !packedPrimitive->embeddedGeometry() )
+            return fail("Packed geometry embedded payload is missing");
+        if( packedPrimitive->embeddedGeometry()->pointCount() != 1 )
+        {
+            return fail(
+                "Packed geometry embedded point count changed to "
+                + std::to_string(packedPrimitive->embeddedGeometry()->pointCount()));
+        }
+        if( packedPrimitive->pivot() != houio::math::V3f(0.25f, 0.5f, 0.75f) )
+            return fail("Packed geometry pivot changed");
+        if( !packedPrimitive->treatAsFolder() )
+            return fail("Packed geometry folder flag changed");
+
+        houio::HouGeo::Ptr vdbGeometry = createHouGeo();
+        auto vdbTopology = std::make_shared<houio::HouGeo::HouTopology>();
+        vdbTopology->appendIndex(0);
+        vdbGeometry->setTopology(vdbTopology);
+        auto payload = houio::json::Array::create();
+        auto metadata = houio::json::Object::create();
+        metadata->appendValue<houio::sint32>("tilesize", 4096);
+        payload->append(metadata);
+        auto opaqueBytes = houio::json::Array::create();
+        opaqueBytes->appendValue<houio::sint32>(32);
+        opaqueBytes->appendValue<houio::sint32>(66);
+        opaqueBytes->appendValue<houio::sint32>(68);
+        opaqueBytes->appendValue<houio::sint32>(86);
+        payload->append(opaqueBytes);
+        auto nativeVdb = std::make_shared<houio::HouGeo::HouVdb>();
+        nativeVdb->setTopologyVertex(0);
+        nativeVdb->setSerializedPayload(payload);
+        vdbGeometry->addPrimitive(
+            std::static_pointer_cast<houio::HouGeoAdapter::NativeVdbPrimitive>(nativeVdb));
+
+        const std::filesystem::path vdbPath = directory / "native_vdb.bgeo";
+        if( !houio::Writer::write(
+                vdbPath,
+                std::static_pointer_cast<houio::HouGeoAdapter>(vdbGeometry)) )
+        {
+            return fail("Writer failed to serialize native VDB payload");
+        }
+        const auto vdbResult = houio::GeometryIO::readHouGeo(vdbPath);
+        if( !vdbResult || vdbResult.value->primitiveCount() != 1 )
+            return fail("Native VDB payload did not round-trip");
+        const auto vdbPrimitive = std::dynamic_pointer_cast<houio::HouGeo::HouVdb>(
+            vdbResult.value->primitives().front());
+        if( !vdbPrimitive || !vdbPrimitive->serializedPayload()
+            || vdbPrimitive->serializedPayload()->size() != 2 )
+        {
+            return fail("Native VDB serialized payload changed");
+        }
+
+        houio::HouGeo::Ptr cyclicGeometry = createHouGeo();
+        auto cyclicTopology = std::make_shared<houio::HouGeo::HouTopology>();
+        cyclicTopology->appendIndex(0);
+        cyclicGeometry->setTopology(cyclicTopology);
+        auto cyclicPacked = std::make_shared<houio::HouGeo::HouPackedGeometry>();
+        cyclicPacked->setEmbeddedGeometry(cyclicGeometry);
+        cyclicPacked->setTopologyVertex(0);
+        cyclicGeometry->addPrimitive(
+            std::static_pointer_cast<houio::HouGeoAdapter::PackedGeometryPrimitive>(cyclicPacked));
+        const std::filesystem::path cyclicPath = directory / "cyclic_packed.bgeo";
+        const houio::WriteResult cyclicResult = houio::Writer::write(
+            cyclicPath,
+            std::static_pointer_cast<houio::HouGeoAdapter>(cyclicGeometry));
+        cyclicPacked->setEmbeddedGeometry(createHouGeo());
+        if( cyclicResult || !containsMessage(cyclicResult.diagnostics, "cyclic") )
+            return fail("Writer did not reject cyclic packed geometry");
+        if( std::filesystem::exists(cyclicPath) )
+            return fail("Cyclic packed geometry created a partial output file");
+        return 0;
+    }
+
+    int verifyCapabilities()
+    {
+        const auto &capabilities = houio::Writer::capabilities();
+        if( capabilities.size() < 7 )
+            return fail("Writer capability table is incomplete");
+        const auto geometry = houio::Writer::capability(
+            houio::WriterDataType::houdini_geometry);
+        if( !geometry || geometry->level != houio::WriterCapabilityLevel::supported
+            || !geometry->writable )
+        {
+            return fail("Houdini geometry capability is not reported as writable");
+        }
+        const auto packed = houio::Writer::capability(
+            houio::WriterDataType::packed_geometry);
+        if( !packed || packed->level != houio::WriterCapabilityLevel::supported
+            || !packed->readable || !packed->writable )
+        {
+            return fail("Packed geometry capability contract is incorrect");
+        }
+        const auto vdb = houio::Writer::capability(
+            houio::WriterDataType::sparse_openvdb);
+        if( !vdb || vdb->level != houio::WriterCapabilityLevel::supported
+            || !vdb->readable || !vdb->writable )
+        {
+            return fail("Sparse OpenVDB capability contract is incorrect");
+        }
+        return 0;
+    }
+}
+
+int main()
+{
+    const std::filesystem::path directory =
+        std::filesystem::temp_directory_path() / "houio_writer_test";
+    std::error_code error;
+    std::filesystem::remove_all(directory, error);
+    std::filesystem::create_directories(directory, error);
+    if( error )
+        return fail("Could not create Writer test directory");
+
+    if( const int result = verifyRequestValidation(); result != 0 )
+        return result;
+    if( const int result = verifyHouGeoWrite(directory); result != 0 )
+        return result;
+    if( const int result = verifyWritePolicies(directory); result != 0 )
+        return result;
+    if( const int result = verifyConvenienceSources(directory); result != 0 )
+        return result;
+    if( const int result = verifyAdvancedPrimitiveSources(directory); result != 0 )
+        return result;
+    if( const int result = verifyCapabilities(); result != 0 )
+        return result;
+
+    std::filesystem::remove_all(directory, error);
+    return 0;
+}

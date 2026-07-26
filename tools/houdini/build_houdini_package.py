@@ -18,6 +18,7 @@ BOOTSTRAP_PATH = PROJECT_ROOT / "tools" / "houdini" / "bootstrap_houdini_package
 def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser()
+    parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--converter", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", required=True)
@@ -52,11 +53,12 @@ def write_package_file(destination: Path, version: str) -> None:
     )
 
 
-def build_package(converter: Path, output: Path, version: str) -> Path:
+def build_package(cli: Path, converter: Path, output: Path, version: str) -> Path:
     """Build a ZIP archive installable through Houdini's Package Browser.
 
     Args:
-        converter: Compiled ``houio_convert`` executable.
+        cli: Compiled primary ``houio`` executable.
+        converter: Compiled legacy ``houio_convert`` executable.
         output: Destination ZIP path.
         version: HouIO package version.
 
@@ -66,8 +68,11 @@ def build_package(converter: Path, output: Path, version: str) -> Path:
     Raises:
         FileNotFoundError: If required source files are missing.
     """
+    cli = cli.resolve()
     converter = converter.resolve()
     output = output.resolve()
+    if not cli.is_file():
+        raise FileNotFoundError(f"HouIO CLI does not exist: {cli}")
     if not converter.is_file():
         raise FileNotFoundError(f"Converter does not exist: {converter}")
     if not PACKAGE_SOURCE_ROOT.is_dir():
@@ -91,6 +96,7 @@ def build_package(converter: Path, output: Path, version: str) -> Path:
 
         binary_root = content_root / "bin"
         binary_root.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(cli, binary_root / cli.name)
         shutil.copy2(converter, binary_root / converter.name)
         shutil.copy2(INSTALLER_PATH, staging_root / INSTALLER_PATH.name)
         shutil.copy2(BOOTSTRAP_PATH, staging_root / BOOTSTRAP_PATH.name)
@@ -114,6 +120,7 @@ def main() -> int:
     """Build the requested package archive."""
     arguments = parse_arguments()
     archive_path = build_package(
+        arguments.cli,
         arguments.converter,
         arguments.output,
         arguments.version,

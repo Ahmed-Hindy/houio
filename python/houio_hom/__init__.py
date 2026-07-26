@@ -1,6 +1,7 @@
 """Houdini Object Model helpers for HouIO file interoperability."""
 
 from .bridge import (
+    HouIOWriteResult,
     VDB_CLASS_ATTRIBUTE,
     VDB_FOG_VOLUME_CLASS,
     VDB_LEVEL_SET_CLASS,
@@ -15,9 +16,14 @@ from .bridge import (
     roundtrip_node_geometry,
     save_from_houio,
     save_node_geometry,
+    write_geometry,
+    write_node_geometry,
 )
 
+from .manifest import UnsupportedHOMDataError, geometry_manifest, write_manifest
+
 __all__ = [
+    "HouIOWriteResult",
     "VDB_CLASS_ATTRIBUTE",
     "VDB_FOG_VOLUME_CLASS",
     "VDB_LEVEL_SET_CLASS",
@@ -32,4 +38,9 @@ __all__ = [
     "roundtrip_node_geometry",
     "save_from_houio",
     "save_node_geometry",
+    "write_geometry",
+    "write_node_geometry",
+    "UnsupportedHOMDataError",
+    "geometry_manifest",
+    "write_manifest",
 ]

@@ -4,14 +4,13 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `refactor/modernization-phases-17-20`
-- Baseline commit: `e00d4b6` (complete Phases 11–16 stack; integration PR #31 targets `master`).
-- Current exact source: MSVC warnings-as-errors suite passes **19/19**.
-- Current exact source: full Release/Houdini matrix passes **47/47**.
-- Current exact source: Windows AddressSanitizer matrix passes **19/19**.
-- Generated fixtures, the large Crag asset, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
-- Phases 11–16 are consolidated for `master` by integration PR #31.
-- Current branch completes field/API cleanup, Houdini 20.0 producer compatibility, indexed string tuples, maintained project contracts, const/range APIs, benchmarks, and structured conversion reporting.
+- Branch: `feat/primary-interface-tooling-ux`
+- Baseline commit: `31a8e82` (`master` after merged modernization PR #32).
+- Current exact source: MSVC warnings-as-errors suite passes **24/24**.
+- Current exact source: Windows AddressSanitizer passes **24/24** and MSVC native analysis is error-clean.
+- Full Release/Houdini validation passes **55/55**.
+- Direct custom writing, the 16-fixture matrix, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- The active branch completes the primary write facade, multi-command CLI, direct HOM custom-writer workflow, embedded PackedGeometry, and native VDB payload preservation.
 
 ## Modernization completed
 
@@ -65,7 +64,41 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Convert one arbitrary n-gon into the simplified polygon model with structured multi-n-gon rejection.
 - [x] Report open-polygon closure loss explicitly when simplified conversion creates a closed face.
 
-## Modernization next
+## Product priorities next
+
+### Primary interface
+
+- [x] Define one obvious write-first public facade for custom geometry serialization.
+- [x] Provide stable typed requests/results for geometry, volumes, and future primitive families.
+- [x] Make file format, compression, overwrite, atomic replacement, directory creation, and diagnostic behavior explicit in one options object.
+- [x] Keep lower-level `HouGeo`, adapter, and parser APIs available without making them the normal entry point.
+- [x] Add concise C++ and HOM examples centered on writing data from a running Houdini or hython session.
+
+### Tooling and infrastructure
+
+- [x] Add a primary CLI with write, write-manifest, inspect, validate, convert, capabilities, and diagnose subcommands while retaining the compatibility converter.
+- [x] Add stable machine-readable JSON output and documented exit-code categories.
+- [x] Add a capability report covering supported and recognized data families.
+- [x] Make build, test, package, fixture, benchmark, and full validation commands discoverable through `tools/dev.ps1`.
+- [x] Keep CI coverage focused on the supported public workflow as well as parser internals.
+
+### Installation and user experience
+
+- [x] Preserve one-command package build, install, uninstall, and isolated launch workflows and include the primary writer executable.
+- [x] Add package self-diagnostics for the primary writer, compatibility converter, and C-Blosc runtime.
+- [x] Expose a small HOM API for writing cooked node geometry through the custom writer.
+- [x] Add a primary **Write Selected Geometry** shelf action and retain diagnostics/conversion tools.
+- [x] Document the first successful custom-write workflow before advanced internals.
+
+### Data-type expansion after the product surface
+
+- [x] Add fixture-backed embedded `PackedGeometry` support, including direct HOM extraction.
+- [ ] Add packed fragments and packed disk primitives.
+- [x] Preserve native sparse VDB primitive payloads without forced densification during file round trips.
+- [ ] Add an optional OpenVDB backend for native sparse-tree construction and editing from live HOM data.
+- [ ] Continue with curves, instancing, height fields, and other observed records one family at a time.
+
+## Modernization completed follow-up
 
 - [x] Complete `Matrix22`, `Matrix33`, and `Matrix44` core and algorithm modernization.
 - [x] Replace output-pointer matrix basis helpers with value-returning APIs.
@@ -154,7 +187,7 @@ Priority levels:
 
 Add fixture-backed support one record type at a time:
 
-- [ ] Packed geometry
+- [x] Embedded packed geometry
 - [ ] Packed fragments
 - [ ] Packed disk primitives
 - [ ] NURBS and Bezier curves
@@ -163,7 +196,7 @@ Add fixture-backed support one record type at a time:
 - [ ] Height fields
 - [ ] Agents and crowds
 - [ ] Instancing records
-- [ ] Native sparse OpenVDB primitives
+- [x] Native sparse OpenVDB primitive payload preservation
 
 ### Volumes and compression
 

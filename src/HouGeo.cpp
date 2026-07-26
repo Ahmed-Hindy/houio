@@ -554,11 +554,32 @@ namespace houio
 		m_primitives.push_back( volumePrimitive );
 	}
 
+	void HouGeo::addPrimitive( VolumePrimitive::Ptr volume )
+	{
+		if( !volume )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null volume" );
+		m_primitives.push_back(std::move(volume));
+	}
+
+	void HouGeo::addPrimitive( PackedGeometryPrimitive::Ptr packedGeometry )
+	{
+		if( !packedGeometry )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null packed geometry" );
+		m_primitives.push_back(std::move(packedGeometry));
+	}
+
+	void HouGeo::addPrimitive( NativeVdbPrimitive::Ptr nativeVdb )
+	{
+		if( !nativeVdb )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null native VDB" );
+		m_primitives.push_back(std::move(nativeVdb));
+	}
+
 	void HouGeo::addPrimitive( PolyPrimitive::Ptr poly )
 	{
 		if( !poly )
 			throw std::invalid_argument( "HouGeo::addPrimitive received a null polygon" );
-		m_primitives.push_back(poly);
+		m_primitives.push_back(std::move(poly));
 	}
 
 	void HouGeo::setTopology( HouTopology::Ptr topo )
@@ -580,14 +601,36 @@ namespace houio
 		m_pointAttributes[attr->name()] = attr;
 	}
 
+	void HouGeo::setVertexAttribute( HouAttribute::Ptr attr )
+	{
+		if( !attr )
+			throw std::invalid_argument( "HouGeo::setVertexAttribute received a null attribute" );
+		if( attr->name().empty() )
+			throw std::invalid_argument( "HouGeo::setVertexAttribute requires a non-empty name" );
+		if( attr->elementCount() != vertexCount() )
+			throw std::invalid_argument( "HouGeo::setVertexAttribute element count does not match vertexcount" );
+		m_vertexAttributes[attr->name()] = std::move(attr);
+	}
+
 	void HouGeo::setPrimitiveAttribute( const std::string &name, HouAttribute::Ptr attr )
 	{
 		if( !attr )
 			throw std::invalid_argument( "HouGeo::setPrimitiveAttribute received a null attribute" );
 		if( name.empty() )
 			throw std::invalid_argument( "HouGeo::setPrimitiveAttribute requires a non-empty name" );
+		if( attr->elementCount() != primitiveCount() )
+			throw std::invalid_argument( "HouGeo::setPrimitiveAttribute element count does not match primitivecount" );
 		attr->name_ = name;
-		m_primitiveAttributes[name] = attr;
+		m_primitiveAttributes[name] = std::move(attr);
+	}
+
+	void HouGeo::setGlobalAttribute( HouAttribute::Ptr attr )
+	{
+		if( !attr )
+			throw std::invalid_argument( "HouGeo::setGlobalAttribute received a null attribute" );
+		if( attr->name().empty() )
+			throw std::invalid_argument( "HouGeo::setGlobalAttribute requires a non-empty name" );
+		m_globalAttributes[attr->name()] = std::move(attr);
 	}
 
 	void HouGeo::setPointGroup( const std::string &name, const std::vector<bool> &membership )
@@ -904,18 +947,27 @@ namespace houio
 				withSchemaPath("sharedprimitivedata[" + std::to_string(entryIndex) + "]", [&]()
 				{
 					const int recordOffset = entryIndex * 2;
-					[[maybe_unused]] const std::string entryType = entries->get<std::string>(recordOffset);
+					const std::string entryType = entries->get<std::string>(recordOffset);
 					json::ArrayPtr entry = entries->array(recordOffset + 1);
 					if( !entry || entry->size() < 3 )
-						throw std::runtime_error( "HouGeo::load shared primitive entry requires type, id, and voxel data" );
+						throw std::runtime_error( "HouGeo::load shared primitive entry requires type, id, and data" );
 
-					[[maybe_unused]] const std::string dataType = entry->get<std::string>(0);
+					const std::string dataType = entry->get<std::string>(0);
 					const std::string dataId = entry->get<std::string>(1);
-					json::ArrayPtr voxelData = entry->array(2);
-					if( !voxelData )
-						throw std::runtime_error( "HouGeo::load shared primitive voxel data must be an array" );
+					json::ArrayPtr sharedData = entry->array(2);
+					if( !sharedData )
+						throw std::runtime_error( "HouGeo::load shared primitive data must be an array" );
 
-					sharedPrimitiveData.sharedVoxelData[dataId] = toObject(voxelData);
+					if( entryType == "PackedGeometry" && dataType == "gu:embeddedgeo" )
+					{
+						HouGeo::Ptr embeddedGeometry = HouGeo::create();
+						embeddedGeometry->load(toObject(sharedData));
+						sharedPrimitiveData.sharedEmbeddedGeometry[dataId] = std::move(embeddedGeometry);
+					}
+					else
+					{
+						sharedPrimitiveData.sharedVoxelData[dataId] = toObject(sharedData);
+					}
 				});
 			}
 		}
@@ -1436,6 +1488,12 @@ namespace houio
 		if( primitiveType=="Volume" )
 			withSchemaPath("data", [&]() { loadVolumePrimitive(toObject(primitive->array(1)), sharedPrimitiveData); });
 		else
+		if( primitiveType=="PackedGeometry" )
+			withSchemaPath("data", [&]() { loadPackedGeometryPrimitive(toObject(primitive->array(1)), sharedPrimitiveData); });
+		else
+		if( primitiveType=="VDB" )
+			withSchemaPath("data", [&]() { loadNativeVdbPrimitive(toObject(primitive->array(1))); });
+		else
 		if( primitiveType=="Poly" )
 			withSchemaPath("data", [&]() { loadPolyPrimitive(toObject(primitive->array(1))); });
 		else
@@ -1461,13 +1519,179 @@ namespace houio
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 				"HouGeo::loadPrimitive does not support run type " + definition->get<std::string>("runtype"), -1, "definition.runtype"});
 		}
-		else if( primitiveType!="Volume" && primitiveType!="Poly" && primitiveType!="Polygon_run"
+		else if( primitiveType!="Volume" && primitiveType!="PackedGeometry"
+			&& primitiveType!="VDB" && primitiveType!="Poly" && primitiveType!="Polygon_run"
 			&& primitiveType!="p_r" && primitiveType!="PolygonCurve_run" && primitiveType!="c_r" )
 		{
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 				"HouGeo::loadPrimitive does not support primitive type " + primitiveType, -1, "definition.type"});
 		}
 
+	}
+
+	void HouGeo::loadPackedGeometryPrimitive(
+		json::ObjectPtr packedGeometry,
+		SharedPrimitiveData& sharedPrimitiveData )
+	{
+		if( !packedGeometry )
+			throw std::invalid_argument(
+				"HouGeo::loadPackedGeometryPrimitive received null data" );
+		json::ObjectPtr parameters = packedGeometry->object("parameters");
+		if( !parameters )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedGeometry primitive is missing parameters",
+				-1,
+				"parameters"});
+		const std::string embeddedId = parameters->get<std::string>("embedded", "");
+		if( embeddedId.empty() )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedGeometry primitive is missing embedded geometry id",
+				-1,
+				"parameters.embedded"});
+		const auto embedded = sharedPrimitiveData.sharedEmbeddedGeometry.find(embeddedId);
+		if( embedded == sharedPrimitiveData.sharedEmbeddedGeometry.end() )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedGeometry embedded geometry was not found",
+				-1,
+				"parameters.embedded"});
+
+		const int topologyVertex = packedGeometry->get<int>("vertex", -1);
+		if( topologyVertex < 0 || !m_topology
+			|| static_cast<sint64>(topologyVertex) >= m_topology->indexCount() )
+		{
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedGeometry topology vertex is outside vertexcount",
+				-1,
+				"vertex"});
+		}
+
+		math::V3f pivot(0.0f);
+		json::ArrayPtr pivotValues = packedGeometry->array("pivot");
+		if( pivotValues )
+		{
+			if( pivotValues->size() != 3 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedGeometry pivot requires three values",
+					-1,
+					"pivot"});
+			pivot = math::V3f(
+				pivotValues->get<real32>(0),
+				pivotValues->get<real32>(1),
+				pivotValues->get<real32>(2));
+		}
+
+		math::M33f transform = math::M33f::identity();
+		json::ArrayPtr transformValues = packedGeometry->array("transform");
+		if( transformValues )
+		{
+			if( transformValues->size() != 9 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedGeometry transform requires nine values",
+					-1,
+					"transform"});
+			transform = math::M33f(
+				transformValues->get<real32>(0),
+				transformValues->get<real32>(1),
+				transformValues->get<real32>(2),
+				transformValues->get<real32>(3),
+				transformValues->get<real32>(4),
+				transformValues->get<real32>(5),
+				transformValues->get<real32>(6),
+				transformValues->get<real32>(7),
+				transformValues->get<real32>(8));
+		}
+
+		auto result = std::make_shared<HouPackedGeometry>();
+		result->embedded_geometry_ = embedded->second;
+		result->topology_vertex_ = topologyVertex;
+		result->pivot_ = pivot;
+		result->transform_ = transform;
+		result->viewport_lod_ = packedGeometry->get<std::string>("viewportlod", "full");
+		result->point_instance_transform_ =
+			parameters->get<int>("pointinstancetransform", 0) != 0;
+		result->treat_as_folder_ = parameters->get<int>("treatasfolder", 0) != 0;
+		m_primitives.push_back(std::move(result));
+	}
+
+	void HouGeo::loadNativeVdbPrimitive( json::ObjectPtr nativeVdb )
+	{
+		if( !nativeVdb )
+			throw std::invalid_argument( "HouGeo::loadNativeVdbPrimitive received null data" );
+		const int topologyVertex = nativeVdb->get<int>("vertex", -1);
+		if( topologyVertex < 0 || !m_topology
+			|| static_cast<sint64>(topologyVertex) >= m_topology->indexCount() )
+		{
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"VDB topology vertex is outside vertexcount",
+				-1,
+				"vertex"});
+		}
+		json::ArrayPtr payload = nativeVdb->array("vdb");
+		if( !payload || payload->size() < 2 )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"VDB primitive is missing its serialized sparse payload",
+				-1,
+				"vdb"});
+
+		auto result = std::make_shared<HouVdb>();
+		result->topology_vertex_ = topologyVertex;
+		result->serialized_payload_ = std::move(payload);
+		m_primitives.push_back(std::move(result));
+	}
+
+	int HouGeo::HouVdb::topologyVertex() const
+	{
+		return topology_vertex_;
+	}
+
+	json::ArrayPtr HouGeo::HouVdb::serializedPayload() const
+	{
+		return serialized_payload_;
+	}
+
+	// HouGeo::HouPackedGeometry =========================================
+
+	HouGeoAdapter::ConstPtr HouGeo::HouPackedGeometry::embeddedGeometry() const
+	{
+		return embedded_geometry_;
+	}
+
+	int HouGeo::HouPackedGeometry::topologyVertex() const
+	{
+		return topology_vertex_;
+	}
+
+	math::V3f HouGeo::HouPackedGeometry::pivot() const
+	{
+		return pivot_;
+	}
+
+	math::M33f HouGeo::HouPackedGeometry::transform() const
+	{
+		return transform_;
+	}
+
+	std::string HouGeo::HouPackedGeometry::viewportLod() const
+	{
+		return viewport_lod_;
+	}
+
+	bool HouGeo::HouPackedGeometry::pointInstanceTransform() const
+	{
+		return point_instance_transform_;
+	}
+
+	bool HouGeo::HouPackedGeometry::treatAsFolder() const
+	{
+		return treat_as_folder_;
 	}
 
 	// HouGeo::HouVolume ==================================================

@@ -89,6 +89,37 @@ target_link_libraries(houio_test_geometry_io PRIVATE houio::houio)
 target_compile_features(houio_test_geometry_io PRIVATE cxx_std_20)
 add_test(NAME houio.geometry_io COMMAND houio_test_geometry_io)
 
+add_executable(houio_test_writer test_writer.cpp)
+target_link_libraries(houio_test_writer PRIVATE houio::houio)
+target_compile_features(houio_test_writer PRIVATE cxx_std_20)
+add_test(NAME houio.writer COMMAND houio_test_writer)
+
+add_executable(houio_test_hom_manifest test_hom_manifest.cpp)
+target_link_libraries(houio_test_hom_manifest PRIVATE houio::houio)
+target_compile_features(houio_test_hom_manifest PRIVATE cxx_std_20)
+add_test(NAME houio.hom_manifest COMMAND houio_test_hom_manifest)
+
+if(TARGET houio_cli)
+    add_test(NAME houio.cli.capabilities COMMAND $<TARGET_FILE:houio_cli> capabilities --json)
+    set_tests_properties(
+        houio.cli.capabilities
+        PROPERTIES PASS_REGULAR_EXPRESSION "\"capabilities\""
+    )
+    add_test(NAME houio.cli.diagnose COMMAND $<TARGET_FILE:houio_cli> diagnose --json)
+    set_tests_properties(
+        houio.cli.diagnose
+        PROPERTIES PASS_REGULAR_EXPRESSION "\"version\""
+    )
+    add_test(
+        NAME houio.cli.contract
+        COMMAND
+            "${CMAKE_COMMAND}"
+            "-DHOUIO_CLI=$<TARGET_FILE:houio_cli>"
+            "-DHOUIO_TEST_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/cli_contract"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/test_cli_contract.cmake"
+    )
+endif()
+
 add_test(
     NAME houio.package_consumer
     COMMAND
@@ -152,6 +183,22 @@ if(HOUIO_HYTHON_EXECUTABLE)
         houio.geometry_io
         PROPERTIES ENVIRONMENT "HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
     )
+
+    if(TARGET houio_cli)
+        add_test(
+            NAME houio.hom_direct_writer
+            COMMAND
+                "${HOUIO_HYTHON_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tools/houdini/test_direct_writer.py"
+                "${CMAKE_CURRENT_BINARY_DIR}/hom_direct_writer"
+        )
+        set_tests_properties(
+            houio.hom_direct_writer
+            PROPERTIES
+                ENVIRONMENT "HOUIO_EXECUTABLE=$<TARGET_FILE:houio_cli>;HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
+                ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
+        )
+    endif()
 
     if(TARGET houio_convert)
         add_test(
@@ -217,6 +264,8 @@ if(HOUIO_HYTHON_EXECUTABLE)
         multiple_polygon_runs
         global_attributes
         dense_volume
+        native_vdb
+        packed_geometry
         primitive_groups
     )
 

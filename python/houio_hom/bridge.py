@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import hou
+
+from .manifest import write_manifest
 
 PathLike = Union[str, Path]
 DEFAULT_CONVERTER_TIMEOUT_SECONDS = 300.0
@@ -18,6 +22,18 @@ VDB_LEVEL_SET_CLASS = "level set"
 VDB_FOG_VOLUME_CLASS = "fog volume"
 VDB_ROUNDTRIP_GROUP_BASE = "__houio_original_vdb"
 _SUPPORTED_VDB_CLASSES = frozenset((VDB_LEVEL_SET_CLASS, VDB_FOG_VOLUME_CLASS))
+
+
+@dataclass(frozen=True)
+class HouIOWriteResult:
+    """Structured result returned by the custom HouIO writer workflow."""
+
+    success: bool
+    destination: Path
+    diagnostics: tuple[dict[str, Any], ...]
+    stdout: str
+    stderr: str
+    returncode: int
 
 
 class HouIOConverterError(subprocess.CalledProcessError):
@@ -70,6 +86,42 @@ def _resolve_converter(executable: Optional[PathLike]) -> Path:
     raise FileNotFoundError(
         "Could not find houio_convert. Pass executable=..., set "
         "HOUIO_CONVERT_EXECUTABLE, or install houio_convert on PATH."
+    )
+
+
+def _resolve_writer(executable: Optional[PathLike]) -> Path:
+    """Resolve the primary ``houio`` command-line writer."""
+    candidates: list[Path] = []
+    if executable is not None:
+        candidates.append(Path(executable))
+    environment_executable = os.environ.get("HOUIO_EXECUTABLE")
+    if environment_executable:
+        candidates.append(Path(environment_executable))
+    path_executable = shutil.which("houio") or shutil.which("houio.exe")
+    if path_executable:
+        candidates.append(Path(path_executable))
+
+    repository_root = os.environ.get("HOUIO_ROOT")
+    if repository_root:
+        root = Path(repository_root)
+        candidates.extend(
+            (
+                root / "bin" / "houio.exe",
+                root / "bin" / "houio",
+                root / "build" / "windows-msvc-release" / "houio.exe",
+                root / "build" / "windows-msvc-werror" / "houio.exe",
+                root / "build" / "linux-gcc-release" / "houio",
+            )
+        )
+
+    package_candidate = Path(__file__).resolve().parents[2] / "bin" / "houio.exe"
+    candidates.append(package_candidate)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    raise FileNotFoundError(
+        "Could not find the houio writer. Pass executable=..., set "
+        "HOUIO_EXECUTABLE, or install houio on PATH."
     )
 
 
@@ -510,22 +562,134 @@ def load_into_current_sop(path: PathLike, *, convert_vdb: bool = True) -> hou.Ge
     return target
 
 
-def save_node_geometry(
-    node: hou.SopNode, path: PathLike, *, convert_volume_for_vdb: bool = True
-) -> None:
-    """Save a cooked SOP node using Houdini's format writers.
+def write_geometry(
+    geometry: hou.Geometry,
+    path: PathLike,
+    *,
+    executable: Optional[PathLike] = None,
+    timeout_seconds: Optional[float] = DEFAULT_CONVERTER_TIMEOUT_SECONDS,
+    overwrite: bool = True,
+    create_directories: bool = True,
+    atomic: bool = True,
+) -> HouIOWriteResult:
+    """Write live HOM geometry through HouIO's custom serializer.
+
+    This path extracts supported geometry directly through HOM into a temporary
+    HouIO manifest. It does not call ``hou.Geometry.data`` or
+    ``hou.Geometry.saveToFile``.
 
     Args:
-        node: SOP node whose cooked geometry should be saved.
-        path: Destination `.bgeo`, `.bgeo.sc`, `.geo`, or `.vdb` path.
-        convert_volume_for_vdb: Convert dense volumes before `.vdb` output.
+        geometry: Cooked HOM geometry to extract.
+        path: Destination `.bgeo` or `.bgeo.sc` path.
+        executable: Optional explicit path to the primary ``houio`` executable.
+        timeout_seconds: Maximum writer runtime, or ``None`` for no timeout.
+        overwrite: Permit replacing an existing destination.
+        create_directories: Create missing destination directories.
+        atomic: Write through a temporary file and replace the destination.
+
+    Returns:
+        Structured writer status and diagnostics.
     """
-    destination = Path(path)
-    geometry = _copy_geometry(node.geometry())
-    if destination.suffix.lower() == ".vdb" and convert_volume_for_vdb:
-        geometry = convert_volume_to_vdb(geometry)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    geometry.saveToFile(str(destination))
+    destination = Path(path).resolve()
+    writer = _resolve_writer(executable)
+    with tempfile.TemporaryDirectory(prefix="houio_manifest_") as temporary_directory:
+        manifest_path = write_manifest(
+            geometry,
+            Path(temporary_directory) / "geometry.houio.json",
+        )
+        command = [
+            str(writer),
+            "write-manifest",
+            str(manifest_path),
+            str(destination),
+            "--json",
+        ]
+        if not overwrite:
+            command.append("--no-overwrite")
+        if not create_directories:
+            command.append("--no-create-directories")
+        if not atomic:
+            command.append("--no-atomic")
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+
+    payload: dict[str, Any] = {}
+    try:
+        payload = json.loads(completed.stdout) if completed.stdout.strip() else {}
+    except json.JSONDecodeError:
+        payload = {}
+    raw_diagnostics = payload.get("diagnostics", ())
+    diagnostics = tuple(
+        diagnostic
+        for diagnostic in raw_diagnostics
+        if isinstance(diagnostic, dict)
+    )
+    return HouIOWriteResult(
+        success=bool(payload.get("success", completed.returncode == 0)),
+        destination=destination,
+        diagnostics=diagnostics,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+        returncode=completed.returncode,
+    )
+
+
+def write_node_geometry(
+    node: Union[str, hou.SopNode],
+    path: PathLike,
+    *,
+    executable: Optional[PathLike] = None,
+    timeout_seconds: Optional[float] = DEFAULT_CONVERTER_TIMEOUT_SECONDS,
+    overwrite: bool = True,
+    create_directories: bool = True,
+    atomic: bool = True,
+) -> HouIOWriteResult:
+    """Cook a SOP node and write it through the custom HouIO serializer."""
+    resolved_node = hou.node(node) if isinstance(node, str) else node
+    if resolved_node is None:
+        raise hou.NodeError(f"Could not resolve SOP node: {node}")
+    return write_geometry(
+        resolved_node.geometry(),
+        path,
+        executable=executable,
+        timeout_seconds=timeout_seconds,
+        overwrite=overwrite,
+        create_directories=create_directories,
+        atomic=atomic,
+    )
+
+
+def save_node_geometry(
+    node: Union[str, hou.SopNode],
+    path: PathLike,
+    *,
+    executable: Optional[PathLike] = None,
+    timeout_seconds: Optional[float] = DEFAULT_CONVERTER_TIMEOUT_SECONDS,
+    overwrite: bool = True,
+    create_directories: bool = True,
+    atomic: bool = True,
+    convert_volume_for_vdb: bool = True,
+) -> HouIOWriteResult:
+    """Compatibility name for :func:`write_node_geometry`.
+
+    ``convert_volume_for_vdb`` is retained for source compatibility. Native VDB
+    output is not available through the custom writer yet.
+    """
+    del convert_volume_for_vdb
+    return write_node_geometry(
+        node,
+        path,
+        executable=executable,
+        timeout_seconds=timeout_seconds,
+        overwrite=overwrite,
+        create_directories=create_directories,
+        atomic=atomic,
+    )
 
 
 def convert_with_houio(

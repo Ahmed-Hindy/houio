@@ -19,6 +19,7 @@ namespace houio
 {
     namespace json
     {
+        struct Array;
         struct Object;
     }
 
@@ -165,6 +166,8 @@ namespace houio
             {
                 volume,
                 polygon,
+                packed_geometry,
+                native_vdb,
             };
 
             virtual ~Primitive() = default;
@@ -185,6 +188,33 @@ namespace houio
             [[nodiscard]] virtual real32 visualizationIso() const;
             [[nodiscard]] virtual real32 visualizationDensity() const;
             [[nodiscard]] virtual RawDataView rawData() const;
+        };
+
+        class PackedGeometryPrimitive : public Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<PackedGeometryPrimitive>;
+            using ConstPtr = std::shared_ptr<const PackedGeometryPrimitive>;
+
+            [[nodiscard]] virtual HouGeoAdapter::ConstPtr embeddedGeometry() const = 0;
+            [[nodiscard]] virtual int topologyVertex() const = 0;
+            [[nodiscard]] virtual math::V3f pivot() const;
+            [[nodiscard]] virtual math::M33f transform() const;
+            [[nodiscard]] virtual std::string viewportLod() const;
+            [[nodiscard]] virtual bool pointInstanceTransform() const;
+            [[nodiscard]] virtual bool treatAsFolder() const;
+        };
+
+        class NativeVdbPrimitive : public Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<NativeVdbPrimitive>;
+            using ConstPtr = std::shared_ptr<const NativeVdbPrimitive>;
+
+            [[nodiscard]] virtual int topologyVertex() const = 0;
+            /// Opaque Houdini VDB payload retained for lossless file round trips.
+            /// Constructing or editing sparse trees requires an optional OpenVDB backend.
+            [[nodiscard]] virtual std::shared_ptr<json::Array> serializedPayload() const = 0;
         };
 
         class PolyPrimitive : public Primitive

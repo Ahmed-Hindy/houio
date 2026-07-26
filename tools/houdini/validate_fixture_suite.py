@@ -169,6 +169,14 @@ def attribute_summary(geometry: hou.Geometry, domain: str) -> dict[str, dict[str
     return summary
 
 
+def geometry_vertex_count(geometry: hou.Geometry) -> int:
+    """Return the geometry-wide vertex count across maintained versions."""
+    getter = getattr(geometry, "vertexCount", None)
+    if getter is not None:
+        return int(getter())
+    return sum(len(primitive.vertices()) for primitive in geometry.prims())
+
+
 def primitive_summary(geometry: hou.Geometry) -> list[dict[str, Any]]:
     """Summarize supported primitive data in primitive order.
 
@@ -180,6 +188,68 @@ def primitive_summary(geometry: hou.Geometry) -> list[dict[str, Any]]:
     """
     summaries = []
     for primitive in geometry.prims():
+        if isinstance(primitive, hou.VDB):
+            active_bounds = primitive.activeVoxelBoundingBox()
+            active_minimum = active_bounds.minvec()
+            active_maximum = active_bounds.maxvec()
+            summaries.append(
+                {
+                    "type": primitive.type().name(),
+                    "closed": None,
+                    "points": [vertex.point().number() for vertex in primitive.vertices()],
+                    "active_voxel_count": primitive.activeVoxelCount(),
+                    "active_bounds": [
+                        int(active_minimum[0]),
+                        int(active_maximum[0]),
+                        int(active_minimum[1]),
+                        int(active_maximum[1]),
+                        int(active_minimum[2]),
+                        int(active_maximum[2]),
+                    ],
+                    "values": list(primitive.voxelRangeAsFloat(active_bounds)),
+                    "value_type": str(primitive.intrinsicValue("vdb_value_type")),
+                    "grid_class": str(primitive.intrinsicValue("vdb_class")),
+                    "transform": list(primitive.intrinsicValue("transform")),
+                    "visualization": {
+                        "mode": str(primitive.intrinsicValue("volumevisualmode")),
+                        "iso": float(primitive.intrinsicValue("volumevisualiso")),
+                        "density": float(primitive.intrinsicValue("volumevisualdensity")),
+                    },
+                }
+            )
+            continue
+        if isinstance(primitive, hou.PackedGeometry):
+            embedded = primitive.getEmbeddedGeometry()
+            summaries.append(
+                {
+                    "type": primitive.type().name(),
+                    "closed": None,
+                    "points": [vertex.point().number() for vertex in primitive.vertices()],
+                    "pivot": list(primitive.intrinsicValue("pivot")),
+                    "transform": list(primitive.intrinsicValue("transform")),
+                    "viewport_lod": str(primitive.intrinsicValue("viewportlod")),
+                    "point_instance_transform": int(
+                        primitive.intrinsicValue("pointinstancetransform")
+                    ),
+                    "treat_as_folder": int(primitive.intrinsicValue("treatasfolder")),
+                    "embedded": {
+                        "point_count": len(embedded.points()),
+                        "vertex_count": geometry_vertex_count(embedded),
+                        "primitive_count": len(embedded.prims()),
+                        "primitive_types": [
+                            embedded_primitive.type().name()
+                            for embedded_primitive in embedded.prims()
+                        ],
+                        "global_attributes": {
+                            attribute.name(): attribute_values(
+                                embedded, "global", attribute
+                            )
+                            for attribute in embedded.globalAttribs()
+                        },
+                    },
+                }
+            )
+            continue
         if isinstance(primitive, hou.Volume):
             summaries.append(
                 {
@@ -226,7 +296,7 @@ def geometry_summary(geometry: hou.Geometry) -> dict[str, Any]:
             for group in geometry.pointGroups()
         },
         "vertex_groups": {
-            group.name(): [vertex.number() for vertex in group.vertices()]
+            group.name(): [vertex.linearNumber() for vertex in group.vertices()]
             for group in geometry.vertexGroups()
         },
         "primitive_groups": {

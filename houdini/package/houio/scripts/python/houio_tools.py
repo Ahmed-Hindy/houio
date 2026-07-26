@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+import subprocess
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
@@ -226,6 +228,68 @@ def _output_path_for(input_path: Path) -> Path:
     return input_path.with_name(input_path.name + "_houio.bgeo.sc")
 
 
+def write_selected_geometry() -> Optional[Path]:
+    """Write the selected SOP through HouIO's custom serializer.
+
+    Returns:
+        The output path, or None when the user cancels or no SOP is selected.
+    """
+    from houio_hom import write_node_geometry
+
+    node = _selected_sop()
+    if node is None:
+        hou.ui.displayMessage(
+            "Select a SOP node, then run Write Selected Geometry again.",
+            severity=hou.severityType.Warning,
+            title="HouIO",
+        )
+        return None
+
+    default_directory = Path(hou.text.expandString("$HIP"))
+    if not default_directory.is_dir():
+        default_directory = Path.home()
+    output_text = hou.ui.selectFile(
+        start_directory=default_directory.as_posix(),
+        default_value=f"{node.name()}.bgeo.sc",
+        title="Write selected SOP with HouIO",
+        chooser_mode=hou.fileChooserMode.Write,
+        file_type=hou.fileType.Geometry,
+        collapse_sequences=True,
+    )
+    if not output_text:
+        return None
+
+    output_path = Path(hou.text.expandString(output_text)).resolve()
+    try:
+        result = write_node_geometry(node, output_path)
+    except Exception as exception:
+        hou.ui.displayMessage(
+            str(exception),
+            severity=hou.severityType.Error,
+            title="HouIO Write Failed",
+        )
+        return None
+    if not result.success:
+        messages = [
+            str(diagnostic.get("message", diagnostic))
+            for diagnostic in result.diagnostics
+        ]
+        details = "\n".join(messages) or result.stderr or result.stdout
+        hou.ui.displayMessage(
+            details or "HouIO custom writer failed without diagnostics.",
+            severity=hou.severityType.Error,
+            title="HouIO Write Failed",
+        )
+        return None
+
+    hou.ui.displayMessage(
+        f"HouIO wrote through the custom serializer:\n{output_path}",
+        severity=hou.severityType.Message,
+        title="HouIO Write Complete",
+    )
+    return output_path
+
+
 def convert_geometry_file() -> Optional[Path]:
     """Open Houdini file dialogs and convert one geometry file with HouIO.
 
@@ -292,11 +356,33 @@ def package_diagnostics() -> dict[str, object]:
     import houio_hom
 
     root_text = os.environ.get("HOUIO_ROOT", "")
+    writer_text = os.environ.get("HOUIO_EXECUTABLE", "")
     converter_text = os.environ.get("HOUIO_CONVERT_EXECUTABLE", "")
     blosc_text = hou.text.expandString(os.environ.get("HOUIO_BLOSC_LIBRARY", ""))
     root_path = Path(root_text) if root_text else None
+    writer_path = Path(writer_text) if writer_text else None
     converter_path = Path(converter_text) if converter_text else None
     blosc_path = Path(blosc_text) if blosc_text else None
+
+    writer_diagnostics: dict[str, object] = {}
+    if writer_path and writer_path.is_file():
+        completed = subprocess.run(
+            (str(writer_path), "diagnose", "--json"),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30.0,
+        )
+        if completed.returncode == 0:
+            try:
+                writer_diagnostics = json.loads(completed.stdout)
+            except json.JSONDecodeError:
+                writer_diagnostics = {"raw": completed.stdout.strip()}
+        else:
+            writer_diagnostics = {
+                "returncode": completed.returncode,
+                "stderr": completed.stderr.strip(),
+            }
 
     return {
         "houdini_version": hou.applicationVersionString(),
@@ -305,6 +391,9 @@ def package_diagnostics() -> dict[str, object]:
         "package_root": str(root_path) if root_path else "not set",
         "package_root_exists": bool(root_path and root_path.is_dir()),
         "python_module": str(Path(houio_hom.__file__).resolve()),
+        "writer": str(writer_path) if writer_path else "not set",
+        "writer_exists": bool(writer_path and writer_path.is_file()),
+        "writer_diagnostics": writer_diagnostics,
         "converter": str(converter_path) if converter_path else "not set",
         "converter_exists": bool(converter_path and converter_path.is_file()),
         "blosc_library": str(blosc_path) if blosc_path else "not set",
@@ -322,6 +411,7 @@ def show_package_diagnostics() -> dict[str, object]:
     rows = [f"{key}: {value}" for key, value in diagnostics.items()]
     healthy = bool(
         diagnostics["package_root_exists"]
+        and diagnostics["writer_exists"]
         and diagnostics["converter_exists"]
         and diagnostics["blosc_exists"]
     )

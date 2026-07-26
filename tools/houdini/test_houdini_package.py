@@ -14,11 +14,14 @@ import houio_tools
 def validate_environment() -> None:
     """Validate package paths and imported modules."""
     package_root = Path(os.environ["HOUIO_ROOT"]).resolve()
+    writer_path = Path(os.environ["HOUIO_EXECUTABLE"]).resolve()
     converter_path = Path(os.environ["HOUIO_CONVERT_EXECUTABLE"]).resolve()
     blosc_path = Path(hou.text.expandString(os.environ["HOUIO_BLOSC_LIBRARY"])).resolve()
 
     if not package_root.is_dir():
         raise AssertionError(f"Missing package root: {package_root}")
+    if not writer_path.is_file():
+        raise AssertionError(f"Missing HouIO writer: {writer_path}")
     if not converter_path.is_file():
         raise AssertionError(f"Missing converter: {converter_path}")
     if not blosc_path.is_file():
@@ -33,6 +36,7 @@ def validate_shelf_tools() -> None:
     """Validate the shelf and Tab-menu tool definitions."""
     expected_tools = {
         "houio_roundtrip_sop",
+        "houio_write_selected_geometry",
         "houio_convert_geometry_file",
         "houio_package_diagnostics",
     }
@@ -95,6 +99,7 @@ def validate_diagnostics() -> None:
     diagnostics = houio_tools.package_diagnostics()
     required_true_values = (
         "package_root_exists",
+        "writer_exists",
         "converter_exists",
         "blosc_exists",
     )

@@ -1,6 +1,6 @@
 # Fixture generation and validation
 
-HouIO fixtures are generated into the build tree with Houdini rather than committed as opaque binary files. The generator records deterministic counts, attribute names, group names, primitive closure, the producing Houdini build, and any intentional losses in `manifest.json`.
+HouIO fixtures are generated into the build tree with Houdini rather than committed as opaque binary files. The generator records deterministic counts, attribute names, group names, primitive closure, packed embedded-payload metadata, native VDB sparse summaries, the producing Houdini build, and any intentional losses in `manifest.json`.
 
 ## Maintained Houdini builds
 
@@ -38,12 +38,14 @@ The script performs these steps:
 6. Loads source and candidate files in every requested Houdini version.
 7. Compares counts, attributes, topology, groups, and supported volume data.
 
-Override the matrix explicitly when testing another installed build:
+The default generator is Houdini 20.0.653, the oldest maintained build. This matters for native VDB fixtures because newer Houdini/OpenVDB payload versions may not be readable by older Houdini builds.
+
+Override the matrix explicitly when the validation set does not include an older VDB reader:
 
 ```powershell
 .\tools\houdini\run_fixture_roundtrips.ps1 `
   -GeneratorVersion 22.0.368 `
-  -ValidationVersions 20.0.653,20.5.410,21.0.631,22.0.368
+  -ValidationVersions 22.0.368
 ```
 
 Generated files are written below:

@@ -19,9 +19,10 @@ The minimum supported Houdini version is **20.0**. The file, large-asset, and pa
 | Component | Purpose |
 | --- | --- |
 | `houio::houio` | Static C++ library for GEO, BGEO, and SCF geometry I/O |
-| `houio_convert` | Command-line file converter |
-| `python/houio_hom` | Houdini Python bridge for package and VDB workflows |
-| Houdini package | Shelf tools, Python SOP round trip, diagnostics, and converter access |
+| `houio` | Primary CLI for write, convert, inspect, validate, capabilities, and diagnostics |
+| `houio_convert` | Compatibility two-path file converter |
+| `python/houio_hom` | Direct HOM extraction and custom-writer bridge |
+| Houdini package | Direct custom-write shelf tool, round trip, diagnostics, and converter access |
 | Test suite | Parser, schema, topology, attribute, volume, package, sanitizer, and fuzz coverage |
 
 ## Supported geometry
@@ -37,6 +38,8 @@ HouIO currently supports:
 - Unordered point, vertex, and primitive groups, including groups spanning mixed polygon and volume records
 - `Poly`, `Polygon_run`, and `PolygonCurve_run`
 - Dense scalar volumes
+- Embedded `PackedGeometry` records with shared geometry, pivot, transform, viewport LOD, and instancing/folder flags
+- Native sparse VDB primitive payloads through lossless opaque file round trips
 - SCF compression through C-Blosc
 
 The simplified `Geometry` API is intentionally render-oriented and may split points at vertex-attribute discontinuities. It supports fixed-size point, line, triangle, and quad sets plus one arbitrary n-gon; multiple variable-size polygons remain a Houdini-oriented-model concern. Use `HouGeo` and `HouGeoAdapter` when domain fidelity matters.
@@ -45,15 +48,16 @@ The simplified `Geometry` API is intentionally render-oriented and may split poi
 
 Not currently supported by the standalone C++ model:
 
-- Packed primitives
+- Packed fragments and packed disk primitives
 - Agents and crowds
 - Height fields
-- Native sparse OpenVDB trees
-- Vector VDB grids
+- Creating or editing native OpenVDB trees without an optional OpenVDB backend
+- Direct HOM extraction of native VDB trees; file-level native VDB payloads are preserved
+- Vector VDB construction and editing
 - NURBS and Bezier primitives
 - Instancing records
 
-The Houdini bridge can explicitly convert supported Float SDF and Fog VDB grids to dense volumes, process them through HouIO, and restore their VDB class on output. It also preserves Houdini Volume Visualization detail metadata across the supported Houdini versions.
+The primary Houdini workflow extracts supported live geometry directly through HOM into the HouIO-owned `houio.hom/1` manifest and invokes the custom C++ writer. It does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`. Polygons, dense scalar volumes, embedded `hou.PackedGeometry`, maintained attribute domains, and groups are supported. Native VDB records are preserved losslessly when HouIO reads and rewrites an existing GEO/BGEO file; constructing a native sparse tree from a live HOM VDB remains a separate optional-backend task.
 
 ## Build
 
@@ -164,18 +168,25 @@ const houio::ScalarField::Ptr loaded = houio::loadField<float>("volume.field");
 
 This installed API is opt-in, but the current native binary layout is experimental, platform-dependent, and not covered by stable interchange guarantees. See [Experimental field persistence format](docs/field-format.md).
 
-### Write geometry
+### Write through the primary facade
 
 ```cpp
+#include <houio/Writer.h>
+
 houio::GeometryWriteOptions options;
 options.format = houio::GeometryFileFormat::bgeo_scf;
+options.overwriteExisting = true;
+options.createParentDirectories = true;
+options.atomicReplace = true;
 
-const auto result = houio::GeometryIO::writeGeometry(
+const houio::WriteResult result = houio::Writer::write(
     "mesh.bgeo.sc",
     mesh,
     options
 );
 ```
+
+`Writer` accepts `HouGeoAdapter`, simplified `Geometry`, and dense `ScalarField` sources. `GeometryIO` remains the lower-level read/write backend for advanced callers.
 
 ### Configure parser limits
 
@@ -189,16 +200,35 @@ options.parserLimits.maxNestingDepth = 256;
 const auto result = houio::GeometryIO::readHouGeo("asset.bgeo", options);
 ```
 
-## Command-line converter
+## Command-line interface
 
 ```powershell
-houio_convert input.bgeo output.bgeo.sc
-houio_convert input.bgeo.sc output.bgeo
+houio write input.bgeo output.bgeo.sc
+houio inspect output.bgeo.sc
+houio inspect output.bgeo.sc --json
+houio validate output.bgeo.sc
+houio capabilities --json
+houio diagnose --json
 ```
 
-Use `HOUIO_BLOSC_LIBRARY` or `GeometryWriteOptions::bloscLibraryPath` when C-Blosc cannot be resolved automatically.
+The Houdini bridge uses `houio write-manifest <manifest.json> <output>` internally. `houio_convert input output` remains available for compatibility. Use `HOUIO_BLOSC_LIBRARY` or `GeometryWriteOptions::bloscLibraryPath` when C-Blosc cannot be resolved automatically.
 
 ## Houdini package
+
+The primary live-session API is:
+
+```python
+from houio_hom import write_node_geometry
+
+result = write_node_geometry(
+    "/obj/geo1/OUT",
+    "D:/cache/asset.bgeo.sc",
+)
+if not result.success:
+    raise RuntimeError(result.diagnostics or result.stderr)
+```
+
+The **Write Selected Geometry** shelf tool exposes the same custom-writer path interactively.
 
 Build the package archive:
 
@@ -279,6 +309,18 @@ See [Fixture generation and validation](docs/fixtures.md) for the manifest, know
 
 ## Development checks
 
+Use the discoverable Windows developer entry point for common workflows:
+
+```powershell
+.\tools\dev.ps1 help
+.\tools\dev.ps1 build
+.\tools\dev.ps1 test
+.\tools\dev.ps1 fixtures
+.\tools\dev.ps1 package
+.\tools\dev.ps1 benchmarks
+.\tools\dev.ps1 validate-all
+```
+
 AddressSanitizer:
 
 ```powershell
@@ -320,6 +362,7 @@ See [Performance baselines](docs/benchmarks.md) for methodology and workload con
 - [Developer onboarding](onboard.md)
 - [Contributing](CONTRIBUTING.md)
 - [Compatibility matrix](docs/compatibility.md)
+- [Command-line interface](docs/cli.md)
 - [Fixture generation and validation](docs/fixtures.md)
 - [Performance baselines](docs/benchmarks.md)
 - [Experimental field persistence format](docs/field-format.md)

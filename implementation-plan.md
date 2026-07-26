@@ -65,14 +65,14 @@ Every phase must preserve these constraints:
 
 ## Current validation status
 
-- Current exact source: MSVC warnings-as-errors CTest suite passes **19/19**.
-- Current exact source: full Release/Houdini matrix passes **47/47**.
-- Current exact source: Windows AddressSanitizer matrix passes **19/19**.
-- Generated fixtures pass with Houdini **20.0.653** and **22.0.368** as producers and with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368** as validators.
-- The large Crag round trip and Houdini package matrix pass in all four maintained versions.
-- Documentation audit contains no retired API references and now records compatibility, fixture, contribution, field-format, and versioning contracts.
-- Phases 11–16 are consolidated for `master` by integration PR #31.
-- Phases 17–31 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
+- Current exact source: MSVC warnings-as-errors CTest suite passes **24/24**.
+- Current exact source: full Release/Houdini matrix passes **55/55**.
+- Current exact source: Windows AddressSanitizer matrix passes **24/24**.
+- MSVC native static analysis is error-clean.
+- The 16-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Documentation records the primary Writer/CLI/HOM workflow, packed geometry support, native VDB payload preservation, and remaining backend limitations.
+- Phases 11–31 are merged into `master` through PRs #31 and #32.
+- Phases 32–34 are complete on the active branch; Phase 35 supports embedded PackedGeometry, and Phase 36 supports lossless opaque native VDB payload preservation.
 
 ## Execution phases
 
@@ -942,13 +942,90 @@ Exit criteria:
 - The benchmark preset builds and runs both timing baselines and the memory probe.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
+### Phase 32 — Primary write interface
+
+**Status: complete.**
+
+Goals:
+
+- Make custom writing the obvious public workflow.
+- Introduce one stable write request/options/result surface for Houdini-oriented geometry, simplified meshes, and dense volumes.
+- Centralize output format, SCF compression, overwrite, path creation, atomic replacement, diagnostics, and capability checks.
+- Preserve lower-level `GeometryIO`, `HouGeoIO`, and adapter APIs for advanced callers.
+- Add focused C++ and HOM examples that write data without using Houdini's geometry writers.
+
+Exit criteria:
+
+- A new user can identify the correct writer API from the first README example.
+- Every supported data model uses the same result and diagnostics conventions.
+- Existing public writer entry points remain source-compatible.
+- Strict, sanitizer, analysis, package, and Houdini compatibility matrices pass.
+
+### Phase 33 — CLI and developer tooling
+
+**Status: complete.**
+
+Goals:
+
+- Replace the minimal positional converter with a subcommand-based CLI.
+- Add `write`, `write-manifest`, `convert`, `inspect`, `validate`, `capabilities`, and `diagnose` commands.
+- Add stable JSON output, documented exit codes, and actionable diagnostics.
+- Add one discoverable developer command for build, test, fixtures, package, benchmarks, and complete validation workflows.
+- Keep commands scriptable and free of interactive requirements by default.
+
+Exit criteria:
+
+- Human-readable and machine-readable output are both maintained contracts.
+- CLI help exposes supported formats, records, compression, and limitations.
+- The old two-path converter behavior remains available through compatibility syntax or a documented migration.
+
+### Phase 34 — Installation and Houdini user experience
+
+**Status: complete for the maintained package workflow.**
+
+Goals:
+
+- Provide one-command package build, install, update, uninstall, and isolated launch operations.
+- Make package diagnostics report exact paths, versions, dependencies, and repair actions.
+- Expose a small HOM-facing API that extracts cooked geometry into the HouIO-owned `houio.hom/1` manifest and sends it through the custom HouIO writer without `geometry.data()` or `saveToFile()`.
+- Add shelf/Python UI actions for writing, inspection, diagnostics, and capability reporting.
+- Put the first successful write workflow before internal architecture in user documentation.
+
+Exit criteria:
+
+- A user can install the package and write a supported SOP geometry file without locating binaries manually.
+- The package never silently falls back to Houdini's native geometry writer.
+- Failures identify the missing executable, dependency, path, format, or unsupported record directly.
+
+### Phase 35 — Packed primitive family
+
+**Status: embedded `PackedGeometry` complete; fragments and disk records remain open.**
+
+Goals:
+
+- Add fixture-backed packed geometry support first.
+- Extend the same primitive-family abstraction to packed fragments and packed disk primitives.
+- Preserve transforms, intrinsic metadata, source references, attributes, and groups where represented by the format.
+- Reject unsupported packed payload variants with structured diagnostics rather than flattening silently.
+
+### Phase 36 — Native sparse OpenVDB primitives
+
+**Status: lossless opaque native-payload preservation complete; tree construction/editing remains open.**
+
+Goals:
+
+- Model native sparse OpenVDB primitive records without forced dense conversion.
+- Preserve Houdini's serialized native payload, including grid class, value type, transform, metadata, active topology, and sparse values, during file round trips.
+- Keep future OpenVDB tree construction/editing optional at build and package time.
+- Report that direct live-HOM native VDB creation is unavailable until an optional OpenVDB backend exists.
+
 ## Deferred work
 
-The following remain separate from this modernization branch unless required by a discovered defect:
+The following remain separate from the active product-facing phases unless required by a discovered defect:
 
-- New primitive-record support.
+- Packed fragments, packed disk primitives, and additional primitive-record families.
 - Lossless point/vertex-domain redesign.
-- Native sparse OpenVDB public adapters.
+- OpenVDB-backed sparse-tree construction and editing APIs.
 - Performance architecture changes that bypass the JSON tree.
 - Project-wide licensing and third-party provenance resolution.
 

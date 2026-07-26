@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$GeneratorVersion = "22.0.368",
+    [string]$GeneratorVersion = "20.0.653",
     [string[]]$ValidationVersions = @("20.0.653", "20.5.410", "21.0.631", "22.0.368"),
     [string]$BuildPreset = "windows-msvc-release"
 )
