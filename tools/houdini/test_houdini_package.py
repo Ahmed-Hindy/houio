@@ -100,12 +100,39 @@ def validate_diagnostics() -> None:
     required_true_values = (
         "package_root_exists",
         "writer_exists",
+        "writer_diagnostics_ok",
         "converter_exists",
         "blosc_exists",
     )
     for key in required_true_values:
         if diagnostics.get(key) is not True:
             raise AssertionError(f"Package diagnostic failed: {key}")
+
+    original_run = houio_tools.subprocess.run
+    try:
+        def raise_timeout(*_args, **_kwargs):
+            """Simulate a writer diagnostics timeout."""
+            raise houio_tools.subprocess.TimeoutExpired("houio", 30.0)
+
+        houio_tools.subprocess.run = raise_timeout
+        timed_out = houio_tools.package_diagnostics()
+        if timed_out.get("writer_diagnostics_ok") is not False:
+            raise AssertionError("Timed-out writer diagnostics were reported as healthy")
+        if "timed out" not in str(timed_out.get("writer_diagnostics", {})):
+            raise AssertionError("Timed-out writer diagnostics were not actionable")
+
+        def raise_os_error(*_args, **_kwargs):
+            """Simulate an operating-system writer startup failure."""
+            raise OSError("test execution failure")
+
+        houio_tools.subprocess.run = raise_os_error
+        failed_start = houio_tools.package_diagnostics()
+        if failed_start.get("writer_diagnostics_ok") is not False:
+            raise AssertionError("Unstartable writer diagnostics were reported as healthy")
+        if "could not start" not in str(failed_start.get("writer_diagnostics", {})):
+            raise AssertionError("Writer startup failure was not actionable")
+    finally:
+        houio_tools.subprocess.run = original_run
 
 
 def main() -> int:

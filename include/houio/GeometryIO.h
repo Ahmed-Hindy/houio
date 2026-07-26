@@ -54,6 +54,10 @@ namespace houio
         std::string bloscLibraryPath;
         bool createParentDirectories = true;
         bool overwriteExisting = true;
+        /// Write through a same-directory temporary file, synchronize its data,
+        /// atomically publish it, and synchronize the parent directory on POSIX.
+        /// A reported synchronization failure may occur after the destination
+        /// has become visible, but durability could not be confirmed.
         bool atomicReplace = true;
     };
 

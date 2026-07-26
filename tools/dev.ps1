@@ -69,7 +69,7 @@ function Get-HythonPath {
     return $path
 }
 
-function Configure-Preset {
+function Initialize-Preset {
     param(
         [Parameter(Mandatory)]
         [string]$Name,
@@ -140,12 +140,12 @@ $script:ctest = Resolve-BuildTool -PreferredPath $visualStudioCTest -CommandName
 
 switch ($Command) {
     "build" {
-        Configure-Preset -Name $Preset
+        Initialize-Preset -Name $Preset
         Build-Preset -Name $Preset
     }
     "test" {
         $hython = Get-HythonPath -Version $HoudiniVersion
-        Configure-Preset -Name $Preset -Hython $hython
+        Initialize-Preset -Name $Preset -Hython $hython
         Build-Preset -Name $Preset
         Test-Preset -Name $Preset
     }
@@ -160,24 +160,24 @@ switch ($Command) {
     }
     "package" {
         $hython = Get-HythonPath -Version $HoudiniVersion
-        Configure-Preset -Name "windows-msvc-release" -Hython $hython
+        Initialize-Preset -Name "windows-msvc-release" -Hython $hython
         Build-Preset -Name "windows-msvc-release" -Targets @("houio_houdini_package")
     }
     "benchmarks" {
-        Configure-Preset -Name "windows-msvc-benchmarks"
+        Initialize-Preset -Name "windows-msvc-benchmarks"
         Build-Preset -Name "windows-msvc-benchmarks"
         Invoke-NativeCommand -Executable (Join-Path $repositoryRoot "build\windows-msvc-benchmarks\houio_benchmarks.exe") -Arguments @()
         Invoke-NativeCommand -Executable (Join-Path $repositoryRoot "build\windows-msvc-benchmarks\houio_memory_probe.exe") -Arguments @()
     }
     "validate-all" {
-        Configure-Preset -Name "windows-msvc-werror"
+        Initialize-Preset -Name "windows-msvc-werror"
         Build-Preset -Name "windows-msvc-werror"
         Test-Preset -Name "windows-msvc-werror"
 
-        Configure-Preset -Name "windows-msvc-analysis"
+        Initialize-Preset -Name "windows-msvc-analysis"
         Build-Preset -Name "windows-msvc-analysis"
 
-        Configure-Preset -Name "windows-msvc-asan"
+        Initialize-Preset -Name "windows-msvc-asan"
         Build-Preset -Name "windows-msvc-asan"
         Test-Preset -Name "windows-msvc-asan"
 

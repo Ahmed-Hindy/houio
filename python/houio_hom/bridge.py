@@ -40,6 +40,7 @@ class HouIOConverterError(subprocess.CalledProcessError):
     """Converter failure that includes captured HouIO diagnostics in its message."""
 
     def __str__(self) -> str:
+        """Return the converter error with captured stdout and stderr details."""
         message = super().__str__()
         details = "\n".join(
             stream.strip()
@@ -114,8 +115,8 @@ def _resolve_writer(executable: Optional[PathLike]) -> Path:
             )
         )
 
-    package_candidate = Path(__file__).resolve().parents[2] / "bin" / "houio.exe"
-    candidates.append(package_candidate)
+    package_bin = Path(__file__).resolve().parents[2] / "bin"
+    candidates.extend((package_bin / "houio.exe", package_bin / "houio"))
     for candidate in candidates:
         if candidate.is_file():
             return candidate.resolve()

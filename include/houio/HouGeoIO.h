@@ -112,11 +112,6 @@ namespace houio
             GeometryConversionReport* report);
         [[nodiscard]] static HouGeo::Ptr adaptVolume(ScalarField::Ptr volume);
         [[nodiscard]] static HouGeo::Ptr adaptGeometry(Geometry::Ptr geometry);
-        [[nodiscard]] static bool exportGeometry(
-            std::ostream& output,
-            HouGeoAdapter::ConstPtr geometry,
-            bool binary,
-            std::vector<const HouGeoAdapter*>& active_geometries);
 
         struct ExportContext
         {
@@ -127,6 +122,11 @@ namespace houio
 
             json::BinaryWriter& writer;
         };
+
+        [[nodiscard]] static bool exportGeometryValue(
+            ExportContext& context,
+            HouGeoAdapter::ConstPtr geometry,
+            std::vector<const HouGeoAdapter*>& active_geometries);
 
         static bool exportAttribute(
             ExportContext& context,
