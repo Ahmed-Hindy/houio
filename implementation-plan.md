@@ -817,8 +817,8 @@ Tasks:
 
 Exit criteria:
 
-- Faithful `HouTopology` export no longer allocates a full duplicate 32-bit index vector.
-- Existing custom topology adapters remain source-compatible.
+- View-enabled faithful `HouTopology` export no longer allocates a full duplicate 32-bit index vector.
+- Existing custom topology adapters remain source-compatible through the documented one-copy fallback.
 - Index count mismatches and negative indices remain rejected.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
@@ -851,8 +851,8 @@ Tasks:
 
 Exit criteria:
 
-- Faithful `HouGeo` export no longer allocates a duplicate primitive shared-pointer vector.
-- Existing custom geometry adapters remain source-compatible.
+- View-enabled faithful `HouGeo` export no longer allocates a duplicate primitive shared-pointer vector.
+- Existing custom geometry adapters remain source-compatible through the documented one-copy fallback.
 - Null, unsupported, count-mismatched, and topology-mismatched primitive adapters are rejected.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
