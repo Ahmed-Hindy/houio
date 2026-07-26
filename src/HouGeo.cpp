@@ -490,6 +490,11 @@ namespace houio
 		return {m_primitives.begin(), m_primitives.end()};
 	}
 
+	std::span<const HouGeoAdapter::Primitive::Ptr> HouGeo::primitiveView() const noexcept
+	{
+		return m_primitives;
+	}
+
 	HouGeo::Topology::Ptr HouGeo::topology()
 	{
 		return m_topology;

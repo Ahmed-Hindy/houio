@@ -343,6 +343,7 @@ namespace houio
             const std::string& name) const override;
         [[nodiscard]] std::vector<Primitive::Ptr> primitives() override;
         [[nodiscard]] std::vector<Primitive::ConstPtr> primitives() const override;
+        [[nodiscard]] std::span<const Primitive::Ptr> primitiveView() const noexcept override;
         [[nodiscard]] std::vector<std::string> globalAttributeNames() const override;
         [[nodiscard]] AttributeAdapter::Ptr globalAttribute(const std::string& name) override;
         [[nodiscard]] AttributeAdapter::ConstPtr globalAttribute(

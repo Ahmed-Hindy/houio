@@ -61,6 +61,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Audit maintained containers and confirm active implementation storage is private behind validated APIs or immutable views.
 - [x] Add installed `HoudiniGeometry` and `SimplifiedMesh` aliases that make model responsibilities explicit without breaking established class names.
 - [x] Add an optional immutable topology view and remove the unconditional topology-vector copy from faithful export.
+- [x] Add an optional immutable primitive-container view and remove the unconditional shared-pointer-vector copy from faithful export.
 
 ## Modernization next
 

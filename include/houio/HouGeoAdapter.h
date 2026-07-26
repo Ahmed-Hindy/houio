@@ -234,6 +234,9 @@ namespace houio
         [[nodiscard]] virtual bool hasPrimitiveAttribute(const std::string& name) const;
         [[nodiscard]] virtual std::vector<Primitive::Ptr> primitives();
         [[nodiscard]] virtual std::vector<Primitive::ConstPtr> primitives() const;
+        /// Optional immutable view used to avoid copying the primitive pointer list during export.
+        /// The default empty view preserves compatibility with existing adapters.
+        [[nodiscard]] virtual std::span<const Primitive::Ptr> primitiveView() const noexcept;
         [[nodiscard]] virtual Topology::Ptr topology();
         [[nodiscard]] virtual Topology::ConstPtr topology() const;
     };

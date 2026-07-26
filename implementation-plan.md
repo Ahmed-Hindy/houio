@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The large Crag round trip and Houdini package matrix pass in all four maintained versions.
 - Documentation audit contains no retired API references and now records compatibility, fixture, contribution, field-format, and versioning contracts.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Phases 17–27 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
+- Phases 17–28 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
 
 ## Execution phases
 
@@ -820,6 +820,40 @@ Exit criteria:
 - Faithful `HouTopology` export no longer allocates a full duplicate 32-bit index vector.
 - Existing custom topology adapters remain source-compatible.
 - Index count mismatches and negative indices remain rejected.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 28 — Zero-copy primitive-container export view
+
+**Status: complete.**
+
+Target files:
+
+- `include/houio/HouGeoAdapter.h`
+- `include/houio/HouGeo.h`
+- `src/HouGeoAdapter.cpp`
+- `src/HouGeo.cpp`
+- `src/HouGeoIO.cpp`
+- `tests/test_export_safety.cpp`
+- roadmap documents
+
+Tasks:
+
+- Add an optional immutable primitive pointer-list view to the adapter contract.
+- Keep both established `primitives()` vector APIs for source compatibility.
+- Expose `HouGeo` owned primitive pointers directly through the immutable view.
+- Convert mutable shared pointers to const primitive views before serialization.
+- Validate every primitive pointer and supported record type.
+- Validate the summed record primitive count against declared `primitiveCount()`.
+- Validate the summed topology vertices against declared `vertexCount()`.
+- Check topology-offset and primitive-count arithmetic before narrowing or addition.
+- Test that view-enabled adapters perform no `primitives()` copy.
+- Test that legacy adapters without a view perform one fallback copy and preserve polygon records.
+
+Exit criteria:
+
+- Faithful `HouGeo` export no longer allocates a duplicate primitive shared-pointer vector.
+- Existing custom geometry adapters remain source-compatible.
+- Null, unsupported, count-mismatched, and topology-mismatched primitive adapters are rejected.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work

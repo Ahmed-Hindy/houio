@@ -1050,23 +1050,72 @@ namespace houio
 			writer.jsonString( "primitives" );
 			writer.jsonBeginArray();
 
-			const std::vector<HouGeoAdapter::Primitive::ConstPtr> primitives = geometry->primitives();
-
-			int topologyVertexOffset = 0;
-			for( const HouGeoAdapter::Primitive::ConstPtr &primitive : primitives )
+			sint64 observedPrimitiveCount = 0;
+			sint64 topologyVertexOffset = 0;
+			const auto exportPrimitiveRange = [&](const auto& primitiveRange)
 			{
-				if( auto volume = std::dynamic_pointer_cast<const HouGeoAdapter::VolumePrimitive>(primitive) )
+				for( const auto &primitiveEntry : primitiveRange )
 				{
-					exportPrimitive(context, volume);
-					++topologyVertexOffset;
+					const HouGeoAdapter::Primitive::ConstPtr primitive = primitiveEntry;
+					if( !primitive )
+						throw std::runtime_error( "HouGeoIO::exportGeometry received a null primitive adapter" );
+
+					const int storedPrimitiveCount = primitive->primitiveCount();
+					if( storedPrimitiveCount < 0
+						|| static_cast<sint64>(storedPrimitiveCount)
+							> std::numeric_limits<sint64>::max() - observedPrimitiveCount )
+					{
+						throw std::overflow_error( "HouGeoIO::exportGeometry primitive count exceeds sint64 range" );
+					}
+					observedPrimitiveCount += static_cast<sint64>(storedPrimitiveCount);
+
+					if( auto volume = std::dynamic_pointer_cast<const HouGeoAdapter::VolumePrimitive>(primitive) )
+					{
+						exportPrimitive(context, volume);
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
+					else if( auto polygonRun = std::dynamic_pointer_cast<const HouGeoAdapter::PolyPrimitive>(primitive) )
+					{
+						if( topologyVertexOffset > std::numeric_limits<int>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry polygon topology offset exceeds int range" );
+						exportPrimitive(context, polygonRun, static_cast<int>(topologyVertexOffset));
+						const int polygonCount = polygonRun->polygonCount();
+						if( polygonCount < 0 )
+							throw std::runtime_error( "HouGeoIO::exportGeometry polygon count cannot be negative" );
+						for( int polygonIndex=0;polygonIndex<polygonCount;++polygonIndex )
+						{
+							const int polygonVertexCount = polygonRun->polygonVertexCount(polygonIndex);
+							if( polygonVertexCount < 0
+								|| static_cast<sint64>(polygonVertexCount)
+									> std::numeric_limits<sint64>::max() - topologyVertexOffset )
+							{
+								throw std::overflow_error( "HouGeoIO::exportGeometry polygon vertex total exceeds sint64 range" );
+							}
+							topologyVertexOffset += static_cast<sint64>(polygonVertexCount);
+						}
+					}
+					else
+					{
+						throw std::runtime_error( "HouGeoIO::exportGeometry encountered an unsupported primitive adapter" );
+					}
 				}
-				else if( auto polygonRun = std::dynamic_pointer_cast<const HouGeoAdapter::PolyPrimitive>(primitive) )
-				{
-					exportPrimitive(context, polygonRun, topologyVertexOffset);
-					for( int polygonIndex=0;polygonIndex<polygonRun->polygonCount();++polygonIndex )
-						topologyVertexOffset += polygonRun->polygonVertexCount(polygonIndex);
-				}
+			};
+
+			const std::span<const HouGeoAdapter::Primitive::Ptr> primitiveView = geometry->primitiveView();
+			if( !primitiveView.empty() )
+				exportPrimitiveRange(primitiveView);
+			else
+			{
+				const std::vector<HouGeoAdapter::Primitive::ConstPtr> copiedPrimitives = geometry->primitives();
+				exportPrimitiveRange(copiedPrimitives);
 			}
+
+			if( observedPrimitiveCount != primitiveCount )
+				throw std::runtime_error( "HouGeoIO::exportGeometry primitive adapters do not match primitiveCount" );
+			if( topologyVertexOffset != vertexCount )
+				throw std::runtime_error( "HouGeoIO::exportGeometry primitive topology does not match vertexCount" );
 			writer.jsonEndArray();
 		}
 
