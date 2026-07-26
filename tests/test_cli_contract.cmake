@@ -1,0 +1,75 @@
+if(NOT DEFINED HOUIO_CLI OR NOT EXISTS "${HOUIO_CLI}")
+    message(FATAL_ERROR "HOUIO_CLI must reference the built houio executable")
+endif()
+if(NOT DEFINED HOUIO_TEST_DIRECTORY)
+    message(FATAL_ERROR "HOUIO_TEST_DIRECTORY is required")
+endif()
+
+file(MAKE_DIRECTORY "${HOUIO_TEST_DIRECTORY}")
+
+execute_process(
+    COMMAND "${HOUIO_CLI}"
+    RESULT_VARIABLE usage_result
+    OUTPUT_VARIABLE usage_output
+    ERROR_VARIABLE usage_error
+)
+if(NOT usage_result EQUAL 2)
+    message(FATAL_ERROR
+        "houio usage exit code changed: expected 2, got ${usage_result}\n"
+        "stdout: ${usage_output}\nstderr: ${usage_error}")
+endif()
+string(FIND "${usage_output}" "Usage:" usage_position)
+if(usage_position EQUAL -1)
+    message(FATAL_ERROR "houio usage output no longer contains Usage:")
+endif()
+
+set(missing_input "${HOUIO_TEST_DIRECTORY}/missing.bgeo")
+file(REMOVE "${missing_input}")
+execute_process(
+    COMMAND "${HOUIO_CLI}" validate "${missing_input}" --json
+    RESULT_VARIABLE input_result
+    OUTPUT_VARIABLE input_output
+    ERROR_VARIABLE input_error
+)
+if(NOT input_result EQUAL 3)
+    message(FATAL_ERROR
+        "houio input exit code changed: expected 3, got ${input_result}\n"
+        "stdout: ${input_output}\nstderr: ${input_error}")
+endif()
+string(FIND "${input_output}" "\"success\":false" input_success_position)
+if(input_success_position EQUAL -1)
+    message(FATAL_ERROR "houio missing-input JSON did not report success=false")
+endif()
+
+set(manifest "${HOUIO_TEST_DIRECTORY}/empty_manifest.json")
+set(vdb_output "${HOUIO_TEST_DIRECTORY}/unsupported.vdb")
+file(WRITE "${manifest}"
+    "{\"schema\":\"houio.hom/1\","
+    "\"point_count\":0,\"vertex_count\":0,\"primitive_count\":0,"
+    "\"topology\":[],\"primitives\":[],"
+    "\"attributes\":{"
+    "\"point\":[{\"name\":\"P\",\"kind\":\"numeric\","
+    "\"storage\":\"float32\",\"tuple_size\":4,"
+    "\"element_count\":0,\"values\":[]}],"
+    "\"vertex\":[],\"primitive\":[],\"global\":[]},"
+    "\"groups\":{\"point\":{},\"vertex\":{},\"primitive\":{}}}"
+)
+file(REMOVE "${vdb_output}")
+execute_process(
+    COMMAND "${HOUIO_CLI}" write-manifest "${manifest}" "${vdb_output}" --json
+    RESULT_VARIABLE unsupported_result
+    OUTPUT_VARIABLE unsupported_output
+    ERROR_VARIABLE unsupported_error
+)
+if(NOT unsupported_result EQUAL 5)
+    message(FATAL_ERROR
+        "houio unsupported exit code changed: expected 5, got ${unsupported_result}\n"
+        "stdout: ${unsupported_output}\nstderr: ${unsupported_error}")
+endif()
+string(FIND "${unsupported_output}" "unsupported_input" unsupported_category_position)
+if(unsupported_category_position EQUAL -1)
+    message(FATAL_ERROR "houio unsupported JSON did not include unsupported_input")
+endif()
+if(EXISTS "${vdb_output}")
+    message(FATAL_ERROR "houio created an unsupported VDB container output")
+endif()

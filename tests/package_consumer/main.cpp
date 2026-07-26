@@ -1,5 +1,7 @@
 #include <houio/GeometryIO.h>
 #include <houio/GeometryModels.h>
+#include <houio/HomManifest.h>
+#include <houio/Writer.h>
 
 #include <filesystem>
 #include <iostream>
@@ -15,8 +17,8 @@ int main()
 
     houio::SimplifiedMesh::Ptr sourceGeometry =
         houio::SimplifiedMesh::createQuad(houio::SimplifiedMesh::QUAD);
-    const houio::GeometryWriteResult writeResult =
-        houio::GeometryIO::writeGeometry(outputPath, sourceGeometry);
+    const houio::WriteResult writeResult =
+        houio::Writer::write(outputPath, sourceGeometry);
     if (!sourceGeometry || !writeResult)
     {
         std::cerr << "failed to export geometry through installed HouIO package\n";
@@ -28,7 +30,13 @@ int main()
     std::error_code removeError;
     std::filesystem::remove(outputPath, removeError);
 
-    if (!readResult || readResult.value->primitiveCount() != 1)
+    const auto packedCapability =
+        houio::Writer::capability(houio::WriterDataType::packed_geometry);
+    const auto vdbCapability =
+        houio::Writer::capability(houio::WriterDataType::sparse_openvdb);
+    if (!readResult || readResult.value->primitiveCount() != 1
+        || !packedCapability || !packedCapability->writable
+        || !vdbCapability || !vdbCapability->writable)
     {
         std::cerr << "failed to import geometry through installed HouIO package\n";
         return 1;

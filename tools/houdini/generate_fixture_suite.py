@@ -387,6 +387,55 @@ def build_dense_volume_geometry() -> hou.Geometry:
     return geometry
 
 
+def build_native_vdb_geometry() -> hou.Geometry:
+    """Build a sparse Float VDB with two active voxels.
+
+    Returns:
+        Geometry containing one native fog-volume VDB primitive.
+    """
+    dense = hou.Geometry()
+    volume = dense.createVolume(4, 4, 4)
+    values = [0.0] * 64
+    values[21] = 1.0
+    values[22] = 2.0
+    volume.setAllVoxels(values)
+    volume.setIntrinsicValue("volumevisualmode", "smoke")
+
+    verb = hou.sopNodeTypeCategory().nodeVerb("convertvdb")
+    if verb is None:
+        raise RuntimeError("Convert VDB SOP verb is unavailable")
+    verb.setParms({"conversion": 1})
+    result = hou.Geometry()
+    verb.execute(result, [dense])
+    if len(result.prims()) != 1 or not isinstance(result.prims()[0], hou.VDB):
+        raise RuntimeError("Convert VDB did not produce one native VDB")
+    return result
+
+
+def build_packed_geometry() -> hou.Geometry:
+    """Build one embedded PackedGeometry primitive.
+
+    Returns:
+        Geometry containing a packed open line with deterministic metadata.
+    """
+    embedded = hou.Geometry()
+    points = create_points(embedded, ((0.0, 0.0, 0.0), (1.5, 0.0, 0.0)))
+    create_polygon(embedded, points, (0, 1), closed=False)
+    embedded.addAttrib(hou.attribType.Global, "payload_name", "")
+    embedded.setGlobalAttribValue("payload_name", "packed_fixture")
+
+    geometry = hou.Geometry()
+    packed = geometry.createPackedGeometry(embedded)
+    packed.setIntrinsicValue("pivot", (0.25, -0.5, 1.0))
+    packed.setIntrinsicValue(
+        "transform",
+        (1.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.5),
+    )
+    packed.setIntrinsicValue("viewportlod", "full")
+    packed.setIntrinsicValue("treatasfolder", 1)
+    return geometry
+
+
 def build_primitive_groups_geometry() -> hou.Geometry:
     """Build overlapping point, vertex, and primitive groups.
 
@@ -485,6 +534,8 @@ def main() -> int:
         ("multiple_polygon_runs", build_multiple_polygon_runs_geometry, ()),
         ("global_attributes", build_global_attributes_geometry, ()),
         ("dense_volume", build_dense_volume_geometry, ()),
+        ("native_vdb", build_native_vdb_geometry, ()),
+        ("packed_geometry", build_packed_geometry, ()),
         ("primitive_groups", build_primitive_groups_geometry, ()),
     )
 

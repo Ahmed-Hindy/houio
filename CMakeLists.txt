@@ -29,6 +29,7 @@ add_library(
     src/Field.cpp
     src/Geometry.cpp
     src/GeometryIO.cpp
+    src/HomManifest.cpp
     src/HouGeo.cpp
     src/HouGeoAdapter.cpp
     src/HouGeoIO.cpp
@@ -36,6 +37,7 @@ add_library(
     src/math/Color.cpp
     src/math/Math.cpp
     src/Scf.cpp
+    src/Writer.cpp
 )
 add_library(houio::houio ALIAS houio)
 
@@ -86,9 +88,14 @@ else()
 endif()
 
 if(HOUIO_BUILD_TOOLS)
+    add_executable(houio_cli tools/houio.cpp)
+    set_target_properties(houio_cli PROPERTIES OUTPUT_NAME houio)
     add_executable(houio_convert tools/houio_convert.cpp)
-    target_link_libraries(houio_convert PRIVATE houio::houio)
-    target_compile_features(houio_convert PRIVATE cxx_std_20)
+    foreach(tool_target IN ITEMS houio_cli houio_convert)
+        target_link_libraries(${tool_target} PRIVATE houio::houio)
+        target_compile_features(${tool_target} PRIVATE cxx_std_20)
+        target_compile_definitions(${tool_target} PRIVATE HOUIO_VERSION_STRING="${PROJECT_VERSION}")
+    endforeach()
 
     if(WIN32)
         find_package(Python3 QUIET COMPONENTS Interpreter)
@@ -108,10 +115,12 @@ if(HOUIO_BUILD_TOOLS)
                 COMMAND
                     "${Python3_EXECUTABLE}"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/build_houdini_package.py"
+                    --cli "$<TARGET_FILE:houio_cli>"
                     --converter "$<TARGET_FILE:houio_convert>"
                     --output "${HOUIO_HOUDINI_PACKAGE_ARCHIVE}"
                     --version "${PROJECT_VERSION}"
                 DEPENDS
+                    houio_cli
                     houio_convert
                     ${HOUIO_HOUDINI_PACKAGE_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/build_houdini_package.py"
@@ -194,9 +203,11 @@ install(
     FILES tools/houdini/install_hom_bridge.ps1
     DESTINATION ${CMAKE_INSTALL_DATADIR}/houio/houdini
 )
-if(TARGET houio_convert)
-    install(TARGETS houio_convert RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
+foreach(tool_target IN ITEMS houio_cli houio_convert)
+    if(TARGET ${tool_target})
+        install(TARGETS ${tool_target} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
+endforeach()
 
 configure_package_config_file(
     cmake/houio-config.cmake.in

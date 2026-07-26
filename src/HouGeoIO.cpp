@@ -1,6 +1,7 @@
 #include <houio/HouGeoIO.h>
 #include <houio/GeometryIO.h>
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <limits>
@@ -1004,8 +1005,34 @@ namespace houio
 		HouGeoAdapter::ConstPtr geometry,
 		bool binary)
 	{
+		std::vector<const HouGeoAdapter*> activeGeometries;
+		return exportGeometry(output, std::move(geometry), binary, activeGeometries);
+	}
+
+	bool HouGeoIO::exportGeometry(
+		std::ostream& output,
+		HouGeoAdapter::ConstPtr geometry,
+		bool binary,
+		std::vector<const HouGeoAdapter*> &activeGeometries)
+	{
 		if (!geometry || !output.good() || !binary)
 			return false;
+		if( std::find(activeGeometries.begin(), activeGeometries.end(), geometry.get())
+			!= activeGeometries.end() )
+		{
+			throw DiagnosticException(Diagnostic{
+				DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"HouGeoIO cannot export a cyclic packed-geometry payload graph",
+				-1,
+				"primitives.packed.embedded"});
+		}
+		activeGeometries.push_back(geometry.get());
+		struct ActiveGeometryGuard final
+		{
+			std::vector<const HouGeoAdapter*> &stack;
+			~ActiveGeometryGuard() { stack.pop_back(); }
+		} activeGeometryGuard{activeGeometries};
 
 		json::BinaryWriter writer(output);
 		ExportContext context(writer);
@@ -1062,6 +1089,7 @@ namespace houio
 
 		writer.jsonEndArray();
 
+		std::vector<std::pair<std::string, HouGeoAdapter::ConstPtr>> embeddedGeometryRecords;
 		if( primitiveCount > 0 )
 		{
 			writer.jsonString( "primitives" );
@@ -1089,6 +1117,26 @@ namespace houio
 					if( auto volume = std::dynamic_pointer_cast<const HouGeoAdapter::VolumePrimitive>(primitive) )
 					{
 						exportPrimitive(context, volume);
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
+					else if( auto packedGeometry = std::dynamic_pointer_cast<const HouGeoAdapter::PackedGeometryPrimitive>(primitive) )
+					{
+						if( !packedGeometry->embeddedGeometry() )
+							throw std::runtime_error( "HouGeoIO::exportGeometry packed geometry has no embedded payload" );
+						const std::string embeddedId = "embed:houio:"
+							+ std::to_string(embeddedGeometryRecords.size());
+						exportPrimitive(context, packedGeometry, embeddedId);
+						embeddedGeometryRecords.emplace_back(
+							embeddedId, packedGeometry->embeddedGeometry());
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
+					else if( auto nativeVdb = std::dynamic_pointer_cast<const HouGeoAdapter::NativeVdbPrimitive>(primitive) )
+					{
+						exportPrimitive(context, nativeVdb);
 						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
 							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
 						++topologyVertexOffset;
@@ -1177,6 +1225,33 @@ namespace houio
 				if (!membership || membership->size() != static_cast<size_t>(primitiveCount))
 					throw std::runtime_error("HouGeoIO::exportGeometry invalid primitive group " + name);
 				exportGroup(context, name, *membership);
+			}
+			writer.jsonEndArray();
+		}
+
+		if( !embeddedGeometryRecords.empty() )
+		{
+			writer.jsonString("sharedprimitivedata");
+			writer.jsonBeginArray();
+			for( const auto &[embeddedId, embeddedGeometry] : embeddedGeometryRecords )
+			{
+				std::ostringstream embeddedOutput(std::ios::out | std::ios::binary);
+				if( !HouGeoIO::exportGeometry(
+					embeddedOutput, embeddedGeometry, true, activeGeometries) )
+					throw std::runtime_error( "HouGeoIO failed to serialize embedded packed geometry" );
+				std::istringstream embeddedInput(
+					embeddedOutput.str(), std::ios::in | std::ios::binary);
+				json::JSONReader embeddedReader;
+				json::Parser embeddedParser;
+				if( !embeddedParser.parse(embeddedInput, embeddedReader) )
+					throw std::runtime_error( "HouGeoIO failed to parse serialized embedded geometry" );
+
+				writer.jsonString("PackedGeometry");
+				writer.jsonBeginArray();
+				writer.jsonString("gu:embeddedgeo");
+				writer.jsonString(embeddedId);
+				writeJsonValue(writer, embeddedReader.root());
+				writer.jsonEndArray();
 			}
 			writer.jsonEndArray();
 		}
@@ -1636,6 +1711,82 @@ namespace houio
 		writer.jsonString("tapery");
 		writer.jsonReal32(1.0f);
 
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		return true;
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::PackedGeometryPrimitive::ConstPtr packedGeometry,
+		const std::string &embeddedId )
+	{
+		if( !packedGeometry || !packedGeometry->embeddedGeometry()
+			|| packedGeometry->topologyVertex() < 0 || embeddedId.empty() )
+		{
+			return false;
+		}
+		json::BinaryWriter &writer = context.writer;
+		const math::V3f pivot = packedGeometry->pivot();
+		const math::M33f transform = packedGeometry->transform();
+
+		writer.jsonBeginArray();
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString("PackedGeometry");
+		writer.jsonEndArray();
+
+		writer.jsonBeginArray();
+		writer.jsonString("parameters");
+		writer.jsonBeginMap();
+		writer.jsonKey("embedded");
+		writer.jsonString(embeddedId);
+		writer.jsonKey("pointinstancetransform");
+		writer.jsonInt32(packedGeometry->pointInstanceTransform() ? 1 : 0);
+		writer.jsonKey("treatasfolder");
+		writer.jsonInt32(packedGeometry->treatAsFolder() ? 1 : 0);
+		writer.jsonEndMap();
+
+		writer.jsonString("pivot");
+		writer.jsonBeginArray();
+		writer.jsonReal32(pivot.x);
+		writer.jsonReal32(pivot.y);
+		writer.jsonReal32(pivot.z);
+		writer.jsonEndArray();
+
+		writer.jsonString("transform");
+		writer.jsonBeginArray();
+		for( const real32 value : transform.ma )
+			writer.jsonReal32(value);
+		writer.jsonEndArray();
+
+		writer.jsonString("vertex");
+		writer.jsonInt32(packedGeometry->topologyVertex());
+		writer.jsonString("viewportlod");
+		writer.jsonString(packedGeometry->viewportLod());
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		return true;
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::NativeVdbPrimitive::ConstPtr nativeVdb )
+	{
+		if( !nativeVdb || nativeVdb->topologyVertex() < 0
+			|| !nativeVdb->serializedPayload() )
+		{
+			return false;
+		}
+		json::BinaryWriter &writer = context.writer;
+		writer.jsonBeginArray();
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString("VDB");
+		writer.jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonString("vertex");
+		writer.jsonInt32(nativeVdb->topologyVertex());
+		writer.jsonString("vdb");
+		writeJsonValue(writer, json::Value::createArray(nativeVdb->serializedPayload()));
 		writer.jsonEndArray();
 		writer.jsonEndArray();
 		return true;

@@ -259,6 +259,84 @@ namespace houio
             friend class HouGeo;
         };
 
+        class HouPackedGeometry final : public PackedGeometryPrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouPackedGeometry>;
+            using ConstPtr = std::shared_ptr<const HouPackedGeometry>;
+
+            [[nodiscard]] HouGeoAdapter::ConstPtr embeddedGeometry() const override;
+            [[nodiscard]] int topologyVertex() const override;
+            [[nodiscard]] math::V3f pivot() const override;
+            [[nodiscard]] math::M33f transform() const override;
+            [[nodiscard]] std::string viewportLod() const override;
+            [[nodiscard]] bool pointInstanceTransform() const override;
+            [[nodiscard]] bool treatAsFolder() const override;
+
+            void setEmbeddedGeometry(HouGeoAdapter::Ptr geometry)
+            {
+                if (!geometry)
+                    throw std::invalid_argument("HouPackedGeometry embedded geometry cannot be null");
+                embedded_geometry_ = std::move(geometry);
+            }
+
+            void setTopologyVertex(int topology_vertex) noexcept
+            {
+                topology_vertex_ = topology_vertex;
+            }
+
+            void setPivot(const math::V3f& pivot) noexcept { pivot_ = pivot; }
+            void setTransform(const math::M33f& transform) noexcept { transform_ = transform; }
+            void setViewportLod(std::string viewport_lod)
+            {
+                viewport_lod_ = viewport_lod.empty() ? "full" : std::move(viewport_lod);
+            }
+            void setPointInstanceTransform(bool enabled) noexcept
+            {
+                point_instance_transform_ = enabled;
+            }
+            void setTreatAsFolder(bool enabled) noexcept { treat_as_folder_ = enabled; }
+
+        private:
+            HouGeoAdapter::Ptr embedded_geometry_;
+            int topology_vertex_ = -1;
+            math::V3f pivot_{0.0f};
+            math::M33f transform_ = math::M33f::identity();
+            std::string viewport_lod_ = "full";
+            bool point_instance_transform_ = false;
+            bool treat_as_folder_ = false;
+
+            friend class HouGeo;
+        };
+
+        class HouVdb final : public NativeVdbPrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouVdb>;
+            using ConstPtr = std::shared_ptr<const HouVdb>;
+
+            [[nodiscard]] int topologyVertex() const override;
+            [[nodiscard]] json::ArrayPtr serializedPayload() const override;
+
+            void setTopologyVertex(int topology_vertex) noexcept
+            {
+                topology_vertex_ = topology_vertex;
+            }
+
+            void setSerializedPayload(json::ArrayPtr payload)
+            {
+                if (!payload)
+                    throw std::invalid_argument("HouVdb serialized payload cannot be null");
+                serialized_payload_ = std::move(payload);
+            }
+
+        private:
+            int topology_vertex_ = -1;
+            json::ArrayPtr serialized_payload_;
+
+            friend class HouGeo;
+        };
+
         class HouPoly final : public PolyPrimitive
         {
         public:
@@ -317,11 +395,16 @@ namespace houio
         [[nodiscard]] static Ptr create();
 
         void setPointAttribute(HouAttribute::Ptr attribute);
+        void setVertexAttribute(HouAttribute::Ptr attribute);
         void setPrimitiveAttribute(const std::string& name, HouAttribute::Ptr attribute);
+        void setGlobalAttribute(HouAttribute::Ptr attribute);
         void setPointGroup(const std::string& name, const std::vector<bool>& membership);
         void setVertexGroup(const std::string& name, const std::vector<bool>& membership);
         void setPrimitiveGroup(const std::string& name, const std::vector<bool>& membership);
         void addPrimitive(ScalarField::Ptr field);
+        void addPrimitive(VolumePrimitive::Ptr volume);
+        void addPrimitive(PackedGeometryPrimitive::Ptr packed_geometry);
+        void addPrimitive(NativeVdbPrimitive::Ptr native_vdb);
         void addPrimitive(PolyPrimitive::Ptr polygon);
         void setTopology(HouTopology::Ptr topology);
 
@@ -363,6 +446,7 @@ namespace houio
         struct SharedPrimitiveData
         {
             std::map<std::string, json::ObjectPtr> sharedVoxelData;
+            std::map<std::string, HouGeo::Ptr> sharedEmbeddedGeometry;
         };
 
         void load(json::ObjectPtr root_object);
@@ -379,6 +463,10 @@ namespace houio
         void loadVolumePrimitive(
             json::ObjectPtr volume,
             SharedPrimitiveData& shared_primitive_data);
+        void loadPackedGeometryPrimitive(
+            json::ObjectPtr packed_geometry,
+            SharedPrimitiveData& shared_primitive_data);
+        void loadNativeVdbPrimitive(json::ObjectPtr native_vdb);
         void loadPolyPrimitive(json::ObjectPtr polygon_object);
         void loadPolyPrimitiveRun(
             json::ObjectPtr definition,

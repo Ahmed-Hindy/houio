@@ -11,6 +11,9 @@
       "HOUIO_VERSION": "@HOUIO_VERSION@"
     },
     {
+      "HOUIO_EXECUTABLE": "$HOUDINI_PACKAGE_PATH/houio/bin/houio.exe"
+    },
+    {
       "HOUIO_CONVERT_EXECUTABLE": "$HOUDINI_PACKAGE_PATH/houio/bin/houio_convert.exe"
     },
     {

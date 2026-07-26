@@ -52,6 +52,9 @@ namespace houio
         bool scfShuffle = true;
         std::string scfCompressor = "blosclz";
         std::string bloscLibraryPath;
+        bool createParentDirectories = true;
+        bool overwriteExisting = true;
+        bool atomicReplace = true;
     };
 
     /// Owned value and diagnostics returned by a path-based read.

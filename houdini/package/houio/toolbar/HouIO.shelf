@@ -2,6 +2,7 @@
 <shelfDocument>
   <toolshelf name="houio" label="HouIO">
     <memberTool name="houio_roundtrip_sop"/>
+    <memberTool name="houio_write_selected_geometry"/>
     <memberTool name="houio_convert_geometry_file"/>
     <memberTool name="houio_package_diagnostics"/>
     <readOnly/>
@@ -18,6 +19,21 @@
     <script scriptType="python"><![CDATA[from houio_tools import create_roundtrip_from_tool
 
 create_roundtrip_from_tool(kwargs)
+]]></script>
+    <readOnly/>
+  </tool>
+
+  <tool name="houio_write_selected_geometry" label="Write Selected Geometry" icon="BUTTONS_save">
+    <toolMenuContext name="network">
+      <contextNetType>SOP</contextNetType>
+    </toolMenuContext>
+    <toolMenuContext name="viewer">
+      <contextNetType>SOP</contextNetType>
+    </toolMenuContext>
+    <toolSubmenu>HouIO</toolSubmenu>
+    <script scriptType="python"><![CDATA[from houio_tools import write_selected_geometry
+
+write_selected_geometry()
 ]]></script>
     <readOnly/>
   </tool>

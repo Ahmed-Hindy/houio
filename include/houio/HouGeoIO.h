@@ -112,6 +112,11 @@ namespace houio
             GeometryConversionReport* report);
         [[nodiscard]] static HouGeo::Ptr adaptVolume(ScalarField::Ptr volume);
         [[nodiscard]] static HouGeo::Ptr adaptGeometry(Geometry::Ptr geometry);
+        [[nodiscard]] static bool exportGeometry(
+            std::ostream& output,
+            HouGeoAdapter::ConstPtr geometry,
+            bool binary,
+            std::vector<const HouGeoAdapter*>& active_geometries);
 
         struct ExportContext
         {
@@ -132,6 +137,13 @@ namespace houio
         static bool exportPrimitive(
             ExportContext& context,
             HouGeoAdapter::VolumePrimitive::ConstPtr volume);
+        static bool exportPrimitive(
+            ExportContext& context,
+            HouGeoAdapter::PackedGeometryPrimitive::ConstPtr packed_geometry,
+            const std::string& embedded_id);
+        static bool exportPrimitive(
+            ExportContext& context,
+            HouGeoAdapter::NativeVdbPrimitive::ConstPtr native_vdb);
         static bool exportPrimitive(
             ExportContext& context,
             HouGeoAdapter::PolyPrimitive::ConstPtr polygon_run,

@@ -4,13 +4,19 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cctype>
+#include <chrono>
 #include <fstream>
 #include <limits>
 #include <sstream>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 #include <houio/HouGeoIO.h>
 
@@ -146,25 +152,89 @@ namespace houio
             return true;
         }
 
-        bool writeFileBytes(const std::filesystem::path &path, std::span<const char> bytes,
+        std::filesystem::path temporaryOutputPath(const std::filesystem::path &path)
+        {
+            static std::atomic<unsigned long long> sequence{0};
+            const unsigned long long timestamp = static_cast<unsigned long long>(
+                std::chrono::steady_clock::now().time_since_epoch().count());
+            std::filesystem::path temporary = path;
+            temporary += ".houio.tmp." + std::to_string(timestamp) + "."
+                + std::to_string(sequence.fetch_add(1, std::memory_order_relaxed));
+            return temporary;
+        }
+
+        bool replaceOutputFile(const std::filesystem::path &temporary,
+            const std::filesystem::path &destination, bool overwriteExisting,
             DiagnosticList &diagnostics)
         {
-            std::error_code directoryError;
-            const std::filesystem::path parent = path.parent_path();
-            if( !parent.empty() )
-                std::filesystem::create_directories(parent, directoryError);
-            if( directoryError )
+#if defined(_WIN32)
+            DWORD flags = MOVEFILE_WRITE_THROUGH;
+            if( overwriteExisting )
+                flags |= MOVEFILE_REPLACE_EXISTING;
+            if( MoveFileExW(temporary.c_str(), destination.c_str(), flags) != 0 )
+                return true;
+            const DWORD errorCode = GetLastError();
+            appendResultError(diagnostics, DiagnosticCategory::io,
+                "Could not replace geometry output file: " + destination.string()
+                    + " (Windows error " + std::to_string(errorCode) + ")");
+#else
+            if( !overwriteExisting && std::filesystem::exists(destination) )
             {
                 appendResultError(diagnostics, DiagnosticCategory::io,
-                    "Could not create output directory: " + parent.string());
+                    "Geometry output file already exists: " + destination.string());
+                return false;
+            }
+            std::error_code renameError;
+            std::filesystem::rename(temporary, destination, renameError);
+            if( !renameError )
+                return true;
+            appendResultError(diagnostics, DiagnosticCategory::io,
+                "Could not replace geometry output file: " + destination.string()
+                    + " (" + renameError.message() + ")");
+#endif
+            return false;
+        }
+
+        bool writeFileBytes(const std::filesystem::path &path, std::span<const char> bytes,
+            const GeometryWriteOptions &options, DiagnosticList &diagnostics)
+        {
+            const std::filesystem::path parent = path.parent_path();
+            if( !parent.empty() )
+            {
+                if( options.createParentDirectories )
+                {
+                    std::error_code directoryError;
+                    std::filesystem::create_directories(parent, directoryError);
+                    if( directoryError )
+                    {
+                        appendResultError(diagnostics, DiagnosticCategory::io,
+                            "Could not create output directory: " + parent.string());
+                        return false;
+                    }
+                }
+                else if( !std::filesystem::is_directory(parent) )
+                {
+                    appendResultError(diagnostics, DiagnosticCategory::io,
+                        "Geometry output directory does not exist: " + parent.string());
+                    return false;
+                }
+            }
+
+            if( !options.overwriteExisting && std::filesystem::exists(path) )
+            {
+                appendResultError(diagnostics, DiagnosticCategory::io,
+                    "Geometry output file already exists: " + path.string());
                 return false;
             }
 
-            std::ofstream output(path, std::ios::binary | std::ios::trunc);
+            const std::filesystem::path outputPath = options.atomicReplace
+                ? temporaryOutputPath(path)
+                : path;
+            std::ofstream output(outputPath, std::ios::binary | std::ios::trunc);
             if( !output )
             {
                 appendResultError(diagnostics, DiagnosticCategory::io,
-                    "Could not open geometry output file: " + path.string());
+                    "Could not open geometry output file: " + outputPath.string());
                 return false;
             }
             if( !bytes.empty() )
@@ -173,12 +243,19 @@ namespace houio
             if( !output )
             {
                 std::error_code removeError;
-                std::filesystem::remove(path, removeError);
+                std::filesystem::remove(outputPath, removeError);
                 appendResultError(diagnostics, DiagnosticCategory::io,
-                    "Could not write complete geometry output file: " + path.string());
+                    "Could not write complete geometry output file: " + outputPath.string());
                 return false;
             }
-            return true;
+
+            if( !options.atomicReplace )
+                return true;
+            if( replaceOutputFile(outputPath, path, options.overwriteExisting, diagnostics) )
+                return true;
+            std::error_code removeError;
+            std::filesystem::remove(outputPath, removeError);
+            return false;
         }
 
         GeometryFileFormat resolveReadFormat(const std::filesystem::path &path,
@@ -418,7 +495,7 @@ namespace houio
                     return result;
                 outputBytes = std::span<const char>(scfBytes.data(), scfBytes.size());
             }
-            result.succeeded = writeFileBytes(path, outputBytes, result.diagnostics);
+            result.succeeded = writeFileBytes(path, outputBytes, options, result.diagnostics);
         }
         catch( const DiagnosticException &exception )
         {
