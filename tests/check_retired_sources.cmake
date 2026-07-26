@@ -47,6 +47,29 @@ foreach(file_path IN LISTS active_sources)
         continue()
     endif()
     file(READ "${file_path}" file_content)
+    string(REGEX MATCH "(^|[^A-Za-z0-9_])typedef([^A-Za-z0-9_]|$)" legacy_typedef "${file_content}")
+    string(REGEX MATCH "(^|[^A-Za-z0-9_])NULL([^A-Za-z0-9_]|$)" legacy_null "${file_content}")
+    if(legacy_typedef)
+        message(FATAL_ERROR "Active source reintroduced typedef: ${file_path}")
+    endif()
+    if(legacy_null)
+        message(FATAL_ERROR "Active source reintroduced NULL: ${file_path}")
+    endif()
+
+    file(STRINGS "${file_path}" source_lines)
+    foreach(source_line IN LISTS source_lines)
+        string(REGEX REPLACE "//.*$" "" code_line "${source_line}")
+        if(code_line MATCHES "(^|[=({,:;])[ \t]*new[ \t]+[A-Za-z_:]")
+            message(FATAL_ERROR "Active source reintroduced raw new allocation: ${file_path}: ${source_line}")
+        endif()
+        if(code_line MATCHES "(^|[;{})])[ \t]*delete[ \t]*(\\[\\])?[ \t]+")
+            message(FATAL_ERROR "Active source reintroduced raw delete: ${file_path}: ${source_line}")
+        endif()
+        if(code_line MATCHES "(^|[^A-Za-z0-9_])(malloc|calloc|realloc|free)[ \t]*\\(")
+            message(FATAL_ERROR "Active source reintroduced C heap ownership: ${file_path}: ${source_line}")
+        endif()
+    endforeach()
+
     string(FIND "${file_content}" "<ttl/" ttl_reference)
     string(FIND "${file_content}" "<houio/math/Half/" half_reference)
     if(NOT ttl_reference EQUAL -1)
@@ -55,10 +78,49 @@ foreach(file_path IN LISTS active_sources)
     if(NOT half_reference EQUAL -1)
         message(FATAL_ERROR "Active source references retired half code: ${file_path}")
     endif()
+
+    foreach(opengl_pattern IN ITEMS
+        "#include <GL/"
+        "#include <OpenGL/"
+        "GLuint"
+        "GL_ARRAY_BUFFER"
+        "glGenBuffers("
+        "glDeleteBuffers("
+        "glBindBuffer("
+    )
+        string(FIND "${file_content}" "${opengl_pattern}" opengl_reference)
+        if(NOT opengl_reference EQUAL -1)
+            message(FATAL_ERROR "Core source reintroduced OpenGL-specific buffer state ${opengl_pattern}: ${file_path}")
+        endif()
+    endforeach()
+endforeach()
+
+file(GLOB_RECURSE public_headers LIST_DIRECTORIES FALSE
+    "${HOUIO_SOURCE_DIR}/include/houio/*.h"
+    "${HOUIO_SOURCE_DIR}/include/houio/*.hpp"
+)
+foreach(header_path IN LISTS public_headers)
+    if(header_path MATCHES "/math/Half/")
+        continue()
+    endif()
+    file(STRINGS "${header_path}" enum_lines REGEX "^[ \t]*enum[ \t]+")
+    foreach(enum_line IN LISTS enum_lines)
+        if(NOT enum_line MATCHES "^[ \t]*enum[ \t]+(class|struct)[ \t]+")
+            message(FATAL_ERROR "Public header reintroduced an unscoped enum: ${header_path}: ${enum_line}")
+        endif()
+    endforeach()
 endforeach()
 
 file(READ "${HOUIO_SOURCE_DIR}/include/houio/Field.h" field_header)
-foreach(retired_name IN ITEMS "sample(" "lvalue(" "getResolution(" "getVoxelSize(")
+foreach(retired_name IN ITEMS
+    "sample("
+    "lvalue("
+    "getResolution("
+    "getVoxelSize("
+    "static Ptr load("
+    "void store("
+    "void storeWithoutBoundingBox("
+)
     string(FIND "${field_header}" "${retired_name}" retired_position)
     if(NOT retired_position EQUAL -1)
         message(FATAL_ERROR "Field public API reintroduced retired name ${retired_name}")
@@ -320,6 +382,14 @@ foreach(retired_pattern IN ITEMS
     string(FIND "${rng_header}" "${retired_pattern}" retired_position)
     if(NOT retired_position EQUAL -1)
         message(FATAL_ERROR "Random API reintroduced retired pattern ${retired_pattern}")
+    endif()
+endforeach()
+
+file(READ "${HOUIO_SOURCE_DIR}/include/houio/json.h" json_header)
+foreach(unscoped_pattern IN ITEMS "enum Type" "enum State")
+    string(FIND "${json_header}" "${unscoped_pattern}" unscoped_position)
+    if(NOT unscoped_position EQUAL -1)
+        message(FATAL_ERROR "JSON API reintroduced unscoped enum ${unscoped_pattern}")
     endif()
 endforeach()
 

@@ -1,3 +1,4 @@
+#include <houio/FieldIO.h>
 #include <houio/HouGeoIO.h>
 
 #include "TestSupport.h"
@@ -336,6 +337,78 @@ int verifyMalformedVolumes()
         return result;
     }
 
+    const std::string extraTile =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
+          "[[\"compression\", 2, \"data\", 1.0], [\"compression\", 2, \"data\", 2.0]]]]";
+    if (const int result = expectFailure(makeVolumeDocument(extraTile), houio::DiagnosticCategory::schema,
+            "primitives[0].data.voxels", "extra volume tile"); result != 0)
+    {
+        return result;
+    }
+
+    const std::string nonObjectTile =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", [1.0]]]";
+    if (const int result = expectFailure(makeVolumeDocument(nonObjectTile), houio::DiagnosticCategory::schema,
+            "primitives[0].data.voxels.tiledarray.tiles[0]", "non-object volume tile"); result != 0)
+    {
+        return result;
+    }
+
+    const std::string missingTileData =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
+          "[[\"compression\", 2]]]]";
+    if (const int result = expectFailure(makeVolumeDocument(missingTileData), houio::DiagnosticCategory::schema,
+            "primitives[0].data.voxels.tiledarray.tiles[0]", "volume tile without data"); result != 0)
+    {
+        return result;
+    }
+
+    const std::string scalarRawTile =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
+          "[[\"compression\", 0, \"data\", 1.0]]]]";
+    if (const int result = expectFailure(makeVolumeDocument(scalarRawTile), houio::DiagnosticCategory::schema,
+            "primitives[0].data.voxels.tiledarray.tiles[0]", "scalar raw volume tile"); result != 0)
+    {
+        return result;
+    }
+
+    const std::string arrayConstantTile =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
+          "[[\"compression\", 2, \"data\", [1.0]]]]]";
+    if (const int result = expectFailure(makeVolumeDocument(arrayConstantTile), houio::DiagnosticCategory::schema,
+            "primitives[0].data.voxels.tiledarray.tiles[0]", "array constant volume tile"); result != 0)
+    {
+        return result;
+    }
+
+    const std::string invalidCompressionType =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
+          "[[\"compression\", \"two\", \"data\", 1.0]]]]";
+    if (const int result = expectFailure(makeVolumeDocument(invalidCompressionType),
+            houio::DiagnosticCategory::malformed_input, "primitives[0].data.voxels.tiledarray.tiles[0]",
+            "non-integer volume compression"); result != 0)
+    {
+        return result;
+    }
+
+    const int maximum = std::numeric_limits<int>::max();
+    const std::string oversizedTileGrid =
+        "\"vertex\", 0, \"transform\", " + identityTransform()
+        + ", \"res\", [" + std::to_string(maximum) + ", " + std::to_string(maximum)
+        + ", 1], \"voxels\", [\"tiledarray\", [\"tiles\", []]]";
+    if (const int result = expectFailure(makeVolumeDocument(oversizedTileGrid),
+            houio::DiagnosticCategory::schema, "primitives[0].data.voxels",
+            "oversized volume tile grid"); result != 0)
+    {
+        return result;
+    }
+
     const std::string unsupportedCompression =
         "\"vertex\", 0, \"transform\", " + identityTransform()
         + ", \"res\", [1, 1, 1], \"voxels\", [\"tiledarray\", [\"tiles\", "
@@ -349,6 +422,9 @@ int verifyFieldStorage()
 {
     const std::filesystem::path storagePath = std::filesystem::temp_directory_path() / "houio_field_storage.bin";
     const std::filesystem::path truncatedPath = std::filesystem::temp_directory_path() / "houio_field_truncated.bin";
+    const std::filesystem::path compactPath = std::filesystem::temp_directory_path() / "houio_field_compact.bin";
+    const std::filesystem::path missingPayloadPath =
+        std::filesystem::temp_directory_path() / "houio_field_missing_payload.bin";
 
     houio::ScalarField source;
     source.resize(2, 2, 1);
@@ -356,9 +432,12 @@ int verifyFieldStorage()
     source.voxel(1, 0, 0) = 2.0f;
     source.voxel(0, 1, 0) = 3.0f;
     source.voxel(1, 1, 0) = 4.0f;
-    source.store(storagePath.string());
+    if (!houio::storeField(source, storagePath.string()))
+    {
+        return fail("field storage write failed");
+    }
 
-    houio::ScalarField::Ptr loaded = houio::ScalarField::load(storagePath.string());
+    houio::ScalarField::Ptr loaded = houio::loadField<float>(storagePath.string());
     std::filesystem::remove(storagePath);
     if (!loaded || std::abs(loaded->voxel(1, 1, 0) - 4.0f) > 1.0e-6f)
     {
@@ -369,16 +448,63 @@ int verifyFieldStorage()
         std::ofstream truncatedOutput(truncatedPath, std::ios::binary | std::ios::trunc);
         truncatedOutput.write("bad", 3);
     }
-    loaded = houio::ScalarField::load(truncatedPath.string());
+    loaded = houio::loadField<float>(truncatedPath.string());
     std::filesystem::remove(truncatedPath);
     if (loaded)
     {
         return fail("truncated field storage was accepted");
     }
 
+    {
+        std::ofstream missingPayloadOutput(missingPayloadPath, std::ios::binary | std::ios::trunc);
+        const auto writeValue = [&missingPayloadOutput](const auto& value)
+        {
+            missingPayloadOutput.write(
+                reinterpret_cast<const char*>(&value),
+                static_cast<std::streamsize>(sizeof(value)));
+        };
+        const int resolutionX = 50000;
+        const int resolutionY = 50000;
+        const int resolutionZ = 1;
+        const float minimum = 0.0f;
+        const float maximum = 1.0f;
+        const int dataType = 1;
+        writeValue(resolutionX);
+        writeValue(resolutionY);
+        writeValue(resolutionZ);
+        writeValue(minimum);
+        writeValue(minimum);
+        writeValue(minimum);
+        writeValue(maximum);
+        writeValue(maximum);
+        writeValue(maximum);
+        writeValue(dataType);
+    }
+    loaded = houio::loadField<float>(missingPayloadPath.string());
+    std::filesystem::remove(missingPayloadPath);
+    if (loaded)
+    {
+        return fail("field storage allocated before validating its payload size");
+    }
+
+    if (!houio::storeFieldWithoutBoundingBox(source, compactPath.string()))
+    {
+        return fail("compact field storage write failed");
+    }
+    const std::uintmax_t compactSize = std::filesystem::file_size(compactPath);
+    std::filesystem::remove(compactPath);
+    const std::uintmax_t expectedCompactSize = sizeof(int) * 4u + sizeof(float) * 4u;
+    if (compactSize != expectedCompactSize)
+    {
+        return fail("compact field storage layout changed");
+    }
+
     houio::ScalarField empty;
     empty.resize(0, 2, 2);
-    empty.store(storagePath.string());
+    if (!houio::storeField(empty, storagePath.string()))
+    {
+        return fail("empty field storage write failed");
+    }
     std::filesystem::remove(storagePath);
     if (const int result = expectThrows<std::invalid_argument>(
             [&empty] { static_cast<void>(houio::field_maximum(empty)); },

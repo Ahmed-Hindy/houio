@@ -356,10 +356,9 @@ namespace houio
             json::ArrayPtr groups,
             sint64 element_count,
             std::map<std::string, std::vector<bool>>& destination);
-        void loadVoxelData(
+        [[nodiscard]] std::vector<float> loadVoxelData(
             json::ObjectPtr voxel_object,
-            const math::V3i& resolution,
-            std::span<float> voxel_data);
+            const math::V3i& resolution);
 
         std::vector<Primitive::Ptr> m_primitives;
         std::map<std::string, HouAttribute::Ptr> m_pointAttributes;

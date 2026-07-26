@@ -4,14 +4,14 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `refactor/strong-attribute-metadata`
-- Baseline commit: `56e6541`.
+- Branch: `refactor/separate-field-io`
+- Baseline commit: `b13bdbd` (`master` after Phase 10).
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
-- Branch CI validation is pending until the branch is pushed.
-- Dense-field sampling and CI/static-analysis maintenance are merged into `master`.
+- Stacked PRs #25–#27 contain the assertion harness, scoped JSON enums, and tile-validation phases.
+- CI validation for the active field-I/O separation branch is pending until it is pushed.
 
 ## Modernization completed
 
@@ -38,6 +38,11 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add exact scalar/vector field sampling, boundary, interpolation, and transform coverage.
 - [x] Reject non-finite field sampling coordinates before floor/integer conversion.
 - [x] Introduce validated tuple-size metadata and canonical attribute type/storage metadata helpers.
+- [x] Add a dependency-free shared test assertion harness and retire duplicated failure helpers.
+- [x] Convert the remaining public JSON token and parser-state enums to scoped enums.
+- [x] Validate complete tiled-volume metadata before allocating destination field storage.
+- [x] Audit active ownership: no raw heap allocation/deallocation remains; the platform library handle is enclosed by `BloscLibrary` RAII.
+- [x] Move custom field persistence out of the `Field<T>` container into a dedicated nonmember I/O API.
 
 ## Modernization next
 
@@ -87,7 +92,7 @@ Priority levels:
 - [x] Unit-test string definition and reference handling.
 - [x] Unit-test every supported uniform numeric array type.
 - [x] Unit-test direct polygon and polygon-run loading independently.
-- [ ] Introduce a small assertion harness or lightweight maintained C++ test framework.
+- [x] Introduce a small dependency-free assertion harness shared by the unit tests.
 - [x] Keep all tests runnable through CTest and directly from IDEs.
 
 ### Compiler quality
@@ -101,7 +106,7 @@ Priority levels:
 ### Public API
 
 - [x] Add const-correct accessors across geometry, field, and adapter types.
-- [ ] Replace remaining raw owning pointers with RAII types.
+- [x] Complete the ownership audit: active heap ownership uses standard RAII, and the dynamic-library handle is enclosed by `BloscLibrary`.
 - [x] Replace unsafe typed attribute access with validated views or `memcpy`-based operations.
 - [x] Resolve alignment and strict-aliasing risks in typed `get()` and `set()` methods.
 - [x] Add immutable attribute views for adapter export.
@@ -141,7 +146,7 @@ Add fixture-backed support one record type at a time:
 
 ### Volumes and compression
 
-- [ ] Validate all tile metadata before allocation and indexing.
+- [x] Validate all tile metadata before allocation and indexing.
 - [ ] Add vector-field support where represented by multiple volumes or tuple data.
 - [ ] Support additional observed compression types.
 - [ ] Investigate additional outer wrappers only when representative fixtures are available.
@@ -151,22 +156,22 @@ Add fixture-backed support one record type at a time:
 
 ### Geometry
 
-- [ ] Remove OpenGL-specific buffer identifiers from the file-format library or isolate them in an optional module.
+- [x] Verify the file-format library contains no OpenGL-specific buffer identifiers and guard against their reintroduction.
 - [ ] Hide mutable implementation details where practical.
 - [ ] Make lossless and simplified geometry responsibilities explicit in type names and APIs.
 
 ### Field
 
-- [ ] Separate file I/O concerns from the field container.
+- [x] Separate custom binary persistence from the field container through `FieldIO.h`.
 - [ ] Audit coordinate conventions and transform composition.
 - [x] Add const sampling APIs.
 - [ ] Define whether the custom field format remains public.
 
 ### Modern C++
 
-- [ ] Replace typedef-style aliases with `using` declarations.
-- [ ] Use `nullptr` consistently.
-- [ ] Use scoped enums where source compatibility permits.
+- [x] Replace typedef-style aliases with `using` declarations.
+- [x] Use `nullptr` consistently.
+- [x] Use scoped enums in public headers where source compatibility permits.
 - [ ] Add `override`, `final`, and `noexcept` where correct.
 - [ ] Apply const-correctness consistently.
 - [ ] Use `std::span` or equivalent views for non-owning ranges.

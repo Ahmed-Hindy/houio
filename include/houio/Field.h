@@ -9,33 +9,12 @@
 #include <span>
 #include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <vector>
 
 #include <houio/math/Math.h>
 
 namespace houio
 {
-    namespace detail
-    {
-        template<typename Value>
-        bool readBinaryValue(std::istream& input, Value& value)
-        {
-            static_assert(std::is_trivially_copyable_v<Value>);
-            input.read(reinterpret_cast<char*>(&value), static_cast<std::streamsize>(sizeof(Value)));
-            return input.good();
-        }
-
-        template<typename Value>
-        void writeBinaryValue(std::ostream& output, const Value& value)
-        {
-            static_assert(std::is_trivially_copyable_v<Value>);
-            output.write(
-                reinterpret_cast<const char*>(&value),
-                static_cast<std::streamsize>(sizeof(Value)));
-        }
-    }
-
     template<typename T>
     class Field
     {
@@ -53,7 +32,6 @@ namespace houio
             T initial_value = T());
         template<typename Source>
         [[nodiscard]] static Ptr create(const typename Field<Source>::Ptr& source);
-        [[nodiscard]] static Ptr load(const std::string& filename);
 
         Field();
 
@@ -85,8 +63,6 @@ namespace houio
         void fill(const T& value);
         void fill(const T& value, const math::Box3f& world_bound);
         void multiply(const T& value);
-        void store(const std::string& filename) const;
-        void storeWithoutBoundingBox(const std::string& filename) const;
 
     private:
         [[nodiscard]] std::size_t linearIndex(int x, int y, int z) const;
@@ -100,8 +76,6 @@ namespace houio
         math::V3i resolution_ = math::V3i(1);
         math::Box3f bound_;
         std::vector<T> data_;
-
-        static const int data_type_;
     };
 
     template<typename T>
@@ -152,115 +126,6 @@ namespace houio
     {
         resize(math::V3i(1));
         setLocalToWorld(math::M44f::identity());
-    }
-
-    template<typename T>
-    typename Field<T>::Ptr Field<T>::load(const std::string& filename)
-    {
-        std::ifstream input(filename, std::ios::binary);
-        if (!input)
-            return nullptr;
-
-        int resolution_x = 0;
-        int resolution_y = 0;
-        int resolution_z = 0;
-        float minimum_x = 0.0f;
-        float minimum_y = 0.0f;
-        float minimum_z = 0.0f;
-        float maximum_x = 0.0f;
-        float maximum_y = 0.0f;
-        float maximum_z = 0.0f;
-        int stored_data_type = 0;
-
-        if (!detail::readBinaryValue(input, resolution_x)
-            || !detail::readBinaryValue(input, resolution_y)
-            || !detail::readBinaryValue(input, resolution_z)
-            || !detail::readBinaryValue(input, minimum_x)
-            || !detail::readBinaryValue(input, minimum_y)
-            || !detail::readBinaryValue(input, minimum_z)
-            || !detail::readBinaryValue(input, maximum_x)
-            || !detail::readBinaryValue(input, maximum_y)
-            || !detail::readBinaryValue(input, maximum_z)
-            || !detail::readBinaryValue(input, stored_data_type)
-            || stored_data_type != data_type_)
-        {
-            return nullptr;
-        }
-
-        auto field = std::make_shared<Field<T>>();
-        try
-        {
-            field->resize(math::V3i(resolution_x, resolution_y, resolution_z));
-        }
-        catch (const std::exception&)
-        {
-            return nullptr;
-        }
-
-        const std::size_t byte_count = field->data_.size() * sizeof(T);
-        if (byte_count > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
-            return nullptr;
-        if (byte_count > 0)
-        {
-            input.read(
-                reinterpret_cast<char*>(field->data_.data()),
-                static_cast<std::streamsize>(byte_count));
-            if (input.gcount() != static_cast<std::streamsize>(byte_count))
-                return nullptr;
-        }
-
-        field->setBound(math::Box3f(
-            math::V3f(minimum_x, minimum_y, minimum_z),
-            math::V3f(maximum_x, maximum_y, maximum_z)));
-        return field;
-    }
-
-    template<typename T>
-    void Field<T>::store(const std::string& filename) const
-    {
-        std::ofstream output(filename, std::ios::binary | std::ios::trunc);
-        if (!output)
-            return;
-
-        detail::writeBinaryValue(output, resolution_.x);
-        detail::writeBinaryValue(output, resolution_.y);
-        detail::writeBinaryValue(output, resolution_.z);
-        detail::writeBinaryValue(output, bound_.minPoint.x);
-        detail::writeBinaryValue(output, bound_.minPoint.y);
-        detail::writeBinaryValue(output, bound_.minPoint.z);
-        detail::writeBinaryValue(output, bound_.maxPoint.x);
-        detail::writeBinaryValue(output, bound_.maxPoint.y);
-        detail::writeBinaryValue(output, bound_.maxPoint.z);
-        detail::writeBinaryValue(output, data_type_);
-
-        const std::size_t byte_count = data_.size() * sizeof(T);
-        if (byte_count > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
-            throw std::length_error("Field storage exceeds streamsize range");
-        if (byte_count > 0)
-            output.write(
-                reinterpret_cast<const char*>(data_.data()),
-                static_cast<std::streamsize>(byte_count));
-    }
-
-    template<typename T>
-    void Field<T>::storeWithoutBoundingBox(const std::string& filename) const
-    {
-        std::ofstream output(filename, std::ios::binary | std::ios::trunc);
-        if (!output)
-            return;
-
-        detail::writeBinaryValue(output, resolution_.x);
-        detail::writeBinaryValue(output, resolution_.y);
-        detail::writeBinaryValue(output, resolution_.z);
-        detail::writeBinaryValue(output, data_type_);
-
-        const std::size_t byte_count = data_.size() * sizeof(T);
-        if (byte_count > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max()))
-            throw std::length_error("Field storage exceeds streamsize range");
-        if (byte_count > 0)
-            output.write(
-                reinterpret_cast<const char*>(data_.data()),
-                static_cast<std::streamsize>(byte_count));
     }
 
     template<typename T>
