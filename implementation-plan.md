@@ -942,9 +942,86 @@ Exit criteria:
 - The benchmark preset builds and runs both timing baselines and the memory probe.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
+### Phase 32 — Primary write interface
+
+**Status: planned.**
+
+Goals:
+
+- Make custom writing the obvious public workflow.
+- Introduce one stable write request/options/result surface for Houdini-oriented geometry, simplified meshes, and dense volumes.
+- Centralize output format, SCF compression, overwrite, path creation, diagnostics, and capability checks.
+- Preserve lower-level `GeometryIO`, `HouGeoIO`, and adapter APIs for advanced callers.
+- Add focused C++ and HOM examples that write data without using Houdini's geometry writers.
+
+Exit criteria:
+
+- A new user can identify the correct writer API from the first README example.
+- Every supported data model uses the same result and diagnostics conventions.
+- Existing public writer entry points remain source-compatible.
+- Strict, sanitizer, analysis, package, and Houdini compatibility matrices pass.
+
+### Phase 33 — CLI and developer tooling
+
+**Status: planned.**
+
+Goals:
+
+- Replace the minimal positional converter with a subcommand-based CLI.
+- Add `write`, `convert`, `inspect`, `validate`, and `capabilities` commands.
+- Add stable JSON output, documented exit codes, and actionable diagnostics.
+- Add one discoverable developer command for build, test, fixtures, package, and compatibility workflows.
+- Keep commands scriptable and free of interactive requirements by default.
+
+Exit criteria:
+
+- Human-readable and machine-readable output are both maintained contracts.
+- CLI help exposes supported formats, records, compression, and limitations.
+- The old two-path converter behavior remains available through compatibility syntax or a documented migration.
+
+### Phase 34 — Installation and Houdini user experience
+
+**Status: planned.**
+
+Goals:
+
+- Provide one-command package build, install, update, uninstall, and isolated launch operations.
+- Make package diagnostics report exact paths, versions, dependencies, and repair actions.
+- Expose a small HOM-facing API that extracts cooked geometry and sends it through the custom HouIO writer.
+- Add shelf/Python UI actions for writing, inspection, diagnostics, and capability reporting.
+- Put the first successful write workflow before internal architecture in user documentation.
+
+Exit criteria:
+
+- A user can install the package and write a supported SOP geometry file without locating binaries manually.
+- The package never silently falls back to Houdini's native geometry writer.
+- Failures identify the missing executable, dependency, path, format, or unsupported record directly.
+
+### Phase 35 — Packed primitive family
+
+**Status: planned after Phases 32–34.**
+
+Goals:
+
+- Add fixture-backed packed geometry support first.
+- Extend the same primitive-family abstraction to packed fragments and packed disk primitives.
+- Preserve transforms, intrinsic metadata, source references, attributes, and groups where represented by the format.
+- Reject unsupported packed payload variants with structured diagnostics rather than flattening silently.
+
+### Phase 36 — Native sparse OpenVDB primitives
+
+**Status: planned after the packed primitive family.**
+
+Goals:
+
+- Model native sparse OpenVDB primitive records without forced dense conversion.
+- Preserve grid class, value type, transform, name, metadata, active topology, and sparse payload.
+- Keep OpenVDB integration optional at build and package time.
+- Define clear behavior when OpenVDB support is unavailable.
+
 ## Deferred work
 
-The following remain separate from this modernization branch unless required by a discovered defect:
+The following remain separate from the active product-facing phases unless required by a discovered defect:
 
 - New primitive-record support.
 - Lossless point/vertex-domain redesign.

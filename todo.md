@@ -4,14 +4,12 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `refactor/modernization-phases-17-20`
-- Baseline commit: `e00d4b6` (complete Phases 11–16 stack; integration PR #31 targets `master`).
+- Branch: `feat/primary-interface-tooling-ux`
+- Baseline commit: `31a8e82` (`master` after merged modernization PR #32).
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
-- Current exact source: full Release/Houdini matrix passes **47/47**.
-- Current exact source: Windows AddressSanitizer matrix passes **19/19**.
 - Generated fixtures, the large Crag asset, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
-- Phases 11–16 are consolidated for `master` by integration PR #31.
-- Current branch completes field/API cleanup, Houdini 20.0 producer compatibility, indexed string tuples, maintained project contracts, const/range APIs, benchmarks, and structured conversion reporting.
+- The active program is product-facing: primary API, CLI/tooling, infrastructure, installation, and Houdini user experience.
+- New primitive and sparse-volume support resumes only after the primary workflow is coherent and documented.
 
 ## Modernization completed
 
@@ -65,7 +63,40 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Convert one arbitrary n-gon into the simplified polygon model with structured multi-n-gon rejection.
 - [x] Report open-polygon closure loss explicitly when simplified conversion creates a closed face.
 
-## Modernization next
+## Product priorities next
+
+### Primary interface
+
+- [ ] Define one obvious write-first public facade for custom geometry serialization.
+- [ ] Provide stable typed requests/results for geometry, volumes, and future primitive families.
+- [ ] Make file format, compression, overwrite, and diagnostic behavior explicit in one options object.
+- [ ] Keep lower-level `HouGeo`, adapter, and parser APIs available without making them the normal entry point.
+- [ ] Add concise C++ and HOM examples centered on writing data from a running Houdini or hython session.
+
+### Tooling and infrastructure
+
+- [ ] Replace the minimal two-path converter CLI with subcommands for write, inspect, validate, convert, and capabilities.
+- [ ] Add stable machine-readable JSON output and documented exit codes.
+- [ ] Add a capability report covering supported records, storage types, compression, and Houdini versions.
+- [ ] Make package, fixture, benchmark, and compatibility commands discoverable through one developer entry point.
+- [ ] Keep CI coverage focused on the supported public workflow as well as parser internals.
+
+### Installation and user experience
+
+- [ ] Provide one-command package build, install, update, uninstall, and isolated launch workflows.
+- [ ] Add package self-diagnostics with actionable repair instructions.
+- [ ] Expose a small HOM API for writing cooked node geometry through the custom writer.
+- [ ] Add shelf/Python UI actions for write, inspect, diagnostics, and capability reporting.
+- [ ] Document the first successful write workflow before advanced internals.
+
+### Data-type expansion after the product surface
+
+- [ ] Add fixture-backed packed geometry support.
+- [ ] Add packed fragments and packed disk primitives.
+- [ ] Add native sparse OpenVDB primitives without forced densification.
+- [ ] Continue with curves, instancing, height fields, and other observed records one family at a time.
+
+## Modernization completed follow-up
 
 - [x] Complete `Matrix22`, `Matrix33`, and `Matrix44` core and algorithm modernization.
 - [x] Replace output-pointer matrix basis helpers with value-returning APIs.
