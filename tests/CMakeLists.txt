@@ -266,6 +266,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
         dense_volume
         native_vdb
         packed_geometry
+        packed_fragment
         primitive_groups
     )
 

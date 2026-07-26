@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstring>
 #include <limits>
@@ -167,6 +168,7 @@ namespace houio
                 volume,
                 polygon,
                 packed_geometry,
+                packed_fragment,
                 native_vdb,
             };
 
@@ -203,6 +205,19 @@ namespace houio
             [[nodiscard]] virtual std::string viewportLod() const;
             [[nodiscard]] virtual bool pointInstanceTransform() const;
             [[nodiscard]] virtual bool treatAsFolder() const;
+        };
+
+        class PackedFragmentPrimitive : public PackedGeometryPrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<PackedFragmentPrimitive>;
+            using ConstPtr = std::shared_ptr<const PackedFragmentPrimitive>;
+            using Bounds = std::array<real32, 6>;
+
+            [[nodiscard]] virtual std::string fragmentAttribute() const = 0;
+            [[nodiscard]] virtual std::string fragmentName() const = 0;
+            [[nodiscard]] virtual Bounds bounds() const;
+            [[nodiscard]] virtual Bounds cachedBounds() const;
         };
 
         class NativeVdbPrimitive : public Primitive

@@ -1,6 +1,7 @@
 #include <houio/HomManifest.h>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <fstream>
 #include <limits>
@@ -382,6 +383,19 @@ namespace houio
             return math::V3f(components[0], components[1], components[2]);
         }
 
+        HouGeoAdapter::PackedFragmentPrimitive::Bounds parseBounds(
+            const json::ArrayPtr &values,
+            const std::string &path)
+        {
+            const std::vector<real32> components = scalarArray<real32>(values, path);
+            if( components.size() != 6 )
+                failManifest(DiagnosticCategory::schema,
+                    "Bounds require exactly six values", path);
+            HouGeoAdapter::PackedFragmentPrimitive::Bounds result{};
+            std::copy(components.begin(), components.end(), result.begin());
+            return result;
+        }
+
         void parsePrimitives(
             const json::ObjectPtr &root,
             const std::vector<int> &topology,
@@ -457,6 +471,50 @@ namespace houio
                         definition->get<bool>("treat_as_folder", false));
                     geometry->addPrimitive(
                         std::static_pointer_cast<HouGeoAdapter::PackedGeometryPrimitive>(packed));
+                }
+                else if( type == "packed_fragment" )
+                {
+                    json::ObjectPtr embeddedManifest = definition->object("embedded_manifest");
+                    if( !embeddedManifest )
+                        failManifest(DiagnosticCategory::schema,
+                            "Packed fragment requires an embedded manifest",
+                            path + ".embedded_manifest");
+                    const std::string fragmentAttribute =
+                        definition->get<std::string>("fragment_attribute", "");
+                    if( fragmentAttribute.empty() )
+                        failManifest(DiagnosticCategory::schema,
+                            "Packed fragment requires a fragment attribute",
+                            path + ".fragment_attribute");
+                    const std::string fragmentName =
+                        definition->get<std::string>("fragment_name", "");
+                    if( fragmentName.empty() )
+                        failManifest(DiagnosticCategory::schema,
+                            "Packed fragment requires a fragment name",
+                            path + ".fragment_name");
+                    auto packed = std::make_shared<HouGeo::HouPackedFragment>();
+                    packed->setEmbeddedGeometry(parseGeometryRoot(embeddedManifest));
+                    packed->setTopologyVertex(vertexOffset);
+                    packed->setPivot(parseVector3(
+                        requireArray(definition, "pivot", path),
+                        path + ".pivot"));
+                    packed->setTransform(parseMatrix33(
+                        requireArray(definition, "transform", path),
+                        path + ".transform"));
+                    packed->setViewportLod(
+                        definition->get<std::string>("viewport_lod", "full"));
+                    packed->setPointInstanceTransform(
+                        definition->get<bool>("point_instance_transform", false));
+                    packed->setFragmentAttribute(fragmentAttribute);
+                    packed->setFragmentName(fragmentName);
+                    const auto bounds = parseBounds(
+                        requireArray(definition, "bounds", path), path + ".bounds");
+                    packed->setBounds(bounds);
+                    json::ArrayPtr cachedBounds = definition->array("cached_bounds");
+                    packed->setCachedBounds(cachedBounds
+                        ? parseBounds(cachedBounds, path + ".cached_bounds")
+                        : bounds);
+                    geometry->addPrimitive(
+                        std::static_pointer_cast<HouGeoAdapter::PackedFragmentPrimitive>(packed));
                 }
                 else if( type == "dense_volume" )
                 {

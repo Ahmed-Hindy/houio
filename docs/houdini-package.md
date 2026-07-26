@@ -182,11 +182,11 @@ Reports the active package root, Houdini version, primary writer path and `houio
 
 ## Supported data
 
-The package supports HouIO's polygon, embedded `PackedGeometry`, numeric/string/dictionary attribute, group, and dense scalar-volume model. Houdini Volume Visualization detail metadata is preserved in both the scalar-attribute layout used by Houdini 20.x and the dictionary layout used by Houdini 21.x and newer.
+The package supports HouIO's polygon, embedded `PackedGeometry`, named `PackedFragment`, numeric/string/dictionary attribute, group, and dense scalar-volume model. Houdini Volume Visualization detail metadata is preserved in both the scalar-attribute layout used by Houdini 20.x and the dictionary layout used by Houdini 21.x and newer.
 
 Existing native VDB primitive payloads are preserved losslessly by file-to-file HouIO round trips. Direct live-HOM writing of native VDB trees is not yet available because HOM does not expose the serialized sparse payload and HouIO does not yet link an optional OpenVDB construction backend. The compatibility round-trip path can still densify supported Float SDF/Fog grids and restore their class.
 
-Unsupported examples include packed fragments, packed disk primitives, agents, height fields, live native-VDB construction, and vector VDB construction/editing.
+File-to-file conversion preserves packed fragments. Direct **Write Selected Geometry** extraction of `hou.PackedFragment` remains unavailable because HOM does not expose its embedded source detail. Other unsupported examples include packed disk primitives, agents, height fields, live native-VDB construction, and vector VDB construction/editing.
 
 ## Runtime model
 

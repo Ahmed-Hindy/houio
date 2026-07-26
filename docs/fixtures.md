@@ -1,6 +1,6 @@
 # Fixture generation and validation
 
-HouIO fixtures are generated into the build tree with Houdini rather than committed as opaque binary files. The generated `manifest.json` records deterministic counts, attribute and group names, primitive closure flags, the producing Houdini build, and any intentional losses. The validator computes richer packed-geometry and native VDB summaries directly from the source and candidate files during comparison.
+HouIO fixtures are generated into the build tree with Houdini rather than committed as opaque binary files. The generated `manifest.json` records deterministic counts, attribute and group names, primitive closure flags, the producing Houdini build, and any intentional losses. The validator computes richer packed-geometry, packed-fragment, and native VDB summaries directly from the source and candidate files during comparison.
 
 ## Maintained Houdini builds
 

@@ -153,6 +153,55 @@ namespace
         if( !packedPrimitive->treatAsFolder() )
             return fail("Packed geometry folder flag changed");
 
+        houio::HouGeo::Ptr fragmentGeometry = createHouGeo();
+        auto fragmentTopology = std::make_shared<houio::HouGeo::HouTopology>();
+        fragmentTopology->appendIndex(0);
+        fragmentGeometry->setTopology(fragmentTopology);
+        auto fragment = std::make_shared<houio::HouGeo::HouPackedFragment>();
+        fragment->setEmbeddedGeometry(createHouGeo());
+        fragment->setTopologyVertex(0);
+        fragment->setFragmentAttribute("name");
+        fragment->setFragmentName("piece0");
+        fragment->setPivot(houio::math::V3f(0.5f, 0.25f, -0.75f));
+        fragment->setTransform(houio::math::M33f(
+            2.0f, 0.0f, 0.0f,
+            0.0f, 3.0f, 0.0f,
+            0.0f, 0.0f, 4.0f));
+        fragment->setBounds({0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f});
+        fragment->setCachedBounds({-1.0f, 2.0f, 1.0f, 4.0f, 3.0f, 6.0f});
+        fragmentGeometry->addPrimitive(
+            std::static_pointer_cast<houio::HouGeoAdapter::PackedFragmentPrimitive>(fragment));
+
+        const std::filesystem::path fragmentPath = directory / "packed_fragment.bgeo";
+        if( !houio::Writer::write(
+                fragmentPath,
+                std::static_pointer_cast<houio::HouGeoAdapter>(fragmentGeometry)) )
+        {
+            return fail("Writer failed to serialize packed fragment");
+        }
+        const auto fragmentResult = houio::GeometryIO::readHouGeo(fragmentPath);
+        if( !fragmentResult || fragmentResult.value->primitiveCount() != 1 )
+            return fail("Packed fragment output did not round-trip");
+        const auto fragmentPrimitive =
+            std::dynamic_pointer_cast<houio::HouGeo::HouPackedFragment>(
+                fragmentResult.value->primitives().front());
+        if( !fragmentPrimitive )
+            return fail("Packed fragment record changed type");
+        if( fragmentPrimitive->fragmentAttribute() != "name"
+            || fragmentPrimitive->fragmentName() != "piece0" )
+        {
+            return fail("Packed fragment identity changed");
+        }
+        if( fragmentPrimitive->bounds()
+                != houio::HouGeoAdapter::PackedFragmentPrimitive::Bounds{
+                    0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f}
+            || fragmentPrimitive->cachedBounds()
+                != houio::HouGeoAdapter::PackedFragmentPrimitive::Bounds{
+                    -1.0f, 2.0f, 1.0f, 4.0f, 3.0f, 6.0f} )
+        {
+            return fail("Packed fragment bounds changed");
+        }
+
         houio::HouGeo::Ptr vdbGeometry = createHouGeo();
         auto vdbTopology = std::make_shared<houio::HouGeo::HouTopology>();
         vdbTopology->appendIndex(0);
@@ -230,6 +279,13 @@ namespace
             || !packed->readable || !packed->writable )
         {
             return fail("Packed geometry capability contract is incorrect");
+        }
+        const auto fragment = houio::Writer::capability(
+            houio::WriterDataType::packed_fragment);
+        if( !fragment || fragment->level != houio::WriterCapabilityLevel::supported
+            || !fragment->readable || !fragment->writable )
+        {
+            return fail("Packed fragment capability contract is incorrect");
         }
         const auto vdb = houio::Writer::capability(
             houio::WriterDataType::sparse_openvdb);

@@ -568,6 +568,13 @@ namespace houio
 		m_primitives.push_back(std::move(packedGeometry));
 	}
 
+	void HouGeo::addPrimitive( PackedFragmentPrimitive::Ptr packedFragment )
+	{
+		if( !packedFragment )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null packed fragment" );
+		m_primitives.push_back(std::move(packedFragment));
+	}
+
 	void HouGeo::addPrimitive( NativeVdbPrimitive::Ptr nativeVdb )
 	{
 		if( !nativeVdb )
@@ -958,7 +965,8 @@ namespace houio
 					if( !sharedData )
 						throw std::runtime_error( "HouGeo::load shared primitive data must be an array" );
 
-					if( entryType == "PackedGeometry" && dataType == "gu:embeddedgeo" )
+					if( (entryType == "PackedGeometry" || entryType == "PackedFragment")
+						&& dataType == "gu:embeddedgeo" )
 					{
 						HouGeo::Ptr embeddedGeometry = HouGeo::create();
 						embeddedGeometry->load(toObject(sharedData));
@@ -1491,6 +1499,9 @@ namespace houio
 		if( primitiveType=="PackedGeometry" )
 			withSchemaPath("data", [&]() { loadPackedGeometryPrimitive(toObject(primitive->array(1)), sharedPrimitiveData); });
 		else
+		if( primitiveType=="PackedFragment" )
+			withSchemaPath("data", [&]() { loadPackedFragmentPrimitive(toObject(primitive->array(1)), sharedPrimitiveData); });
+		else
 		if( primitiveType=="VDB" )
 			withSchemaPath("data", [&]() { loadNativeVdbPrimitive(toObject(primitive->array(1))); });
 		else
@@ -1617,6 +1628,145 @@ namespace houio
 		m_primitives.push_back(std::move(result));
 	}
 
+	void HouGeo::loadPackedFragmentPrimitive(
+		json::ObjectPtr packedFragment,
+		SharedPrimitiveData& sharedPrimitiveData )
+	{
+		if( !packedFragment )
+			throw std::invalid_argument(
+				"HouGeo::loadPackedFragmentPrimitive received null data" );
+		json::ObjectPtr parameters = packedFragment->object("parameters");
+		if( !parameters )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedFragment primitive is missing parameters",
+				-1,
+				"parameters"});
+
+		const std::string embeddedId = parameters->get<std::string>("embedded", "");
+		if( embeddedId.empty() )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedFragment primitive is missing embedded geometry id",
+				-1,
+				"parameters.embedded"});
+		const auto embedded = sharedPrimitiveData.sharedEmbeddedGeometry.find(embeddedId);
+		if( embedded == sharedPrimitiveData.sharedEmbeddedGeometry.end() )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedFragment embedded geometry was not found",
+				-1,
+				"parameters.embedded"});
+
+		const std::string fragmentAttribute = parameters->get<std::string>("attribute", "");
+		if( fragmentAttribute.empty() )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedFragment primitive is missing its fragment attribute",
+				-1,
+				"parameters.attribute"});
+		const std::string fragmentName = parameters->get<std::string>("name", "");
+		if( fragmentName.empty() )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedFragment primitive is missing its fragment name",
+				-1,
+				"parameters.name"});
+
+		const int topologyVertex = packedFragment->get<int>("vertex", -1);
+		if( topologyVertex < 0 || !m_topology
+			|| static_cast<sint64>(topologyVertex) >= m_topology->indexCount() )
+		{
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedFragment topology vertex is outside vertexcount",
+				-1,
+				"vertex"});
+		}
+
+		const auto parseBounds = [&](const std::string& key,
+			const HouGeoAdapter::PackedFragmentPrimitive::Bounds* fallback = nullptr)
+		{
+			json::ArrayPtr values = parameters->array(key);
+			if( !values )
+			{
+				if( fallback )
+					return *fallback;
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedFragment " + key + " requires six values",
+					-1,
+					"parameters." + key});
+			}
+			if( values->size() != 6 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedFragment " + key + " requires six values",
+					-1,
+					"parameters." + key});
+			HouGeoAdapter::PackedFragmentPrimitive::Bounds result{};
+			for( int index = 0; index < 6; ++index )
+				result[static_cast<std::size_t>(index)] = values->get<real32>(index);
+			return result;
+		};
+
+		const HouGeoAdapter::PackedFragmentPrimitive::Bounds bounds = parseBounds("bounds");
+		const HouGeoAdapter::PackedFragmentPrimitive::Bounds cachedBounds =
+			parseBounds("cachedbounds", &bounds);
+
+		math::V3f pivot(0.0f);
+		json::ArrayPtr pivotValues = packedFragment->array("pivot");
+		if( pivotValues )
+		{
+			if( pivotValues->size() != 3 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedFragment pivot requires three values",
+					-1,
+					"pivot"});
+			pivot = math::V3f(
+				pivotValues->get<real32>(0),
+				pivotValues->get<real32>(1),
+				pivotValues->get<real32>(2));
+		}
+
+		math::M33f transform = math::M33f::identity();
+		json::ArrayPtr transformValues = packedFragment->array("transform");
+		if( transformValues )
+		{
+			if( transformValues->size() != 9 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedFragment transform requires nine values",
+					-1,
+					"transform"});
+			transform = math::M33f(
+				transformValues->get<real32>(0),
+				transformValues->get<real32>(1),
+				transformValues->get<real32>(2),
+				transformValues->get<real32>(3),
+				transformValues->get<real32>(4),
+				transformValues->get<real32>(5),
+				transformValues->get<real32>(6),
+				transformValues->get<real32>(7),
+				transformValues->get<real32>(8));
+		}
+
+		auto result = std::make_shared<HouPackedFragment>();
+		result->embedded_geometry_ = embedded->second;
+		result->topology_vertex_ = topologyVertex;
+		result->pivot_ = pivot;
+		result->transform_ = transform;
+		result->viewport_lod_ = packedFragment->get<std::string>("viewportlod", "full");
+		result->point_instance_transform_ =
+			parameters->get<int>("pointinstancetransform", 0) != 0;
+		result->fragment_attribute_ = fragmentAttribute;
+		result->fragment_name_ = fragmentName;
+		result->bounds_ = bounds;
+		result->cached_bounds_ = cachedBounds;
+		m_primitives.push_back(std::move(result));
+	}
+
 	void HouGeo::loadNativeVdbPrimitive( json::ObjectPtr nativeVdb )
 	{
 		if( !nativeVdb )
@@ -1653,6 +1803,63 @@ namespace houio
 	json::ArrayPtr HouGeo::HouVdb::serializedPayload() const
 	{
 		return serialized_payload_;
+	}
+
+	// HouGeo::HouPackedFragment =========================================
+
+	HouGeoAdapter::ConstPtr HouGeo::HouPackedFragment::embeddedGeometry() const
+	{
+		return embedded_geometry_;
+	}
+
+	int HouGeo::HouPackedFragment::topologyVertex() const
+	{
+		return topology_vertex_;
+	}
+
+	math::V3f HouGeo::HouPackedFragment::pivot() const
+	{
+		return pivot_;
+	}
+
+	math::M33f HouGeo::HouPackedFragment::transform() const
+	{
+		return transform_;
+	}
+
+	std::string HouGeo::HouPackedFragment::viewportLod() const
+	{
+		return viewport_lod_;
+	}
+
+	bool HouGeo::HouPackedFragment::pointInstanceTransform() const
+	{
+		return point_instance_transform_;
+	}
+
+	bool HouGeo::HouPackedFragment::treatAsFolder() const
+	{
+		return false;
+	}
+
+	std::string HouGeo::HouPackedFragment::fragmentAttribute() const
+	{
+		return fragment_attribute_;
+	}
+
+	std::string HouGeo::HouPackedFragment::fragmentName() const
+	{
+		return fragment_name_;
+	}
+
+	HouGeoAdapter::PackedFragmentPrimitive::Bounds HouGeo::HouPackedFragment::bounds() const
+	{
+		return bounds_;
+	}
+
+	HouGeoAdapter::PackedFragmentPrimitive::Bounds HouGeo::HouPackedFragment::cachedBounds() const
+	{
+		return cached_bounds_;
 	}
 
 	// HouGeo::HouPackedGeometry =========================================

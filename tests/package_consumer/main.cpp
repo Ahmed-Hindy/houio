@@ -32,10 +32,13 @@ int main()
 
     const auto packedCapability =
         houio::Writer::capability(houio::WriterDataType::packed_geometry);
+    const auto fragmentCapability =
+        houio::Writer::capability(houio::WriterDataType::packed_fragment);
     const auto vdbCapability =
         houio::Writer::capability(houio::WriterDataType::sparse_openvdb);
     if (!readResult || readResult.value->primitiveCount() != 1
         || !packedCapability || !packedCapability->writable
+        || !fragmentCapability || !fragmentCapability->writable
         || !vdbCapability || !vdbCapability->writable)
     {
         std::cerr << "failed to import geometry through installed HouIO package\n";

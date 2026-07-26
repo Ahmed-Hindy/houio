@@ -177,6 +177,15 @@ int verifyStructuredDiagnostics()
     }
 
     if (const int result = expectImportDiagnostic(
+            R"JSON(["pointcount",1,"vertexcount",1,"primitivecount",1,"topology",["pointref",["indices",[0]]],"sharedprimitivedata",["PackedFragment",["gu:embeddedgeo","embed:test",["pointcount",0,"vertexcount",0,"primitivecount",0]]],"primitives",[[["type","PackedFragment"],["parameters",{"attribute":"name","bounds":[0,1,0,1,0,0],"cachedbounds":[0,1,0,1,0,0],"embedded":"embed:test","pointinstancetransform":0},"vertex",0]]]])JSON",
+            houio::DiagnosticCategory::schema,
+            "primitives[0].data.parameters.name", "packed fragment name diagnostic");
+        result != 0)
+    {
+        return result;
+    }
+
+    if (const int result = expectImportDiagnostic(
             R"JSON(["pointcount", 1, "vertexcount", 0, "primitivecount", 0, "pointgroups", [[["name", "bad"], ["selection", ["ordered", ["i8", [1]]]]]]])JSON",
             houio::DiagnosticCategory::unsupported_input, "pointgroups.selection",
             "unsupported group diagnostic");

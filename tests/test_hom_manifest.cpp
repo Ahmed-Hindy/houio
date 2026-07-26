@@ -203,7 +203,7 @@ namespace
         return 0;
     }
 
-    int verifyUnsupportedRecord(const std::filesystem::path &directory)
+    int verifyPackedFragmentManifest(const std::filesystem::path &directory)
     {
         const std::filesystem::path path = directory / "packed_fragment.json";
         writeText(path, R"JSON({
@@ -212,7 +212,60 @@ namespace
             "vertex_count":1,
             "primitive_count":1,
             "topology":[0],
-            "primitives":[{"type":"packed_fragment","vertex_offset":0}],
+            "primitives":[{
+                "type":"packed_fragment","vertex_offset":0,
+                "pivot":[0.25,0.5,0.75],
+                "transform":[2,0,0,0,3,0,0,0,4],
+                "fragment_attribute":"name","fragment_name":"piece0",
+                "bounds":[0,1,2,3,4,5],
+                "cached_bounds":[-1,2,1,4,3,6],
+                "embedded_manifest":{
+                    "schema":"houio.hom/1",
+                    "point_count":0,"vertex_count":0,"primitive_count":0,
+                    "topology":[],"primitives":[],
+                    "attributes":{"point":[],"vertex":[],"primitive":[],"global":[]}
+                }
+            }],
+            "attributes":{
+                "point":[{
+                    "name":"P","kind":"numeric","storage":"float32",
+                    "tuple_size":4,"element_count":1,"values":[0,0,0,1]
+                }],
+                "vertex":[],"primitive":[],"global":[]
+            }
+        })JSON");
+        const auto result = houio::HomManifest::read(path);
+        if( !result || result.value->primitiveCount() != 1 )
+            return fail("packed fragment manifest failed to load");
+        const auto fragment = std::dynamic_pointer_cast<houio::HouGeo::HouPackedFragment>(
+            result.value->primitives().front());
+        if( !fragment || fragment->fragmentAttribute() != "name"
+            || fragment->fragmentName() != "piece0" )
+        {
+            return fail("packed fragment manifest lost fragment identity");
+        }
+        if( fragment->bounds()
+                != houio::HouGeoAdapter::PackedFragmentPrimitive::Bounds{
+                    0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f}
+            || fragment->cachedBounds()
+                != houio::HouGeoAdapter::PackedFragmentPrimitive::Bounds{
+                    -1.0f, 2.0f, 1.0f, 4.0f, 3.0f, 6.0f} )
+        {
+            return fail("packed fragment manifest lost bounds");
+        }
+        return 0;
+    }
+
+    int verifyUnsupportedRecord(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path path = directory / "packed_disk.json";
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,
+            "vertex_count":1,
+            "primitive_count":1,
+            "topology":[0],
+            "primitives":[{"type":"packed_disk","vertex_offset":0}],
             "attributes":{
                 "point":[{
                     "name":"P","kind":"numeric","storage":"float32",
@@ -244,6 +297,8 @@ int main()
     if( const int result = verifyMixedManifest(directory); result != 0 )
         return result;
     if( const int result = verifyInvalidTopologyOffsets(directory); result != 0 )
+        return result;
+    if( const int result = verifyPackedFragmentManifest(directory); result != 0 )
         return result;
     if( const int result = verifyUnsupportedRecord(directory); result != 0 )
         return result;

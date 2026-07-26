@@ -218,6 +218,26 @@ def primitive_summary(geometry: hou.Geometry) -> list[dict[str, Any]]:
                 }
             )
             continue
+        if isinstance(primitive, hou.PackedFragment):
+            summaries.append(
+                {
+                    "type": primitive.type().name(),
+                    "closed": None,
+                    "points": [vertex.point().number() for vertex in primitive.vertices()],
+                    "pivot": list(primitive.intrinsicValue("pivot")),
+                    "transform": list(primitive.intrinsicValue("transform")),
+                    "viewport_lod": str(primitive.intrinsicValue("viewportlod")),
+                    "point_instance_transform": int(
+                        primitive.intrinsicValue("pointinstancetransform")
+                    ),
+                    "fragment_attribute": str(
+                        primitive.intrinsicValue("fragmentattribute")
+                    ),
+                    "fragment_name": str(primitive.intrinsicValue("fragmentname")),
+                    "packed_bounds": list(primitive.intrinsicValue("packedbounds")),
+                }
+            )
+            continue
         if isinstance(primitive, hou.PackedGeometry):
             embedded = primitive.getEmbeddedGeometry()
             summaries.append(
@@ -274,6 +294,34 @@ def primitive_summary(geometry: hou.Geometry) -> list[dict[str, Any]]:
     return summaries
 
 
+def packed_fragment_payload_summary(geometry: hou.Geometry) -> dict[str, Any] | None:
+    """Unpack and summarize embedded packed-fragment payloads.
+
+    Args:
+        geometry: Geometry that may contain packed fragments.
+
+    Returns:
+        Deterministic unpacked payload data, or ``None`` when no fragments exist.
+    """
+    if not any(isinstance(primitive, hou.PackedFragment) for primitive in geometry.prims()):
+        return None
+    verb = hou.sopNodeTypeCategory().nodeVerb("unpack")
+    if verb is None:
+        raise RuntimeError("Unpack SOP verb is unavailable")
+    unpacked = hou.Geometry()
+    verb.execute(unpacked, [geometry])
+    return {
+        "point_count": len(unpacked.points()),
+        "vertex_count": geometry_vertex_count(unpacked),
+        "primitive_count": len(unpacked.prims()),
+        "positions": [list(point.position()) for point in unpacked.points()],
+        "primitives": primitive_summary(unpacked),
+        "attributes": {
+            domain: attribute_summary(unpacked, domain) for domain in ATTRIBUTE_DOMAINS
+        },
+    }
+
+
 def geometry_summary(geometry: hou.Geometry) -> dict[str, Any]:
     """Create a complete deterministic comparison summary.
 
@@ -291,6 +339,7 @@ def geometry_summary(geometry: hou.Geometry) -> dict[str, Any]:
             domain: attribute_summary(geometry, domain) for domain in ATTRIBUTE_DOMAINS
         },
         "primitives": primitive_summary(geometry),
+        "packed_fragment_payload": packed_fragment_payload_summary(geometry),
         "point_groups": {
             group.name(): [point.number() for point in group.points()]
             for group in geometry.pointGroups()

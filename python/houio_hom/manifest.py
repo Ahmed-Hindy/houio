@@ -286,6 +286,13 @@ def _primitive_manifest(primitive: hou.Prim) -> dict[str, Any]:
     """Extract one supported primitive without invoking a Houdini file writer."""
     vertices = primitive.vertices()
     vertex_offset = vertices[0].linearNumber() if vertices else 0
+    if isinstance(primitive, hou.PackedFragment):
+        raise UnsupportedHOMDataError(
+            "hou.PackedFragment file records are supported by HouIO, but HOM does "
+            "not expose the fragment's embedded source detail for lossless direct "
+            "manifest extraction; write an existing BGEO record or construct a "
+            "houio.hom/1 packed_fragment manifest explicitly"
+        )
     if isinstance(primitive, hou.PackedGeometry):
         return {
             "type": "packed_geometry",
@@ -331,8 +338,9 @@ def _primitive_manifest(primitive: hou.Prim) -> dict[str, Any]:
     type_name = primitive.type().name()
     if "Packed" in type_name or "packed" in type_name:
         raise UnsupportedHOMDataError(
-            f"Packed primitive {type_name!r} is recognized, but only embedded "
-            "hou.PackedGeometry is supported by the direct HOM manifest"
+            f"Packed primitive {type_name!r} is recognized, but direct HOM extraction "
+            "currently supports only embedded hou.PackedGeometry; PackedFragment is "
+            "supported at the file and explicit-manifest layers"
         )
     raise UnsupportedHOMDataError(
         f"Primitive {primitive.number()} uses unsupported type {type_name!r}"

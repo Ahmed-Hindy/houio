@@ -249,12 +249,21 @@ namespace
 
         std::size_t polygonRecords = 0;
         std::size_t denseVolumes = 0;
+        std::size_t packedGeometryRecords = 0;
+        std::size_t packedFragmentRecords = 0;
+        std::size_t nativeVdbRecords = 0;
         for( const houio::HouGeoAdapter::Primitive::Ptr &primitive : result.value->primitives() )
         {
             if( std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(primitive) )
                 ++polygonRecords;
             else if( std::dynamic_pointer_cast<houio::HouGeoAdapter::VolumePrimitive>(primitive) )
                 ++denseVolumes;
+            else if( std::dynamic_pointer_cast<houio::HouGeoAdapter::PackedFragmentPrimitive>(primitive) )
+                ++packedFragmentRecords;
+            else if( std::dynamic_pointer_cast<houio::HouGeoAdapter::PackedGeometryPrimitive>(primitive) )
+                ++packedGeometryRecords;
+            else if( std::dynamic_pointer_cast<houio::HouGeoAdapter::NativeVdbPrimitive>(primitive) )
+                ++nativeVdbRecords;
         }
 
         if( json )
@@ -266,6 +275,9 @@ namespace
                 << ",\"primitives\":" << result.value->primitiveCount()
                 << ",\"polygon_records\":" << polygonRecords
                 << ",\"dense_volumes\":" << denseVolumes
+                << ",\"packed_geometry_records\":" << packedGeometryRecords
+                << ",\"packed_fragment_records\":" << packedFragmentRecords
+                << ",\"native_vdb_records\":" << nativeVdbRecords
                 << ",\"point_attributes\":";
             printStringArray(result.value->pointAttributeNames());
             std::cout << ",\"vertex_attributes\":";
@@ -292,7 +304,10 @@ namespace
                 << "vertices=" << result.value->vertexCount() << '\n'
                 << "primitives=" << result.value->primitiveCount() << '\n'
                 << "polygon_records=" << polygonRecords << '\n'
-                << "dense_volumes=" << denseVolumes << '\n';
+                << "dense_volumes=" << denseVolumes << '\n'
+                << "packed_geometry_records=" << packedGeometryRecords << '\n'
+                << "packed_fragment_records=" << packedFragmentRecords << '\n'
+                << "native_vdb_records=" << nativeVdbRecords << '\n';
             printDiagnostics(result.diagnostics, false);
         }
         return static_cast<int>(ExitCode::success);
