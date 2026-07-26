@@ -73,3 +73,50 @@ endif()
 if(EXISTS "${vdb_output}")
     message(FATAL_ERROR "houio created an unsupported VDB container output")
 endif()
+
+set(fragment_manifest "${HOUIO_TEST_DIRECTORY}/packed_fragment_manifest.json")
+set(fragment_output "${HOUIO_TEST_DIRECTORY}/packed_fragment.bgeo")
+file(WRITE "${fragment_manifest}"
+    "{\"schema\":\"houio.hom/1\","
+    "\"point_count\":1,\"vertex_count\":1,\"primitive_count\":1,"
+    "\"topology\":[0],\"primitives\":[{"
+    "\"type\":\"packed_fragment\",\"vertex_offset\":0,"
+    "\"pivot\":[0,0,0],\"transform\":[1,0,0,0,1,0,0,0,1],"
+    "\"fragment_attribute\":\"name\",\"fragment_name\":\"piece0\","
+    "\"bounds\":[0,1,0,1,0,0],\"cached_bounds\":[0,1,0,1,0,0],"
+    "\"embedded_manifest\":{\"schema\":\"houio.hom/1\","
+    "\"point_count\":0,\"vertex_count\":0,\"primitive_count\":0,"
+    "\"topology\":[],\"primitives\":[],\"attributes\":{"
+    "\"point\":[],\"vertex\":[],\"primitive\":[],\"global\":[]}}}],"
+    "\"attributes\":{\"point\":[{\"name\":\"P\",\"kind\":\"numeric\","
+    "\"storage\":\"float32\",\"tuple_size\":4,\"element_count\":1,"
+    "\"values\":[0,0,0,1]}],\"vertex\":[],\"primitive\":[],\"global\":[]}}"
+)
+file(REMOVE "${fragment_output}")
+execute_process(
+    COMMAND "${HOUIO_CLI}" write-manifest "${fragment_manifest}" "${fragment_output}" --json
+    RESULT_VARIABLE fragment_write_result
+    OUTPUT_VARIABLE fragment_write_output
+    ERROR_VARIABLE fragment_write_error
+)
+if(NOT fragment_write_result EQUAL 0)
+    message(FATAL_ERROR
+        "houio failed to write packed-fragment manifest: ${fragment_write_result}\n"
+        "stdout: ${fragment_write_output}\nstderr: ${fragment_write_error}")
+endif()
+execute_process(
+    COMMAND "${HOUIO_CLI}" inspect "${fragment_output}" --json
+    RESULT_VARIABLE fragment_inspect_result
+    OUTPUT_VARIABLE fragment_inspect_output
+    ERROR_VARIABLE fragment_inspect_error
+)
+if(NOT fragment_inspect_result EQUAL 0)
+    message(FATAL_ERROR
+        "houio failed to inspect packed-fragment output: ${fragment_inspect_result}\n"
+        "stdout: ${fragment_inspect_output}\nstderr: ${fragment_inspect_error}")
+endif()
+string(FIND "${fragment_inspect_output}" "\"packed_fragment_records\":1" fragment_count_position)
+if(fragment_count_position EQUAL -1)
+    message(FATAL_ERROR
+        "houio inspect did not report one packed fragment: ${fragment_inspect_output}")
+endif()

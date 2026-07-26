@@ -309,6 +309,74 @@ namespace houio
             friend class HouGeo;
         };
 
+        class HouPackedFragment final : public PackedFragmentPrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouPackedFragment>;
+            using ConstPtr = std::shared_ptr<const HouPackedFragment>;
+
+            [[nodiscard]] HouGeoAdapter::ConstPtr embeddedGeometry() const override;
+            [[nodiscard]] int topologyVertex() const override;
+            [[nodiscard]] math::V3f pivot() const override;
+            [[nodiscard]] math::M33f transform() const override;
+            [[nodiscard]] std::string viewportLod() const override;
+            [[nodiscard]] bool pointInstanceTransform() const override;
+            [[nodiscard]] bool treatAsFolder() const override;
+            [[nodiscard]] std::string fragmentAttribute() const override;
+            [[nodiscard]] std::string fragmentName() const override;
+            [[nodiscard]] Bounds bounds() const override;
+            [[nodiscard]] Bounds cachedBounds() const override;
+
+            void setEmbeddedGeometry(HouGeoAdapter::Ptr geometry)
+            {
+                if (!geometry)
+                    throw std::invalid_argument("HouPackedFragment embedded geometry cannot be null");
+                embedded_geometry_ = std::move(geometry);
+            }
+            void setTopologyVertex(int topology_vertex) noexcept
+            {
+                topology_vertex_ = topology_vertex;
+            }
+            void setPivot(const math::V3f& pivot) noexcept { pivot_ = pivot; }
+            void setTransform(const math::M33f& transform) noexcept { transform_ = transform; }
+            void setViewportLod(std::string viewport_lod)
+            {
+                viewport_lod_ = viewport_lod.empty() ? "full" : std::move(viewport_lod);
+            }
+            void setPointInstanceTransform(bool enabled) noexcept
+            {
+                point_instance_transform_ = enabled;
+            }
+            void setFragmentAttribute(std::string attribute)
+            {
+                if (attribute.empty())
+                    throw std::invalid_argument("HouPackedFragment attribute cannot be empty");
+                fragment_attribute_ = std::move(attribute);
+            }
+            void setFragmentName(std::string name)
+            {
+                if (name.empty())
+                    throw std::invalid_argument("HouPackedFragment name cannot be empty");
+                fragment_name_ = std::move(name);
+            }
+            void setBounds(const Bounds& bounds) noexcept { bounds_ = bounds; }
+            void setCachedBounds(const Bounds& bounds) noexcept { cached_bounds_ = bounds; }
+
+        private:
+            HouGeoAdapter::Ptr embedded_geometry_;
+            int topology_vertex_ = -1;
+            math::V3f pivot_{0.0f};
+            math::M33f transform_ = math::M33f::identity();
+            std::string viewport_lod_ = "full";
+            bool point_instance_transform_ = false;
+            std::string fragment_attribute_;
+            std::string fragment_name_;
+            Bounds bounds_{};
+            Bounds cached_bounds_{};
+
+            friend class HouGeo;
+        };
+
         class HouVdb final : public NativeVdbPrimitive
         {
         public:
@@ -404,6 +472,7 @@ namespace houio
         void addPrimitive(ScalarField::Ptr field);
         void addPrimitive(VolumePrimitive::Ptr volume);
         void addPrimitive(PackedGeometryPrimitive::Ptr packed_geometry);
+        void addPrimitive(PackedFragmentPrimitive::Ptr packed_fragment);
         void addPrimitive(NativeVdbPrimitive::Ptr native_vdb);
         void addPrimitive(PolyPrimitive::Ptr polygon);
         void setTopology(HouTopology::Ptr topology);
@@ -465,6 +534,9 @@ namespace houio
             SharedPrimitiveData& shared_primitive_data);
         void loadPackedGeometryPrimitive(
             json::ObjectPtr packed_geometry,
+            SharedPrimitiveData& shared_primitive_data);
+        void loadPackedFragmentPrimitive(
+            json::ObjectPtr packed_fragment,
             SharedPrimitiveData& shared_primitive_data);
         void loadNativeVdbPrimitive(json::ObjectPtr native_vdb);
         void loadPolyPrimitive(json::ObjectPtr polygon_object);

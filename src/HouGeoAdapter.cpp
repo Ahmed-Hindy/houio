@@ -199,6 +199,18 @@ namespace houio
         return false;
     }
 
+    HouGeoAdapter::PackedFragmentPrimitive::Bounds
+    HouGeoAdapter::PackedFragmentPrimitive::bounds() const
+    {
+        return {};
+    }
+
+    HouGeoAdapter::PackedFragmentPrimitive::Bounds
+    HouGeoAdapter::PackedFragmentPrimitive::cachedBounds() const
+    {
+        return bounds();
+    }
+
     int HouGeoAdapter::PolyPrimitive::polygonCount() const
     {
         return 0;

@@ -1092,7 +1092,13 @@ namespace houio
 
 		writer.jsonEndArray();
 
-		std::vector<std::pair<std::string, HouGeoAdapter::ConstPtr>> embeddedGeometryRecords;
+		struct EmbeddedGeometryRecord
+		{
+			std::string primitiveType;
+			std::string embeddedId;
+			HouGeoAdapter::ConstPtr geometry;
+		};
+		std::vector<EmbeddedGeometryRecord> embeddedGeometryRecords;
 		if( primitiveCount > 0 )
 		{
 			writer.jsonString( "primitives" );
@@ -1124,6 +1130,20 @@ namespace houio
 							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
 						++topologyVertexOffset;
 					}
+					else if( auto packedFragment = std::dynamic_pointer_cast<const HouGeoAdapter::PackedFragmentPrimitive>(primitive) )
+					{
+						if( !packedFragment->embeddedGeometry() )
+							throw std::runtime_error( "HouGeoIO::exportGeometry packed fragment has no embedded payload" );
+						const std::string embeddedId = "embed:houio:"
+							+ std::to_string(embeddedGeometryRecords.size());
+						if( !exportPrimitive(context, packedFragment, embeddedId) )
+							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a packed fragment primitive" );
+						embeddedGeometryRecords.push_back(
+							{"PackedFragment", embeddedId, packedFragment->embeddedGeometry()});
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
 					else if( auto packedGeometry = std::dynamic_pointer_cast<const HouGeoAdapter::PackedGeometryPrimitive>(primitive) )
 					{
 						if( !packedGeometry->embeddedGeometry() )
@@ -1132,8 +1152,8 @@ namespace houio
 							+ std::to_string(embeddedGeometryRecords.size());
 						if( !exportPrimitive(context, packedGeometry, embeddedId) )
 							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a packed geometry primitive" );
-						embeddedGeometryRecords.emplace_back(
-							embeddedId, packedGeometry->embeddedGeometry());
+						embeddedGeometryRecords.push_back(
+							{"PackedGeometry", embeddedId, packedGeometry->embeddedGeometry()});
 						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
 							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
 						++topologyVertexOffset;
@@ -1238,13 +1258,13 @@ namespace houio
 		{
 			writer.jsonString("sharedprimitivedata");
 			writer.jsonBeginArray();
-			for( const auto &[embeddedId, embeddedGeometry] : embeddedGeometryRecords )
+			for( const EmbeddedGeometryRecord &record : embeddedGeometryRecords )
 			{
-				writer.jsonString("PackedGeometry");
+				writer.jsonString(record.primitiveType);
 				writer.jsonBeginArray();
 				writer.jsonString("gu:embeddedgeo");
-				writer.jsonString(embeddedId);
-				if( !exportGeometryValue(context, embeddedGeometry, activeGeometries) )
+				writer.jsonString(record.embeddedId);
+				if( !exportGeometryValue(context, record.geometry, activeGeometries) )
 					throw std::runtime_error( "HouGeoIO failed to serialize embedded packed geometry" );
 				writer.jsonEndArray();
 			}
@@ -1758,6 +1778,70 @@ namespace houio
 		writer.jsonInt32(packedGeometry->topologyVertex());
 		writer.jsonString("viewportlod");
 		writer.jsonString(packedGeometry->viewportLod());
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		return true;
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::PackedFragmentPrimitive::ConstPtr packedFragment,
+		const std::string &embeddedId )
+	{
+		if( !packedFragment || !packedFragment->embeddedGeometry()
+			|| packedFragment->topologyVertex() < 0 || embeddedId.empty()
+			|| packedFragment->fragmentAttribute().empty()
+			|| packedFragment->fragmentName().empty() )
+		{
+			return false;
+		}
+		json::BinaryWriter &writer = context.writer;
+		const math::V3f pivot = packedFragment->pivot();
+		const math::M33f transform = packedFragment->transform();
+		const auto bounds = packedFragment->bounds();
+		const auto cachedBounds = packedFragment->cachedBounds();
+
+		writer.jsonBeginArray();
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString("PackedFragment");
+		writer.jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonString("parameters");
+		writer.jsonBeginMap();
+		writer.jsonKey("attribute");
+		writer.jsonString(packedFragment->fragmentAttribute());
+		writer.jsonKey("bounds");
+		writer.jsonBeginArray();
+		for( const real32 value : bounds )
+			writer.jsonReal32(value);
+		writer.jsonEndArray();
+		writer.jsonKey("cachedbounds");
+		writer.jsonBeginArray();
+		for( const real32 value : cachedBounds )
+			writer.jsonReal32(value);
+		writer.jsonEndArray();
+		writer.jsonKey("embedded");
+		writer.jsonString(embeddedId);
+		writer.jsonKey("name");
+		writer.jsonString(packedFragment->fragmentName());
+		writer.jsonKey("pointinstancetransform");
+		writer.jsonInt32(packedFragment->pointInstanceTransform() ? 1 : 0);
+		writer.jsonEndMap();
+		writer.jsonString("pivot");
+		writer.jsonBeginArray();
+		writer.jsonReal32(pivot.x);
+		writer.jsonReal32(pivot.y);
+		writer.jsonReal32(pivot.z);
+		writer.jsonEndArray();
+		writer.jsonString("transform");
+		writer.jsonBeginArray();
+		for( const real32 value : transform.ma )
+			writer.jsonReal32(value);
+		writer.jsonEndArray();
+		writer.jsonString("vertex");
+		writer.jsonInt32(packedFragment->topologyVertex());
+		writer.jsonString("viewportlod");
+		writer.jsonString(packedFragment->viewportLod());
 		writer.jsonEndArray();
 		writer.jsonEndArray();
 		return true;

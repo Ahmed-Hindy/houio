@@ -143,6 +143,10 @@ namespace houio
             const std::string& embedded_id);
         static bool exportPrimitive(
             ExportContext& context,
+            HouGeoAdapter::PackedFragmentPrimitive::ConstPtr packed_fragment,
+            const std::string& embedded_id);
+        static bool exportPrimitive(
+            ExportContext& context,
             HouGeoAdapter::NativeVdbPrimitive::ConstPtr native_vdb);
         static bool exportPrimitive(
             ExportContext& context,

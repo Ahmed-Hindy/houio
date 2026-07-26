@@ -436,6 +436,49 @@ def build_packed_geometry() -> hou.Geometry:
     return geometry
 
 
+def build_packed_fragment_geometry() -> hou.Geometry:
+    """Build two named packed fragments from one embedded detail.
+
+    Returns:
+        Geometry containing two transformed packed fragment primitives.
+    """
+    embedded = hou.Geometry()
+    points = create_points(
+        embedded,
+        (
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (0.0, 1.0, 0.0),
+            (2.0, 0.0, 0.0),
+            (3.0, 0.0, 0.0),
+            (2.0, 1.0, 0.0),
+        ),
+    )
+    name_attribute = embedded.addAttrib(hou.attribType.Prim, "name", "")
+    first = create_polygon(embedded, points, (0, 1, 2))
+    second = create_polygon(embedded, points, (3, 4, 5))
+    first.setAttribValue(name_attribute, "piece0")
+    second.setAttribValue(name_attribute, "piece1")
+    frozen = embedded.freeze()
+
+    geometry = hou.Geometry()
+    first_fragment = geometry.createPacked("PackedFragment")
+    first_fragment.setEmbeddedGeometry(frozen, "name", "piece0")
+    first_fragment.setIntrinsicValue("pivot", (0.25, 0.5, 0.75))
+    second_fragment = geometry.createPacked("PackedFragment")
+    second_fragment.setEmbeddedGeometry(frozen, "name", "piece1")
+    second_fragment.setIntrinsicValue(
+        "transform",
+        (2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0),
+    )
+
+    kind_attribute = geometry.addAttrib(hou.attribType.Prim, "kind", "")
+    first_fragment.setAttribValue(kind_attribute, "first")
+    second_fragment.setAttribValue(kind_attribute, "second")
+    geometry.createPrimGroup("fragments").add((first_fragment, second_fragment))
+    return geometry
+
+
 def build_primitive_groups_geometry() -> hou.Geometry:
     """Build overlapping point, vertex, and primitive groups.
 
@@ -536,6 +579,7 @@ def main() -> int:
         ("dense_volume", build_dense_volume_geometry, ()),
         ("native_vdb", build_native_vdb_geometry, ()),
         ("packed_geometry", build_packed_geometry, ()),
+        ("packed_fragment", build_packed_fragment_geometry, ()),
         ("primitive_groups", build_primitive_groups_geometry, ()),
     )
 
