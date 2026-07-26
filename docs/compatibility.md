@@ -66,7 +66,7 @@ The Houdini-oriented `HouGeo` model currently supports:
 - `PolygonCurve_run`.
 - Dense scalar `Volume` records.
 - Point, vertex, primitive, and global attributes.
-- Unordered point, vertex, and primitive groups.
+- Unordered point, vertex, and primitive groups, including primitive groups spanning mixed polygon and dense-volume records.
 - Indexed string and dictionary data used by the covered fixtures.
 - Attribute definition scope and complete semantic `options` objects.
 

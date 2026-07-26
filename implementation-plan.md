@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The large Crag round trip and Houdini package matrix pass in all four maintained versions.
 - Documentation audit contains no retired API references and now records compatibility, fixture, contribution, field-format, and versioning contracts.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Phases 17–24 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
+- Phases 17–25 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
 
 ## Execution phases
 
@@ -735,6 +735,33 @@ Exit criteria:
 - Attribute scope survives faithful `HouGeo` round trips.
 - Nested option values and unknown option keys survive without interpretation or loss.
 - Existing adapters that do not provide metadata continue to export public attributes with empty options.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 25 — Mixed primitive-group and storage encapsulation audit
+
+**Status: complete.**
+
+Target files:
+
+- `src/HouGeo.cpp`
+- `tests/test_groups.cpp`
+- README, compatibility, and roadmap documents
+
+Tasks:
+
+- Reject empty programmatic group names.
+- Reject point, vertex, and primitive memberships that do not match their active domains.
+- Construct a faithful mixed-record geometry containing one polygon and one dense volume.
+- Round-trip independent primitive groups selecting each record type.
+- Confirm primitive order, counts, topology, and membership remain stable.
+- Audit `HouAttribute`, `HouTopology`, `HouVolume`, `HouPoly`, `HouGeo`, `Geometry`, and `Attribute` storage visibility.
+- Confirm mutable storage remains private and external access uses validated mutation or immutable views.
+
+Exit criteria:
+
+- Invalid programmatic group state is rejected before export.
+- Mixed polygon/volume primitive groups survive binary export and import.
+- Maintained implementation containers expose no public mutable storage.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work

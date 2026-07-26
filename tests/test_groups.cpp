@@ -114,6 +114,91 @@ int verifyGroups(const houio::HouGeo::Ptr& geometry)
         &houio::HouGeoAdapter::primitiveGroupMembership,
         {"left", "right"}, {{true, false}, {false, true}});
 }
+
+houio::HouGeo::Ptr createMixedPrimitiveGeometry()
+{
+    houio::HouGeo::Ptr geometry = houio::HouGeo::create();
+    houio::Attribute::Ptr positions = houio::Attribute::createV4f();
+    positions->appendElement(houio::math::V4f(0.0f, 0.0f, 0.0f, 1.0f));
+    positions->appendElement(houio::math::V4f(1.0f, 0.0f, 0.0f, 1.0f));
+    positions->appendElement(houio::math::V4f(0.0f, 1.0f, 0.0f, 1.0f));
+    geometry->setPointAttribute(
+        std::make_shared<houio::HouGeo::HouAttribute>("P", positions));
+
+    auto topology = std::make_shared<houio::HouGeo::HouTopology>();
+    topology->setIndices({0, 1, 2});
+    geometry->setTopology(topology);
+
+    auto polygon = std::make_shared<houio::HouGeo::HouPoly>();
+    polygon->setPolygonData(1, {3}, {0}, {0, 1, 2}, true);
+    geometry->addPrimitive(polygon);
+
+    houio::ScalarField::Ptr field = houio::ScalarField::create(
+        houio::math::V3i(1),
+        houio::math::Box3f(-1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f),
+        2.0f);
+    geometry->addPrimitive(field);
+    geometry->setPrimitiveGroup("surface", {true, false});
+    geometry->setPrimitiveGroup("density", {false, true});
+    return geometry;
+}
+
+int verifyMixedPrimitiveGroups(const houio::HouGeo::Ptr& geometry)
+{
+    if (!geometry || geometry->pointCount() != 4 || geometry->vertexCount() != 4
+        || geometry->primitiveCount() != 2)
+    {
+        return fail("mixed primitive geometry counts are incorrect");
+    }
+    const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives = geometry->primitives();
+    if (primitives.size() != 2
+        || !std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(primitives[0])
+        || !std::dynamic_pointer_cast<houio::HouGeoAdapter::VolumePrimitive>(primitives[1]))
+    {
+        return fail("mixed primitive records were not preserved");
+    }
+    return verifyGroupDomain(
+        geometry, &houio::HouGeoAdapter::primitiveGroupNames,
+        &houio::HouGeoAdapter::primitiveGroupMembership,
+        {"density", "surface"}, {{false, true}, {true, false}});
+}
+
+int verifyProgrammaticGroupValidation(const houio::HouGeo::Ptr& geometry)
+{
+    try
+    {
+        geometry->setPrimitiveGroup("", {true, false});
+        return fail("primitive group accepted an empty name");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+    try
+    {
+        geometry->setPrimitiveGroup("invalid", {true});
+        return fail("primitive group accepted the wrong membership count");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+    try
+    {
+        geometry->setPointGroup("invalid", {true});
+        return fail("point group accepted the wrong membership count");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+    try
+    {
+        geometry->setVertexGroup("invalid", {true});
+        return fail("vertex group accepted the wrong membership count");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+    return 0;
+}
 }
 
 int main()
@@ -132,5 +217,18 @@ int main()
     }
 
     std::istringstream binaryInput(binaryOutput.str(), std::ios::in | std::ios::binary);
-    return verifyGroups(houio::HouGeoIO::import(binaryInput));
+    if (const int result = verifyGroups(houio::HouGeoIO::import(binaryInput)); result != 0)
+        return result;
+
+    houio::HouGeo::Ptr mixedGeometry = createMixedPrimitiveGeometry();
+    if (const int result = verifyProgrammaticGroupValidation(mixedGeometry); result != 0)
+        return result;
+    if (const int result = verifyMixedPrimitiveGroups(mixedGeometry); result != 0)
+        return result;
+
+    std::ostringstream mixedOutput(std::ios::out | std::ios::binary);
+    if (!houio::HouGeoIO::exportGeometry(mixedOutput, mixedGeometry, true))
+        return fail("failed to export mixed primitive groups");
+    std::istringstream mixedInput(mixedOutput.str(), std::ios::in | std::ios::binary);
+    return verifyMixedPrimitiveGroups(houio::HouGeoIO::import(mixedInput));
 }

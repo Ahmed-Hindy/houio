@@ -57,6 +57,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add opt-in dependency-free baselines for numeric attributes, topology generation/traversal, and dense-volume import.
 - [x] Add a structured simplified-conversion result that reports splits, duplicates, skipped attributes, dropped groups, winding changes, and diagnostics.
 - [x] Preserve attribute definition scope and complete semantic `options` objects across import and export.
+- [x] Validate programmatic group domains and preserve primitive groups spanning mixed polygon and dense-volume records.
+- [x] Audit maintained containers and confirm active implementation storage is private behind validated APIs or immutable views.
 
 ## Modernization next
 
@@ -138,7 +140,7 @@ Priority levels:
 ### Geometry
 
 - [ ] Preserve point and vertex domains in a lossless mesh representation.
-- [ ] Support mixed primitive groups.
+- [x] Support mixed primitive groups.
 - [ ] Support arbitrary n-gons in simplified conversion or return multiple geometry objects.
 - [ ] Preserve face-varying attributes without forced point duplication.
 - [x] Add a conversion result that reports splits, losses, and unsupported data.
@@ -171,7 +173,7 @@ Add fixture-backed support one record type at a time:
 ### Geometry
 
 - [x] Verify the file-format library contains no OpenGL-specific buffer identifiers and guard against their reintroduction.
-- [ ] Hide mutable implementation details where practical.
+- [x] Hide mutable implementation details where practical.
 - [ ] Make lossless and simplified geometry responsibilities explicit in type names and APIs.
 
 ### Field

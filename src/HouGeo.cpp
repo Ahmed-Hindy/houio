@@ -587,16 +587,31 @@ namespace houio
 
 	void HouGeo::setPointGroup( const std::string &name, const std::vector<bool> &membership )
 	{
+		if( name.empty() )
+			throw std::invalid_argument( "HouGeo::setPointGroup requires a non-empty name" );
+		const sint64 elementCount = pointCount();
+		if( elementCount < 0 || static_cast<uint64>(elementCount) != membership.size() )
+			throw std::invalid_argument( "HouGeo::setPointGroup membership count does not match pointcount" );
 		m_pointGroups[name] = membership;
 	}
 
 	void HouGeo::setVertexGroup( const std::string &name, const std::vector<bool> &membership )
 	{
+		if( name.empty() )
+			throw std::invalid_argument( "HouGeo::setVertexGroup requires a non-empty name" );
+		const sint64 elementCount = vertexCount();
+		if( elementCount < 0 || static_cast<uint64>(elementCount) != membership.size() )
+			throw std::invalid_argument( "HouGeo::setVertexGroup membership count does not match vertexcount" );
 		m_vertexGroups[name] = membership;
 	}
 
 	void HouGeo::setPrimitiveGroup( const std::string &name, const std::vector<bool> &membership )
 	{
+		if( name.empty() )
+			throw std::invalid_argument( "HouGeo::setPrimitiveGroup requires a non-empty name" );
+		const sint64 elementCount = primitiveCount();
+		if( elementCount < 0 || static_cast<uint64>(elementCount) != membership.size() )
+			throw std::invalid_argument( "HouGeo::setPrimitiveGroup membership count does not match primitivecount" );
 		m_primitiveGroups[name] = membership;
 	}
 
