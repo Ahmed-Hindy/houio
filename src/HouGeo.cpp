@@ -1519,9 +1519,7 @@ namespace houio
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 				"HouGeo::loadPrimitive does not support run type " + definition->get<std::string>("runtype"), -1, "definition.runtype"});
 		}
-		else if( primitiveType!="Volume" && primitiveType!="PackedGeometry"
-			&& primitiveType!="VDB" && primitiveType!="Poly" && primitiveType!="Polygon_run"
-			&& primitiveType!="p_r" && primitiveType!="PolygonCurve_run" && primitiveType!="c_r" )
+		else
 		{
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 				"HouGeo::loadPrimitive does not support primitive type " + primitiveType, -1, "definition.type"});

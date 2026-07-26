@@ -7,6 +7,8 @@
 #include <atomic>
 #include <cctype>
 #include <chrono>
+#include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <limits>
 #include <sstream>
@@ -16,6 +18,9 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
 #endif
 
 #include <houio/HouGeoIO.h>
@@ -152,16 +157,99 @@ namespace houio
             return true;
         }
 
+        unsigned long long currentProcessId() noexcept
+        {
+#if defined(_WIN32)
+            return static_cast<unsigned long long>(GetCurrentProcessId());
+#else
+            return static_cast<unsigned long long>(getpid());
+#endif
+        }
+
         std::filesystem::path temporaryOutputPath(const std::filesystem::path &path)
         {
             static std::atomic<unsigned long long> sequence{0};
             const unsigned long long timestamp = static_cast<unsigned long long>(
                 std::chrono::steady_clock::now().time_since_epoch().count());
             std::filesystem::path temporary = path;
-            temporary += ".houio.tmp." + std::to_string(timestamp) + "."
+            temporary += ".houio.tmp." + std::to_string(currentProcessId()) + "."
+                + std::to_string(timestamp) + "."
                 + std::to_string(sequence.fetch_add(1, std::memory_order_relaxed));
             return temporary;
         }
+
+        bool synchronizeFile(const std::filesystem::path &path, DiagnosticList &diagnostics)
+        {
+#if defined(_WIN32)
+            const HANDLE handle = CreateFileW(
+                path.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if( handle == INVALID_HANDLE_VALUE )
+            {
+                appendResultError(diagnostics, DiagnosticCategory::io,
+                    "Could not open temporary geometry output for synchronization: "
+                        + path.string() + " (Windows error "
+                        + std::to_string(GetLastError()) + ")");
+                return false;
+            }
+            const bool synchronized = FlushFileBuffers(handle) != 0;
+            const DWORD errorCode = synchronized ? ERROR_SUCCESS : GetLastError();
+            CloseHandle(handle);
+            if( synchronized )
+                return true;
+            appendResultError(diagnostics, DiagnosticCategory::io,
+                "Could not synchronize temporary geometry output: " + path.string()
+                    + " (Windows error " + std::to_string(errorCode) + ")");
+            return false;
+#else
+            const int descriptor = open(path.c_str(), O_RDONLY);
+            if( descriptor < 0 )
+            {
+                appendResultError(diagnostics, DiagnosticCategory::io,
+                    "Could not open temporary geometry output for synchronization: "
+                        + path.string() + " (" + std::strerror(errno) + ")");
+                return false;
+            }
+            const int syncResult = fsync(descriptor);
+            const int syncError = errno;
+            close(descriptor);
+            if( syncResult == 0 )
+                return true;
+            appendResultError(diagnostics, DiagnosticCategory::io,
+                "Could not synchronize temporary geometry output: " + path.string()
+                    + " (" + std::strerror(syncError) + ")");
+            return false;
+#endif
+        }
+
+#if !defined(_WIN32)
+        bool synchronizeDirectory(const std::filesystem::path &path, DiagnosticList &diagnostics)
+        {
+            const std::filesystem::path directory = path.empty()
+                ? std::filesystem::path(".") : path;
+#ifdef O_DIRECTORY
+            const int descriptor = open(directory.c_str(), O_RDONLY | O_DIRECTORY);
+#else
+            const int descriptor = open(directory.c_str(), O_RDONLY);
+#endif
+            if( descriptor < 0 )
+            {
+                appendResultError(diagnostics, DiagnosticCategory::io,
+                    "Could not open geometry output directory for synchronization: "
+                        + directory.string() + " (" + std::strerror(errno) + ")");
+                return false;
+            }
+            const int syncResult = fsync(descriptor);
+            const int syncError = errno;
+            close(descriptor);
+            if( syncResult == 0 )
+                return true;
+            appendResultError(diagnostics, DiagnosticCategory::io,
+                "Could not synchronize geometry output directory: " + directory.string()
+                    + " (" + std::strerror(syncError) + ")");
+            return false;
+        }
+#endif
 
         bool replaceOutputFile(const std::filesystem::path &temporary,
             const std::filesystem::path &destination, bool overwriteExisting,
@@ -178,16 +266,34 @@ namespace houio
                 "Could not replace geometry output file: " + destination.string()
                     + " (Windows error " + std::to_string(errorCode) + ")");
 #else
-            if( !overwriteExisting && std::filesystem::exists(destination) )
+            if( !overwriteExisting )
             {
-                appendResultError(diagnostics, DiagnosticCategory::io,
-                    "Geometry output file already exists: " + destination.string());
-                return false;
+                std::error_code linkError;
+                std::filesystem::create_hard_link(temporary, destination, linkError);
+                if( linkError )
+                {
+                    const std::string message = std::filesystem::exists(destination)
+                        ? "Geometry output file already exists: " + destination.string()
+                        : "Could not create geometry output file without replacement: "
+                            + destination.string() + " (" + linkError.message() + ")";
+                    appendResultError(diagnostics, DiagnosticCategory::io, message);
+                    return false;
+                }
+                std::error_code removeError;
+                std::filesystem::remove(temporary, removeError);
+                if( removeError )
+                {
+                    appendResultError(diagnostics, DiagnosticCategory::io,
+                        "Could not remove temporary geometry output file: "
+                            + temporary.string() + " (" + removeError.message() + ")");
+                    return false;
+                }
+                return synchronizeDirectory(destination.parent_path(), diagnostics);
             }
             std::error_code renameError;
             std::filesystem::rename(temporary, destination, renameError);
             if( !renameError )
-                return true;
+                return synchronizeDirectory(destination.parent_path(), diagnostics);
             appendResultError(diagnostics, DiagnosticCategory::io,
                 "Could not replace geometry output file: " + destination.string()
                     + " (" + renameError.message() + ")");
@@ -251,6 +357,12 @@ namespace houio
 
             if( !options.atomicReplace )
                 return true;
+            if( !synchronizeFile(outputPath, diagnostics) )
+            {
+                std::error_code removeError;
+                std::filesystem::remove(outputPath, removeError);
+                return false;
+            }
             if( replaceOutputFile(outputPath, path, options.overwriteExisting, diagnostics) )
                 return true;
             std::error_code removeError;

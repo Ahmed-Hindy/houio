@@ -80,6 +80,19 @@ def _domain_elements(geometry: hou.Geometry, domain: str) -> tuple[Any, ...]:
     raise ValueError(f"Unknown attribute domain: {domain}")
 
 
+def _domain_element_count(geometry: hou.Geometry, domain: str) -> int:
+    """Return one attribute-domain count without materializing its elements."""
+    if domain == "point":
+        return len(geometry.points())
+    if domain == "vertex":
+        return _vertex_count(geometry)
+    if domain == "primitive":
+        return len(geometry.prims())
+    if domain == "global":
+        return 1
+    raise ValueError(f"Unknown attribute domain: {domain}")
+
+
 def _numeric_values(
     geometry: hou.Geometry, attribute: hou.Attrib, domain: str
 ) -> list[int | float]:
@@ -148,7 +161,7 @@ def _attribute_manifest(
     definition: dict[str, Any] = {
         "name": attribute.name(),
         "tuple_size": int(attribute.size()),
-        "element_count": len(_domain_elements(geometry, domain)),
+        "element_count": _domain_element_count(geometry, domain),
         "scope": "public",
     }
     data_type = str(attribute.dataType())
@@ -184,6 +197,31 @@ def _attribute_manifest(
     return definition
 
 
+def _position_manifest(geometry: hou.Geometry) -> dict[str, Any]:
+    """Return canonical float32 four-tuple point positions.
+
+    HOM point positions are intentionally normalized to Houdini's canonical
+    ``P`` interchange representation, even when the source attribute reports a
+    wider numeric storage type.
+    """
+    positions: list[float] = []
+    points = geometry.points()
+    for point in points:
+        position = point.position()
+        positions.extend(
+            (float(position[0]), float(position[1]), float(position[2]), 1.0)
+        )
+    return {
+        "name": "P",
+        "kind": "numeric",
+        "storage": "float32",
+        "tuple_size": 4,
+        "element_count": len(points),
+        "scope": "public",
+        "values": positions,
+    }
+
+
 def _attributes(geometry: hou.Geometry) -> dict[str, list[dict[str, Any]]]:
     """Extract all maintained attribute domains."""
     result: dict[str, list[dict[str, Any]]] = {
@@ -201,44 +239,11 @@ def _attributes(geometry: hou.Geometry) -> dict[str, list[dict[str, Any]]]:
     for domain, attributes in domain_attributes.items():
         for attribute in attributes:
             if domain == "point" and attribute.name() == "P":
-                positions: list[float] = []
-                for point in geometry.points():
-                    position = point.position()
-                    positions.extend(
-                        (float(position[0]), float(position[1]), float(position[2]), 1.0)
-                    )
-                result[domain].append(
-                    {
-                        "name": "P",
-                        "kind": "numeric",
-                        "storage": "float32",
-                        "tuple_size": 4,
-                        "element_count": len(geometry.points()),
-                        "scope": "public",
-                        "values": positions,
-                    }
-                )
+                result[domain].append(_position_manifest(geometry))
                 continue
             result[domain].append(_attribute_manifest(geometry, attribute, domain))
     if not any(attribute["name"] == "P" for attribute in result["point"]):
-        positions = []
-        for point in geometry.points():
-            position = point.position()
-            positions.extend(
-                (float(position[0]), float(position[1]), float(position[2]), 1.0)
-            )
-        result["point"].insert(
-            0,
-            {
-                "name": "P",
-                "kind": "numeric",
-                "storage": "float32",
-                "tuple_size": 4,
-                "element_count": len(geometry.points()),
-                "scope": "public",
-                "values": positions,
-            },
-        )
+        result["point"].insert(0, _position_manifest(geometry))
     return result
 
 

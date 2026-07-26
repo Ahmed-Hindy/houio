@@ -1,6 +1,6 @@
 # Fixture generation and validation
 
-HouIO fixtures are generated into the build tree with Houdini rather than committed as opaque binary files. The generator records deterministic counts, attribute names, group names, primitive closure, packed embedded-payload metadata, native VDB sparse summaries, the producing Houdini build, and any intentional losses in `manifest.json`.
+HouIO fixtures are generated into the build tree with Houdini rather than committed as opaque binary files. The generated `manifest.json` records deterministic counts, attribute and group names, primitive closure flags, the producing Houdini build, and any intentional losses. The validator computes richer packed-geometry and native VDB summaries directly from the source and candidate files during comparison.
 
 ## Maintained Houdini builds
 
@@ -11,7 +11,7 @@ The default Windows validation matrix is:
 - 21.0.631
 - 22.0.368
 
-The generator defaults to 22.0.368. Each output is then loaded and compared independently by all four maintained versions.
+Direct fixture generation uses the `hython` executable configured for the active CMake build. The maintained cross-version script described below deliberately uses Houdini 20.0.653 as its default producer, then loads and compares each output independently with all four maintained versions.
 
 Expected installation layout:
 
@@ -38,7 +38,7 @@ The script performs these steps:
 6. Loads source and candidate files in every requested Houdini version.
 7. Compares counts, attributes, topology, groups, and supported volume data.
 
-The default generator is Houdini 20.0.653, the oldest maintained build. This matters for native VDB fixtures because newer Houdini/OpenVDB payload versions may not be readable by older Houdini builds.
+`run_fixture_roundtrips.ps1` defaults to Houdini 20.0.653 as the producer because it is the oldest maintained build. Native VDB payloads written by newer Houdini/OpenVDB versions may not be readable by older Houdini builds.
 
 Override the matrix explicitly when the validation set does not include an older VDB reader:
 

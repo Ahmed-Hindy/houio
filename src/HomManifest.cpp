@@ -69,6 +69,9 @@ namespace houio
             if( value < 0 )
                 failManifest(DiagnosticCategory::schema,
                     "Manifest count cannot be negative", path);
+            if( value > static_cast<sint64>(std::numeric_limits<int>::max()) )
+                failManifest(DiagnosticCategory::schema,
+                    "Manifest count is outside the supported int range", path);
             return static_cast<std::size_t>(value);
         }
 
@@ -397,6 +400,13 @@ namespace houio
                 const int vertexOffset = checkedCount(
                     definition->get<sint64>("vertex_offset", 0),
                     path + ".vertex_offset");
+                if( type != "polygon"
+                    && static_cast<std::size_t>(vertexOffset) >= topology.size() )
+                {
+                    failManifest(DiagnosticCategory::schema,
+                        "Primitive topology vertex exceeds the topology domain",
+                        path + ".vertex_offset");
+                }
                 if( type == "polygon" )
                 {
                     const int vertexCount = checkedCount(

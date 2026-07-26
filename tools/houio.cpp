@@ -210,6 +210,8 @@ namespace
             << "  houio diagnose [--json]\n\n"
             << "Write options:\n"
             << "  --format <bgeo|bgeo.sc|geo|vdb>\n"
+            << "    ASCII GEO and standalone VDB output may be unavailable;\n"
+            << "    run 'houio capabilities' to verify write support.\n"
             << "  --no-overwrite\n"
             << "  --no-create-directories\n"
             << "  --no-atomic\n"
@@ -319,16 +321,20 @@ namespace
             : static_cast<int>(classifyFailure(result.diagnostics, ExitCode::input));
     }
 
-    int writeFile(const std::filesystem::path &inputPath,
-        const std::filesystem::path &outputPath, const Arguments &arguments)
+    int writeReadResult(
+        houio::GeometryReadResult<houio::HouGeo::Ptr> readResult,
+        const std::filesystem::path &sourcePath,
+        const std::filesystem::path &outputPath,
+        const Arguments &arguments,
+        std::string_view readStage,
+        std::string_view sourceField)
     {
-        houio::GeometryReadResult<houio::HouGeo::Ptr> readResult =
-            houio::GeometryIO::readHouGeo(inputPath);
         if( !readResult )
         {
             if( arguments.json )
             {
-                std::cout << "{\"success\":false,\"stage\":\"read\",\"diagnostics\":";
+                std::cout << "{\"success\":false,\"stage\":\""
+                    << jsonEscape(readStage) << "\",\"diagnostics\":";
                 printDiagnostics(readResult.diagnostics, true);
                 std::cout << "}\n";
             }
@@ -351,14 +357,18 @@ namespace
         if( arguments.json )
         {
             std::cout << "{\"success\":" << (writeResult ? "true" : "false")
-                << ",\"input\":\"" << jsonEscape(inputPath.string())
+                << ",\"" << jsonEscape(sourceField) << "\":\""
+                << jsonEscape(sourcePath.string())
                 << "\",\"output\":\"" << jsonEscape(outputPath.string())
                 << "\",\"points\":" << readResult.value->pointCount()
                 << ",\"vertices\":" << readResult.value->vertexCount()
                 << ",\"primitives\":" << readResult.value->primitiveCount()
                 << ",\"diagnostics\":";
             houio::DiagnosticList diagnostics = std::move(readResult.diagnostics);
-            diagnostics.insert(diagnostics.end(), writeResult.diagnostics.begin(), writeResult.diagnostics.end());
+            diagnostics.insert(
+                diagnostics.end(),
+                writeResult.diagnostics.begin(),
+                writeResult.diagnostics.end());
             printDiagnostics(diagnostics, true);
             std::cout << "}\n";
         }
@@ -379,64 +389,28 @@ namespace
             : static_cast<int>(classifyFailure(writeResult.diagnostics, ExitCode::output));
     }
 
+    int writeFile(const std::filesystem::path &inputPath,
+        const std::filesystem::path &outputPath, const Arguments &arguments)
+    {
+        return writeReadResult(
+            houio::GeometryIO::readHouGeo(inputPath),
+            inputPath,
+            outputPath,
+            arguments,
+            "read",
+            "input");
+    }
+
     int writeManifest(const std::filesystem::path &manifestPath,
         const std::filesystem::path &outputPath, const Arguments &arguments)
     {
-        houio::GeometryReadResult<houio::HouGeo::Ptr> manifestResult =
-            houio::HomManifest::read(manifestPath);
-        if( !manifestResult )
-        {
-            if( arguments.json )
-            {
-                std::cout << "{\"success\":false,\"stage\":\"manifest\",\"diagnostics\":";
-                printDiagnostics(manifestResult.diagnostics, true);
-                std::cout << "}\n";
-            }
-            else
-                printDiagnostics(manifestResult.diagnostics, false);
-            return static_cast<int>(classifyFailure(
-                manifestResult.diagnostics, ExitCode::input));
-        }
-
-        houio::GeometryWriteOptions options;
-        options.overwriteExisting = arguments.overwrite;
-        options.createParentDirectories = arguments.createDirectories;
-        options.atomicReplace = arguments.atomic;
-        if( arguments.outputFormat )
-            options.format = *arguments.outputFormat;
-
-        const houio::WriteResult writeResult = houio::Writer::write(
+        return writeReadResult(
+            houio::HomManifest::read(manifestPath),
+            manifestPath,
             outputPath,
-            std::static_pointer_cast<houio::HouGeoAdapter>(manifestResult.value),
-            options);
-        if( arguments.json )
-        {
-            std::cout << "{\"success\":" << (writeResult ? "true" : "false")
-                << ",\"manifest\":\"" << jsonEscape(manifestPath.string())
-                << "\",\"output\":\"" << jsonEscape(outputPath.string())
-                << "\",\"points\":" << manifestResult.value->pointCount()
-                << ",\"vertices\":" << manifestResult.value->vertexCount()
-                << ",\"primitives\":" << manifestResult.value->primitiveCount()
-                << ",\"diagnostics\":";
-            houio::DiagnosticList diagnostics = std::move(manifestResult.diagnostics);
-            diagnostics.insert(
-                diagnostics.end(),
-                writeResult.diagnostics.begin(),
-                writeResult.diagnostics.end());
-            printDiagnostics(diagnostics, true);
-            std::cout << "}\n";
-        }
-        else
-        {
-            printDiagnostics(manifestResult.diagnostics, false);
-            printDiagnostics(writeResult.diagnostics, false);
-            if( writeResult )
-                std::cout << "wrote=" << outputPath.string() << '\n';
-        }
-        return writeResult
-            ? static_cast<int>(ExitCode::success)
-            : static_cast<int>(classifyFailure(
-                writeResult.diagnostics, ExitCode::output));
+            arguments,
+            "manifest",
+            "manifest");
     }
 
     int printCapabilities(bool json)

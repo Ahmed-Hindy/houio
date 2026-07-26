@@ -365,24 +365,43 @@ def package_diagnostics() -> dict[str, object]:
     blosc_path = Path(blosc_text) if blosc_text else None
 
     writer_diagnostics: dict[str, object] = {}
+    writer_diagnostics_ok = False
     if writer_path and writer_path.is_file():
-        completed = subprocess.run(
-            (str(writer_path), "diagnose", "--json"),
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30.0,
-        )
-        if completed.returncode == 0:
-            try:
-                writer_diagnostics = json.loads(completed.stdout)
-            except json.JSONDecodeError:
-                writer_diagnostics = {"raw": completed.stdout.strip()}
-        else:
+        try:
+            completed = subprocess.run(
+                (str(writer_path), "diagnose", "--json"),
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30.0,
+            )
+        except subprocess.TimeoutExpired as exception:
             writer_diagnostics = {
-                "returncode": completed.returncode,
-                "stderr": completed.stderr.strip(),
+                "error": "writer diagnostics timed out",
+                "timeout_seconds": exception.timeout,
             }
+        except OSError as exception:
+            writer_diagnostics = {
+                "error": "writer diagnostics could not start",
+                "detail": str(exception),
+            }
+        else:
+            if completed.returncode == 0:
+                try:
+                    writer_diagnostics = json.loads(completed.stdout)
+                    writer_diagnostics_ok = True
+                except json.JSONDecodeError as exception:
+                    writer_diagnostics = {
+                        "error": "writer diagnostics returned invalid JSON",
+                        "detail": str(exception),
+                        "raw": completed.stdout.strip(),
+                    }
+            else:
+                writer_diagnostics = {
+                    "error": "writer diagnostics failed",
+                    "returncode": completed.returncode,
+                    "stderr": completed.stderr.strip(),
+                }
 
     return {
         "houdini_version": hou.applicationVersionString(),
@@ -394,6 +413,7 @@ def package_diagnostics() -> dict[str, object]:
         "writer": str(writer_path) if writer_path else "not set",
         "writer_exists": bool(writer_path and writer_path.is_file()),
         "writer_diagnostics": writer_diagnostics,
+        "writer_diagnostics_ok": writer_diagnostics_ok,
         "converter": str(converter_path) if converter_path else "not set",
         "converter_exists": bool(converter_path and converter_path.is_file()),
         "blosc_library": str(blosc_path) if blosc_path else "not set",
@@ -412,6 +432,7 @@ def show_package_diagnostics() -> dict[str, object]:
     healthy = bool(
         diagnostics["package_root_exists"]
         and diagnostics["writer_exists"]
+        and diagnostics["writer_diagnostics_ok"]
         and diagnostics["converter_exists"]
         and diagnostics["blosc_exists"]
     )

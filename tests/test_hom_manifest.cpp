@@ -139,6 +139,70 @@ namespace
         return 0;
     }
 
+    int verifyInvalidTopologyOffsets(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path densePath = directory / "invalid_dense_offset.json";
+        writeText(densePath, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,
+            "vertex_count":1,
+            "primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"dense_volume","vertex_offset":1,"resolution":[1,1,1],
+                "local_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                "voxels":[1]
+            }],
+            "attributes":{
+                "point":[{
+                    "name":"P","kind":"numeric","storage":"float32",
+                    "tuple_size":4,"element_count":1,"values":[0,0,0,1]
+                }],
+                "vertex":[],"primitive":[],"global":[]
+            }
+        })JSON");
+        const auto denseResult = houio::HomManifest::read(densePath);
+        if( denseResult
+            || !containsCategory(denseResult.diagnostics, houio::DiagnosticCategory::schema) )
+        {
+            return fail("dense-volume manifest accepted an out-of-range topology vertex");
+        }
+
+        const std::filesystem::path packedPath = directory / "invalid_packed_offset.json";
+        writeText(packedPath, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,
+            "vertex_count":1,
+            "primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"packed_geometry","vertex_offset":1,
+                "pivot":[0,0,0],
+                "transform":[1,0,0,0,1,0,0,0,1],
+                "embedded_manifest":{
+                    "schema":"houio.hom/1",
+                    "point_count":0,"vertex_count":0,"primitive_count":0,
+                    "topology":[],"primitives":[],
+                    "attributes":{"point":[],"vertex":[],"primitive":[],"global":[]}
+                }
+            }],
+            "attributes":{
+                "point":[{
+                    "name":"P","kind":"numeric","storage":"float32",
+                    "tuple_size":4,"element_count":1,"values":[0,0,0,1]
+                }],
+                "vertex":[],"primitive":[],"global":[]
+            }
+        })JSON");
+        const auto packedResult = houio::HomManifest::read(packedPath);
+        if( packedResult
+            || !containsCategory(packedResult.diagnostics, houio::DiagnosticCategory::schema) )
+        {
+            return fail("packed manifest accepted an out-of-range topology vertex");
+        }
+        return 0;
+    }
+
     int verifyUnsupportedRecord(const std::filesystem::path &directory)
     {
         const std::filesystem::path path = directory / "packed_fragment.json";
@@ -178,6 +242,8 @@ int main()
         return fail("could not create HOM manifest test directory");
 
     if( const int result = verifyMixedManifest(directory); result != 0 )
+        return result;
+    if( const int result = verifyInvalidTopologyOffsets(directory); result != 0 )
         return result;
     if( const int result = verifyUnsupportedRecord(directory); result != 0 )
         return result;
