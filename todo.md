@@ -10,7 +10,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - Current exact source: Windows AddressSanitizer passes **24/24** and MSVC native analysis is error-clean.
 - Full Release/Houdini validation passes **57/57**.
 - Direct custom writing, the 18-fixture matrix, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
-- The active branch adds external `PackedDisk` references across the file model, direct HOM manifest, CLI, fixtures, and compatibility documentation without dereferencing targets.
+- The active branch completes the packed-reference family with `PackedDiskSequence` file, manifest, direct-HOM, CLI, fixture, and compatibility support.
 
 ## Modernization completed
 
@@ -95,7 +95,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add fixture-backed embedded `PackedGeometry` support, including direct HOM extraction.
 - [x] Add named packed fragments with fragment identity, bounds, transforms, shared payloads, and four-version fixtures.
 - [x] Add packed disk primitives with authored paths, expansion metadata, transforms, flags, direct HOM extraction, and four-version fixtures.
-- [ ] Add packed disk sequences.
+- [x] Add packed disk sequences with explicit sample lists, fractional index, wrap modes, direct HOM extraction, and four-version fixtures.
 - [x] Preserve native sparse VDB primitive payloads without forced densification during file round trips.
 - [ ] Add an optional OpenVDB backend for native sparse-tree construction and editing from live HOM data.
 - [ ] Continue with curves, instancing, height fields, and other observed records one family at a time.
@@ -192,7 +192,7 @@ Add fixture-backed support one record type at a time:
 - [x] Embedded packed geometry
 - [x] Named packed fragments
 - [x] External packed disk references
-- [ ] Packed disk sequences
+- [x] Packed disk sequences
 - [ ] NURBS and Bezier curves
 - [ ] Spheres and tubes
 - [ ] Tetrahedra

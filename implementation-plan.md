@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The 18-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Documentation records the primary Writer/CLI/HOM workflow, packed geometry/fragment/disk support, native VDB payload preservation, and remaining backend limitations.
 - Phases 11–31 are merged into `master` through PRs #31 and #32.
-- Phases 32–34 are complete and merged. Phase 35 supports embedded PackedGeometry, named PackedFragment, and external PackedDisk records; PackedDiskSequence remains open. Phase 36 supports lossless opaque native VDB payload preservation.
+- Phases 32–34 are complete and merged. Phase 35 supports embedded PackedGeometry, named PackedFragment, external PackedDisk, and PackedDiskSequence records. Phase 36 supports lossless opaque native VDB payload preservation; optional sparse-tree construction/editing remains open.
 
 ## Execution phases
 
@@ -999,7 +999,7 @@ Exit criteria:
 
 ### Phase 35 — Packed primitive family
 
-**Status: embedded `PackedGeometry`, named `PackedFragment`, and external `PackedDisk` complete; packed disk sequences remain open.**
+**Status: embedded `PackedGeometry`, named `PackedFragment`, external `PackedDisk`, and `PackedDiskSequence` complete.**
 
 Goals:
 
@@ -1023,7 +1023,7 @@ Goals:
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
 
-- Packed disk sequences and additional primitive-record families.
+- Additional primitive-record families after the packed-reference family.
 - Lossless point/vertex-domain redesign.
 - OpenVDB-backed sparse-tree construction and editing APIs.
 - Performance architecture changes that bypass the JSON tree.

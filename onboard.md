@@ -277,7 +277,7 @@ Topology values are point indices. Primitive records refer to topology ranges, n
 
 ### Packed primitives
 
-Embedded `PackedGeometry` records preserve their shared HouGeo payload, topology vertex, pivot, transform, viewport LOD, and instancing/folder flags. Named `PackedFragment` records additionally preserve fragment attribute/name and local cached bounds. External `PackedDisk` records preserve the authored filename, expansion frame/policy, transform metadata, and flags without dereferencing the target; they are supported by direct HOM extraction. Direct HOM extraction of an existing `hou.PackedFragment` remains unavailable because HOM does not expose its embedded source detail.
+Embedded `PackedGeometry` records preserve their shared HouGeo payload, topology vertex, pivot, transform, viewport LOD, and instancing/folder flags. Named `PackedFragment` records additionally preserve fragment attribute/name and local cached bounds. External `PackedDisk` records preserve the authored filename, expansion frame/policy, transform metadata, and flags without dereferencing the target. `PackedDiskSequence` records preserve their explicit sample list, fractional index, wrap mode, transform metadata, and point-instancing flag. Both are supported by direct HOM extraction. Direct HOM extraction of an existing `hou.PackedFragment` remains unavailable because HOM does not expose its embedded source detail.
 
 ### VDB
 
