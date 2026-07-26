@@ -9,6 +9,16 @@ namespace houio
         return {};
     }
 
+    std::string HouGeoAdapter::AttributeAdapter::scope() const
+    {
+        return "public";
+    }
+
+    std::shared_ptr<json::Object> HouGeoAdapter::AttributeAdapter::options() const
+    {
+        return nullptr;
+    }
+
     HouGeoAdapter::AttributeAdapter::Type HouGeoAdapter::AttributeAdapter::type() const
     {
         return Type::invalid;
@@ -24,6 +34,11 @@ namespace houio
         return {};
     }
 
+    std::span<const int> HouGeoAdapter::Topology::indexView() const noexcept
+    {
+        return {};
+    }
+
     int HouGeoAdapter::AttributeAdapter::elementCount() const
     {
         return 0;
@@ -32,6 +47,15 @@ namespace houio
     HouGeoAdapter::RawDataView HouGeoAdapter::AttributeAdapter::rawData() const
     {
         return {};
+    }
+
+    std::string HouGeoAdapter::AttributeAdapter::stringValue(
+        int element_index,
+        int component_index) const
+    {
+        if (component_index != 0)
+            throw std::out_of_range("AttributeAdapter string component is out of range");
+        return stringValue(element_index);
     }
 
     std::shared_ptr<json::Object> HouGeoAdapter::AttributeAdapter::dictionaryValue(int) const
@@ -277,6 +301,11 @@ namespace houio
     }
 
     std::vector<HouGeoAdapter::Primitive::ConstPtr> HouGeoAdapter::primitives() const
+    {
+        return {};
+    }
+
+    std::span<const HouGeoAdapter::Primitive::Ptr> HouGeoAdapter::primitiveView() const noexcept
     {
         return {};
     }

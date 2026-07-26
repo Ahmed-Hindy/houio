@@ -1,4 +1,4 @@
-"""Generate minimal Houdini 21/22 geometry compatibility fixtures."""
+"""Generate minimal Houdini 20.0+ geometry compatibility fixtures."""
 
 from __future__ import annotations
 
@@ -182,9 +182,19 @@ def build_paged_attributes_geometry() -> hou.Geometry:
     )
     constant_attribute = geometry.addAttrib(hou.attribType.Point, "page_constant", 0.0)
     varying_attribute = geometry.addAttrib(hou.attribType.Point, "page_id", 0)
+    string_attribute = geometry.addAttrib(hou.attribType.Point, "page_label", "")
+    string_tuple_attribute = geometry.addAttrib(
+        hou.attribType.Point, "page_label_pair", ("", "")
+    )
     for point_index, point in enumerate(points):
-        point.setAttribValue(constant_attribute, float(point_index // 1024 + 1))
+        page_index = point_index // 1024
+        point.setAttribValue(constant_attribute, float(page_index + 1))
         point.setAttribValue(varying_attribute, point_index * 3 - 17)
+        point.setAttribValue(string_attribute, f"page_{page_index}")
+        point.setAttribValue(
+            string_tuple_attribute,
+            (f"page_{page_index}", f"point_{point_index}"),
+        )
     return geometry
 
 
@@ -308,6 +318,11 @@ def build_uv_seam_geometry() -> hou.Geometry:
         vertex.setAttribValue(uv_attribute, uv_value)
     for vertex, uv_value in zip(second_polygon.vertices(), second_uvs):
         vertex.setAttribValue(uv_attribute, uv_value)
+
+    corner_label = geometry.addAttrib(hou.attribType.Vertex, "corner_label", "")
+    vertices = list(first_polygon.vertices()) + list(second_polygon.vertices())
+    for corner_index, vertex in enumerate(vertices):
+        vertex.setAttribValue(corner_label, f"corner_{corner_index}")
 
     return geometry
 

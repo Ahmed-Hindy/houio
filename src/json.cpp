@@ -651,7 +651,7 @@ namespace houio
 
 		bool Parser::readASCIIToken( Token &t, char c )
 		{
-			// Read an ASCII token (returns a _jValue or None)
+			// Decode one ASCII token into the supplied token record.
 			while( (c == ' ')||(c == '\r')||(c == '\n')||(c == '\t') )
 			{
 				c = read<char>();
@@ -774,13 +774,11 @@ namespace houio
 			else
 				state = stateStack.top();
 
-						
 			if( (state == STATE_MAP_NEED_VALUE)||(state == STATE_MAP_START))
 				setState( STATE_MAP_GOT_VALUE );
 			else if( (state == STATE_ARRAY_NEED_VALUE)||(state == STATE_ARRAY_START))
 				setState( STATE_ARRAY_GOT_VALUE );
 
-			// return true
 		}
 
 		void Parser::setState( State s )
@@ -824,15 +822,10 @@ namespace houio
 
 		sint64 Parser::readLength()
 		{
-			// In the binary format, length is encoded in a multi-byte format.
-			//For lenthgs < 0xf1 (240) the lenths are stored as a single byte.
-			//If the length is longer than 240 bytes, the value of the first byte
-			//determines the number of bytes that follow used to store the
-			//length.  Currently, the only supported values for the binary byte
-			//0xf2 = 2 bytes (16 bit unsigned length)
-			//0xf4 = 4 bytes (32 bit unsigned length)
-			//0xf8 = 8 bytes (64 bit signed length)
-			//Other values (i.e. 0xf1 or 0xfa) are considered errors.
+			// Binary lengths below 0xf1 are stored directly in one byte.
+			// Larger values use a marker followed by a 2-, 4-, or 8-byte length:
+			// 0xf2 = uint16, 0xf4 = uint32, and 0xf8 = sint64.
+			// All other marker values are malformed input.
 			const ubyte n = read<ubyte>();
 			sint64 length = 0;
 			switch( n )

@@ -9,7 +9,7 @@ Supported containers:
 - `.bgeo.sc`
 - `.vdb` through the Houdini Python bridge
 
-The minimum supported Houdini version is **20.0**. The package is validated with Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368.
+The minimum supported Houdini version is **20.0**. The file, large-asset, and package matrices are validated with Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368. See the [compatibility matrix](docs/compatibility.md).
 
 > [!IMPORTANT]
 > This project does not currently include a project-wide license file. Do not redistribute source or binaries until licensing and third-party provenance are resolved.
@@ -33,12 +33,15 @@ HouIO currently supports:
 - Float16, Float32, and Float64 storage
 - Indexed string attributes, including Houdini's empty-string sentinel
 - Indexed dictionary metadata in faithful `HouGeo` round trips
-- Unordered point, vertex, and primitive groups
+- Attribute definition scope and complete semantic `options` objects
+- Unordered point, vertex, and primitive groups, including groups spanning mixed polygon and volume records
 - `Poly`, `Polygon_run`, and `PolygonCurve_run`
 - Dense scalar volumes
 - SCF compression through C-Blosc
 
-The simplified `Geometry` API is intentionally render-oriented and may split points at vertex-attribute discontinuities. Use `HouGeo` and `HouGeoAdapter` when domain fidelity matters.
+The simplified `Geometry` API is intentionally render-oriented and may split points at vertex-attribute discontinuities. It supports fixed-size point, line, triangle, and quad sets plus one arbitrary n-gon; multiple variable-size polygons remain a Houdini-oriented-model concern. Use `HouGeo` and `HouGeoAdapter` when domain fidelity matters.
+
+`<houio/GeometryModels.h>` provides intention-revealing, non-breaking aliases: `HoudiniGeometry` for the supported Houdini-oriented model and `SimplifiedMesh` for the render-oriented convenience model.
 
 Not currently supported by the standalone C++ model:
 
@@ -114,6 +117,29 @@ if (!result)
 houio::Geometry::Ptr mesh = result.value;
 ```
 
+For explicit split and loss reporting, convert one Houdini-oriented primitive directly:
+
+```cpp
+const auto source = houio::GeometryIO::readHouGeo("mesh.bgeo");
+if (!source || source.value->primitives().empty())
+    return;
+
+const houio::GeometryConversionResult conversion =
+    houio::HouGeoIO::convertToGeometryResult(
+        source.value,
+        source.value->primitives().front());
+if (!conversion)
+{
+    // Inspect conversion.diagnostics.
+    return;
+}
+
+houio::Geometry::Ptr mesh = conversion.value;
+const std::size_t duplicated_points = conversion.report.duplicatedPointCount;
+```
+
+The report also lists skipped point, vertex, primitive, and global attributes; dropped groups; source/output point counts; split source points; winding reversal; and closure loss when an open Houdini polygon becomes a closed simplified face.
+
 ### Read all dense scalar volumes
 
 ```cpp
@@ -126,6 +152,17 @@ for (const houio::ScalarField::Ptr& volume : result.value)
     const houio::math::V3i resolution = volume->resolution();
 }
 ```
+
+### Experimental native field persistence
+
+```cpp
+#include <houio/FieldIO.h>
+
+const bool stored = houio::storeField(*volume, "volume.field");
+const houio::ScalarField::Ptr loaded = houio::loadField<float>("volume.field");
+```
+
+This installed API is opt-in, but the current native binary layout is experimental, platform-dependent, and not covered by stable interchange guarantees. See [Experimental field persistence format](docs/field-format.md).
 
 ### Write geometry
 
@@ -217,19 +254,28 @@ The generated fixture matrix covers:
 - Dense scalar volumes
 - Point, vertex, and primitive groups
 
-Run it with installed Houdini versions:
+Run it with the maintained Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368 matrix:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_fixture_roundtrips.ps1
 ```
 
-A static Crag round-trip is also available:
+The same four-version matrix validates each output inside Houdini. A large Crag round-trip is also available:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_crag_roundtrip.ps1
 ```
+
+Validate the generated Houdini package across the maintained matrix:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\tools\houdini\run_package_matrix.ps1
+```
+
+See [Fixture generation and validation](docs/fixtures.md) for the manifest, known-loss, and extension workflow.
 
 ## Development checks
 
@@ -257,10 +303,27 @@ cmake --build --preset linux-clang-fuzzer
 ./build/linux-clang-fuzzer/houio_fuzz_parser -runs=2000 -max_len=512 -timeout=5
 ```
 
+Opt-in performance baselines:
+
+```powershell
+cmake --preset windows-msvc-benchmarks
+cmake --build --preset windows-msvc-benchmarks
+.\build\windows-msvc-benchmarks\houio_benchmarks.exe
+.\build\windows-msvc-benchmarks\houio_memory_probe.exe
+```
+
+See [Performance baselines](docs/benchmarks.md) for methodology and workload controls.
+
 ## Documentation
 
 - [Architecture](architecture.md)
 - [Developer onboarding](onboard.md)
+- [Contributing](CONTRIBUTING.md)
+- [Compatibility matrix](docs/compatibility.md)
+- [Fixture generation and validation](docs/fixtures.md)
+- [Performance baselines](docs/benchmarks.md)
+- [Experimental field persistence format](docs/field-format.md)
+- [Versioning and release policy](docs/versioning.md)
 - [Houdini package](docs/houdini-package.md)
 - [Houdini integration on Windows](docs/houdini-windows.md)
 - [Security policy](SECURITY.md)

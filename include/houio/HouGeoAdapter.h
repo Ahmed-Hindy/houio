@@ -120,12 +120,15 @@ namespace houio
             virtual ~AttributeAdapter() = default;
 
             [[nodiscard]] virtual std::string name() const;
+            [[nodiscard]] virtual std::string scope() const;
+            [[nodiscard]] virtual std::shared_ptr<json::Object> options() const;
             [[nodiscard]] virtual Type type() const;
             [[nodiscard]] virtual TupleSize tupleSize() const = 0;
             [[nodiscard]] virtual Storage storage() const;
             [[nodiscard]] virtual std::vector<int> packing() const;
             [[nodiscard]] virtual int elementCount() const;
             [[nodiscard]] virtual std::string stringValue(int index) const = 0;
+            [[nodiscard]] virtual std::string stringValue(int element_index, int component_index) const;
             [[nodiscard]] virtual std::shared_ptr<json::Object> dictionaryValue(int index) const;
             [[nodiscard]] virtual RawDataView rawData() const;
 
@@ -145,6 +148,9 @@ namespace houio
             virtual ~Topology() = default;
 
             [[nodiscard]] virtual std::vector<int> indexValues() const = 0;
+            /// Optional immutable view used to avoid copying topology during export.
+            /// The default empty view preserves compatibility with existing adapters.
+            [[nodiscard]] virtual std::span<const int> indexView() const noexcept;
             virtual void appendIndices(std::span<const int> indices) = 0;
             [[nodiscard]] virtual sint64 indexCount() const = 0;
         };
@@ -228,6 +234,9 @@ namespace houio
         [[nodiscard]] virtual bool hasPrimitiveAttribute(const std::string& name) const;
         [[nodiscard]] virtual std::vector<Primitive::Ptr> primitives();
         [[nodiscard]] virtual std::vector<Primitive::ConstPtr> primitives() const;
+        /// Optional immutable view used to avoid copying the primitive pointer list during export.
+        /// The default empty view preserves compatibility with existing adapters.
+        [[nodiscard]] virtual std::span<const Primitive::Ptr> primitiveView() const noexcept;
         [[nodiscard]] virtual Topology::Ptr topology();
         [[nodiscard]] virtual Topology::ConstPtr topology() const;
     };

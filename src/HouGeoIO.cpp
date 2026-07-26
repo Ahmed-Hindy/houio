@@ -323,7 +323,7 @@ namespace houio
 		HouGeo::ConstPtr houGeo,
 		HouGeoAdapter::Primitive::ConstPtr houPrim )
 	{
-		return convertToGeometry(houGeo, houPrim, nullptr);
+		return convertToGeometry(houGeo, houPrim, nullptr, nullptr);
 	}
 
 	Geometry::Ptr HouGeoIO::convertToGeometry(
@@ -331,6 +331,26 @@ namespace houio
 		HouGeoAdapter::Primitive::ConstPtr houPrim,
 		DiagnosticList *diagnostics )
 	{
+		return convertToGeometry(houGeo, houPrim, diagnostics, nullptr);
+	}
+
+	GeometryConversionResult HouGeoIO::convertToGeometryResult(
+		HouGeo::ConstPtr houGeo,
+		HouGeoAdapter::Primitive::ConstPtr houPrim )
+	{
+		GeometryConversionResult result;
+		result.value = convertToGeometry(houGeo, houPrim, &result.diagnostics, &result.report);
+		return result;
+	}
+
+	Geometry::Ptr HouGeoIO::convertToGeometry(
+		HouGeo::ConstPtr houGeo,
+		HouGeoAdapter::Primitive::ConstPtr houPrim,
+		DiagnosticList *diagnostics,
+		GeometryConversionReport *report )
+	{
+		if( report )
+			*report = {};
 		try
 		{
 			if( !houGeo )
@@ -343,9 +363,18 @@ namespace houio
 		const sint64 numVertices = houGeo->vertexCount();
 		const size_t pointCount = checkedConversionCount(numPoints, "Point count");
 		const size_t vertexCount = checkedConversionCount(numVertices, "Vertex count");
+		if( report )
+		{
+			report->sourcePointCount = pointCount;
+			report->skippedPrimitiveAttributes = houGeo->primitiveAttributeNames();
+			report->skippedGlobalAttributes = houGeo->globalAttributeNames();
+			report->droppedPointGroups = houGeo->pointGroupNames();
+			report->droppedVertexGroups = houGeo->vertexGroupNames();
+			report->droppedPrimitiveGroups = houGeo->primitiveGroupNames();
+		}
 
-		// we only support geometry with non mixed primitives (e.g. triangles only)
-		// this code checks if that is the case...
+		// The simplified model supports fixed-size primitive sets and one arbitrary n-gon.
+		int numPolys = 0;
 		int numVerticesPerPoly = 0;
 		if( houPrim )
 		{
@@ -354,7 +383,7 @@ namespace houio
 			if( !poly )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 					"HouGeoIO::convertToGeometry supports only polygon primitives", -1, "conversion.primitive"});
-			const int numPolys = poly->polygonCount();
+			numPolys = poly->polygonCount();
 			if( numPolys < 0 )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry polygon count cannot be negative", -1, "conversion.primitive"});
@@ -379,6 +408,14 @@ namespace houio
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry polygon vertex total does not match vertexcount", -1,
 					"conversion.primitive"});
+			if( numVerticesPerPoly >= 3 && !poly->isClosed() )
+			{
+				if( report )
+					report->polygonClosureLost = true;
+				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
+					"HouGeoIO::convertToGeometry closes open polygons in the simplified mesh model", -1,
+					"conversion.primitive.closed"});
+			}
 		}
 
 		// create the right kind of geometry depending on vertexcount per primitive (point, line or triangle geometry)
@@ -401,9 +438,14 @@ namespace houio
 		{
 			result = Geometry::createQuadGeometry();
 		}
+		else
+		if( numPolys == 1 && numVerticesPerPoly > 4 )
+		{
+			result = Geometry::createPolyGeometry();
+		}
 		if( !result )
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
-				"HouGeoIO::convertToGeometry supports only lines, triangles, and quads", -1,
+				"HouGeoIO::convertToGeometry supports lines, triangles, quads, or one arbitrary n-gon", -1,
 				"conversion.primitive"});
 
 		// attributes ---
@@ -422,6 +464,8 @@ namespace houio
 			validateDomainAttribute(houAttr, numPoints, attributePath);
 			if( houAttr->type() != HouGeoAdapter::AttributeAdapter::Type::numeric )
 			{
+				if( report )
+					report->skippedPointAttributes.push_back(attrName);
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry skips non-numeric point attribute " + attrName,
 					-1, attributePath});
@@ -536,9 +580,13 @@ namespace houio
 					raw_data.bytes(), houAttr->elementCount());
 			}
 			else
+			{
+				if( report )
+					report->skippedPointAttributes.push_back(attrName);
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry cannot convert point attribute " + attrName,
 					-1, "attributes.pointattributes." + attrName});
+			}
 
 			if( attr )
 				result->setAttribute(attrName, attr);
@@ -561,6 +609,8 @@ namespace houio
 			validateDomainAttribute(houAttr, numVertices, attributePath);
 			if( houAttr->type() != HouGeoAdapter::AttributeAdapter::Type::numeric )
 			{
+				if( report )
+					report->skippedVertexAttributes.push_back(attrName);
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry skips non-numeric vertex attribute " + attrName,
 					-1, attributePath});
@@ -633,6 +683,8 @@ namespace houio
 
 			if( !attr )
 			{
+				if( report )
+					report->skippedVertexAttributes.push_back(attrName);
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry cannot convert vertex attribute " + attrName,
 					-1, "attributes.vertexattributes." + attrName});
@@ -657,7 +709,6 @@ namespace houio
 			if( !poly )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 					"HouGeoIO::convertToGeometry expected a polygon primitive", -1, "conversion.primitive"});
-			const int numPolys = poly->polygonCount();
 
 			// Geometry has no face-varying domain, so points are split when vertex values differ.
 			std::vector<bool> pointsToSplit(pointCount, false);
@@ -707,6 +758,11 @@ namespace houio
 			}
 			if( globalVertexIndex != vertexCount )
 				throw std::runtime_error( "Polygon traversal did not consume the complete vertex domain" );
+			if( report )
+			{
+				report->splitSourcePointCount = static_cast<size_t>(
+					std::count(pointsToSplit.begin(), pointsToSplit.end(), true));
+			}
 
 			globalVertexIndex = 0;
 			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
@@ -725,7 +781,11 @@ namespace houio
 					unsigned int finalPointIndex = static_cast<unsigned int>(pointIndex);
 
 					if( pointsToSplit[pointIndex] && pointsInitialized[pointIndex] )
+					{
 						finalPointIndex = result->duplicatePoint(finalPointIndex);
+						if( report )
+							++report->duplicatedPointCount;
+					}
 					else if( !pointsInitialized[pointIndex] )
 						pointsInitialized[pointIndex] = true;
 
@@ -749,10 +809,24 @@ namespace houio
 					result->addTriangle(vertices[0], vertices[1], vertices[2]);
 				else if( polygonVertexCount == 4 )
 					result->addQuad(vertices[0], vertices[1], vertices[2], vertices[3]);
+				else if( numPolys == 1 && polygonVertexCount > 4 )
+				{
+					for( const unsigned int vertex : vertices )
+						result->addPolygonVertex(vertex);
+				}
 			}
 
 			// Houdini polygons are clockwise; the convenience geometry expects counter-clockwise order.
 			result->reverse();
+			if( report )
+				report->windingReversed = true;
+		}
+		if( report )
+		{
+			const Attribute::CPtr outputPositions = result->attribute("P");
+			report->outputPointCount = outputPositions
+				? static_cast<size_t>(outputPositions->numElements())
+				: 0u;
 		}
 			return result;
 		}
@@ -993,23 +1067,72 @@ namespace houio
 			writer.jsonString( "primitives" );
 			writer.jsonBeginArray();
 
-			const std::vector<HouGeoAdapter::Primitive::ConstPtr> primitives = geometry->primitives();
-
-			int topologyVertexOffset = 0;
-			for( const HouGeoAdapter::Primitive::ConstPtr &primitive : primitives )
+			sint64 observedPrimitiveCount = 0;
+			sint64 topologyVertexOffset = 0;
+			const auto exportPrimitiveRange = [&](const auto& primitiveRange)
 			{
-				if( auto volume = std::dynamic_pointer_cast<const HouGeoAdapter::VolumePrimitive>(primitive) )
+				for( const auto &primitiveEntry : primitiveRange )
 				{
-					exportPrimitive(context, volume);
-					++topologyVertexOffset;
+					const HouGeoAdapter::Primitive::ConstPtr primitive = primitiveEntry;
+					if( !primitive )
+						throw std::runtime_error( "HouGeoIO::exportGeometry received a null primitive adapter" );
+
+					const int storedPrimitiveCount = primitive->primitiveCount();
+					if( storedPrimitiveCount < 0
+						|| static_cast<sint64>(storedPrimitiveCount)
+							> std::numeric_limits<sint64>::max() - observedPrimitiveCount )
+					{
+						throw std::overflow_error( "HouGeoIO::exportGeometry primitive count exceeds sint64 range" );
+					}
+					observedPrimitiveCount += static_cast<sint64>(storedPrimitiveCount);
+
+					if( auto volume = std::dynamic_pointer_cast<const HouGeoAdapter::VolumePrimitive>(primitive) )
+					{
+						exportPrimitive(context, volume);
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
+					else if( auto polygonRun = std::dynamic_pointer_cast<const HouGeoAdapter::PolyPrimitive>(primitive) )
+					{
+						if( topologyVertexOffset > std::numeric_limits<int>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry polygon topology offset exceeds int range" );
+						exportPrimitive(context, polygonRun, static_cast<int>(topologyVertexOffset));
+						const int polygonCount = polygonRun->polygonCount();
+						if( polygonCount < 0 )
+							throw std::runtime_error( "HouGeoIO::exportGeometry polygon count cannot be negative" );
+						for( int polygonIndex=0;polygonIndex<polygonCount;++polygonIndex )
+						{
+							const int polygonVertexCount = polygonRun->polygonVertexCount(polygonIndex);
+							if( polygonVertexCount < 0
+								|| static_cast<sint64>(polygonVertexCount)
+									> std::numeric_limits<sint64>::max() - topologyVertexOffset )
+							{
+								throw std::overflow_error( "HouGeoIO::exportGeometry polygon vertex total exceeds sint64 range" );
+							}
+							topologyVertexOffset += static_cast<sint64>(polygonVertexCount);
+						}
+					}
+					else
+					{
+						throw std::runtime_error( "HouGeoIO::exportGeometry encountered an unsupported primitive adapter" );
+					}
 				}
-				else if( auto polygonRun = std::dynamic_pointer_cast<const HouGeoAdapter::PolyPrimitive>(primitive) )
-				{
-					exportPrimitive(context, polygonRun, topologyVertexOffset);
-					for( int polygonIndex=0;polygonIndex<polygonRun->polygonCount();++polygonIndex )
-						topologyVertexOffset += polygonRun->polygonVertexCount(polygonIndex);
-				}
+			};
+
+			const std::span<const HouGeoAdapter::Primitive::Ptr> primitiveView = geometry->primitiveView();
+			if( !primitiveView.empty() )
+				exportPrimitiveRange(primitiveView);
+			else
+			{
+				const std::vector<HouGeoAdapter::Primitive::ConstPtr> copiedPrimitives = geometry->primitives();
+				exportPrimitiveRange(copiedPrimitives);
 			}
+
+			if( observedPrimitiveCount != primitiveCount )
+				throw std::runtime_error( "HouGeoIO::exportGeometry primitive adapters do not match primitiveCount" );
+			if( topologyVertexOffset != vertexCount )
+				throw std::runtime_error( "HouGeoIO::exportGeometry primitive topology does not match vertexCount" );
 			writer.jsonEndArray();
 		}
 
@@ -1079,7 +1202,12 @@ namespace houio
 		const HouGeoAdapter::AttributeAdapter::Storage attribute_storage = attribute->storage();
 		const HouGeoAdapter::AttributeAdapter::TupleSize sourceTupleSize = attribute->tupleSize();
 		const std::string name = attribute->name();
-		const bool promotePosition = name == "P" && sourceTupleSize.value() == 3;
+		const std::string attributeScope = attribute->scope();
+		if( attributeScope.empty() )
+			throw std::runtime_error( "HouGeoIO::exportAttribute: attribute scope cannot be empty for " + name );
+		const std::shared_ptr<json::Object> attributeOptions = attribute->options();
+		const bool promotePosition = attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric
+			&& name == "P" && sourceTupleSize.value() == 3;
 		const int exportTupleSize = promotePosition ? 4 : sourceTupleSize.value();
 		const int elementCount = attribute->elementCount();
 		if (elementCount < 0)
@@ -1100,21 +1228,27 @@ namespace houio
 		if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric && !storageName )
 			throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported storage for attribute " + name );
 
-		if( name == "P" && exportTupleSize != 4 )
+		if( attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric
+			&& name == "P" && exportTupleSize != 4 )
 			throw std::runtime_error( "HouGeoIO::exportAttribute: P must contain either three or four components" );
 
 		writer.jsonBeginArray();
 
 		writer.jsonBeginArray();
 		writer.jsonString( "scope" );
-		writer.jsonString( "public" );
+		writer.jsonString( attributeScope );
 		writer.jsonString( "type" );
 		writer.jsonString(std::string(*attributeTypeName));
 		writer.jsonString( "name" );
 		writer.jsonString( name );
 		writer.jsonString( "options" );
-		writer.jsonBeginMap();
-		writer.jsonEndMap();
+		if( attributeOptions )
+			writeJsonObject(writer, attributeOptions);
+		else
+		{
+			writer.jsonBeginMap();
+			writer.jsonEndMap();
+		}
 		writer.jsonEndArray();
 
 		writer.jsonBeginArray();
@@ -1203,15 +1337,24 @@ namespace houio
 			std::map<std::string, sint32> stringLookup;
 			std::vector<std::string> stringTable;
 			std::vector<sint32> stringIndices;
-			stringTable.reserve(static_cast<size_t>(elementCount));
-			stringIndices.reserve(static_cast<size_t>(elementCount));
+			stringIndices.reserve(scalar_count);
 			for( int elementIndex=0;elementIndex<elementCount;++elementIndex )
 			{
-				const std::string value = attribute->stringValue(elementIndex);
-				auto insertion = stringLookup.emplace(value, static_cast<sint32>(stringTable.size()));
-				if( insertion.second )
-					stringTable.push_back(value);
-				stringIndices.push_back(insertion.first->second);
+				for( int componentIndex=0;componentIndex<sourceTupleSize.value();++componentIndex )
+				{
+					const std::string value = attribute->stringValue(elementIndex, componentIndex);
+					auto existing = stringLookup.find(value);
+					if( existing == stringLookup.end() )
+					{
+						if( stringTable.size() > static_cast<size_t>(std::numeric_limits<sint32>::max()) )
+							throw std::length_error( "HouGeoIO::exportAttribute string table exceeds int32 range for attribute "
+								+ name );
+						const sint32 stringIndex = static_cast<sint32>(stringTable.size());
+						stringTable.push_back(value);
+						existing = stringLookup.emplace(value, stringIndex).first;
+					}
+					stringIndices.push_back(existing->second);
+				}
 			}
 
 			writer.jsonString( "strings" );
@@ -1223,7 +1366,7 @@ namespace houio
 			writer.jsonString( "indices" );
 			writer.jsonBeginArray();
 			writer.jsonString( "size" );
-			writer.jsonInt32( 1 );
+			writer.jsonInt32( exportTupleSize );
 			writer.jsonString( "storage" );
 			writer.jsonString( "int32" );
 			writer.jsonString( "pagesize" );
@@ -1282,11 +1425,25 @@ namespace houio
 			return false;
 		json::BinaryWriter &writer = context.writer;
 
-		const std::vector<int> topology_indices = topology->indexValues();
-		std::vector<sint32> indices(topology_indices.begin(), topology_indices.end());
+		const sint64 declaredIndexCount = topology->indexCount();
+		if( declaredIndexCount < 0
+			|| static_cast<uint64>(declaredIndexCount) > std::numeric_limits<size_t>::max() )
+		{
+			throw std::length_error( "HouGeoIO::exportTopology index count exceeds addressable storage" );
+		}
+		const size_t expectedIndexCount = static_cast<size_t>(declaredIndexCount);
+		std::vector<int> copiedIndices;
+		std::span<const int> topologyIndices = topology->indexView();
+		if( topologyIndices.size() != expectedIndexCount )
+		{
+			copiedIndices = topology->indexValues();
+			if( copiedIndices.size() != expectedIndexCount )
+				throw std::runtime_error( "HouGeoIO::exportTopology index data does not match indexCount" );
+			topologyIndices = copiedIndices;
+		}
 
 		bool requires32BitIndices = false;
-		for( const sint32 index : indices )
+		for( const int index : topologyIndices )
 		{
 			if( index < 0 )
 				throw std::runtime_error( "HouGeoIO::exportTopology cannot export negative point indices" );
@@ -1299,13 +1456,15 @@ namespace houio
 		writer.jsonString( "indices" );
 		if( requires32BitIndices )
 		{
-			writer.jsonUniformArray<sint32>(indices);
+			static_assert(std::is_same_v<int, sint32>);
+			writer.jsonUniformArray<sint32>(
+				std::span<const sint32>(topologyIndices.data(), topologyIndices.size()));
 		}
 		else
 		{
 			std::vector<sint16> compactIndices;
-			compactIndices.reserve(indices.size());
-			for( const sint32 index : indices )
+			compactIndices.reserve(topologyIndices.size());
+			for( const int index : topologyIndices )
 				compactIndices.push_back(static_cast<sint16>(index));
 			writer.jsonUniformArray<sint16>(compactIndices);
 		}

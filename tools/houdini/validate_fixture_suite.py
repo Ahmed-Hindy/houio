@@ -10,6 +10,7 @@ from typing import Any
 import hou
 
 ATTRIBUTE_DOMAINS = ("point", "vertex", "primitive", "global")
+KNOWN_LOSS_KEYS = frozenset({"point_groups", "vertex_groups", "primitive_groups"})
 
 
 def parse_args() -> argparse.Namespace:
@@ -125,6 +126,27 @@ def attribute_values(geometry: hou.Geometry, domain: str, attribute: hou.Attrib)
     return list(reader(attribute_name))
 
 
+def numeric_data_type(attribute: hou.Attrib) -> str | None:
+    """Return numeric storage metadata when exposed by this Houdini version.
+
+    Houdini 20.0 does not expose ``hou.Attrib.numericDataType``. In that
+    version, value and broad data-type comparisons remain active while the
+    storage-precision field is reported as unavailable for both source and
+    candidate geometry.
+
+    Args:
+        attribute: Attribute whose numeric storage metadata is requested.
+
+    Returns:
+        String representation of the numeric data type, or ``None`` when the
+        attribute is non-numeric or the running Houdini version cannot expose it.
+    """
+    if attribute.dataType() not in (hou.attribData.Float, hou.attribData.Int):
+        return None
+    getter = getattr(attribute, "numericDataType", None)
+    return str(getter()) if getter is not None else None
+
+
 def attribute_summary(geometry: hou.Geometry, domain: str) -> dict[str, dict[str, Any]]:
     """Summarize all attributes in one owner domain.
 
@@ -140,11 +162,7 @@ def attribute_summary(geometry: hou.Geometry, domain: str) -> dict[str, dict[str
         data_type = attribute.dataType()
         summary[attribute.name()] = {
             "data_type": str(data_type),
-            "numeric_data_type": (
-                str(attribute.numericDataType())
-                if data_type in (hou.attribData.Float, hou.attribData.Int)
-                else None
-            ),
+            "numeric_data_type": numeric_data_type(attribute),
             "size": attribute.size(),
             "values": attribute_values(geometry, domain, attribute),
         }
@@ -319,6 +337,11 @@ def main() -> int:
         source_summary = geometry_summary(load_geometry(source_path))
         candidate_summary = geometry_summary(load_geometry(candidate_path))
         known_losses = set(fixture["known_losses"])
+        unknown_losses = known_losses - KNOWN_LOSS_KEYS
+        if unknown_losses:
+            raise RuntimeError(
+                f"{fixture_name}: manifest contains unknown loss keys: {sorted(unknown_losses)!r}"
+            )
 
         validate_manifest_source(fixture_name, fixture["source"], source_summary)
         compare_roundtrip(fixture_name, source_summary, candidate_summary, known_losses)

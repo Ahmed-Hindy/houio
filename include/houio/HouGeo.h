@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <map>
 #include <memory>
 #include <span>
@@ -30,12 +31,15 @@ namespace houio
             HouAttribute(const std::string& name, Attribute::Ptr attribute);
 
             [[nodiscard]] std::string name() const override;
+            [[nodiscard]] std::string scope() const override;
+            [[nodiscard]] json::ObjectPtr options() const override;
             [[nodiscard]] Type type() const override;
             [[nodiscard]] TupleSize tupleSize() const override;
             [[nodiscard]] Storage storage() const override;
             [[nodiscard]] std::vector<int> packing() const override;
             [[nodiscard]] int elementCount() const override;
             [[nodiscard]] std::string stringValue(int index) const override;
+            [[nodiscard]] std::string stringValue(int element_index, int component_index) const override;
             [[nodiscard]] std::shared_ptr<json::Object> dictionaryValue(int index) const override;
             [[nodiscard]] RawDataView rawData() const override;
 
@@ -44,6 +48,18 @@ namespace houio
             void setName(std::string name)
             {
                 name_ = std::move(name);
+            }
+
+            void setScope(std::string scope)
+            {
+                if (scope.empty())
+                    throw std::invalid_argument("HouAttribute scope cannot be empty");
+                scope_ = std::move(scope);
+            }
+
+            void setOptions(json::ObjectPtr options)
+            {
+                options_ = options ? std::move(options) : json::Object::create();
             }
 
             void setTupleSize(TupleSize tuple_size) noexcept
@@ -90,13 +106,25 @@ namespace houio
 
             void setStringValues(std::vector<std::string> values)
             {
+                setStringValues(std::move(values), TupleSize(1));
+            }
+
+            void setStringValues(std::vector<std::string> values, TupleSize tuple_size)
+            {
+                const std::size_t component_count = tuple_size.asSize();
+                if (values.size() % component_count != 0)
+                    throw std::invalid_argument("HouAttribute string values do not form complete tuples");
+                const std::size_t element_count = values.size() / component_count;
+                if (element_count > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+                    throw std::length_error("HouAttribute string element count exceeds int range");
+
                 string_values_ = std::move(values);
                 dictionary_values_.clear();
                 numeric_attribute_.reset();
                 type_ = Type::string;
                 storage_ = Storage::int32;
-                tuple_size_ = TupleSize(1);
-                element_count_ = static_cast<int>(string_values_.size());
+                tuple_size_ = tuple_size;
+                element_count_ = static_cast<int>(element_count);
             }
 
             [[nodiscard]] const std::vector<std::string>& stringValues() const noexcept
@@ -122,6 +150,8 @@ namespace houio
 
         private:
             std::string name_;
+            std::string scope_ = "public";
+            json::ObjectPtr options_;
             TupleSize tuple_size_{1};
             Storage storage_ = Storage::invalid;
             Type type_ = Type::numeric;
@@ -142,6 +172,7 @@ namespace houio
             HouTopology();
 
             [[nodiscard]] std::vector<int> indexValues() const override;
+            [[nodiscard]] std::span<const int> indexView() const noexcept override;
             void appendIndices(std::span<const int> indices) override;
             [[nodiscard]] sint64 indexCount() const override;
 
@@ -312,6 +343,7 @@ namespace houio
             const std::string& name) const override;
         [[nodiscard]] std::vector<Primitive::Ptr> primitives() override;
         [[nodiscard]] std::vector<Primitive::ConstPtr> primitives() const override;
+        [[nodiscard]] std::span<const Primitive::Ptr> primitiveView() const noexcept override;
         [[nodiscard]] std::vector<std::string> globalAttributeNames() const override;
         [[nodiscard]] AttributeAdapter::Ptr globalAttribute(const std::string& name) override;
         [[nodiscard]] AttributeAdapter::ConstPtr globalAttribute(

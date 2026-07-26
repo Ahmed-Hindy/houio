@@ -37,6 +37,21 @@
         "CMAKE_BUILD_TYPE": "Release",
         "HOUIO_BUILD_TESTS": "ON",
         "HOUIO_BUILD_EXAMPLES": "ON",
+        "HOUIO_BUILD_BENCHMARKS": "ON",
+        "HOUIO_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "windows-msvc-benchmarks",
+      "displayName": "Windows MSVC Performance Baselines",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-msvc-benchmarks",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HOUIO_BUILD_TESTS": "OFF",
+        "HOUIO_BUILD_EXAMPLES": "OFF",
+        "HOUIO_BUILD_TOOLS": "OFF",
+        "HOUIO_BUILD_BENCHMARKS": "ON",
         "HOUIO_WARNINGS_AS_ERRORS": "ON"
       }
     },
@@ -74,7 +89,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "HOUIO_BUILD_TESTS": "ON",
-        "HOUIO_BUILD_EXAMPLES": "ON"
+        "HOUIO_BUILD_EXAMPLES": "ON",
+        "HOUIO_BUILD_BENCHMARKS": "ON"
       }
     },
     {
@@ -116,6 +132,14 @@
     {
       "name": "windows-msvc-werror",
       "configurePreset": "windows-msvc-werror"
+    },
+    {
+      "name": "windows-msvc-benchmarks",
+      "configurePreset": "windows-msvc-benchmarks",
+      "targets": [
+        "houio_benchmarks",
+        "houio_memory_probe"
+      ]
     },
     {
       "name": "windows-msvc-analysis",

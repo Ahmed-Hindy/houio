@@ -90,10 +90,10 @@ if (!result)
 }
 ```
 
-Choose the representation deliberately:
+Choose the representation deliberately. `<houio/GeometryModels.h>` also exposes the intention-revealing aliases shown in parentheses:
 
-- `HouGeo`: Houdini-oriented domains, records, attributes, and groups
-- `Geometry`: simplified render-oriented mesh
+- `HouGeo` (`HoudiniGeometry`): Houdini-oriented domains, records, attributes, and groups
+- `Geometry` (`SimplifiedMesh`): simplified render-oriented mesh
 - `ScalarField`: dense scalar volume
 - `HouGeoAdapter`: caller-defined export source
 
@@ -155,12 +155,14 @@ For a schema or compatibility change:
 
 Generated fixtures belong under the build directory, not in the source tree.
 
-Run the fixture matrix:
+Run the maintained fixture matrix for Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_fixture_roundtrips.ps1
 ```
+
+Use `-GeneratorVersion 20.0.653` when validating Houdini 20.0 as the fixture producer.
 
 Run the Crag integration test:
 
@@ -185,7 +187,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
   -Install
 ```
 
-The default installer targets Houdini 20.0, 20.5, 21.0, and 22.0.
+The default installer targets Houdini 20.0, 20.5, 21.0, and 22.0. Validate the generated archive across the maintained builds with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\tools\houdini\run_package_matrix.ps1
+```
 
 Inside a SOP network, verify:
 
@@ -232,7 +239,7 @@ Topology values are point indices. Primitive records refer to topology ranges, n
 
 ### Position attribute
 
-`P` is required for simplified mesh conversion. The Houdini-oriented model may contain valid data without a simplified `Geometry` result.
+`P` is required for simplified mesh conversion. The Houdini-oriented model may contain valid data without a simplified `Geometry` result. Use `HouGeoIO::convertToGeometryResult` when a caller needs explicit split, skipped-attribute, dropped-group, winding, open-polygon closure-loss, and failure diagnostics.
 
 ### Volumes
 
@@ -263,6 +270,12 @@ Before opening a pull request:
 
 - [README](README.md)
 - [Architecture](architecture.md)
+- [Contributing](CONTRIBUTING.md)
+- [Compatibility matrix](docs/compatibility.md)
+- [Fixture generation and validation](docs/fixtures.md)
+- [Performance baselines](docs/benchmarks.md)
+- [Experimental field persistence format](docs/field-format.md)
+- [Versioning and release policy](docs/versioning.md)
 - [Houdini package](docs/houdini-package.md)
 - [Houdini integration on Windows](docs/houdini-windows.md)
 - [Security policy](SECURITY.md)

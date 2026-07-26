@@ -48,7 +48,11 @@ const char* modernQuadGeometry()
                     [
                         "scope", "public",
                         "type", "numeric",
-                        "name", "P"
+                        "name", "P",
+                        "options", {
+                            "type": {"type": "string", "value": "point"},
+                            "label": {"type": "string", "value": "position"}
+                        }
                     ],
                     [
                         "size", 3,
@@ -113,7 +117,7 @@ const char* modernQuadGeometry()
             "primitiveattributes", [
                 [
                     [
-                        "scope", "public",
+                        "scope", "private",
                         "type", "string",
                         "name", "name"
                     ],
@@ -232,6 +236,24 @@ int verifyStrongAttributeMetadata()
     {
         return fail("invalid attribute storage metadata was not rejected");
     }
+
+    houio::HouGeo::HouAttribute attribute;
+    if (attribute.scope() != "public" || !attribute.options()
+        || !attribute.options()->entries().empty())
+    {
+        return fail("default attribute definition metadata is invalid");
+    }
+    try
+    {
+        attribute.setScope("");
+        return fail("attribute accepted an empty scope");
+    }
+    catch (const std::invalid_argument&)
+    {
+    }
+    attribute.setOptions(nullptr);
+    if (!attribute.options() || !attribute.options()->entries().empty())
+        return fail("null options did not normalize to an empty object");
     return 0;
 }
 
@@ -256,6 +278,15 @@ int verifyGeometry(const houio::HouGeo::ConstPtr& geometry, int expectedPosition
         return fail(
             "unexpected P metadata: tuple_size=" + std::to_string(position->tupleSize().value())
             + ", elements=" + std::to_string(position->elementCount()));
+    }
+    const houio::json::ObjectPtr positionOptions = position->options();
+    const houio::json::ObjectPtr positionType = positionOptions ? positionOptions->object("type") : nullptr;
+    const houio::json::ObjectPtr positionLabel = positionOptions ? positionOptions->object("label") : nullptr;
+    if (position->scope() != "public" || !positionType || !positionLabel
+        || positionType->get<std::string>("value") != "point"
+        || positionLabel->get<std::string>("value") != "position")
+    {
+        return fail("P scope or semantic options were not preserved");
     }
 
     houio::HouGeoAdapter::AttributeAdapter::ConstPtr normals = geometry->vertexAttribute("N");
@@ -282,7 +313,8 @@ int verifyGeometry(const houio::HouGeo::ConstPtr& geometry, int expectedPosition
     houio::HouGeoAdapter::AttributeAdapter::ConstPtr name =
         geometry->primitiveAttribute("name");
     if (!name || name->type() != houio::HouGeoAdapter::AttributeAdapter::Type::string
-        || name->elementCount() != 1 || name->stringValue(0) != "prop")
+        || name->scope() != "private" || name->elementCount() != 1
+        || name->stringValue(0) != "prop")
     {
         return fail("indexed primitive string attribute was not preserved");
     }

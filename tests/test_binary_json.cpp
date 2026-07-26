@@ -13,6 +13,12 @@
 #include <type_traits>
 #include <vector>
 
+static_assert(std::has_virtual_destructor_v<houio::json::Handler>);
+static_assert(std::has_virtual_destructor_v<houio::json::Writer>);
+static_assert(std::is_final_v<houio::json::BinaryWriter>);
+static_assert(std::is_final_v<houio::json::ASCIIWriter>);
+static_assert(std::is_final_v<houio::json::JSONLogger>);
+static_assert(std::is_final_v<houio::json::JSONReader>);
 static_assert(std::is_enum_v<houio::json::Token::Type>);
 static_assert(!std::is_convertible_v<houio::json::Token::Type, int>);
 static_assert(static_cast<houio::ubyte>(houio::json::Token::JID_MAGIC) == 0x7f);
@@ -23,7 +29,7 @@ namespace
 {
 constexpr unsigned char binaryMagic[] = {0x7f, 0x4e, 0x53, 0x4a, 0x62};
 
-class NonSeekableBuffer : public std::stringbuf
+class NonSeekableBuffer final : public std::stringbuf
 {
 public:
     explicit NonSeekableBuffer(const std::string& value) : std::stringbuf(value, std::ios::in)

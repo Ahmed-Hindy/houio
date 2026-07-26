@@ -4,14 +4,14 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `refactor/separate-field-io`
-- Baseline commit: `b13bdbd` (`master` after Phase 10).
+- Branch: `refactor/modernization-phases-17-20`
+- Baseline commit: `e00d4b6` (complete Phases 11–16 stack; integration PR #31 targets `master`).
 - Current exact source: MSVC warnings-as-errors suite passes **19/19**.
 - Current exact source: full Release/Houdini matrix passes **47/47**.
 - Current exact source: Windows AddressSanitizer matrix passes **19/19**.
-- Houdini fixture validation passes with Houdini **21.0.631** and **22.0.368**.
-- Stacked PRs #25–#27 contain the assertion harness, scoped JSON enums, and tile-validation phases.
-- CI validation for the active field-I/O separation branch is pending until it is pushed.
+- Generated fixtures, the large Crag asset, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Phases 11–16 are consolidated for `master` by integration PR #31.
+- Current branch completes field/API cleanup, Houdini 20.0 producer compatibility, indexed string tuples, maintained project contracts, const/range APIs, benchmarks, and structured conversion reporting.
 
 ## Modernization completed
 
@@ -43,6 +43,27 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Validate complete tiled-volume metadata before allocating destination field storage.
 - [x] Audit active ownership: no raw heap allocation/deallocation remains; the platform library handle is enclosed by `BloscLibrary` RAII.
 - [x] Move custom field persistence out of the `Field<T>` container into a dedicated nonmember I/O API.
+- [x] Define and test normalized-local, voxel-center, and row-vector field transform conventions.
+- [x] Make field transform and bound updates strongly exception-safe.
+- [x] Report voxel spacing from transformed basis-vector lengths.
+- [x] Make concrete JSON handlers and test adapters explicit `final` classes with complete `override` declarations.
+- [x] Complete the bounded `noexcept` audit without annotating allocating or checked-access APIs incorrectly.
+- [x] Remove obsolete commented-out parser implementation and guard against disabled code blocks returning.
+- [x] Preserve indexed string tuples across point, vertex, primitive, and global domains.
+- [x] Validate multi-page string indices and Houdini 20.0 `varmap` tuple encoding.
+- [x] Run fixture, large-asset, and package matrices across Houdini 20.0, 20.5, 21.0, and 22.0.
+- [x] Define maintained compatibility, fixture, contribution, versioning, and experimental field-format contracts.
+- [x] Make field conversion read from immutable source references and make geometry merge accept non-owning mutable/immutable pointer spans.
+- [x] Add opt-in dependency-free baselines for numeric attributes, topology generation/traversal, and dense-volume import.
+- [x] Add a structured simplified-conversion result that reports splits, duplicates, skipped attributes, dropped groups, winding changes, and diagnostics.
+- [x] Preserve attribute definition scope and complete semantic `options` objects across import and export.
+- [x] Validate programmatic group domains and preserve primitive groups spanning mixed polygon and dense-volume records.
+- [x] Audit maintained containers and confirm active implementation storage is private behind validated APIs or immutable views.
+- [x] Add installed `HoudiniGeometry` and `SimplifiedMesh` aliases that make model responsibilities explicit without breaking established class names.
+- [x] Add an optional immutable topology view and remove the unconditional topology-vector copy from faithful export.
+- [x] Add an optional immutable primitive-container view and remove the unconditional shared-pointer-vector copy from faithful export.
+- [x] Convert one arbitrary n-gon into the simplified polygon model with structured multi-n-gon rejection.
+- [x] Report open-polygon closure loss explicitly when simplified conversion creates a closed face.
 
 ## Modernization next
 
@@ -78,10 +99,10 @@ Priority levels:
 
 ### Houdini 20.0+ compatibility
 
-- [ ] Add generated compatibility coverage using Houdini 20.0 as a fixture producer.
-- [ ] Keep package validation active for 20.0, 20.5, 21.0, and 22.0.
-- [ ] Document recognized records that remain unsupported.
-- [ ] Record intentional round-trip losses in fixture manifests.
+- [x] Add generated compatibility coverage using Houdini 20.0 as a fixture producer.
+- [x] Keep package validation active for 20.0, 20.5, 21.0, and 22.0.
+- [x] Document recognized records that remain unsupported.
+- [x] Record intentional round-trip losses in fixture manifests and reject unknown loss keys.
 
 ### Tests
 
@@ -118,16 +139,16 @@ Priority levels:
 ### Attributes
 
 - [ ] Add unsigned integer storage where the file format uses it.
-- [ ] Preserve complete attribute type and semantic metadata.
-- [ ] Extend string-table coverage to every supported domain and page layout.
+- [x] Preserve complete attribute type and semantic metadata.
+- [x] Extend string-table coverage to every supported domain and maintained page layout.
 
 ### Geometry
 
 - [ ] Preserve point and vertex domains in a lossless mesh representation.
-- [ ] Support mixed primitive groups.
-- [ ] Support arbitrary n-gons in simplified conversion or return multiple geometry objects.
+- [x] Support mixed primitive groups.
+- [ ] Support multiple variable-size polygons by returning multiple simplified meshes or extending the simplified topology model.
 - [ ] Preserve face-varying attributes without forced point duplication.
-- [ ] Add a conversion result that reports splits, losses, and unsupported data.
+- [x] Add a conversion result that reports splits, losses, and unsupported data.
 
 ### Primitive records
 
@@ -157,32 +178,32 @@ Add fixture-backed support one record type at a time:
 ### Geometry
 
 - [x] Verify the file-format library contains no OpenGL-specific buffer identifiers and guard against their reintroduction.
-- [ ] Hide mutable implementation details where practical.
-- [ ] Make lossless and simplified geometry responsibilities explicit in type names and APIs.
+- [x] Hide mutable implementation details where practical.
+- [x] Make Houdini-oriented and simplified geometry responsibilities explicit in type names and APIs.
 
 ### Field
 
 - [x] Separate custom binary persistence from the field container through `FieldIO.h`.
-- [ ] Audit coordinate conventions and transform composition.
+- [x] Audit coordinate conventions and transform composition.
 - [x] Add const sampling APIs.
-- [ ] Define whether the custom field format remains public.
+- [x] Keep the custom field I/O API public and opt-in while explicitly classifying its native on-disk layout as experimental.
 
 ### Modern C++
 
 - [x] Replace typedef-style aliases with `using` declarations.
 - [x] Use `nullptr` consistently.
 - [x] Use scoped enums in public headers where source compatibility permits.
-- [ ] Add `override`, `final`, and `noexcept` where correct.
-- [ ] Apply const-correctness consistently.
-- [ ] Use `std::span` or equivalent views for non-owning ranges.
-- [ ] Remove obsolete commented-out implementation blocks.
+- [x] Add `override`, `final`, and `noexcept` where correct.
+- [x] Apply const-correctness consistently across the maintained field, geometry, adapter, and export surfaces.
+- [x] Use `std::span` or equivalent views for maintained contiguous non-owning ranges; retain `vector<bool>` only where its proxy storage prevents a safe span.
+- [x] Remove obsolete commented-out implementation blocks.
 
 ## P3 — Performance
 
-- [ ] Measure memory amplification from input stream to JSON tree to `HouGeo`.
-- [ ] Benchmark large numeric attributes.
-- [ ] Benchmark large topology arrays.
-- [ ] Benchmark dense-volume imports.
+- [x] Add a reproducible Windows/Linux working-set probe for input bytes, the parsed JSON tree, and retained `HouGeo` memory amplification.
+- [x] Benchmark large numeric attributes.
+- [x] Benchmark large topology arrays.
+- [x] Benchmark dense-volume imports.
 - [ ] Avoid per-element `Value` allocations for large arrays.
 - [ ] Preserve uniform arrays through semantic loading where possible.
 - [ ] Evaluate direct semantic handlers that bypass the generic JSON tree.
@@ -191,9 +212,9 @@ Add fixture-backed support one record type at a time:
 
 ## Documentation and releases
 
-- [ ] Add a maintained Houdini-version and feature compatibility matrix.
-- [ ] Add contributor guidelines.
-- [ ] Document fixture regeneration steps.
-- [ ] Define semantic-versioning expectations.
+- [x] Add a maintained Houdini-version and feature compatibility matrix.
+- [x] Add contributor guidelines.
+- [x] Document fixture regeneration steps.
+- [x] Define semantic-versioning expectations.
 - [ ] Add release notes when versioned releases begin.
 - [ ] Publish checksums and build provenance with every binary artifact.

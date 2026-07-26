@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <fstream>
 #include <limits>
 #include <span>
@@ -10,6 +11,11 @@
 
 namespace houio
 {
+    /// Experimental native binary persistence for dense fields.
+    ///
+    /// The installed API is public and opt-in, but its current on-disk layout
+    /// has no magic, version, canonical byte order, or stable portability
+    /// guarantee. Prefer Houdini geometry formats for maintained interchange.
     namespace detail
     {
         template<typename Value>
@@ -129,6 +135,16 @@ namespace houio
             return nullptr;
         }
 
+        const math::Box3f serialized_bound(
+            math::V3f(minimum_x, minimum_y, minimum_z),
+            math::V3f(maximum_x, maximum_y, maximum_z));
+        if (!std::isfinite(minimum_x) || !std::isfinite(minimum_y) || !std::isfinite(minimum_z)
+            || !std::isfinite(maximum_x) || !std::isfinite(maximum_y) || !std::isfinite(maximum_z)
+            || maximum_x <= minimum_x || maximum_y <= minimum_y || maximum_z <= minimum_z)
+        {
+            return nullptr;
+        }
+
         const math::V3i resolution(resolution_x, resolution_y, resolution_z);
         std::size_t value_count = 0;
         if (!detail::checkedFieldValueCount(resolution, value_count)
@@ -159,6 +175,7 @@ namespace houio
         try
         {
             field->resize(resolution);
+            field->setBound(serialized_bound);
         }
         catch (const std::exception&)
         {
@@ -175,9 +192,6 @@ namespace houio
                 return nullptr;
         }
 
-        field->setBound(math::Box3f(
-            math::V3f(minimum_x, minimum_y, minimum_z),
-            math::V3f(maximum_x, maximum_y, maximum_z)));
         return field;
     }
 

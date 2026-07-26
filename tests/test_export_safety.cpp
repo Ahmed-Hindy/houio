@@ -11,7 +11,7 @@
 
 namespace
 {
-class DictionaryAttributeAdapter : public houio::HouGeoAdapter::AttributeAdapter
+class DictionaryAttributeAdapter final : public houio::HouGeoAdapter::AttributeAdapter
 {
 public:
     DictionaryAttributeAdapter()
@@ -63,7 +63,7 @@ private:
     std::shared_ptr<houio::json::Object> dictionary_;
 };
 
-class DictionaryGeometryAdapter : public houio::HouGeoAdapter
+class DictionaryGeometryAdapter final : public houio::HouGeoAdapter
 {
 public:
     DictionaryGeometryAdapter()
@@ -105,7 +105,129 @@ private:
     AttributeAdapter::Ptr attribute_;
 };
 
-class RejectingStreamBuffer : public std::streambuf
+class CountingTopologyAdapter final : public houio::HouGeoAdapter::Topology
+{
+public:
+    explicit CountingTopologyAdapter(
+        bool expose_view,
+        std::vector<int> indices = {0, 40000, 1})
+        : expose_view_(expose_view), indices_(std::move(indices))
+    {
+    }
+
+    std::vector<int> indexValues() const override
+    {
+        ++copy_calls_;
+        return indices_;
+    }
+
+    std::span<const int> indexView() const noexcept override
+    {
+        return expose_view_ ? std::span<const int>(indices_) : std::span<const int>();
+    }
+
+    void appendIndices(std::span<const int> indices) override
+    {
+        indices_.insert(indices_.end(), indices.begin(), indices.end());
+    }
+
+    houio::sint64 indexCount() const override
+    {
+        return static_cast<houio::sint64>(indices_.size());
+    }
+
+    int copyCalls() const noexcept
+    {
+        return copy_calls_;
+    }
+
+private:
+    bool expose_view_ = false;
+    std::vector<int> indices_;
+    mutable int copy_calls_ = 0;
+};
+
+class TopologyGeometryAdapter final : public houio::HouGeoAdapter
+{
+public:
+    explicit TopologyGeometryAdapter(std::shared_ptr<CountingTopologyAdapter> topology)
+        : topology_(std::move(topology))
+    {
+    }
+
+    houio::sint64 pointCount() const override { return 40001; }
+    houio::sint64 vertexCount() const override { return 3; }
+    houio::sint64 primitiveCount() const override { return 0; }
+    std::vector<std::string> primitiveAttributeNames() const override { return {}; }
+    AttributeAdapter::Ptr primitiveAttribute(const std::string&) override { return nullptr; }
+    AttributeAdapter::ConstPtr primitiveAttribute(const std::string&) const override { return nullptr; }
+    Topology::Ptr topology() override { return topology_; }
+    Topology::ConstPtr topology() const override { return topology_; }
+
+private:
+    std::shared_ptr<CountingTopologyAdapter> topology_;
+};
+
+class TrianglePrimitiveAdapter final : public houio::HouGeoAdapter::PolyPrimitive
+{
+public:
+    int polygonCount() const override { return 1; }
+    int polygonVertexCount(int polygon_index) const override
+    {
+        if (polygon_index != 0)
+            throw std::out_of_range("triangle polygon index is out of range");
+        return 3;
+    }
+    std::span<const int> polygonVertexIndices(int polygon_index) const override
+    {
+        if (polygon_index != 0)
+            throw std::out_of_range("triangle polygon index is out of range");
+        return indices_;
+    }
+    bool isClosed() const override { return true; }
+
+private:
+    std::vector<int> indices_{0, 1, 2};
+};
+
+class CountingPrimitiveGeometryAdapter final : public houio::HouGeoAdapter
+{
+public:
+    explicit CountingPrimitiveGeometryAdapter(bool expose_view)
+        : expose_view_(expose_view),
+          topology_(std::make_shared<CountingTopologyAdapter>(true, std::vector<int>{0, 1, 2})),
+          primitives_{std::make_shared<TrianglePrimitiveAdapter>()}
+    {
+    }
+
+    houio::sint64 pointCount() const override { return 3; }
+    houio::sint64 vertexCount() const override { return 3; }
+    houio::sint64 primitiveCount() const override { return 1; }
+    std::vector<std::string> primitiveAttributeNames() const override { return {}; }
+    AttributeAdapter::Ptr primitiveAttribute(const std::string&) override { return nullptr; }
+    AttributeAdapter::ConstPtr primitiveAttribute(const std::string&) const override { return nullptr; }
+    std::vector<Primitive::ConstPtr> primitives() const override
+    {
+        ++copy_calls_;
+        return {primitives_.begin(), primitives_.end()};
+    }
+    std::span<const Primitive::Ptr> primitiveView() const noexcept override
+    {
+        return expose_view_ ? std::span<const Primitive::Ptr>(primitives_)
+                            : std::span<const Primitive::Ptr>();
+    }
+    Topology::Ptr topology() override { return topology_; }
+    Topology::ConstPtr topology() const override { return topology_; }
+    int copyCalls() const noexcept { return copy_calls_; }
+
+private:
+    bool expose_view_ = false;
+    std::shared_ptr<CountingTopologyAdapter> topology_;
+    std::vector<Primitive::Ptr> primitives_;
+    mutable int copy_calls_ = 0;
+};
+
+class RejectingStreamBuffer final : public std::streambuf
 {
 protected:
     std::streamsize xsputn(const char*, std::streamsize) override
@@ -158,6 +280,38 @@ bool roundtripOnce(const houio::HouGeoAdapter::Ptr& source)
            && imported->primitiveCount() == 0;
 }
 
+int verifyNonNumericPositionNameRoundtrip()
+{
+    auto attribute = std::make_shared<houio::HouGeo::HouAttribute>();
+    attribute->setName("P");
+    attribute->setStringValues(
+        {"left", "center", "right"},
+        houio::HouGeoAdapter::AttributeAdapter::TupleSize(3));
+
+    houio::HouGeo::Ptr source = houio::HouGeo::create();
+    source->setPointAttribute(attribute);
+
+    std::ostringstream output(std::ios::out | std::ios::binary);
+    if (!houio::HouGeoIO::exportGeometry(output, source, true))
+        return fail("non-numeric P attribute export failed");
+
+    std::istringstream input(output.str(), std::ios::in | std::ios::binary);
+    houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
+    const auto importedAttribute = imported ? imported->pointAttribute("P")
+                                            : houio::HouGeoAdapter::AttributeAdapter::Ptr();
+    if (!importedAttribute
+        || importedAttribute->type() != houio::HouGeoAdapter::AttributeAdapter::Type::string
+        || importedAttribute->tupleSize().value() != 3
+        || importedAttribute->elementCount() != 1
+        || importedAttribute->stringValue(0, 0) != "left"
+        || importedAttribute->stringValue(0, 1) != "center"
+        || importedAttribute->stringValue(0, 2) != "right")
+    {
+        return fail("non-numeric P attribute metadata changed during export");
+    }
+    return 0;
+}
+
 int verifyAdapterDictionaryExport()
 {
     auto source = std::make_shared<DictionaryGeometryAdapter>();
@@ -179,6 +333,69 @@ int verifyAdapterDictionaryExport()
         return fail("abstract adapter dictionary value changed during export");
     }
     return 0;
+}
+
+int verifyTopologyViewExport()
+{
+    const auto verifyExport = [](bool exposeView, int expectedCopyCalls) -> int
+    {
+        auto topology = std::make_shared<CountingTopologyAdapter>(exposeView);
+        auto geometry = std::make_shared<TopologyGeometryAdapter>(topology);
+        std::ostringstream output(std::ios::out | std::ios::binary);
+        if (!houio::HouGeoIO::exportGeometry(output, geometry, true))
+            return fail("topology adapter export failed");
+        if (topology->copyCalls() != expectedCopyCalls)
+            return fail("topology export used the wrong copy path");
+
+        std::istringstream input(output.str(), std::ios::in | std::ios::binary);
+        houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
+        const auto importedTopology = imported ? imported->topology()
+                                               : houio::HouGeoAdapter::Topology::Ptr();
+        const std::span<const int> indices = importedTopology ? importedTopology->indexView()
+                                                               : std::span<const int>();
+        if (!imported || imported->pointCount() != 40001 || imported->vertexCount() != 3
+            || indices.size() != 3 || indices[0] != 0 || indices[1] != 40000 || indices[2] != 1)
+        {
+            return fail("topology adapter values changed during export");
+        }
+        return 0;
+    };
+
+    if (const int result = verifyExport(true, 0); result != 0)
+        return result;
+    return verifyExport(false, 1);
+}
+
+int verifyPrimitiveViewExport()
+{
+    const auto verifyExport = [](bool exposeView, int expectedCopyCalls) -> int
+    {
+        auto geometry = std::make_shared<CountingPrimitiveGeometryAdapter>(exposeView);
+        std::ostringstream output(std::ios::out | std::ios::binary);
+        if (!houio::HouGeoIO::exportGeometry(output, geometry, true))
+            return fail("primitive adapter export failed");
+        if (geometry->copyCalls() != expectedCopyCalls)
+            return fail("primitive export used the wrong copy path");
+
+        std::istringstream input(output.str(), std::ios::in | std::ios::binary);
+        houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
+        const std::vector<houio::HouGeoAdapter::Primitive::Ptr> primitives =
+            imported ? imported->primitives() : std::vector<houio::HouGeoAdapter::Primitive::Ptr>();
+        const auto polygon = primitives.size() == 1
+            ? std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(primitives.front())
+            : houio::HouGeoAdapter::PolyPrimitive::Ptr();
+        if (!imported || imported->pointCount() != 3 || imported->vertexCount() != 3
+            || imported->primitiveCount() != 1 || !polygon || polygon->polygonCount() != 1
+            || polygon->polygonVertexCount(0) != 3)
+        {
+            return fail("primitive adapter values changed during export");
+        }
+        return 0;
+    };
+
+    if (const int result = verifyExport(true, 0); result != 0)
+        return result;
+    return verifyExport(false, 1);
 }
 
 int verifyReferenceStreamApi(const houio::HouGeoAdapter::Ptr& validGeometry)
@@ -312,7 +529,19 @@ int main()
 {
     const houio::HouGeoAdapter::Ptr validGeometry = createPointGeometry();
 
+    if (const int result = verifyNonNumericPositionNameRoundtrip(); result != 0)
+    {
+        return result;
+    }
     if (const int result = verifyAdapterDictionaryExport(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyTopologyViewExport(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifyPrimitiveViewExport(); result != 0)
     {
         return result;
     }
