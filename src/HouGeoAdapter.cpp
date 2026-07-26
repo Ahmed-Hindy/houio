@@ -9,6 +9,16 @@ namespace houio
         return {};
     }
 
+    std::string HouGeoAdapter::AttributeAdapter::scope() const
+    {
+        return "public";
+    }
+
+    std::shared_ptr<json::Object> HouGeoAdapter::AttributeAdapter::options() const
+    {
+        return nullptr;
+    }
+
     HouGeoAdapter::AttributeAdapter::Type HouGeoAdapter::AttributeAdapter::type() const
     {
         return Type::invalid;

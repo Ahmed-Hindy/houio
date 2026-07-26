@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The large Crag round trip and Houdini package matrix pass in all four maintained versions.
 - Documentation audit contains no retired API references and now records compatibility, fixture, contribution, field-format, and versioning contracts.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Phases 17–23 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
+- Phases 17–24 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
 
 ## Execution phases
 
@@ -703,6 +703,38 @@ Exit criteria:
 - Face-varying point splitting is quantified deterministically.
 - Failed conversions return no geometry but preserve diagnostics and available source metadata.
 - Existing `convertToGeometry` overloads retain their behavior.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 24 — Attribute definition metadata preservation
+
+**Status: complete.**
+
+Target files:
+
+- `include/houio/HouGeoAdapter.h`
+- `include/houio/HouGeo.h`
+- `src/HouGeoAdapter.cpp`
+- `src/HouGeo.cpp`
+- `src/HouGeoIO.cpp`
+- `tests/test_modern_geometry.cpp`
+- README, compatibility, and roadmap documents
+
+Tasks:
+
+- Add adapter-level accessors for attribute definition scope and semantic options.
+- Keep custom adapters source-compatible through public-scope and empty-options defaults.
+- Preserve arbitrary non-empty scope strings from parsed attribute definitions.
+- Preserve the complete nested JSON `options` object rather than selecting known keys.
+- Export retained metadata instead of hardcoding `public` and an empty map.
+- Normalize programmatic null options to an owned empty object.
+- Reject empty programmatic scopes.
+- Exercise non-empty nested semantic options and a non-public scope through import, binary export, and re-import.
+
+Exit criteria:
+
+- Attribute scope survives faithful `HouGeo` round trips.
+- Nested option values and unknown option keys survive without interpretation or loss.
+- Existing adapters that do not provide metadata continue to export public attributes with empty options.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work

@@ -68,6 +68,7 @@ The Houdini-oriented `HouGeo` model currently supports:
 - Point, vertex, primitive, and global attributes.
 - Unordered point, vertex, and primitive groups.
 - Indexed string and dictionary data used by the covered fixtures.
+- Attribute definition scope and complete semantic `options` objects.
 
 SCF outer compression is supported through a compatible C-Blosc runtime.
 

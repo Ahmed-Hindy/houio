@@ -1134,6 +1134,10 @@ namespace houio
 		const HouGeoAdapter::AttributeAdapter::Storage attribute_storage = attribute->storage();
 		const HouGeoAdapter::AttributeAdapter::TupleSize sourceTupleSize = attribute->tupleSize();
 		const std::string name = attribute->name();
+		const std::string attributeScope = attribute->scope();
+		if( attributeScope.empty() )
+			throw std::runtime_error( "HouGeoIO::exportAttribute: attribute scope cannot be empty for " + name );
+		const std::shared_ptr<json::Object> attributeOptions = attribute->options();
 		const bool promotePosition = attribute_type == HouGeoAdapter::AttributeAdapter::Type::numeric
 			&& name == "P" && sourceTupleSize.value() == 3;
 		const int exportTupleSize = promotePosition ? 4 : sourceTupleSize.value();
@@ -1164,14 +1168,19 @@ namespace houio
 
 		writer.jsonBeginArray();
 		writer.jsonString( "scope" );
-		writer.jsonString( "public" );
+		writer.jsonString( attributeScope );
 		writer.jsonString( "type" );
 		writer.jsonString(std::string(*attributeTypeName));
 		writer.jsonString( "name" );
 		writer.jsonString( name );
 		writer.jsonString( "options" );
-		writer.jsonBeginMap();
-		writer.jsonEndMap();
+		if( attributeOptions )
+			writeJsonObject(writer, attributeOptions);
+		else
+		{
+			writer.jsonBeginMap();
+			writer.jsonEndMap();
+		}
 		writer.jsonEndArray();
 
 		writer.jsonBeginArray();

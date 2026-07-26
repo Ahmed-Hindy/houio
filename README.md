@@ -33,6 +33,7 @@ HouIO currently supports:
 - Float16, Float32, and Float64 storage
 - Indexed string attributes, including Houdini's empty-string sentinel
 - Indexed dictionary metadata in faithful `HouGeo` round trips
+- Attribute definition scope and complete semantic `options` objects
 - Unordered point, vertex, and primitive groups
 - `Poly`, `Polygon_run`, and `PolygonCurve_run`
 - Dense scalar volumes

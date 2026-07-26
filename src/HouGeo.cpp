@@ -603,12 +603,14 @@ namespace houio
 	// Attribute ==============================
 
 	HouGeo::HouAttribute::HouAttribute()
-		: name_("unnamed")
+		: name_("unnamed"),
+		  options_(json::Object::create())
 	{
 	}
 
 	HouGeo::HouAttribute::HouAttribute(const std::string& name, Attribute::Ptr attribute)
 		: name_(name),
+		  options_(json::Object::create()),
 		  tuple_size_(TupleSize(attribute ? attribute->numComponents() : 1)),
 		  storage_(Storage::float32),
 		  type_(Type::numeric),
@@ -642,6 +644,16 @@ namespace houio
 	std::string HouGeo::HouAttribute::name() const
 	{
 		return name_;
+	}
+
+	std::string HouGeo::HouAttribute::scope() const
+	{
+		return scope_;
+	}
+
+	json::ObjectPtr HouGeo::HouAttribute::options() const
+	{
+		return options_;
 	}
 
 	HouGeoAdapter::AttributeAdapter::Type HouGeo::HouAttribute::type() const
@@ -980,6 +992,20 @@ namespace houio
 		HouGeo::HouAttribute::Ptr attr = std::make_shared<HouGeo::HouAttribute>();
 
 		std::string attrName = attrDef->get<std::string>("name");
+		attr->name_ = attrName;
+		attr->scope_ = attrDef->get<std::string>("scope", "public");
+		if( attr->scope_.empty() )
+			throw std::runtime_error( "HouGeo::loadAttribute scope cannot be empty for attribute " + attrName );
+		if( attrDef->contains("options") )
+		{
+			attr->options_ = attrDef->object("options");
+			if( !attr->options_ )
+				throw std::runtime_error( "HouGeo::loadAttribute options must be an object for attribute " + attrName );
+		}
+		else
+		{
+			attr->options_ = json::Object::create();
+		}
 		AttributeAdapter::Type attrType = AttributeAdapter::parseType(
 			attrDef->get<std::string>("type"));
 

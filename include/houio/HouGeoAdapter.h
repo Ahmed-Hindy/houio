@@ -120,6 +120,8 @@ namespace houio
             virtual ~AttributeAdapter() = default;
 
             [[nodiscard]] virtual std::string name() const;
+            [[nodiscard]] virtual std::string scope() const;
+            [[nodiscard]] virtual std::shared_ptr<json::Object> options() const;
             [[nodiscard]] virtual Type type() const;
             [[nodiscard]] virtual TupleSize tupleSize() const = 0;
             [[nodiscard]] virtual Storage storage() const;

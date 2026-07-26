@@ -56,6 +56,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Make field conversion read from immutable source references and make geometry merge accept non-owning mutable/immutable pointer spans.
 - [x] Add opt-in dependency-free baselines for numeric attributes, topology generation/traversal, and dense-volume import.
 - [x] Add a structured simplified-conversion result that reports splits, duplicates, skipped attributes, dropped groups, winding changes, and diagnostics.
+- [x] Preserve attribute definition scope and complete semantic `options` objects across import and export.
 
 ## Modernization next
 
@@ -131,7 +132,7 @@ Priority levels:
 ### Attributes
 
 - [ ] Add unsigned integer storage where the file format uses it.
-- [ ] Preserve complete attribute type and semantic metadata.
+- [x] Preserve complete attribute type and semantic metadata.
 - [x] Extend string-table coverage to every supported domain and maintained page layout.
 
 ### Geometry

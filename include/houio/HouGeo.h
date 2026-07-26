@@ -31,6 +31,8 @@ namespace houio
             HouAttribute(const std::string& name, Attribute::Ptr attribute);
 
             [[nodiscard]] std::string name() const override;
+            [[nodiscard]] std::string scope() const override;
+            [[nodiscard]] json::ObjectPtr options() const override;
             [[nodiscard]] Type type() const override;
             [[nodiscard]] TupleSize tupleSize() const override;
             [[nodiscard]] Storage storage() const override;
@@ -46,6 +48,18 @@ namespace houio
             void setName(std::string name)
             {
                 name_ = std::move(name);
+            }
+
+            void setScope(std::string scope)
+            {
+                if (scope.empty())
+                    throw std::invalid_argument("HouAttribute scope cannot be empty");
+                scope_ = std::move(scope);
+            }
+
+            void setOptions(json::ObjectPtr options)
+            {
+                options_ = options ? std::move(options) : json::Object::create();
             }
 
             void setTupleSize(TupleSize tuple_size) noexcept
@@ -136,6 +150,8 @@ namespace houio
 
         private:
             std::string name_;
+            std::string scope_ = "public";
+            json::ObjectPtr options_;
             TupleSize tuple_size_{1};
             Storage storage_ = Storage::invalid;
             Type type_ = Type::numeric;
