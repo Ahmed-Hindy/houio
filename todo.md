@@ -200,7 +200,7 @@ Add fixture-backed support one record type at a time:
 
 ## P3 — Performance
 
-- [ ] Measure memory amplification from input stream to JSON tree to `HouGeo`.
+- [x] Add a reproducible Windows/Linux working-set probe for input bytes, the parsed JSON tree, and retained `HouGeo` memory amplification.
 - [x] Benchmark large numeric attributes.
 - [x] Benchmark large topology arrays.
 - [x] Benchmark dense-volume imports.

@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The large Crag round trip and Houdini package matrix pass in all four maintained versions.
 - Documentation audit contains no retired API references and now records compatibility, fixture, contribution, field-format, and versioning contracts.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Phases 17–30 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
+- Phases 17–31 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
 
 ## Execution phases
 
@@ -907,6 +907,39 @@ Exit criteria:
 - Open-face closure loss is never silent when using `convertToGeometryResult`.
 - Successful conversion retains diagnostics and report metadata.
 - Closed polygon conversion behavior remains unchanged.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 31 — Input-to-tree-to-HouGeo memory probe
+
+**Status: complete.**
+
+Target files:
+
+- `benchmarks/houio_memory_probe.cpp`
+- `CMakeLists.txt`
+- `CMakePresets.json`
+- `docs/benchmarks.md`
+- README and roadmap documents
+
+Tasks:
+
+- Generate a deterministic binary point-attribute document without external fixtures.
+- Release the source geometry while retaining the binary input buffer.
+- Parse the document into a retained `JSONReader` tree.
+- Load a retained `HouGeo` semantic model from the same tree.
+- Sample the current process working set before parsing, after tree construction, and after semantic loading.
+- Support Windows through `GetProcessMemoryInfo` and Linux through `/proc/self/statm`.
+- Report exact input bytes, incremental stage deltas, combined extra bytes, stage amplification ratios, and a checksum.
+- Add reduced-workload and CSV controls.
+- Keep the probe opt-in and free of timing or memory pass/fail thresholds.
+- Compile the probe in the Windows warnings-as-errors and Linux GCC Release presets.
+
+Exit criteria:
+
+- Input, JSON-tree, and retained `HouGeo` stages are measured independently in one reproducible process.
+- The probe builds under strict warning policies on Windows and Linux.
+- Documentation distinguishes sampled current working set from exact allocation attribution and transient peak memory.
+- The benchmark preset builds and runs both timing baselines and the memory probe.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work

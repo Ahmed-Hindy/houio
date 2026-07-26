@@ -65,6 +65,32 @@ This baseline exercises:
 - Dense field allocation and constant fill.
 - Semantic primitive construction.
 
+### Input-to-tree-to-HouGeo memory amplification
+
+`houio_memory_probe` generates a deterministic binary point-attribute document, releases the source geometry, then retains these stages simultaneously:
+
+1. The binary input buffer.
+2. The parsed `JSONReader` tree.
+3. The loaded `HouGeo` semantic model.
+
+Run the default 500,000-point probe:
+
+```powershell
+.\build\windows-msvc-benchmarks\houio_memory_probe.exe
+```
+
+Emit one CSV row or choose a reduced workload:
+
+```powershell
+.\build\windows-msvc-benchmarks\houio_memory_probe.exe `
+  --elements 100000 `
+  --csv
+```
+
+The report includes exact input bytes, incremental current-working-set deltas for the JSON and `HouGeo` stages, combined extra bytes, stage amplification ratios, and a checksum. Working-set sampling is supported on Windows and Linux.
+
+The probe deliberately does not define pass/fail thresholds. Current working set is affected by allocator reuse, page commitment, operating-system accounting, background activity, and measurement order. Compare revisions only on the same machine, compiler, build type, workload, and process conditions. Use an allocation profiler when exact allocation ownership or transient peak memory is required.
+
 ## Options
 
 ```text
@@ -102,6 +128,6 @@ Do not commit machine-specific timing numbers as universal performance claims.
 
 ## Scope not yet measured
 
-The current executable does not measure peak memory amplification from compressed input through the JSON tree to `HouGeo`. Standard allocation is not currently routed through an instrumented allocator, and retained process memory is not a reliable portable peak measurement. That roadmap item remains open until allocation tracking or a sampling profiler is integrated deliberately.
+The memory probe samples retained current working set; it does not attribute allocations to individual types and does not capture every transient peak. Exact allocator-level accounting remains future diagnostic work rather than a release gate.
 
 The benchmarks also do not yet cover direct semantic handlers, streaming APIs, native sparse volumes, or large mixed-record assets beyond the separate Crag compatibility test.

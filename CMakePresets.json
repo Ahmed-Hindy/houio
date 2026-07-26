@@ -37,6 +37,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "HOUIO_BUILD_TESTS": "ON",
         "HOUIO_BUILD_EXAMPLES": "ON",
+        "HOUIO_BUILD_BENCHMARKS": "ON",
         "HOUIO_WARNINGS_AS_ERRORS": "ON"
       }
     },
@@ -88,7 +89,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "HOUIO_BUILD_TESTS": "ON",
-        "HOUIO_BUILD_EXAMPLES": "ON"
+        "HOUIO_BUILD_EXAMPLES": "ON",
+        "HOUIO_BUILD_BENCHMARKS": "ON"
       }
     },
     {
@@ -135,7 +137,8 @@
       "name": "windows-msvc-benchmarks",
       "configurePreset": "windows-msvc-benchmarks",
       "targets": [
-        "houio_benchmarks"
+        "houio_benchmarks",
+        "houio_memory_probe"
       ]
     },
     {

@@ -309,6 +309,7 @@ Opt-in performance baselines:
 cmake --preset windows-msvc-benchmarks
 cmake --build --preset windows-msvc-benchmarks
 .\build\windows-msvc-benchmarks\houio_benchmarks.exe
+.\build\windows-msvc-benchmarks\houio_memory_probe.exe
 ```
 
 See [Performance baselines](docs/benchmarks.md) for methodology and workload controls.
