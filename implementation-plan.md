@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The large Crag round trip and Houdini package matrix pass in all four maintained versions.
 - Documentation audit contains no retired API references and now records compatibility, fixture, contribution, field-format, and versioning contracts.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Phases 17–29 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
+- Phases 17–30 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
 
 ## Execution phases
 
@@ -880,6 +880,33 @@ Exit criteria:
 - A single polygon with more than four vertices converts successfully.
 - The simplified result reports one polygon and the exact vertex count.
 - Multiple n-gons remain explicitly rejected rather than flattened ambiguously.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 30 — Open-polygon closure-loss reporting
+
+**Status: complete.**
+
+Target files:
+
+- `include/houio/HouGeoIO.h`
+- `src/HouGeoIO.cpp`
+- `tests/test_conversion_safety.cpp`
+- README, compatibility, onboarding, and roadmap documents
+
+Tasks:
+
+- Detect open polygon runs with three or more vertices during simplified conversion.
+- Leave two-vertex line conversion unaffected because line closure is not represented as a face boundary.
+- Add `polygonClosureLost` to the structured conversion report.
+- Emit a warning diagnostic at `conversion.primitive.closed`.
+- Continue conversion because the simplified result remains useful when the loss is accepted explicitly.
+- Exercise the flag and warning through an open five-vertex polygon conversion.
+
+Exit criteria:
+
+- Open-face closure loss is never silent when using `convertToGeometryResult`.
+- Successful conversion retains diagnostics and report metadata.
+- Closed polygon conversion behavior remains unchanged.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work

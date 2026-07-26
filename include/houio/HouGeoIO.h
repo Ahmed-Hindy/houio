@@ -22,6 +22,7 @@ namespace houio
         std::size_t splitSourcePointCount = 0;
         std::size_t duplicatedPointCount = 0;
         bool windingReversed = false;
+        bool polygonClosureLost = false;
         std::vector<std::string> skippedPointAttributes;
         std::vector<std::string> skippedVertexAttributes;
         std::vector<std::string> skippedPrimitiveAttributes;

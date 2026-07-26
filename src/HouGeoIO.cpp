@@ -408,6 +408,14 @@ namespace houio
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry polygon vertex total does not match vertexcount", -1,
 					"conversion.primitive"});
+			if( numVerticesPerPoly >= 3 && !poly->isClosed() )
+			{
+				if( report )
+					report->polygonClosureLost = true;
+				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
+					"HouGeoIO::convertToGeometry closes open polygons in the simplified mesh model", -1,
+					"conversion.primitive.closed"});
+			}
 		}
 
 		// create the right kind of geometry depending on vertexcount per primitive (point, line or triangle geometry)

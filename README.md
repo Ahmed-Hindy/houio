@@ -138,7 +138,7 @@ houio::Geometry::Ptr mesh = conversion.value;
 const std::size_t duplicated_points = conversion.report.duplicatedPointCount;
 ```
 
-The report also lists skipped point, vertex, primitive, and global attributes; dropped groups; source/output point counts; split source points; and winding reversal.
+The report also lists skipped point, vertex, primitive, and global attributes; dropped groups; source/output point counts; split source points; winding reversal; and closure loss when an open Houdini polygon becomes a closed simplified face.
 
 ### Read all dense scalar volumes
 

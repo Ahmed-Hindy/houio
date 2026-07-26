@@ -63,6 +63,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add an optional immutable topology view and remove the unconditional topology-vector copy from faithful export.
 - [x] Add an optional immutable primitive-container view and remove the unconditional shared-pointer-vector copy from faithful export.
 - [x] Convert one arbitrary n-gon into the simplified polygon model with structured multi-n-gon rejection.
+- [x] Report open-polygon closure loss explicitly when simplified conversion creates a closed face.
 
 ## Modernization next
 

@@ -391,7 +391,7 @@ int verifySingleNgonConversion()
     geometry->setTopology(topology);
 
     auto polygon = std::make_shared<houio::HouGeo::HouPoly>();
-    polygon->setPolygonData(1, {5}, {0}, {0, 1, 2, 3, 4}, true);
+    polygon->setPolygonData(1, {5}, {0}, {0, 1, 2, 3, 4}, false);
     geometry->addPrimitive(polygon);
 
     houio::GeometryConversionResult conversion =
@@ -400,11 +400,20 @@ int verifySingleNgonConversion()
         ? conversion.value->indexBuffer() : std::span<const houio::Geometry::Index>();
     const houio::Attribute::CPtr convertedPositions = conversion.value
         ? conversion.value->attribute("P") : houio::Attribute::CPtr();
+    bool closureWarning = false;
+    for (const houio::Diagnostic& diagnostic : conversion.diagnostics)
+    {
+        closureWarning = closureWarning
+            || (diagnostic.severity == houio::DiagnosticSeverity::warning
+                && diagnostic.category == houio::DiagnosticCategory::conversion
+                && diagnostic.path == "conversion.primitive.closed");
+    }
     if (!conversion || conversion.value->primitiveType() != houio::Geometry::PrimitiveType::polygon
         || conversion.value->primitiveCount() != 1 || conversion.value->verticesPerPrimitive() != 5
         || indices.size() != 5 || indices[0] != 4 || indices[1] != 3 || indices[2] != 2
         || indices[3] != 1 || indices[4] != 0 || !convertedPositions
-        || convertedPositions->numElements() != 5 || !conversion.report.windingReversed)
+        || convertedPositions->numElements() != 5 || !conversion.report.windingReversed
+        || !conversion.report.polygonClosureLost || !closureWarning)
     {
         return fail("single n-gon conversion did not preserve simplified polygon topology");
     }
