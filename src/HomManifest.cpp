@@ -516,6 +516,35 @@ namespace houio
                     geometry->addPrimitive(
                         std::static_pointer_cast<HouGeoAdapter::PackedFragmentPrimitive>(packed));
                 }
+                else if( type == "packed_disk" )
+                {
+                    const std::string filename =
+                        definition->get<std::string>("filename", "");
+                    if( filename.empty() )
+                        failManifest(DiagnosticCategory::schema,
+                            "Packed disk requires a filename", path + ".filename");
+                    auto packed = std::make_shared<HouGeo::HouPackedDisk>();
+                    packed->setTopologyVertex(vertexOffset);
+                    packed->setFilename(filename);
+                    packed->setExpandFrame(
+                        definition->get<real32>("expand_frame", 1.0f));
+                    packed->setExpandFilename(
+                        definition->get<bool>("expand_filename", false));
+                    packed->setPivot(parseVector3(
+                        requireArray(definition, "pivot", path),
+                        path + ".pivot"));
+                    packed->setTransform(parseMatrix33(
+                        requireArray(definition, "transform", path),
+                        path + ".transform"));
+                    packed->setViewportLod(
+                        definition->get<std::string>("viewport_lod", "full"));
+                    packed->setPointInstanceTransform(
+                        definition->get<bool>("point_instance_transform", false));
+                    packed->setTreatAsFolder(
+                        definition->get<bool>("treat_as_folder", false));
+                    geometry->addPrimitive(
+                        std::static_pointer_cast<HouGeoAdapter::PackedDiskPrimitive>(packed));
+                }
                 else if( type == "dense_volume" )
                 {
                     const json::ArrayPtr resolutionValues = requireArray(

@@ -202,6 +202,54 @@ namespace
             return fail("Packed fragment bounds changed");
         }
 
+        houio::HouGeo::Ptr diskGeometry = createHouGeo();
+        auto diskTopology = std::make_shared<houio::HouGeo::HouTopology>();
+        diskTopology->appendIndex(0);
+        diskGeometry->setTopology(diskTopology);
+        auto packedDisk = std::make_shared<houio::HouGeo::HouPackedDisk>();
+        packedDisk->setTopologyVertex(0);
+        packedDisk->setFilename("$HIP/missing_payload.$F4.bgeo");
+        packedDisk->setExpandFrame(24.5f);
+        packedDisk->setExpandFilename(true);
+        packedDisk->setPivot(houio::math::V3f(-0.5f, 0.25f, 1.5f));
+        packedDisk->setTransform(houio::math::M33f(
+            1.0f, 0.0f, 0.0f,
+            0.0f, 2.0f, 0.0f,
+            0.0f, 0.0f, 3.0f));
+        packedDisk->setViewportLod("box");
+        packedDisk->setPointInstanceTransform(true);
+        packedDisk->setTreatAsFolder(true);
+        diskGeometry->addPrimitive(
+            std::static_pointer_cast<houio::HouGeoAdapter::PackedDiskPrimitive>(packedDisk));
+
+        const std::filesystem::path diskPath = directory / "packed_disk.bgeo";
+        if( !houio::Writer::write(
+                diskPath,
+                std::static_pointer_cast<houio::HouGeoAdapter>(diskGeometry)) )
+        {
+            return fail("Writer failed to serialize packed disk reference");
+        }
+        const auto diskResult = houio::GeometryIO::readHouGeo(diskPath);
+        if( !diskResult || diskResult.value->primitiveCount() != 1 )
+            return fail("Packed disk reference did not round-trip");
+        const auto diskPrimitive = std::dynamic_pointer_cast<houio::HouGeo::HouPackedDisk>(
+            diskResult.value->primitives().front());
+        if( !diskPrimitive )
+            return fail("Packed disk record changed type");
+        if( diskPrimitive->filename() != "$HIP/missing_payload.$F4.bgeo"
+            || diskPrimitive->expandFrame() != 24.5f
+            || !diskPrimitive->expandFilename() )
+        {
+            return fail("Packed disk path expansion metadata changed");
+        }
+        if( diskPrimitive->pivot() != houio::math::V3f(-0.5f, 0.25f, 1.5f)
+            || diskPrimitive->viewportLod() != "box"
+            || !diskPrimitive->pointInstanceTransform()
+            || !diskPrimitive->treatAsFolder() )
+        {
+            return fail("Packed disk transform or flags changed");
+        }
+
         houio::HouGeo::Ptr vdbGeometry = createHouGeo();
         auto vdbTopology = std::make_shared<houio::HouGeo::HouTopology>();
         vdbTopology->appendIndex(0);
@@ -286,6 +334,13 @@ namespace
             || !fragment->readable || !fragment->writable )
         {
             return fail("Packed fragment capability contract is incorrect");
+        }
+        const auto disk = houio::Writer::capability(
+            houio::WriterDataType::packed_disk);
+        if( !disk || disk->level != houio::WriterCapabilityLevel::supported
+            || !disk->readable || !disk->writable )
+        {
+            return fail("Packed disk capability contract is incorrect");
         }
         const auto vdb = houio::Writer::capability(
             houio::WriterDataType::sparse_openvdb);

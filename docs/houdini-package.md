@@ -159,7 +159,7 @@ Open a SOP network and press **Tab > HouIO**.
 
 Writes the selected cooked SOP through direct HOM extraction and HouIO's custom C++ serializer. The primary path does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`.
 
-Supported live records include polygons, dense scalar volumes, and embedded `hou.PackedGeometry`, together with maintained point, vertex, primitive, and global attributes and groups.
+Supported live records include polygons, dense scalar volumes, embedded `hou.PackedGeometry`, and external `PackedDisk` references, together with maintained point, vertex, primitive, and global attributes and groups.
 
 ### HouIO Round Trip
 
@@ -182,11 +182,11 @@ Reports the active package root, Houdini version, primary writer path and `houio
 
 ## Supported data
 
-The package supports HouIO's polygon, embedded `PackedGeometry`, named `PackedFragment`, numeric/string/dictionary attribute, group, and dense scalar-volume model. Houdini Volume Visualization detail metadata is preserved in both the scalar-attribute layout used by Houdini 20.x and the dictionary layout used by Houdini 21.x and newer.
+The package supports HouIO's polygon, embedded `PackedGeometry`, named `PackedFragment`, external `PackedDisk`, numeric/string/dictionary attribute, group, and dense scalar-volume model. Packed-disk authored filenames, expansion frames/policies, transforms, viewport LOD, and flags are preserved without opening or copying the referenced file. Houdini Volume Visualization detail metadata is preserved in both the scalar-attribute layout used by Houdini 20.x and the dictionary layout used by Houdini 21.x and newer.
 
 Existing native VDB primitive payloads are preserved losslessly by file-to-file HouIO round trips. Direct live-HOM writing of native VDB trees is not yet available because HOM does not expose the serialized sparse payload and HouIO does not yet link an optional OpenVDB construction backend. The compatibility round-trip path can still densify supported Float SDF/Fog grids and restore their class.
 
-File-to-file conversion preserves packed fragments. Direct **Write Selected Geometry** extraction of `hou.PackedFragment` remains unavailable because HOM does not expose its embedded source detail. Other unsupported examples include packed disk primitives, agents, height fields, live native-VDB construction, and vector VDB construction/editing.
+File-to-file conversion preserves packed fragments, and direct **Write Selected Geometry** supports `PackedDisk` references. Direct extraction of `hou.PackedFragment` remains unavailable because HOM does not expose its embedded source detail. Other unsupported examples include packed disk sequences, agents, height fields, live native-VDB construction, and vector VDB construction/editing.
 
 ## Runtime model
 

@@ -267,6 +267,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
         native_vdb
         packed_geometry
         packed_fragment
+        packed_disk
         primitive_groups
     )
 

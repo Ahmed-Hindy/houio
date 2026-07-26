@@ -120,3 +120,47 @@ if(fragment_count_position EQUAL -1)
     message(FATAL_ERROR
         "houio inspect did not report one packed fragment: ${fragment_inspect_output}")
 endif()
+
+set(disk_manifest "${HOUIO_TEST_DIRECTORY}/packed_disk_manifest.json")
+set(disk_output "${HOUIO_TEST_DIRECTORY}/packed_disk.bgeo")
+file(WRITE "${disk_manifest}"
+    "{\"schema\":\"houio.hom/1\","
+    "\"point_count\":1,\"vertex_count\":1,\"primitive_count\":1,"
+    "\"topology\":[0],\"primitives\":[{"
+    "\"type\":\"packed_disk\",\"vertex_offset\":0,"
+    "\"filename\":\"$HIP/cache/payload.$F4.bgeo\","
+    "\"expand_frame\":12.5,\"expand_filename\":true,"
+    "\"pivot\":[0,0,0],\"transform\":[1,0,0,0,1,0,0,0,1],"
+    "\"viewport_lod\":\"box\"}],"
+    "\"attributes\":{\"point\":[{\"name\":\"P\",\"kind\":\"numeric\","
+    "\"storage\":\"float32\",\"tuple_size\":4,\"element_count\":1,"
+    "\"values\":[0,0,0,1]}],\"vertex\":[],\"primitive\":[],\"global\":[]}}"
+)
+file(REMOVE "${disk_output}")
+execute_process(
+    COMMAND "${HOUIO_CLI}" write-manifest "${disk_manifest}" "${disk_output}" --json
+    RESULT_VARIABLE disk_write_result
+    OUTPUT_VARIABLE disk_write_output
+    ERROR_VARIABLE disk_write_error
+)
+if(NOT disk_write_result EQUAL 0)
+    message(FATAL_ERROR
+        "houio failed to write packed-disk manifest: ${disk_write_result}\n"
+        "stdout: ${disk_write_output}\nstderr: ${disk_write_error}")
+endif()
+execute_process(
+    COMMAND "${HOUIO_CLI}" inspect "${disk_output}" --json
+    RESULT_VARIABLE disk_inspect_result
+    OUTPUT_VARIABLE disk_inspect_output
+    ERROR_VARIABLE disk_inspect_error
+)
+if(NOT disk_inspect_result EQUAL 0)
+    message(FATAL_ERROR
+        "houio failed to inspect packed-disk output: ${disk_inspect_result}\n"
+        "stdout: ${disk_inspect_output}\nstderr: ${disk_inspect_error}")
+endif()
+string(FIND "${disk_inspect_output}" "\"packed_disk_records\":1" disk_count_position)
+if(disk_count_position EQUAL -1)
+    message(FATAL_ERROR
+        "houio inspect did not report one packed disk: ${disk_inspect_output}")
+endif()

@@ -479,6 +479,51 @@ def build_packed_fragment_geometry() -> hou.Geometry:
     return geometry
 
 
+def build_packed_disk_geometry(output_directory: Path) -> hou.Geometry:
+    """Build one external PackedDisk reference and its payload file.
+
+    Args:
+        output_directory: Fixture directory receiving the referenced payload.
+
+    Returns:
+        Geometry containing one transformed packed disk primitive.
+    """
+    payload = hou.Geometry()
+    points = create_points(payload, ((0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (0.0, 1.0, 0.0)))
+    create_polygon(payload, points, (0, 1, 2))
+    payload.addAttrib(hou.attribType.Global, "payload_name", "")
+    payload.setGlobalAttribValue("payload_name", "packed_disk_fixture")
+    payload_path = output_directory / "packed_disk_payload.bgeo"
+    payload.saveToFile(str(payload_path))
+
+    obj = hou.node("/obj")
+    if obj is None:
+        raise RuntimeError("Houdini object context is unavailable")
+    container = obj.createNode("geo", "houio_packed_disk_fixture")
+    for child in container.children():
+        child.destroy()
+    file_node = container.createNode("file", "packed_disk")
+    file_node.parm("file").set(str(payload_path))
+    file_node.parm("loadtype").set("delayed")
+    file_node.parm("packexpanded").set(1)
+    file_node.parm("viewportlod").set("box")
+    file_node.cook(force=True)
+
+    geometry = hou.Geometry()
+    geometry.merge(file_node.geometry())
+    container.destroy()
+    primitive = geometry.prims()[0]
+    primitive.setIntrinsicValue("pivot", (0.25, -0.5, 1.0))
+    primitive.setIntrinsicValue(
+        "transform",
+        (1.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.5),
+    )
+    kind_attribute = geometry.addAttrib(hou.attribType.Prim, "kind", "")
+    primitive.setAttribValue(kind_attribute, "external")
+    geometry.createPrimGroup("packed_disks").add(primitive)
+    return geometry
+
+
 def build_primitive_groups_geometry() -> hou.Geometry:
     """Build overlapping point, vertex, and primitive groups.
 
@@ -580,6 +625,7 @@ def main() -> int:
         ("native_vdb", build_native_vdb_geometry, ()),
         ("packed_geometry", build_packed_geometry, ()),
         ("packed_fragment", build_packed_fragment_geometry, ()),
+        ("packed_disk", lambda: build_packed_disk_geometry(output_directory), ()),
         ("primitive_groups", build_primitive_groups_geometry, ()),
     )
 

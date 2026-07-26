@@ -256,7 +256,7 @@ namespace
         return 0;
     }
 
-    int verifyUnsupportedRecord(const std::filesystem::path &directory)
+    int verifyPackedDiskManifest(const std::filesystem::path &directory)
     {
         const std::filesystem::path path = directory / "packed_disk.json";
         writeText(path, R"JSON({
@@ -265,7 +265,49 @@ namespace
             "vertex_count":1,
             "primitive_count":1,
             "topology":[0],
-            "primitives":[{"type":"packed_disk","vertex_offset":0}],
+            "primitives":[{
+                "type":"packed_disk","vertex_offset":0,
+                "filename":"$HIP/cache/payload.$F4.bgeo",
+                "expand_frame":24.5,"expand_filename":true,
+                "pivot":[0.25,0.5,0.75],
+                "transform":[2,0,0,0,3,0,0,0,4],
+                "viewport_lod":"box",
+                "point_instance_transform":true,
+                "treat_as_folder":true
+            }],
+            "attributes":{
+                "point":[{
+                    "name":"P","kind":"numeric","storage":"float32",
+                    "tuple_size":4,"element_count":1,"values":[0,0,0,1]
+                }],
+                "vertex":[],"primitive":[],"global":[]
+            }
+        })JSON");
+        const auto result = houio::HomManifest::read(path);
+        if( !result || result.value->primitiveCount() != 1 )
+            return fail("packed disk manifest failed to load");
+        const auto disk = std::dynamic_pointer_cast<houio::HouGeo::HouPackedDisk>(
+            result.value->primitives().front());
+        if( !disk || disk->filename() != "$HIP/cache/payload.$F4.bgeo"
+            || disk->expandFrame() != 24.5f || !disk->expandFilename()
+            || disk->viewportLod() != "box"
+            || !disk->pointInstanceTransform() || !disk->treatAsFolder() )
+        {
+            return fail("packed disk manifest lost reference metadata");
+        }
+        return 0;
+    }
+
+    int verifyUnsupportedRecord(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path path = directory / "packed_disk_sequence.json";
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,
+            "vertex_count":1,
+            "primitive_count":1,
+            "topology":[0],
+            "primitives":[{"type":"packed_disk_sequence","vertex_offset":0}],
             "attributes":{
                 "point":[{
                     "name":"P","kind":"numeric","storage":"float32",
@@ -299,6 +341,8 @@ int main()
     if( const int result = verifyInvalidTopologyOffsets(directory); result != 0 )
         return result;
     if( const int result = verifyPackedFragmentManifest(directory); result != 0 )
+        return result;
+    if( const int result = verifyPackedDiskManifest(directory); result != 0 )
         return result;
     if( const int result = verifyUnsupportedRecord(directory); result != 0 )
         return result;

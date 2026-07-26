@@ -88,9 +88,9 @@ namespace houio
             {WriterDataType::packed_fragment, WriterCapabilityLevel::supported,
                 true, true, "packed_fragment",
                 "Embedded PackedFragment records with fragment identity, bounds, transform, and shared HouGeo payload."},
-            {WriterDataType::packed_disk, WriterCapabilityLevel::recognized,
-                false, false, "packed_disk",
-                "Record family is planned; fixture-backed schema and adapter are not implemented."},
+            {WriterDataType::packed_disk, WriterCapabilityLevel::supported,
+                true, true, "packed_disk",
+                "External PackedDisk references with authored filename, expansion policy, transform, pivot, and flags."},
             {WriterDataType::sparse_openvdb, WriterCapabilityLevel::supported,
                 true, true, "sparse_openvdb",
                 "Lossless opaque Houdini VDB payload pass-through; tree creation and editing require an optional OpenVDB backend."}

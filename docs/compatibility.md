@@ -19,7 +19,7 @@ The minimum supported Houdini line is 20.0. Compatibility is established by the 
 
 ## What the fixture matrix validates
 
-The generated suite contains 17 deterministic fixtures and compares the source and HouIO output inside each supported Houdini version. It validates:
+The generated suite contains 18 deterministic fixtures and compares the source and HouIO output inside each supported Houdini version. It validates:
 
 - Empty and point-only geometry.
 - Point, vertex, primitive, and global attribute domains.
@@ -34,6 +34,7 @@ The generated suite contains 17 deterministic fixtures and compares the source a
 - Dense scalar-volume resolution, transform, position, and voxel values.
 - Embedded `PackedGeometry` payloads, pivot, transform, viewport LOD, and packed flags.
 - Named `PackedFragment` identity, local bounds, pivot, transform, viewport LOD, attributes, and groups.
+- External `PackedDisk` filenames, expansion policy, transform metadata, attributes, groups, bounds, and referenced payload content.
 - Native VDB active bounds, values, grid class, value type, transform, and visualization metadata.
 - BGEO and SCF round trips.
 
@@ -70,6 +71,7 @@ The Houdini-oriented `HouGeo` model currently supports:
 - Dense scalar `Volume` records.
 - Embedded `PackedGeometry` records and shared geometry payloads.
 - Named `PackedFragment` records with fragment attribute/name, bounds, transform, and embedded geometry payloads.
+- External `PackedDisk` references with authored filename, expansion frame/policy, transform, pivot, viewport LOD, and packed flags.
 - Native `VDB` records through opaque serialized-payload preservation.
 - Point, vertex, primitive, and global attributes.
 - Unordered point, vertex, and primitive groups, including primitive groups spanning mixed polygon and dense-volume records.
@@ -82,7 +84,7 @@ SCF outer compression is supported through a compatible C-Blosc runtime.
 
 The standalone C++ model does not currently preserve these records:
 
-- Packed disk primitives.
+- Packed disk sequences.
 - NURBS and Bezier curves.
 - Spheres, tubes, tetrahedra, and height fields.
 - Agents, crowds, and instancing records.
@@ -90,7 +92,7 @@ The standalone C++ model does not currently preserve these records:
 - Vector VDB construction and editing.
 - Additional volume tile-compression encodings not represented by maintained fixtures.
 
-Unsupported recognized input should produce an `unsupported_input` diagnostic rather than silent data loss. File-level `PackedFragment` records are supported, while direct HOM extraction remains unavailable because HOM does not expose the fragment's embedded source detail.
+Unsupported recognized input should produce an `unsupported_input` diagnostic rather than silent data loss. File-level `PackedFragment` records are supported, while direct HOM extraction remains unavailable because HOM does not expose the fragment's embedded source detail. `PackedDisk` references are supported in file and direct-HOM workflows; HouIO preserves the authored path and does not require the target to exist during serialization.
 
 ## Lossless and simplified representations
 

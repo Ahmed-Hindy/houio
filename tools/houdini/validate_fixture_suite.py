@@ -270,6 +270,49 @@ def primitive_summary(geometry: hou.Geometry) -> list[dict[str, Any]]:
                 }
             )
             continue
+        packed_type_name = (
+            str(primitive.intrinsicValue("packedtypename"))
+            if "packedtypename" in primitive.intrinsicNames()
+            else primitive.type().name()
+        )
+        if packed_type_name == "PackedDisk":
+            resolved_filename = str(primitive.intrinsicValue("filename"))
+            referenced = hou.Geometry()
+            referenced.loadFromFile(resolved_filename)
+            summaries.append(
+                {
+                    "type": packed_type_name,
+                    "closed": None,
+                    "points": [vertex.point().number() for vertex in primitive.vertices()],
+                    "filename": str(primitive.intrinsicValue("unexpandedfilename")),
+                    "resolved_filename": resolved_filename,
+                    "expand_frame": float(primitive.intrinsicValue("expandframe")),
+                    "expand_filename": int(primitive.intrinsicValue("expandfilename")),
+                    "pivot": list(primitive.intrinsicValue("pivot")),
+                    "transform": list(primitive.intrinsicValue("transform")),
+                    "viewport_lod": str(primitive.intrinsicValue("viewportlod")),
+                    "point_instance_transform": int(
+                        primitive.intrinsicValue("pointinstancetransform")
+                    ),
+                    "treat_as_folder": int(primitive.intrinsicValue("treatasfolder")),
+                    "packed_bounds": list(primitive.intrinsicValue("packedbounds")),
+                    "referenced": {
+                        "point_count": len(referenced.points()),
+                        "vertex_count": geometry_vertex_count(referenced),
+                        "primitive_count": len(referenced.prims()),
+                        "positions": [list(point.position()) for point in referenced.points()],
+                        "primitive_types": [
+                            referenced_primitive.type().name()
+                            for referenced_primitive in referenced.prims()
+                        ],
+                        "attributes": {
+                            domain: attribute_summary(referenced, domain)
+                            for domain in ATTRIBUTE_DOMAINS
+                        },
+                    },
+                }
+            )
+            continue
         if isinstance(primitive, hou.Volume):
             summaries.append(
                 {

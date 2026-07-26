@@ -18,8 +18,8 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def create_source_geometry() -> hou.Geometry:
-    """Create mixed polygon and dense-volume geometry with maintained domains."""
+def create_source_geometry(output_directory: Path) -> hou.Geometry:
+    """Create mixed geometry, including one external PackedDisk reference."""
     geometry = hou.Geometry()
     points = []
     for position in ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)):
@@ -49,6 +49,35 @@ def create_source_geometry() -> hou.Geometry:
     packed = geometry.createPackedGeometry(embedded)
     packed.setIntrinsicValue("pivot", (0.25, 0.5, 0.75))
 
+    disk_payload = hou.Geometry()
+    disk_points = []
+    for position in ((0.0, 0.0, 0.0), (0.0, 2.0, 0.0)):
+        point = disk_payload.createPoint()
+        point.setPosition(position)
+        disk_points.append(point)
+    disk_line = disk_payload.createPolygon(is_closed=False)
+    for point in disk_points:
+        disk_line.addVertex(point)
+    disk_payload_path = output_directory / "direct_writer_payload.bgeo"
+    disk_payload.saveToFile(str(disk_payload_path))
+
+    obj = hou.node("/obj")
+    if obj is None:
+        raise RuntimeError("Houdini object context is unavailable")
+    container = obj.createNode("geo", "houio_direct_writer_packed_disk")
+    for child in container.children():
+        child.destroy()
+    file_node = container.createNode("file", "packed_disk")
+    file_node.parm("file").set(str(disk_payload_path))
+    file_node.parm("loadtype").set("delayed")
+    file_node.parm("packexpanded").set(1)
+    file_node.parm("viewportlod").set("box")
+    file_node.cook(force=True)
+    geometry.merge(file_node.geometry())
+    container.destroy()
+    packed_disk = geometry.prims()[-1]
+    packed_disk.setIntrinsicValue("pivot", (-0.25, 0.5, 1.0))
+
     label = geometry.addAttrib(hou.attribType.Point, "label", "")
     for point in geometry.points():
         point.setAttribValue(label, f"point_{point.number()}")
@@ -61,6 +90,7 @@ def create_source_geometry() -> hou.Geometry:
     polygon.setAttribValue(primitive_kind, "polygon")
     volume.setAttribValue(primitive_kind, "volume")
     packed.setAttribValue(primitive_kind, "packed")
+    packed_disk.setAttribValue(primitive_kind, "packed_disk")
     geometry.setGlobalAttribValue(
         geometry.addAttrib(hou.attribType.Global, "asset", ""),
         "direct_writer",
@@ -69,6 +99,7 @@ def create_source_geometry() -> hou.Geometry:
     geometry.createPointGroup("selected_points").add(points[0])
     geometry.createVertexGroup("selected_vertices").add(polygon.vertices()[1])
     geometry.createPrimGroup("volumes").add(volume)
+    geometry.createPrimGroup("packed_disks").add(packed_disk)
     return geometry
 
 
@@ -76,14 +107,14 @@ def validate_output(path: Path) -> None:
     """Use Houdini's reader to verify the file produced by HouIO."""
     result = hou.Geometry()
     result.loadFromFile(str(path))
-    if len(result.points()) != 5:
+    if len(result.points()) != 6:
         raise AssertionError("Direct writer did not preserve point count")
     vertex_count = (
         result.vertexCount()
         if hasattr(result, "vertexCount")
         else sum(len(primitive.vertices()) for primitive in result.prims())
     )
-    if vertex_count != 5 or len(result.prims()) != 3:
+    if vertex_count != 6 or len(result.prims()) != 4:
         raise AssertionError("Direct writer did not preserve topology or primitives")
     if result.findPointAttrib("label") is None:
         raise AssertionError("Direct writer lost point string attributes")
@@ -97,7 +128,7 @@ def validate_output(path: Path) -> None:
         raise AssertionError("Direct writer lost point groups")
     if result.findVertexGroup("selected_vertices") is None:
         raise AssertionError("Direct writer lost vertex groups")
-    if result.findPrimGroup("volumes") is None:
+    if result.findPrimGroup("volumes") is None or result.findPrimGroup("packed_disks") is None:
         raise AssertionError("Direct writer lost primitive groups")
 
     packed_primitives = [
@@ -118,6 +149,22 @@ def validate_output(path: Path) -> None:
     ):
         raise AssertionError("Direct writer changed packed pivot metadata")
 
+    packed_disks = [
+        primitive
+        for primitive in result.prims()
+        if "packedtypename" in primitive.intrinsicNames()
+        and str(primitive.intrinsicValue("packedtypename")) == "PackedDisk"
+    ]
+    if len(packed_disks) != 1:
+        raise AssertionError("Direct writer did not preserve packed disk")
+    packed_disk = packed_disks[0]
+    if str(packed_disk.intrinsicValue("unexpandedfilename")) != str(
+        path.parent / "direct_writer_payload.bgeo"
+    ):
+        raise AssertionError("Direct writer changed packed disk filename")
+    if str(packed_disk.intrinsicValue("viewportlod")) != "box":
+        raise AssertionError("Direct writer changed packed disk viewport metadata")
+
     volumes = [primitive for primitive in result.prims() if isinstance(primitive, hou.Volume)]
     if len(volumes) != 1:
         raise AssertionError("Direct writer did not preserve the dense volume")
@@ -131,7 +178,9 @@ def main() -> int:
     arguments = parse_arguments()
     arguments.output_directory.mkdir(parents=True, exist_ok=True)
     output_path = arguments.output_directory / "direct_writer.bgeo"
-    write_result = write_geometry(create_source_geometry(), output_path)
+    write_result = write_geometry(
+        create_source_geometry(arguments.output_directory), output_path
+    )
     if not write_result.success:
         raise AssertionError(
             "HouIO direct writer failed:\n"

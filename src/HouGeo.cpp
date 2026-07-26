@@ -575,6 +575,13 @@ namespace houio
 		m_primitives.push_back(std::move(packedFragment));
 	}
 
+	void HouGeo::addPrimitive( PackedDiskPrimitive::Ptr packedDisk )
+	{
+		if( !packedDisk )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null packed disk" );
+		m_primitives.push_back(std::move(packedDisk));
+	}
+
 	void HouGeo::addPrimitive( NativeVdbPrimitive::Ptr nativeVdb )
 	{
 		if( !nativeVdb )
@@ -1502,6 +1509,9 @@ namespace houio
 		if( primitiveType=="PackedFragment" )
 			withSchemaPath("data", [&]() { loadPackedFragmentPrimitive(toObject(primitive->array(1)), sharedPrimitiveData); });
 		else
+		if( primitiveType=="PackedDisk" )
+			withSchemaPath("data", [&]() { loadPackedDiskPrimitive(toObject(primitive->array(1))); });
+		else
 		if( primitiveType=="VDB" )
 			withSchemaPath("data", [&]() { loadNativeVdbPrimitive(toObject(primitive->array(1))); });
 		else
@@ -1767,6 +1777,80 @@ namespace houio
 		m_primitives.push_back(std::move(result));
 	}
 
+	void HouGeo::loadPackedDiskPrimitive( json::ObjectPtr packedDisk )
+	{
+		if( !packedDisk )
+			throw std::invalid_argument( "HouGeo::loadPackedDiskPrimitive received null data" );
+		json::ObjectPtr parameters = packedDisk->object("parameters");
+		if( !parameters )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema, "PackedDisk primitive is missing parameters",
+				-1, "parameters"});
+
+		const std::string filename = parameters->get<std::string>("filename", "");
+		if( filename.empty() )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema, "PackedDisk primitive is missing its filename",
+				-1, "parameters.filename"});
+
+		const int topologyVertex = packedDisk->get<int>("vertex", -1);
+		if( topologyVertex < 0 || !m_topology
+			|| static_cast<sint64>(topologyVertex) >= m_topology->indexCount() )
+		{
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"PackedDisk topology vertex is outside vertexcount",
+				-1, "vertex"});
+		}
+
+		math::V3f pivot(0.0f);
+		json::ArrayPtr pivotValues = packedDisk->array("pivot");
+		if( pivotValues )
+		{
+			if( pivotValues->size() != 3 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedDisk pivot requires three values", -1, "pivot"});
+			pivot = math::V3f(
+				pivotValues->get<real32>(0),
+				pivotValues->get<real32>(1),
+				pivotValues->get<real32>(2));
+		}
+
+		math::M33f transform = math::M33f::identity();
+		json::ArrayPtr transformValues = packedDisk->array("transform");
+		if( transformValues )
+		{
+			if( transformValues->size() != 9 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"PackedDisk transform requires nine values", -1, "transform"});
+			transform = math::M33f(
+				transformValues->get<real32>(0),
+				transformValues->get<real32>(1),
+				transformValues->get<real32>(2),
+				transformValues->get<real32>(3),
+				transformValues->get<real32>(4),
+				transformValues->get<real32>(5),
+				transformValues->get<real32>(6),
+				transformValues->get<real32>(7),
+				transformValues->get<real32>(8));
+		}
+
+		auto result = std::make_shared<HouPackedDisk>();
+		result->topology_vertex_ = topologyVertex;
+		result->filename_ = filename;
+		result->expand_frame_ = parameters->get<real32>("expandframe", 1.0f);
+		result->expand_filename_ = parameters->get<int>("expandfilename", 0) != 0;
+		result->pivot_ = pivot;
+		result->transform_ = transform;
+		result->viewport_lod_ = packedDisk->get<std::string>("viewportlod", "full");
+		result->point_instance_transform_ =
+			parameters->get<int>("pointinstancetransform", 0) != 0;
+		result->treat_as_folder_ = parameters->get<int>("treatasfolder", 0) != 0;
+		m_primitives.push_back(std::move(result));
+	}
+
 	void HouGeo::loadNativeVdbPrimitive( json::ObjectPtr nativeVdb )
 	{
 		if( !nativeVdb )
@@ -1793,6 +1877,53 @@ namespace houio
 		result->topology_vertex_ = topologyVertex;
 		result->serialized_payload_ = std::move(payload);
 		m_primitives.push_back(std::move(result));
+	}
+
+	// HouGeo::HouPackedDisk =============================================
+
+	int HouGeo::HouPackedDisk::topologyVertex() const
+	{
+		return topology_vertex_;
+	}
+
+	std::string HouGeo::HouPackedDisk::filename() const
+	{
+		return filename_;
+	}
+
+	real32 HouGeo::HouPackedDisk::expandFrame() const
+	{
+		return expand_frame_;
+	}
+
+	bool HouGeo::HouPackedDisk::expandFilename() const
+	{
+		return expand_filename_;
+	}
+
+	math::V3f HouGeo::HouPackedDisk::pivot() const
+	{
+		return pivot_;
+	}
+
+	math::M33f HouGeo::HouPackedDisk::transform() const
+	{
+		return transform_;
+	}
+
+	std::string HouGeo::HouPackedDisk::viewportLod() const
+	{
+		return viewport_lod_;
+	}
+
+	bool HouGeo::HouPackedDisk::pointInstanceTransform() const
+	{
+		return point_instance_transform_;
+	}
+
+	bool HouGeo::HouPackedDisk::treatAsFolder() const
+	{
+		return treat_as_folder_;
 	}
 
 	int HouGeo::HouVdb::topologyVertex() const
