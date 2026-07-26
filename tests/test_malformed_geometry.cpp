@@ -224,6 +224,8 @@ int main()
          R"JSON(["pointcount", 1, "vertexcount", 1, "primitivecount", 1, "topology", ["pointref", ["indices", [0]]], "primitives", [[["type", "Poly"], ["vertex", [1], "closed", true]]]])JSON"},
         {"polygon run exceeds topology",
          R"JSON(["pointcount", 1, "vertexcount", 1, "primitivecount", 1, "topology", ["pointref", ["indices", [0]]], "primitives", [[["type", "p_r"], ["s_v", 0, "n_p", 1, "n_v", [2]]]]])JSON"},
+        {"packed disk missing filename",
+         R"JSON(["pointcount", 1, "vertexcount", 1, "primitivecount", 1, "topology", ["pointref", ["indices", [0]]], "primitives", [[["type", "PackedDisk"], ["parameters", ["filename", ""], "vertex", 0]]]])JSON"},
     };
 
     for (const auto& [name, sourceText] : malformedCases)

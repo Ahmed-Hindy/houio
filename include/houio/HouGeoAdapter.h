@@ -169,6 +169,7 @@ namespace houio
                 polygon,
                 packed_geometry,
                 packed_fragment,
+                packed_disk,
                 native_vdb,
             };
 
@@ -218,6 +219,23 @@ namespace houio
             [[nodiscard]] virtual std::string fragmentName() const = 0;
             [[nodiscard]] virtual Bounds bounds() const;
             [[nodiscard]] virtual Bounds cachedBounds() const;
+        };
+
+        class PackedDiskPrimitive : public Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<PackedDiskPrimitive>;
+            using ConstPtr = std::shared_ptr<const PackedDiskPrimitive>;
+
+            [[nodiscard]] virtual int topologyVertex() const = 0;
+            [[nodiscard]] virtual std::string filename() const = 0;
+            [[nodiscard]] virtual real32 expandFrame() const;
+            [[nodiscard]] virtual bool expandFilename() const;
+            [[nodiscard]] virtual math::V3f pivot() const;
+            [[nodiscard]] virtual math::M33f transform() const;
+            [[nodiscard]] virtual std::string viewportLod() const;
+            [[nodiscard]] virtual bool pointInstanceTransform() const;
+            [[nodiscard]] virtual bool treatAsFolder() const;
         };
 
         class NativeVdbPrimitive : public Primitive

@@ -1158,6 +1158,14 @@ namespace houio
 							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
 						++topologyVertexOffset;
 					}
+					else if( auto packedDisk = std::dynamic_pointer_cast<const HouGeoAdapter::PackedDiskPrimitive>(primitive) )
+					{
+						if( !exportPrimitive(context, packedDisk) )
+							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a packed disk primitive" );
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
 					else if( auto nativeVdb = std::dynamic_pointer_cast<const HouGeoAdapter::NativeVdbPrimitive>(primitive) )
 					{
 						if( !exportPrimitive(context, nativeVdb) )
@@ -1842,6 +1850,57 @@ namespace houio
 		writer.jsonInt32(packedFragment->topologyVertex());
 		writer.jsonString("viewportlod");
 		writer.jsonString(packedFragment->viewportLod());
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		return true;
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::PackedDiskPrimitive::ConstPtr packedDisk )
+	{
+		if( !packedDisk || packedDisk->topologyVertex() < 0
+			|| packedDisk->filename().empty() )
+		{
+			return false;
+		}
+		json::BinaryWriter &writer = context.writer;
+		const math::V3f pivot = packedDisk->pivot();
+		const math::M33f transform = packedDisk->transform();
+
+		writer.jsonBeginArray();
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString("PackedDisk");
+		writer.jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonString("parameters");
+		writer.jsonBeginMap();
+		writer.jsonKey("expandfilename");
+		writer.jsonInt32(packedDisk->expandFilename() ? 1 : 0);
+		writer.jsonKey("expandframe");
+		writer.jsonReal32(packedDisk->expandFrame());
+		writer.jsonKey("filename");
+		writer.jsonString(packedDisk->filename());
+		writer.jsonKey("pointinstancetransform");
+		writer.jsonInt32(packedDisk->pointInstanceTransform() ? 1 : 0);
+		writer.jsonKey("treatasfolder");
+		writer.jsonInt32(packedDisk->treatAsFolder() ? 1 : 0);
+		writer.jsonEndMap();
+		writer.jsonString("pivot");
+		writer.jsonBeginArray();
+		writer.jsonReal32(pivot.x);
+		writer.jsonReal32(pivot.y);
+		writer.jsonReal32(pivot.z);
+		writer.jsonEndArray();
+		writer.jsonString("transform");
+		writer.jsonBeginArray();
+		for( const real32 value : transform.ma )
+			writer.jsonReal32(value);
+		writer.jsonEndArray();
+		writer.jsonString("vertex");
+		writer.jsonInt32(packedDisk->topologyVertex());
+		writer.jsonString("viewportlod");
+		writer.jsonString(packedDisk->viewportLod());
 		writer.jsonEndArray();
 		writer.jsonEndArray();
 		return true;

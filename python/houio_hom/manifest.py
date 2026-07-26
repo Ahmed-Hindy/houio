@@ -286,6 +286,36 @@ def _primitive_manifest(primitive: hou.Prim) -> dict[str, Any]:
     """Extract one supported primitive without invoking a Houdini file writer."""
     vertices = primitive.vertices()
     vertex_offset = vertices[0].linearNumber() if vertices else 0
+    type_name = primitive.type().name()
+    packed_type_name = (
+        str(primitive.intrinsicValue("packedtypename"))
+        if "packedtypename" in primitive.intrinsicNames()
+        else type_name
+    )
+    if packed_type_name == "PackedDisk":
+        authored_filename = str(primitive.intrinsicValue("unexpandedfilename"))
+        if not authored_filename:
+            authored_filename = str(primitive.intrinsicValue("filename"))
+        if not authored_filename:
+            raise UnsupportedHOMDataError(
+                "hou.PackedPrim PackedDisk has no authored filename"
+            )
+        return {
+            "type": "packed_disk",
+            "vertex_offset": vertex_offset,
+            "filename": authored_filename,
+            "expand_frame": float(primitive.intrinsicValue("expandframe")),
+            "expand_filename": bool(primitive.intrinsicValue("expandfilename")),
+            "pivot": [float(value) for value in primitive.intrinsicValue("pivot")],
+            "transform": [
+                float(value) for value in primitive.intrinsicValue("transform")
+            ],
+            "viewport_lod": str(primitive.intrinsicValue("viewportlod")),
+            "point_instance_transform": bool(
+                primitive.intrinsicValue("pointinstancetransform")
+            ),
+            "treat_as_folder": bool(primitive.intrinsicValue("treatasfolder")),
+        }
     if isinstance(primitive, hou.PackedFragment):
         raise UnsupportedHOMDataError(
             "hou.PackedFragment file records are supported by HouIO, but HOM does "
@@ -335,12 +365,11 @@ def _primitive_manifest(primitive: hou.Prim) -> dict[str, Any]:
             "closed": bool(primitive.isClosed()),
         }
 
-    type_name = primitive.type().name()
-    if "Packed" in type_name or "packed" in type_name:
+    if "Packed" in packed_type_name or "packed" in packed_type_name:
         raise UnsupportedHOMDataError(
-            f"Packed primitive {type_name!r} is recognized, but direct HOM extraction "
-            "currently supports only embedded hou.PackedGeometry; PackedFragment is "
-            "supported at the file and explicit-manifest layers"
+            f"Packed primitive {packed_type_name!r} is recognized, but direct HOM extraction "
+            "supports embedded hou.PackedGeometry and PackedDisk references; "
+            "PackedFragment is supported at the file and explicit-manifest layers"
         )
     raise UnsupportedHOMDataError(
         f"Primitive {primitive.number()} uses unsupported type {type_name!r}"

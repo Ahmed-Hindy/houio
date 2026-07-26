@@ -377,6 +377,60 @@ namespace houio
             friend class HouGeo;
         };
 
+        class HouPackedDisk final : public PackedDiskPrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouPackedDisk>;
+            using ConstPtr = std::shared_ptr<const HouPackedDisk>;
+
+            [[nodiscard]] int topologyVertex() const override;
+            [[nodiscard]] std::string filename() const override;
+            [[nodiscard]] real32 expandFrame() const override;
+            [[nodiscard]] bool expandFilename() const override;
+            [[nodiscard]] math::V3f pivot() const override;
+            [[nodiscard]] math::M33f transform() const override;
+            [[nodiscard]] std::string viewportLod() const override;
+            [[nodiscard]] bool pointInstanceTransform() const override;
+            [[nodiscard]] bool treatAsFolder() const override;
+
+            void setTopologyVertex(int topology_vertex) noexcept
+            {
+                topology_vertex_ = topology_vertex;
+            }
+            void setFilename(std::string filename)
+            {
+                if (filename.empty())
+                    throw std::invalid_argument("HouPackedDisk filename cannot be empty");
+                filename_ = std::move(filename);
+            }
+            void setExpandFrame(real32 frame) noexcept { expand_frame_ = frame; }
+            void setExpandFilename(bool enabled) noexcept { expand_filename_ = enabled; }
+            void setPivot(const math::V3f& pivot) noexcept { pivot_ = pivot; }
+            void setTransform(const math::M33f& transform) noexcept { transform_ = transform; }
+            void setViewportLod(std::string viewport_lod)
+            {
+                viewport_lod_ = viewport_lod.empty() ? "full" : std::move(viewport_lod);
+            }
+            void setPointInstanceTransform(bool enabled) noexcept
+            {
+                point_instance_transform_ = enabled;
+            }
+            void setTreatAsFolder(bool enabled) noexcept { treat_as_folder_ = enabled; }
+
+        private:
+            int topology_vertex_ = -1;
+            std::string filename_;
+            real32 expand_frame_ = 1.0f;
+            bool expand_filename_ = false;
+            math::V3f pivot_{0.0f};
+            math::M33f transform_ = math::M33f::identity();
+            std::string viewport_lod_ = "full";
+            bool point_instance_transform_ = false;
+            bool treat_as_folder_ = false;
+
+            friend class HouGeo;
+        };
+
         class HouVdb final : public NativeVdbPrimitive
         {
         public:
@@ -473,6 +527,7 @@ namespace houio
         void addPrimitive(VolumePrimitive::Ptr volume);
         void addPrimitive(PackedGeometryPrimitive::Ptr packed_geometry);
         void addPrimitive(PackedFragmentPrimitive::Ptr packed_fragment);
+        void addPrimitive(PackedDiskPrimitive::Ptr packed_disk);
         void addPrimitive(NativeVdbPrimitive::Ptr native_vdb);
         void addPrimitive(PolyPrimitive::Ptr polygon);
         void setTopology(HouTopology::Ptr topology);
@@ -538,6 +593,7 @@ namespace houio
         void loadPackedFragmentPrimitive(
             json::ObjectPtr packed_fragment,
             SharedPrimitiveData& shared_primitive_data);
+        void loadPackedDiskPrimitive(json::ObjectPtr packed_disk);
         void loadNativeVdbPrimitive(json::ObjectPtr native_vdb);
         void loadPolyPrimitive(json::ObjectPtr polygon_object);
         void loadPolyPrimitiveRun(

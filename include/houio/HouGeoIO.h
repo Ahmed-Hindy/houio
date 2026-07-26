@@ -147,6 +147,9 @@ namespace houio
             const std::string& embedded_id);
         static bool exportPrimitive(
             ExportContext& context,
+            HouGeoAdapter::PackedDiskPrimitive::ConstPtr packed_disk);
+        static bool exportPrimitive(
+            ExportContext& context,
             HouGeoAdapter::NativeVdbPrimitive::ConstPtr native_vdb);
         static bool exportPrimitive(
             ExportContext& context,

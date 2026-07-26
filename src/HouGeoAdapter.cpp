@@ -211,6 +211,41 @@ namespace houio
         return bounds();
     }
 
+    real32 HouGeoAdapter::PackedDiskPrimitive::expandFrame() const
+    {
+        return 1.0f;
+    }
+
+    bool HouGeoAdapter::PackedDiskPrimitive::expandFilename() const
+    {
+        return false;
+    }
+
+    math::V3f HouGeoAdapter::PackedDiskPrimitive::pivot() const
+    {
+        return math::V3f(0.0f);
+    }
+
+    math::M33f HouGeoAdapter::PackedDiskPrimitive::transform() const
+    {
+        return math::M33f::identity();
+    }
+
+    std::string HouGeoAdapter::PackedDiskPrimitive::viewportLod() const
+    {
+        return "full";
+    }
+
+    bool HouGeoAdapter::PackedDiskPrimitive::pointInstanceTransform() const
+    {
+        return false;
+    }
+
+    bool HouGeoAdapter::PackedDiskPrimitive::treatAsFolder() const
+    {
+        return false;
+    }
+
     int HouGeoAdapter::PolyPrimitive::polygonCount() const
     {
         return 0;
