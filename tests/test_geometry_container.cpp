@@ -133,6 +133,12 @@ namespace
             houio::math::V3f(3.0f, 0.0f, 0.0f));
         const std::array<houio::Geometry::Ptr, 2> mutable_sources = {first, second};
         const houio::Geometry::Ptr merged = houio::Geometry::merge(mutable_sources);
+        const houio::Geometry::Ptr merged_from_initializer = houio::Geometry::merge({first, second});
+        if (!merged_from_initializer || merged_from_initializer->primitiveCount() != 2
+            || merged_from_initializer->indexBuffer().size() != 4)
+        {
+            return fail("initializer-list geometry merge compatibility was lost");
+        }
         if (!merged || merged->primitiveCount() != 2 || merged->indexBuffer().size() != 4)
             return fail("line merge produced incorrect topology");
         const houio::Attribute::Ptr positions = merged->attribute("P");
@@ -144,10 +150,15 @@ namespace
 
         const std::array<houio::Geometry::ConstPtr, 2> immutable_sources = {first, second};
         const houio::Geometry::Ptr merged_from_const = houio::Geometry::merge(immutable_sources);
+        const houio::Attribute::CPtr const_positions = merged_from_const
+            ? merged_from_const->attribute("P") : houio::Attribute::CPtr();
         if (!merged_from_const || merged_from_const->primitiveCount() != 2
-            || merged_from_const->indexBuffer().size() != 4)
+            || merged_from_const->indexBuffer().size() != 4 || !const_positions
+            || const_positions->numElements() != 4
+            || merged_from_const->indexBuffer()[2] != 2
+            || merged_from_const->indexBuffer()[3] != 3)
         {
-            return fail("const geometry merge produced incorrect topology");
+            return fail("const geometry merge produced incorrect point offsets");
         }
 
         const houio::Geometry::Index duplicate_index = merged->duplicatePoint(1);

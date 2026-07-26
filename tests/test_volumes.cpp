@@ -426,6 +426,10 @@ int verifyFieldStorage()
     const std::filesystem::path compactPath = std::filesystem::temp_directory_path() / "houio_field_compact.bin";
     const std::filesystem::path missingPayloadPath =
         std::filesystem::temp_directory_path() / "houio_field_missing_payload.bin";
+    const std::filesystem::path emptyBoundPath =
+        std::filesystem::temp_directory_path() / "houio_field_empty_bound.bin";
+    const std::filesystem::path nonFiniteBoundPath =
+        std::filesystem::temp_directory_path() / "houio_field_nonfinite_bound.bin";
 
     houio::ScalarField source;
     source.resize(2, 2, 1);
@@ -487,6 +491,60 @@ int verifyFieldStorage()
     {
         return fail("field storage allocated before validating its payload size");
     }
+
+    const auto writeInvalidBoundField = [](const std::filesystem::path& path, float maximumX)
+    {
+        std::ofstream output(path, std::ios::binary | std::ios::trunc);
+        const auto writeValue = [&output](const auto& value)
+        {
+            output.write(reinterpret_cast<const char*>(&value),
+                static_cast<std::streamsize>(sizeof(value)));
+        };
+        const int resolution = 1;
+        const float minimum = 0.0f;
+        const float maximum = 1.0f;
+        const int dataType = 1;
+        const float voxel = 2.0f;
+        writeValue(resolution);
+        writeValue(resolution);
+        writeValue(resolution);
+        writeValue(minimum);
+        writeValue(minimum);
+        writeValue(minimum);
+        writeValue(maximumX);
+        writeValue(maximum);
+        writeValue(maximum);
+        writeValue(dataType);
+        writeValue(voxel);
+    };
+
+    writeInvalidBoundField(emptyBoundPath, 0.0f);
+    try
+    {
+        loaded = houio::loadField<float>(emptyBoundPath.string());
+    }
+    catch (...)
+    {
+        std::filesystem::remove(emptyBoundPath);
+        return fail("empty serialized field bound escaped the nullable loader");
+    }
+    std::filesystem::remove(emptyBoundPath);
+    if (loaded)
+        return fail("empty serialized field bound was accepted");
+
+    writeInvalidBoundField(nonFiniteBoundPath, std::numeric_limits<float>::infinity());
+    try
+    {
+        loaded = houio::loadField<float>(nonFiniteBoundPath.string());
+    }
+    catch (...)
+    {
+        std::filesystem::remove(nonFiniteBoundPath);
+        return fail("non-finite serialized field bound escaped the nullable loader");
+    }
+    std::filesystem::remove(nonFiniteBoundPath);
+    if (loaded)
+        return fail("non-finite serialized field bound was accepted");
 
     if (!houio::storeFieldWithoutBoundingBox(source, compactPath.string()))
     {
@@ -557,7 +615,11 @@ int verifyConstFieldConversion()
 {
     houio::ScalarField source;
     source.resize(2, 2, 1);
-    source.setBound(houio::math::Box3f(-2.0f, -1.0f, 3.0f, 2.0f, 5.0f, 7.0f));
+    const houio::math::M44f sourceTransform =
+        houio::math::M44f::scaleMatrix(2.0f, 3.0f, 4.0f)
+        * houio::math::M44f::rotationZ(0.35f)
+        * houio::math::M44f::translationMatrix(-2.0f, 5.0f, 7.0f);
+    source.setLocalToWorld(sourceTransform);
     source.voxel(0, 0, 0) = 1.25f;
     source.voxel(1, 0, 0) = -2.5f;
     source.voxel(0, 1, 0) = 3.75f;
@@ -568,6 +630,7 @@ int verifyConstFieldConversion()
     if (!converted || converted->resolution() != source.resolution()
         || !nearlyEqual(converted->bound().minPoint, source.bound().minPoint)
         || !nearlyEqual(converted->bound().maxPoint, source.bound().maxPoint)
+        || !nearlyEqual(converted->localToWorldMatrix(), source.localToWorldMatrix())
         || std::abs(converted->voxel(0, 0, 0) - 1.25) > 1.0e-12
         || std::abs(converted->voxel(1, 0, 0) + 2.5) > 1.0e-12
         || std::abs(converted->voxel(0, 1, 0) - 3.75) > 1.0e-12

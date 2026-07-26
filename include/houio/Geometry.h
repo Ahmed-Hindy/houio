@@ -1,5 +1,6 @@
 #pragma once
 
+#include <initializer_list>
 #include <map>
 #include <memory>
 #include <span>
@@ -120,6 +121,7 @@ namespace houio
             const math::V3f& point1);
         [[nodiscard]] static Ptr merge(std::span<const Ptr> geometries);
         [[nodiscard]] static Ptr merge(std::span<const ConstPtr> geometries);
+        [[nodiscard]] static Ptr merge(std::initializer_list<Ptr> geometries);
 
     private:
         template<typename Pointer>

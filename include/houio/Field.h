@@ -110,7 +110,7 @@ namespace houio
     template<typename Source>
     typename Field<T>::Ptr Field<T>::create(const Field<Source>& source)
     {
-        auto destination = Field<T>::create(source.resolution(), source.bound());
+        auto destination = Field<T>::create(source.resolution(), source.localToWorldMatrix());
         const std::span<const Source> source_values = source.values();
         std::span<T> destination_values = destination->values();
         if (source_values.size() != destination_values.size())

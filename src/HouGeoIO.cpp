@@ -349,6 +349,8 @@ namespace houio
 		DiagnosticList *diagnostics,
 		GeometryConversionReport *report )
 	{
+		if( report )
+			*report = {};
 		try
 		{
 			if( !houGeo )

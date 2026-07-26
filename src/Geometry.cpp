@@ -950,4 +950,9 @@ namespace houio
     {
         return mergeRange(geometries);
     }
+
+    Geometry::Ptr Geometry::merge(std::initializer_list<Ptr> geometries)
+    {
+        return merge(std::span<const Ptr>(geometries.begin(), geometries.size()));
+    }
 }
