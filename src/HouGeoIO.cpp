@@ -373,8 +373,8 @@ namespace houio
 			report->droppedPrimitiveGroups = houGeo->primitiveGroupNames();
 		}
 
-		// we only support geometry with non mixed primitives (e.g. triangles only)
-		// this code checks if that is the case...
+		// The simplified model supports fixed-size primitive sets and one arbitrary n-gon.
+		int numPolys = 0;
 		int numVerticesPerPoly = 0;
 		if( houPrim )
 		{
@@ -383,7 +383,7 @@ namespace houio
 			if( !poly )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 					"HouGeoIO::convertToGeometry supports only polygon primitives", -1, "conversion.primitive"});
-			const int numPolys = poly->polygonCount();
+			numPolys = poly->polygonCount();
 			if( numPolys < 0 )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry polygon count cannot be negative", -1, "conversion.primitive"});
@@ -430,9 +430,14 @@ namespace houio
 		{
 			result = Geometry::createQuadGeometry();
 		}
+		else
+		if( numPolys == 1 && numVerticesPerPoly > 4 )
+		{
+			result = Geometry::createPolyGeometry();
+		}
 		if( !result )
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
-				"HouGeoIO::convertToGeometry supports only lines, triangles, and quads", -1,
+				"HouGeoIO::convertToGeometry supports lines, triangles, quads, or one arbitrary n-gon", -1,
 				"conversion.primitive"});
 
 		// attributes ---
@@ -696,7 +701,6 @@ namespace houio
 			if( !poly )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 					"HouGeoIO::convertToGeometry expected a polygon primitive", -1, "conversion.primitive"});
-			const int numPolys = poly->polygonCount();
 
 			// Geometry has no face-varying domain, so points are split when vertex values differ.
 			std::vector<bool> pointsToSplit(pointCount, false);
@@ -797,6 +801,11 @@ namespace houio
 					result->addTriangle(vertices[0], vertices[1], vertices[2]);
 				else if( polygonVertexCount == 4 )
 					result->addQuad(vertices[0], vertices[1], vertices[2], vertices[3]);
+				else if( numPolys == 1 && polygonVertexCount > 4 )
+				{
+					for( const unsigned int vertex : vertices )
+						result->addPolygonVertex(vertex);
+				}
 			}
 
 			// Houdini polygons are clockwise; the convenience geometry expects counter-clockwise order.

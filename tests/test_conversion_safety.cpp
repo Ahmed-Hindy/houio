@@ -374,6 +374,65 @@ int verifyOversizedIntegerPackingRejection()
     return 0;
 }
 
+int verifySingleNgonConversion()
+{
+    houio::HouGeo::Ptr geometry = houio::HouGeo::create();
+    houio::Attribute::Ptr positions = houio::Attribute::createV3f();
+    positions->appendElement(houio::math::V3f(0.0f, 0.0f, 0.0f));
+    positions->appendElement(houio::math::V3f(1.0f, 0.0f, 0.0f));
+    positions->appendElement(houio::math::V3f(1.5f, 1.0f, 0.0f));
+    positions->appendElement(houio::math::V3f(0.5f, 2.0f, 0.0f));
+    positions->appendElement(houio::math::V3f(-0.5f, 1.0f, 0.0f));
+    geometry->setPointAttribute(
+        std::make_shared<houio::HouGeo::HouAttribute>("P", positions));
+
+    auto topology = std::make_shared<houio::HouGeo::HouTopology>();
+    topology->setIndices({0, 1, 2, 3, 4});
+    geometry->setTopology(topology);
+
+    auto polygon = std::make_shared<houio::HouGeo::HouPoly>();
+    polygon->setPolygonData(1, {5}, {0}, {0, 1, 2, 3, 4}, true);
+    geometry->addPrimitive(polygon);
+
+    houio::GeometryConversionResult conversion =
+        houio::HouGeoIO::convertToGeometryResult(geometry, polygon);
+    const std::span<const houio::Geometry::Index> indices = conversion.value
+        ? conversion.value->indexBuffer() : std::span<const houio::Geometry::Index>();
+    const houio::Attribute::CPtr convertedPositions = conversion.value
+        ? conversion.value->attribute("P") : houio::Attribute::CPtr();
+    if (!conversion || conversion.value->primitiveType() != houio::Geometry::PrimitiveType::polygon
+        || conversion.value->primitiveCount() != 1 || conversion.value->verticesPerPrimitive() != 5
+        || indices.size() != 5 || indices[0] != 4 || indices[1] != 3 || indices[2] != 2
+        || indices[3] != 1 || indices[4] != 0 || !convertedPositions
+        || convertedPositions->numElements() != 5 || !conversion.report.windingReversed)
+    {
+        return fail("single n-gon conversion did not preserve simplified polygon topology");
+    }
+
+    houio::HouGeo::Ptr multiple = houio::HouGeo::create();
+    houio::Attribute::Ptr multiplePositions = houio::Attribute::createV3f();
+    for (int pointIndex = 0; pointIndex < 10; ++pointIndex)
+        multiplePositions->appendElement(houio::math::V3f(static_cast<float>(pointIndex), 0.0f, 0.0f));
+    multiple->setPointAttribute(
+        std::make_shared<houio::HouGeo::HouAttribute>("P", multiplePositions));
+    auto multipleTopology = std::make_shared<houio::HouGeo::HouTopology>();
+    multipleTopology->setIndices({0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+    multiple->setTopology(multipleTopology);
+    auto multiplePolygons = std::make_shared<houio::HouGeo::HouPoly>();
+    multiplePolygons->setPolygonData(
+        2, {5, 5}, {0, 5}, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, true);
+    multiple->addPrimitive(multiplePolygons);
+    const houio::GeometryConversionResult rejected =
+        houio::HouGeoIO::convertToGeometryResult(multiple, multiplePolygons);
+    if (rejected || rejected.diagnostics.empty()
+        || rejected.diagnostics.back().category != houio::DiagnosticCategory::unsupported_input
+        || rejected.diagnostics.back().path != "conversion.primitive")
+    {
+        return fail("multiple n-gons were not rejected explicitly");
+    }
+    return 0;
+}
+
 int verifyRawDataViewBounds()
 {
     const houio::HouGeoAdapter::RawDataView unavailable;
@@ -487,6 +546,10 @@ int main()
         return result;
     }
     if (const int result = verifyOversizedIntegerPackingRejection(); result != 0)
+    {
+        return result;
+    }
+    if (const int result = verifySingleNgonConversion(); result != 0)
     {
         return result;
     }

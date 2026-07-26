@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The large Crag round trip and Houdini package matrix pass in all four maintained versions.
 - Documentation audit contains no retired API references and now records compatibility, fixture, contribution, field-format, and versioning contracts.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Phases 17–28 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
+- Phases 17–29 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
 
 ## Execution phases
 
@@ -854,6 +854,32 @@ Exit criteria:
 - Faithful `HouGeo` export no longer allocates a duplicate primitive shared-pointer vector.
 - Existing custom geometry adapters remain source-compatible.
 - Null, unsupported, count-mismatched, and topology-mismatched primitive adapters are rejected.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 29 — Single n-gon simplified conversion
+
+**Status: complete.**
+
+Target files:
+
+- `src/HouGeoIO.cpp`
+- `tests/test_conversion_safety.cpp`
+- README, compatibility, and roadmap documents
+
+Tasks:
+
+- Reuse the simplified model's existing single-polygon storage for one arbitrary n-gon.
+- Preserve point attributes, vertex-to-point splitting, winding conversion, and conversion reporting.
+- Keep fixed-size line, triangle, and quad conversion unchanged.
+- Reject multiple n-gons because `SimplifiedMesh` cannot encode multiple variable-size polygon boundaries.
+- Return a structured `unsupported_input` diagnostic for the multi-n-gon case.
+- Verify a five-vertex polygon's type, count, topology, point data, and winding reversal.
+
+Exit criteria:
+
+- A single polygon with more than four vertices converts successfully.
+- The simplified result reports one polygon and the exact vertex count.
+- Multiple n-gons remain explicitly rejected rather than flattened ambiguously.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work

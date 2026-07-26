@@ -93,7 +93,7 @@ Use `HouGeo` (`HoudiniGeometry`) or `HouGeoAdapter` when Houdini domain fidelity
 - Vertex-domain discontinuities may require point duplication.
 - Point identity can therefore change even when rendered attribute values are preserved.
 - Mixed primitive families are not silently collapsed into one mesh.
-- Arbitrary n-gons are not promised by the simplified representation.
+- One arbitrary n-gon is supported; multiple variable-size polygons are not represented by a single `SimplifiedMesh`.
 - Native sparse volumes and unsupported primitive records are not converted implicitly.
 
 `HouGeoIO::convertToGeometryResult` reports source/output point counts, distinct split source points, duplicated points, winding reversal, skipped point/vertex/primitive/global attributes, dropped groups, and structured diagnostics for unsupported or invalid data. Callers that require faithful round trips should still stay on the Houdini-oriented model rather than treating a clean simplified conversion as proof that every domain was preserved.

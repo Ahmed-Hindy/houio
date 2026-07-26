@@ -39,7 +39,7 @@ HouIO currently supports:
 - Dense scalar volumes
 - SCF compression through C-Blosc
 
-The simplified `Geometry` API is intentionally render-oriented and may split points at vertex-attribute discontinuities. Use `HouGeo` and `HouGeoAdapter` when domain fidelity matters.
+The simplified `Geometry` API is intentionally render-oriented and may split points at vertex-attribute discontinuities. It supports fixed-size point, line, triangle, and quad sets plus one arbitrary n-gon; multiple variable-size polygons remain a Houdini-oriented-model concern. Use `HouGeo` and `HouGeoAdapter` when domain fidelity matters.
 
 `<houio/GeometryModels.h>` provides intention-revealing, non-breaking aliases: `HoudiniGeometry` for the supported Houdini-oriented model and `SimplifiedMesh` for the render-oriented convenience model.
 
