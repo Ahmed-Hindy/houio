@@ -7,6 +7,9 @@
 #include <memory>
 #include <string>
 
+static_assert(static_cast<int>(houio::WriterDataType::sparse_openvdb) == 6);
+static_assert(static_cast<int>(houio::WriterDataType::packed_disk_sequence) == 7);
+
 namespace
 {
     using houio::test::fail;

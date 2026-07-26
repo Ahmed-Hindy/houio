@@ -1,5 +1,6 @@
 #include <houio/GeometryIO.h>
 #include <houio/HomManifest.h>
+#include <houio/OpenVdbBackend.h>
 #include <houio/Writer.h>
 
 #include <algorithm>
@@ -472,6 +473,7 @@ namespace
 
     int diagnose(bool json)
     {
+        const houio::OpenVdbBackendInfo openVdb = houio::OpenVdbBackend::info();
         if( json )
         {
             std::cout << "{\"version\":\"" << HOUIO_VERSION_STRING
@@ -484,13 +486,20 @@ namespace
                 << "linux"
 #endif
                 << "\",\"default_write_format\":\"bgeo_binary\",\"atomic_replace\":true,"
-                << "\"capability_count\":" << houio::Writer::capabilities().size() << "}\n";
+                << "\"openvdb_backend_compiled\":"
+                << (openVdb.compiled ? "true" : "false")
+                << ",\"openvdb_backend_version\":\"" << jsonEscape(openVdb.version)
+                << "\",\"openvdb_backend_detail\":\"" << jsonEscape(openVdb.detail)
+                << "\",\"capability_count\":" << houio::Writer::capabilities().size() << "}\n";
         }
         else
         {
             std::cout << "version=" << HOUIO_VERSION_STRING << '\n'
                 << "default_write_format=bgeo_binary\n"
                 << "atomic_replace=yes\n"
+                << "openvdb_backend_compiled=" << (openVdb.compiled ? "yes" : "no") << '\n'
+                << "openvdb_backend_version=" << openVdb.version << '\n'
+                << "openvdb_backend_detail=" << openVdb.detail << '\n'
                 << "capability_count=" << houio::Writer::capabilities().size() << '\n';
         }
         return static_cast<int>(ExitCode::success);

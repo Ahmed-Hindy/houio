@@ -207,7 +207,14 @@ def validate_output(path: Path) -> None:
     if len(packed_sequences) != 1:
         raise AssertionError("Direct writer did not preserve packed disk sequence")
     packed_sequence = packed_sequences[0]
-    if len(packed_sequence.intrinsicValue("filenames")) != 3:
+    expected_sequence_filenames = [
+        str(path.parent / f"direct_sequence.{frame:04d}.bgeo")
+        for frame in range(1, 4)
+    ]
+    actual_sequence_filenames = [
+        str(filename) for filename in packed_sequence.intrinsicValue("filenames")
+    ]
+    if actual_sequence_filenames != expected_sequence_filenames:
         raise AssertionError("Direct writer changed packed sequence samples")
     if str(packed_sequence.intrinsicValue("wrap")) != "mirror":
         raise AssertionError("Direct writer changed packed sequence wrap mode")

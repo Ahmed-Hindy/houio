@@ -20,6 +20,7 @@ option(HOUIO_ENABLE_UNDEFINED_SANITIZER "Enable UndefinedBehaviorSanitizer instr
 option(HOUIO_ENABLE_MSVC_ANALYSIS "Enable the MSVC native static analyzer" OFF)
 option(HOUIO_BUILD_FUZZ_TARGETS "Build optional Clang libFuzzer targets" OFF)
 option(HOUIO_BUILD_BENCHMARKS "Build opt-in HouIO performance baselines" OFF)
+option(HOUIO_ENABLE_OPENVDB "Enable the optional OpenVDB FloatGrid backend" OFF)
 set(HOUIO_HYTHON_EXECUTABLE "" CACHE FILEPATH "Optional hython executable for Houdini integration tests")
 
 add_library(
@@ -34,6 +35,8 @@ add_library(
     src/HouGeoAdapter.cpp
     src/HouGeoIO.cpp
     src/json.cpp
+    src/OpenVdbBackend.cpp
+    src/SparseGrid.cpp
     src/math/Color.cpp
     src/math/Math.cpp
     src/Scf.cpp
@@ -48,6 +51,25 @@ target_include_directories(
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+
+if(HOUIO_ENABLE_OPENVDB)
+    find_package(OpenVDB QUIET)
+    if(NOT OpenVDB_FOUND)
+        message(FATAL_ERROR
+            "HOUIO_ENABLE_OPENVDB=ON requires an OpenVDB development package. "
+            "Add the installed OpenVDB CMake module directory to CMAKE_MODULE_PATH, "
+            "or provide a package through OpenVDB_DIR/CMAKE_PREFIX_PATH.")
+    endif()
+    if(NOT TARGET OpenVDB::openvdb)
+        message(FATAL_ERROR "OpenVDB was found but did not provide the OpenVDB::openvdb target")
+    endif()
+    target_link_libraries(houio PUBLIC OpenVDB::openvdb)
+    target_compile_definitions(houio PUBLIC HOUIO_HAS_OPENVDB=1)
+    set(HOUIO_CONFIG_FIND_OPENVDB "include(CMakeFindDependencyMacro)\nfind_dependency(OpenVDB)")
+else()
+    target_compile_definitions(houio PUBLIC HOUIO_HAS_OPENVDB=0)
+    set(HOUIO_CONFIG_FIND_OPENVDB "")
+endif()
 
 set_target_properties(
     houio
