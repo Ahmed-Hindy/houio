@@ -41,6 +41,8 @@ HouIO currently supports:
 
 The simplified `Geometry` API is intentionally render-oriented and may split points at vertex-attribute discontinuities. Use `HouGeo` and `HouGeoAdapter` when domain fidelity matters.
 
+`<houio/GeometryModels.h>` provides intention-revealing, non-breaking aliases: `HoudiniGeometry` for the supported Houdini-oriented model and `SimplifiedMesh` for the render-oriented convenience model.
+
 Not currently supported by the standalone C++ model:
 
 - Packed primitives

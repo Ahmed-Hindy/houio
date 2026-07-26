@@ -88,7 +88,7 @@ Unsupported recognized input should produce an `unsupported_input` diagnostic ra
 
 ## Lossless and simplified representations
 
-Use `HouGeo` or `HouGeoAdapter` when Houdini domain fidelity matters. The simplified `Geometry` type is render-oriented and has different guarantees:
+Use `HouGeo` (`HoudiniGeometry`) or `HouGeoAdapter` when Houdini domain fidelity matters. The simplified `Geometry` (`SimplifiedMesh`) type is render-oriented and has different guarantees. The aliases are provided by `<houio/GeometryModels.h>` and do not replace the established class names:
 
 - Vertex-domain discontinuities may require point duplication.
 - Point identity can therefore change even when rendered attribute values are preserved.

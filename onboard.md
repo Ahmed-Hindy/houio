@@ -90,10 +90,10 @@ if (!result)
 }
 ```
 
-Choose the representation deliberately:
+Choose the representation deliberately. `<houio/GeometryModels.h>` also exposes the intention-revealing aliases shown in parentheses:
 
-- `HouGeo`: Houdini-oriented domains, records, attributes, and groups
-- `Geometry`: simplified render-oriented mesh
+- `HouGeo` (`HoudiniGeometry`): Houdini-oriented domains, records, attributes, and groups
+- `Geometry` (`SimplifiedMesh`): simplified render-oriented mesh
 - `ScalarField`: dense scalar volume
 - `HouGeoAdapter`: caller-defined export source
 

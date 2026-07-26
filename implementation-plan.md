@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The large Crag round trip and Houdini package matrix pass in all four maintained versions.
 - Documentation audit contains no retired API references and now records compatibility, fixture, contribution, field-format, and versioning contracts.
 - Phases 11–16 are consolidated for `master` by integration PR #31.
-- Phases 17–25 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
+- Phases 17–26 are complete on the active branch; the updated PR #32 head requires CI validation after publication.
 
 ## Execution phases
 
@@ -762,6 +762,32 @@ Exit criteria:
 - Invalid programmatic group state is rejected before export.
 - Mixed polygon/volume primitive groups survive binary export and import.
 - Maintained implementation containers expose no public mutable storage.
+- Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
+
+### Phase 26 — Explicit geometry-model names
+
+**Status: complete.**
+
+Target files:
+
+- `include/houio/GeometryModels.h`
+- `tests/package_consumer/main.cpp`
+- README, compatibility, onboarding, and roadmap documents
+
+Tasks:
+
+- Add `HoudiniGeometry` as a non-breaking alias for the supported Houdini-oriented `HouGeo` model.
+- Add `SimplifiedMesh` as a non-breaking alias for the render-oriented `Geometry` model.
+- Keep established class names and APIs intact.
+- Document the distinct domain and conversion guarantees next to the aliases.
+- Compile and execute an installed-package consumer using the new names.
+- Add compile-time alias identity checks.
+
+Exit criteria:
+
+- Public type names communicate which model is Houdini-oriented and which is simplified.
+- Existing source remains compatible.
+- The new header is installed and usable through `find_package(houio)`.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
 
 ## Deferred work

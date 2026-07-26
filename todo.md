@@ -59,6 +59,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Preserve attribute definition scope and complete semantic `options` objects across import and export.
 - [x] Validate programmatic group domains and preserve primitive groups spanning mixed polygon and dense-volume records.
 - [x] Audit maintained containers and confirm active implementation storage is private behind validated APIs or immutable views.
+- [x] Add installed `HoudiniGeometry` and `SimplifiedMesh` aliases that make model responsibilities explicit without breaking established class names.
 
 ## Modernization next
 
@@ -174,7 +175,7 @@ Add fixture-backed support one record type at a time:
 
 - [x] Verify the file-format library contains no OpenGL-specific buffer identifiers and guard against their reintroduction.
 - [x] Hide mutable implementation details where practical.
-- [ ] Make lossless and simplified geometry responsibilities explicit in type names and APIs.
+- [x] Make Houdini-oriented and simplified geometry responsibilities explicit in type names and APIs.
 
 ### Field
 
