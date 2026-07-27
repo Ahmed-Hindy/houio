@@ -6,6 +6,7 @@
 
 #include "TestSupport.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -854,6 +855,48 @@ namespace
             : houio::GeometryReadResult<houio::HouGeo::Ptr>{};
         if( !roundTrip || roundTrip.value->primitiveCount() != 2 )
             return fail("curve manifest failed writer round-trip");
+
+        const auto roundTripPrimitives = roundTrip.value->primitives();
+        const auto roundTripNurbs =
+            std::dynamic_pointer_cast<houio::HouGeo::HouCurve>(roundTripPrimitives[0]);
+        const auto roundTripBezier =
+            std::dynamic_pointer_cast<houio::HouGeo::HouCurve>(roundTripPrimitives[1]);
+        const std::vector<int> expectedNurbsVertices{0, 1, 2, 3, 4};
+        const std::vector<houio::real64> expectedNurbsKnots{
+            0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 2.0, 2.0, 2.0};
+        const std::vector<int> expectedBezierVertices{5, 6, 7, 8, 9, 10, 11};
+        const std::vector<houio::real64> expectedBezierKnots{0.0, 1.0, 2.0};
+        if( !roundTripNurbs || !roundTripBezier
+            || roundTripNurbs->basis()
+                != houio::HouGeoAdapter::CurvePrimitive::Basis::nurbs
+            || roundTripNurbs->order() != 4 || roundTripNurbs->isClosed()
+            || !roundTripNurbs->endInterpolation()
+            || !std::equal(
+                roundTripNurbs->vertexIndices().begin(),
+                roundTripNurbs->vertexIndices().end(),
+                expectedNurbsVertices.begin(),
+                expectedNurbsVertices.end())
+            || !std::equal(
+                roundTripNurbs->knots().begin(),
+                roundTripNurbs->knots().end(),
+                expectedNurbsKnots.begin(),
+                expectedNurbsKnots.end())
+            || roundTripBezier->basis()
+                != houio::HouGeoAdapter::CurvePrimitive::Basis::bezier
+            || roundTripBezier->order() != 4 || roundTripBezier->isClosed()
+            || !std::equal(
+                roundTripBezier->vertexIndices().begin(),
+                roundTripBezier->vertexIndices().end(),
+                expectedBezierVertices.begin(),
+                expectedBezierVertices.end())
+            || !std::equal(
+                roundTripBezier->knots().begin(),
+                roundTripBezier->knots().end(),
+                expectedBezierKnots.begin(),
+                expectedBezierKnots.end()) )
+        {
+            return fail("curve manifest writer round-trip changed curve metadata");
+        }
         return 0;
     }
 

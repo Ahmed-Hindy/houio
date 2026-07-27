@@ -147,7 +147,7 @@ int verifyProgrammaticValidation()
             {0, 1, 2, 3},
             false,
             4,
-            {0.0, 1.0, 0.5});
+            {0.0, 0.0, 0.0, 0.0, 1.0, 0.5, 1.0, 1.0});
         return fail("decreasing NURBS knots were accepted");
     }
     catch( const std::invalid_argument& )
