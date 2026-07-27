@@ -222,14 +222,25 @@ int main()
     const auto int32RoundTrip = encodedInt32Stream
         ? houio::OpenVdbBackend::decodeInt32Grid(encodedInt32Stream.value, "labels")
         : houio::GeometryReadResult<houio::SparseInt32Grid>{};
-    if( !int32RoundTrip
-        || int32RoundTrip.value.background() != -1
+    if( !int32RoundTrip )
+        return houio::test::fail("compiled OpenVDB Int32Grid round-trip failed to decode");
+    if( int32RoundTrip.value.background() != -1
         || int32RoundTrip.value.activeTileCount() == 0
         || int32RoundTrip.value.value(houio::math::V3i(9, 9, 9)) != 7
         || int32RoundTrip.value.value(houio::math::V3i(10, 10, 10)) != 42
         || int32RoundTrip.value.value(houio::math::V3i(-1, -2, -3)) != -9 )
     {
-        return houio::test::fail("compiled OpenVDB Int32Grid round-trip changed topology or values");
+        return houio::test::fail(
+            "compiled OpenVDB Int32Grid round-trip changed topology or values: background="
+            + std::to_string(int32RoundTrip.value.background())
+            + ", voxels=" + std::to_string(int32RoundTrip.value.activeVoxelCount())
+            + ", tiles=" + std::to_string(int32RoundTrip.value.activeTileCount())
+            + ", tile_value="
+            + std::to_string(int32RoundTrip.value.value(houio::math::V3i(9, 9, 9)))
+            + ", override="
+            + std::to_string(int32RoundTrip.value.value(houio::math::V3i(10, 10, 10)))
+            + ", isolated="
+            + std::to_string(int32RoundTrip.value.value(houio::math::V3i(-1, -2, -3))));
     }
 
     const auto encodedTileStream = houio::OpenVdbBackend::encodeFloatGrid(tiledGrid);
