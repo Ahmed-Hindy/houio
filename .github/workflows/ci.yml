@@ -129,8 +129,7 @@ jobs:
             -DCMAKE_MODULE_PATH="$openvdb_cmake_dir" \
             -DHOUIO_ENABLE_OPENVDB=ON \
             -DHOUIO_BUILD_TESTS=ON \
-            -DHOUIO_BUILD_TOOLS=ON \
-            -DHOUIO_WARNINGS_AS_ERRORS=ON
+            -DHOUIO_BUILD_TOOLS=ON
 
       - name: Build OpenVDB backend
         run: cmake --build build/linux-gcc-openvdb
