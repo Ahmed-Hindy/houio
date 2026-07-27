@@ -1,0 +1,53 @@
+{
+  "schema": "houio.hom/1",
+  "point_count": 1,
+  "vertex_count": 1,
+  "primitive_count": 1,
+  "topology": [0],
+  "primitives": [
+    {
+      "type": "sparse_vec3f_vdb",
+      "vertex_offset": 0,
+      "name": "velocity",
+      "grid_class": "staggered",
+      "vector_type": "contravariant_relative",
+      "background": [0.0, 0.0, 0.0],
+      "index_to_world": [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+      ],
+      "active_indices": [18, 18, 18, -1, -2, -3],
+      "active_values": [
+        [-1.0, 4.0, 0.5],
+        [2.0, -3.0, 1.0]
+      ],
+      "active_tiles": [
+        {
+          "minimum": [16, 16, 16],
+          "maximum": [23, 23, 23],
+          "value": [1.0, 2.0, 3.0]
+        }
+      ],
+      "metadata": {
+        "creator": "HouIO Vec3f VDB construction test"
+      }
+    }
+  ],
+  "attributes": {
+    "point": [
+      {
+        "name": "P",
+        "kind": "numeric",
+        "storage": "float32",
+        "tuple_size": 4,
+        "element_count": 1,
+        "values": [0.0, 0.0, 0.0, 1.0]
+      }
+    ],
+    "vertex": [],
+    "primitive": [],
+    "global": []
+  }
+}

@@ -384,6 +384,39 @@ namespace houio
             return math::V3f(components[0], components[1], components[2]);
         }
 
+        math::V3f parseFiniteVector3(
+            const json::ArrayPtr& values,
+            const std::string& path)
+        {
+            const math::V3f result = parseVector3(values, path);
+            if( !std::isfinite(result.x)
+                || !std::isfinite(result.y)
+                || !std::isfinite(result.z) )
+            {
+                failManifest(DiagnosticCategory::schema,
+                    "Vector3 components must be finite", path);
+            }
+            return result;
+        }
+
+        SparseVectorType parseSparseVectorType(
+            const std::string& value,
+            const std::string& path)
+        {
+            if( value == "invariant" )
+                return SparseVectorType::invariant;
+            if( value == "covariant" )
+                return SparseVectorType::covariant;
+            if( value == "covariant_normalize" )
+                return SparseVectorType::covariant_normalize;
+            if( value == "contravariant_relative" )
+                return SparseVectorType::contravariant_relative;
+            if( value == "contravariant_absolute" )
+                return SparseVectorType::contravariant_absolute;
+            failManifest(DiagnosticCategory::schema,
+                "Sparse Vec3f VDB vector type is invalid", path);
+        }
+
         HouGeoAdapter::PackedFragmentPrimitive::Bounds parseBounds(
             const json::ArrayPtr &values,
             const std::string &path)
@@ -923,6 +956,168 @@ namespace houio
                     geometry->addPrimitive(
                         std::static_pointer_cast<
                             HouGeoAdapter::SparseInt32VdbPrimitive>(sparseVdb));
+                }
+                else if( type == "sparse_vec3f_vdb" )
+                {
+                    const std::string gridClassName =
+                        definition->get<std::string>("grid_class", "unknown");
+                    SparseGridClass gridClass = SparseGridClass::unknown;
+                    if( gridClassName == "fog_volume" )
+                        gridClass = SparseGridClass::fog_volume;
+                    else if( gridClassName == "level_set" )
+                        gridClass = SparseGridClass::level_set;
+                    else if( gridClassName == "staggered" )
+                        gridClass = SparseGridClass::staggered;
+                    else if( gridClassName != "unknown" )
+                        failManifest(DiagnosticCategory::schema,
+                            "Sparse Vec3f VDB grid class is invalid",
+                            path + ".grid_class");
+
+                    math::V3f background(0.0f);
+                    if( definition->contains("background") )
+                    {
+                        background = parseFiniteVector3(
+                            requireArray(definition, "background", path),
+                            path + ".background");
+                    }
+                    SparseVec3fGrid grid(background);
+                    grid.setName(definition->get<std::string>("name", ""));
+                    grid.setGridClass(gridClass);
+                    grid.setVectorType(parseSparseVectorType(
+                        definition->get<std::string>("vector_type", "invariant"),
+                        path + ".vector_type"));
+                    grid.setIndexToWorld(parseMatrix44(
+                        requireArray(definition, "index_to_world", path),
+                        path + ".index_to_world"));
+
+                    const bool hasActiveIndices = definition->contains("active_indices");
+                    const bool hasActiveValues = definition->contains("active_values");
+                    if( hasActiveIndices != hasActiveValues )
+                    {
+                        failManifest(DiagnosticCategory::schema,
+                            "Sparse Vec3f VDB active_indices and active_values must be provided together",
+                            path);
+                    }
+                    if( hasActiveIndices )
+                    {
+                        const std::vector<sint32> activeIndices = scalarArray<sint32>(
+                            requireArray(definition, "active_indices", path),
+                            path + ".active_indices");
+                        const json::ArrayPtr activeValues =
+                            requireArray(definition, "active_values", path);
+                        const std::size_t valueCount =
+                            checkedSize(activeValues->size(), path + ".active_values");
+                        if( activeIndices.size() % 3 != 0
+                            || valueCount != activeIndices.size() / 3 )
+                        {
+                            failManifest(DiagnosticCategory::schema,
+                                "Sparse Vec3f VDB active indices and values have inconsistent lengths",
+                                path + ".active_indices");
+                        }
+                        for( std::size_t valueIndex = 0; valueIndex < valueCount; ++valueIndex )
+                        {
+                            const std::size_t coordinateOffset = valueIndex * 3;
+                            const std::string valuePath = path + ".active_values["
+                                + std::to_string(valueIndex) + "]";
+                            const json::ArrayPtr tuple =
+                                activeValues->array(static_cast<int>(valueIndex));
+                            if( !tuple )
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse Vec3f VDB active value must be a three-component array",
+                                    valuePath);
+                            grid.setVoxel(
+                                math::V3i(
+                                    activeIndices[coordinateOffset],
+                                    activeIndices[coordinateOffset + 1],
+                                    activeIndices[coordinateOffset + 2]),
+                                parseFiniteVector3(tuple, valuePath));
+                        }
+                        if( grid.activeVoxelCount() != valueCount )
+                        {
+                            failManifest(DiagnosticCategory::schema,
+                                "Sparse Vec3f VDB active indices contain duplicate coordinates",
+                                path + ".active_indices");
+                        }
+                    }
+
+                    if( definition->contains("active_tiles") )
+                    {
+                        const json::ArrayPtr activeTiles =
+                            requireArray(definition, "active_tiles", path);
+                        const std::size_t tileCount =
+                            checkedSize(activeTiles->size(), path + ".active_tiles");
+                        std::vector<SparseIndexBounds> parsedBounds;
+                        parsedBounds.reserve(tileCount);
+                        for( std::size_t tileIndex = 0; tileIndex < tileCount; ++tileIndex )
+                        {
+                            const std::string tilePath = path + ".active_tiles["
+                                + std::to_string(tileIndex) + "]";
+                            const json::ObjectPtr tile =
+                                activeTiles->object(static_cast<int>(tileIndex));
+                            if( !tile )
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse Vec3f VDB active tile must be an object", tilePath);
+
+                            const std::vector<sint32> minimum = scalarArray<sint32>(
+                                requireArray(tile, "minimum", tilePath),
+                                tilePath + ".minimum");
+                            const std::vector<sint32> maximum = scalarArray<sint32>(
+                                requireArray(tile, "maximum", tilePath),
+                                tilePath + ".maximum");
+                            if( minimum.size() != 3 || maximum.size() != 3 )
+                            {
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse Vec3f VDB active tile bounds must contain three integers",
+                                    tilePath);
+                            }
+                            const SparseIndexBounds bounds{
+                                math::V3i(minimum[0], minimum[1], minimum[2]),
+                                math::V3i(maximum[0], maximum[1], maximum[2])};
+                            if( bounds.minimum.x > bounds.maximum.x
+                                || bounds.minimum.y > bounds.maximum.y
+                                || bounds.minimum.z > bounds.maximum.z )
+                            {
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse Vec3f VDB active tile bounds must be ordered",
+                                    tilePath);
+                            }
+                            const auto duplicate = std::find_if(
+                                parsedBounds.begin(), parsedBounds.end(),
+                                [&](const SparseIndexBounds& existing)
+                                {
+                                    return existing.minimum == bounds.minimum
+                                        && existing.maximum == bounds.maximum;
+                                });
+                            if( duplicate != parsedBounds.end() )
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse Vec3f VDB active tiles contain duplicate bounds",
+                                    tilePath);
+
+                            parsedBounds.push_back(bounds);
+                            grid.addActiveTile(bounds, parseFiniteVector3(
+                                requireArray(tile, "value", tilePath),
+                                tilePath + ".value"));
+                        }
+                    }
+
+                    if( const json::ObjectPtr metadata = definition->object("metadata") )
+                    {
+                        for( const std::string& key : metadata->keys() )
+                        {
+                            if( key.empty() )
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse Vec3f VDB metadata key cannot be empty",
+                                    path + ".metadata");
+                            grid.setMetadata(key, metadata->get<std::string>(key));
+                        }
+                    }
+
+                    auto sparseVdb = std::make_shared<HouGeo::HouSparseVec3fVdb>();
+                    sparseVdb->setTopologyVertex(vertexOffset);
+                    sparseVdb->setSparseGrid(std::move(grid));
+                    geometry->addPrimitive(
+                        std::static_pointer_cast<
+                            HouGeoAdapter::SparseVec3fVdbPrimitive>(sparseVdb));
                 }
                 else if( type == "dense_volume" )
                 {

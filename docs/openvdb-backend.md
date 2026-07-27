@@ -15,37 +15,38 @@ The default is `OFF`. A normal HouIO build therefore has no OpenVDB headers, lib
 
 ## Dependency-neutral sparse grids
 
-`houio::SparseFloatGrid` and `houio::SparseInt32Grid` are available in every build. Both use the same typed sparse-scalar topology implementation and preserve:
+`houio::SparseFloatGrid`, `houio::SparseInt32Grid`, and `houio::SparseVec3fGrid` are available in every build. They use one typed sparse-value topology implementation and preserve:
 
 - A typed background value.
 - Active voxel coordinates and typed values.
 - Active tiles as inclusive index-space bounds plus one typed value.
-- Grid name and class (`unknown`, `fog_volume`, or `level_set`).
+- Grid name and class (`unknown`, `fog_volume`, `level_set`, or `staggered`).
 - A linear 4×4 index-to-world transform.
 - String metadata.
 - Deterministic active-voxel traversal and active index bounds.
 
-Float values must be finite. Int32 values retain their exact signed 32-bit representation. An active voxel may equal the background numerically; activity and value are stored independently.
+Float and Vec3f components must be finite. Int32 values retain their exact signed 32-bit representation. `SparseVec3fGrid` also preserves invariant, covariant, normalized-covariant, relative-contravariant, and absolute-contravariant vector semantics. An active voxel may equal the background numerically; activity and value are stored independently.
 
 ## Native backend API
 
 `houio::OpenVdbBackend::info()` reports whether the optional backend was compiled and, when available, the OpenVDB version.
 
-`readFloatGrid()` / `writeFloatGrid()` and `readInt32Grid()` / `writeInt32Grid()` provide native file I/O. Their `encode*Grid()` and `decode*Grid()` counterparts provide equivalent in-memory OpenVDB streams for Houdini payload construction:
+`readFloatGrid()` / `writeFloatGrid()`, `readInt32Grid()` / `writeInt32Grid()`, and `readVec3fGrid()` / `writeVec3fGrid()` provide native file I/O. Their `encode*Grid()` and `decode*Grid()` counterparts provide equivalent in-memory OpenVDB streams for Houdini payload construction:
 
-- One OpenVDB `FloatGrid` or `Int32Grid` at a time.
+- One OpenVDB `FloatGrid`, `Int32Grid`, or `Vec3SGrid` at a time.
 - Sparse active voxel and active-tile values without dense conversion.
 - Linear transforms.
-- Grid class metadata, including fog-volume and level-set values where authored.
+- Grid class metadata, including fog-volume, level-set, and staggered values where authored.
+- Vec3 transformation semantics for vector grids.
 - Grid names and string metadata.
 
-`NativeVdbPayload` validates and converts between one standard OpenVDB stream and Houdini's tiled `vdb` primitive payload. `encodeStream()` accepts a stream-producing callback and emits fixed-size tiles incrementally, so `HouSparseVdb` and `HouSparseInt32Vdb` construction do not retain a second complete OpenVDB byte buffer during BGEO/SCF serialization.
+`NativeVdbPayload` validates and converts between one standard OpenVDB stream and Houdini's tiled `vdb` primitive payload. `encodeStream()` accepts a stream-producing callback and emits fixed-size tiles incrementally, so sparse Float, Int32, and Vec3f primitive construction does not retain a second complete OpenVDB byte buffer during BGEO/SCF serialization.
 
 When the backend is disabled, OpenVDB-dependent operations return an `unsupported_input` diagnostic instead of attempting a dense fallback. Opaque native payload pass-through remains available in every build.
 
 ## Current boundary
 
-The sparse models represent active OpenVDB tiles as inclusive index-space bounds plus one typed scalar value. Reads preserve active tiles without densifying them; writes reconstruct the active regions through OpenVDB tree filling and then apply explicit voxel overrides. Explicit `houio.hom/1` manifests can construct the same topology through an optional `active_tiles` array:
+The sparse models represent active OpenVDB tiles as inclusive index-space bounds plus one typed value. Reads preserve active tiles without densifying them; writes reconstruct the active regions through OpenVDB tree filling and then apply explicit voxel overrides. Explicit `houio.hom/1` manifests can construct the same topology through an optional `active_tiles` array:
 
 ```json
 "active_tiles": [
@@ -57,13 +58,13 @@ The sparse models represent active OpenVDB tiles as inclusive index-space bounds
 ]
 ```
 
-Bounds are inclusive, must be ordered, and duplicate bound pairs are rejected. `active_indices` and `active_values` are optional, but must appear together when explicit voxels are present. Explicit active voxels take precedence over tile values. The same schema is available as `sparse_float_vdb` for FloatGrid values and `sparse_int32_vdb` for signed 32-bit integer values. Pure active tiles remain tiles through native OpenVDB round trips. When an explicit voxel overrides a tile inside the same OpenVDB leaf, OpenVDB necessarily refines that leaf; decoding may therefore return an equivalent set of explicit active voxels rather than the original non-canonical tile-plus-override decomposition. Activity and values remain exact. Nonlinear/frustum transforms are still rejected.
+Bounds are inclusive, must be ordered, and duplicate bound pairs are rejected. `active_indices` and `active_values` are optional, but must appear together when explicit voxels are present. Explicit active voxels take precedence over tile values. The schema is available as `sparse_float_vdb`, `sparse_int32_vdb`, and `sparse_vec3f_vdb`; Vec3f backgrounds, voxels, and tile values are three-component arrays, and `vector_type` records their transformation semantics. Pure active tiles remain tiles through native OpenVDB round trips. When an explicit voxel overrides a tile inside the same OpenVDB leaf, OpenVDB necessarily refines that leaf; decoding may therefore return an equivalent set of explicit active voxels rather than the original non-canonical tile-plus-override decomposition. Activity and values remain exact. Nonlinear/frustum transforms are still rejected.
 
 Live HOM extraction supports scalar Float VDBs only when exact active topology can be proven from `activeVoxelCount()`, the exclusive active bounding box, and sampled values. It rejects active background-valued voxels, inactive interior values, active tiles, half-float policy, local-space grids, and scan domains larger than 262,144 voxels rather than approximating them.
 
 Remaining backend increments are:
 
-1. Vec3f and other vector grid types with explicit vector semantics.
+1. Additional vector and scalar grid value types beyond Vec3f.
 2. Additional typed metadata and serialization policies.
 3. Nonlinear/frustum transform representation.
 4. Exact extraction paths for activity patterns and value types HOM cannot currently expose.

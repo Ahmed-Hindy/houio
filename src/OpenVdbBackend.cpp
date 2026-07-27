@@ -99,6 +99,7 @@ namespace houio
             {
             case openvdb::GRID_FOG_VOLUME: return SparseGridClass::fog_volume;
             case openvdb::GRID_LEVEL_SET: return SparseGridClass::level_set;
+            case openvdb::GRID_STAGGERED: return SparseGridClass::staggered;
             default: return SparseGridClass::unknown;
             }
         }
@@ -109,6 +110,7 @@ namespace houio
             {
             case SparseGridClass::fog_volume: return openvdb::GRID_FOG_VOLUME;
             case SparseGridClass::level_set: return openvdb::GRID_LEVEL_SET;
+            case SparseGridClass::staggered: return openvdb::GRID_STAGGERED;
             case SparseGridClass::unknown: return openvdb::GRID_UNKNOWN;
             }
             return openvdb::GRID_UNKNOWN;
@@ -124,6 +126,82 @@ namespace houio
                     return true;
             }
             return false;
+        }
+
+        SparseVectorType fromOpenVdbVectorType(openvdb::VecType value) noexcept
+        {
+            switch( value )
+            {
+            case openvdb::VEC_COVARIANT: return SparseVectorType::covariant;
+            case openvdb::VEC_COVARIANT_NORMALIZE:
+                return SparseVectorType::covariant_normalize;
+            case openvdb::VEC_CONTRAVARIANT_RELATIVE:
+                return SparseVectorType::contravariant_relative;
+            case openvdb::VEC_CONTRAVARIANT_ABSOLUTE:
+                return SparseVectorType::contravariant_absolute;
+            case openvdb::VEC_INVARIANT: return SparseVectorType::invariant;
+            }
+            return SparseVectorType::invariant;
+        }
+
+        openvdb::VecType toOpenVdbVectorType(SparseVectorType value) noexcept
+        {
+            switch( value )
+            {
+            case SparseVectorType::covariant: return openvdb::VEC_COVARIANT;
+            case SparseVectorType::covariant_normalize:
+                return openvdb::VEC_COVARIANT_NORMALIZE;
+            case SparseVectorType::contravariant_relative:
+                return openvdb::VEC_CONTRAVARIANT_RELATIVE;
+            case SparseVectorType::contravariant_absolute:
+                return openvdb::VEC_CONTRAVARIANT_ABSOLUTE;
+            case SparseVectorType::invariant: return openvdb::VEC_INVARIANT;
+            }
+            return openvdb::VEC_INVARIANT;
+        }
+
+        template<typename Target, typename Source>
+        Target convertGridValue(const Source& value)
+        {
+            return static_cast<Target>(value);
+        }
+
+        template<>
+        math::V3f convertGridValue<math::V3f, openvdb::Vec3s>(
+            const openvdb::Vec3s& value)
+        {
+            return math::V3f(value.x(), value.y(), value.z());
+        }
+
+        template<>
+        openvdb::Vec3s convertGridValue<openvdb::Vec3s, math::V3f>(
+            const math::V3f& value)
+        {
+            return openvdb::Vec3s(value.x, value.y, value.z);
+        }
+
+        template<typename OpenGrid, typename SparseGrid>
+        void readGridSpecificState(const OpenGrid&, SparseGrid&)
+        {
+        }
+
+        void readGridSpecificState(
+            const openvdb::Vec3SGrid& grid,
+            SparseVec3fGrid& sparse)
+        {
+            sparse.setVectorType(fromOpenVdbVectorType(grid.getVectorType()));
+        }
+
+        template<typename OpenGrid, typename SparseGrid>
+        void writeGridSpecificState(OpenGrid&, const SparseGrid&)
+        {
+        }
+
+        void writeGridSpecificState(
+            openvdb::Vec3SGrid& grid,
+            const SparseVec3fGrid& sparse)
+        {
+            grid.setVectorType(toOpenVdbVectorType(sparse.vectorType()));
         }
 
         template<typename OpenGrid, typename SparseGrid>
@@ -167,9 +245,11 @@ namespace houio
                 return result;
             }
 
-            SparseGrid sparse(grid->background());
+            SparseGrid sparse(convertGridValue<typename SparseGrid::ValueType>(
+                grid->background()));
             sparse.setName(grid->getName());
             sparse.setGridClass(fromOpenVdbClass(grid->getGridClass()));
+            readGridSpecificState(*grid, sparse);
             if( !grid->getCreator().empty() )
                 sparse.setMetadata("creator", grid->getCreator());
             sparse.setIndexToWorld(fromOpenVdbMatrix(
@@ -195,7 +275,7 @@ namespace houio
                     const openvdb::Coord coordinate = iterator.getCoord();
                     sparse.setVoxel(
                         math::V3i(coordinate.x(), coordinate.y(), coordinate.z()),
-                        *iterator);
+                        convertGridValue<typename SparseGrid::ValueType>(*iterator));
                     continue;
                 }
 
@@ -205,7 +285,7 @@ namespace houio
                     SparseIndexBounds{
                         math::V3i(bounds.min().x(), bounds.min().y(), bounds.min().z()),
                         math::V3i(bounds.max().x(), bounds.max().y(), bounds.max().z())},
-                    *iterator);
+                    convertGridValue<typename SparseGrid::ValueType>(*iterator));
             }
 
             result.value = std::move(sparse);
@@ -216,9 +296,11 @@ namespace houio
         template<typename OpenGrid, typename SparseGrid>
         typename OpenGrid::Ptr openVdbFromSparse(const SparseGrid& grid)
         {
-            typename OpenGrid::Ptr vdbGrid = OpenGrid::create(grid.background());
+            typename OpenGrid::Ptr vdbGrid = OpenGrid::create(
+                convertGridValue<typename OpenGrid::ValueType>(grid.background()));
             vdbGrid->setName(grid.name());
             vdbGrid->setGridClass(toOpenVdbClass(grid.gridClass()));
+            writeGridSpecificState(*vdbGrid, grid);
             vdbGrid->setTransform(openvdb::math::Transform::createLinearTransform(
                 toOpenVdbMatrix(grid.indexToWorld())));
             if( const auto creator = grid.metadata("creator") )
@@ -241,7 +323,7 @@ namespace houio
                             tile.bounds.maximum.x,
                             tile.bounds.maximum.y,
                             tile.bounds.maximum.z)),
-                    tile.value,
+                    convertGridValue<typename OpenGrid::ValueType>(tile.value),
                     true);
             }
 
@@ -251,7 +333,7 @@ namespace houio
                 {
                     accessor.setValueOn(
                         openvdb::Coord(voxel.index.x, voxel.index.y, voxel.index.z),
-                        voxel.value);
+                        convertGridValue<typename OpenGrid::ValueType>(voxel.value));
                 });
             return vdbGrid;
         }
@@ -500,7 +582,7 @@ namespace houio
         return OpenVdbBackendInfo{
             true,
             OPENVDB_LIBRARY_VERSION_STRING,
-            "Optional OpenVDB backend is compiled; FloatGrid and Int32Grid read and write are available."};
+            "Optional OpenVDB backend is compiled; FloatGrid, Int32Grid, and Vec3SGrid read and write are available."};
 #else
         return OpenVdbBackendInfo{
             false,
@@ -658,6 +740,83 @@ namespace houio
         static_cast<void>(openvdbStream);
         static_cast<void>(gridName);
         GeometryReadResult<SparseInt32Grid> result;
+        result.diagnostics.push_back(unavailableDiagnostic());
+        return result;
+#endif
+    }
+
+    GeometryReadResult<SparseVec3fGrid> OpenVdbBackend::readVec3fGrid(
+        const std::filesystem::path& path,
+        const std::string& gridName)
+    {
+#if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
+        return readGridFile<openvdb::Vec3SGrid, SparseVec3fGrid>(
+            path, gridName, "Vec3SGrid");
+#else
+        static_cast<void>(path);
+        static_cast<void>(gridName);
+        GeometryReadResult<SparseVec3fGrid> result;
+        result.diagnostics.push_back(unavailableDiagnostic());
+        return result;
+#endif
+    }
+
+    GeometryWriteResult OpenVdbBackend::writeVec3fGrid(
+        const std::filesystem::path& path,
+        const SparseVec3fGrid& grid,
+        bool overwriteExisting,
+        bool createParentDirectories)
+    {
+#if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
+        return writeGridFile<openvdb::Vec3SGrid>(
+            path, grid, overwriteExisting, createParentDirectories, "Vec3SGrid");
+#else
+        static_cast<void>(path);
+        static_cast<void>(grid);
+        static_cast<void>(overwriteExisting);
+        static_cast<void>(createParentDirectories);
+        GeometryWriteResult result;
+        result.diagnostics.push_back(unavailableDiagnostic());
+        return result;
+#endif
+    }
+
+    GeometryWriteResult OpenVdbBackend::encodeVec3fGrid(
+        std::ostream& output,
+        const SparseVec3fGrid& grid)
+    {
+#if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
+        return encodeGridStream<openvdb::Vec3SGrid>(output, grid, "Vec3SGrid");
+#else
+        static_cast<void>(output);
+        static_cast<void>(grid);
+        GeometryWriteResult result;
+        result.diagnostics.push_back(unavailableDiagnostic());
+        return result;
+#endif
+    }
+
+    GeometryReadResult<std::vector<ubyte>> OpenVdbBackend::encodeVec3fGrid(
+        const SparseVec3fGrid& grid)
+    {
+        return encodeGridBytes(grid,
+            [](std::ostream& output, const SparseVec3fGrid& value)
+            {
+                return OpenVdbBackend::encodeVec3fGrid(output, value);
+            });
+    }
+
+    GeometryReadResult<SparseVec3fGrid> OpenVdbBackend::decodeVec3fGrid(
+        std::span<const ubyte> openvdbStream,
+        const std::string& gridName)
+    {
+#if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
+        return decodeGridStream<openvdb::Vec3SGrid, SparseVec3fGrid>(
+            openvdbStream, gridName, "Vec3SGrid");
+#else
+        static_cast<void>(openvdbStream);
+        static_cast<void>(gridName);
+        GeometryReadResult<SparseVec3fGrid> result;
         result.diagnostics.push_back(unavailableDiagnostic());
         return result;
 #endif

@@ -43,7 +43,7 @@ HouIO currently supports:
 - External `PackedDisk` references with authored filename, expansion frame/policy, pivot, transform, viewport LOD, and packed flags
 - `PackedDiskSequence` records with explicit sample lists, fractional index, wrap mode, pivot, transform, and viewport metadata
 - Native sparse VDB primitive payloads through lossless opaque file round trips
-- Dependency-neutral sparse FloatGrid and Int32Grid editing, with optional native `.vdb` I/O and Houdini VDB primitive construction when built against OpenVDB
+- Dependency-neutral sparse FloatGrid, Int32Grid, and Vec3fGrid editing, with optional native `.vdb` I/O and Houdini VDB primitive construction when built against OpenVDB
 - Exact live-HOM extraction of scalar Float VDBs whose active topology is fully observable
 - SCF compression through C-Blosc
 
@@ -55,13 +55,13 @@ Not currently supported by the standalone C++ model:
 
 - Agents and crowds
 - Height fields
-- Nonlinear OpenVDB transforms and native grid types other than FloatGrid and Int32Grid
+- Nonlinear OpenVDB transforms and native grid types other than FloatGrid, Int32Grid, and Vec3SGrid
 - Live-HOM VDB extraction when activity cannot be distinguished exactly from background/inactive values
 - Vector VDB construction and editing
 - NURBS and Bezier primitives
 - Instancing records
 
-The primary Houdini workflow extracts supported live geometry directly through HOM into the HouIO-owned `houio.hom/1` manifest and invokes the custom C++ writer. It does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`. Polygons, dense scalar volumes, embedded `hou.PackedGeometry`, external `PackedDisk` references, `PackedDiskSequence` references, maintained attribute domains, and groups are supported. Packed-disk filenames and expansion policies are retained without opening, copying, or embedding the referenced file. `PackedFragment` is supported by the file reader/writer and explicit manifests, but direct extraction from a standalone `hou.PackedFragment` is unavailable because HOM exposes its fragment metadata without the embedded source detail. Native VDB records are preserved losslessly when HouIO reads and rewrites an existing GEO/BGEO file. `SparseFloatGrid` and `SparseInt32Grid` provide dependency-neutral sparse editing. Exact scalar Float VDBs can be extracted from live HOM into `sparse_float_vdb` manifests. In an OpenVDB-enabled build, the C++ `OpenVdbBackend` API reads and writes standalone `.vdb` FloatGrid and Int32Grid data, while `houio write-manifest` can construct native VDB records inside GEO/BGEO/SCF containers from `sparse_float_vdb` or `sparse_int32_vdb` explicit voxels and bounded active tiles. The default bundled Houdini package is backend-off, so its primary workflow preserves existing native payloads but does not provide standalone `.vdb` output or constructed sparse records. The extractor rejects ambiguous active topology instead of inferring it.
+The primary Houdini workflow extracts supported live geometry directly through HOM into the HouIO-owned `houio.hom/1` manifest and invokes the custom C++ writer. It does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`. Polygons, dense scalar volumes, embedded `hou.PackedGeometry`, external `PackedDisk` references, `PackedDiskSequence` references, maintained attribute domains, and groups are supported. Packed-disk filenames and expansion policies are retained without opening, copying, or embedding the referenced file. `PackedFragment` is supported by the file reader/writer and explicit manifests, but direct extraction from a standalone `hou.PackedFragment` is unavailable because HOM exposes its fragment metadata without the embedded source detail. Native VDB records are preserved losslessly when HouIO reads and rewrites an existing GEO/BGEO file. `SparseFloatGrid`, `SparseInt32Grid`, and `SparseVec3fGrid` provide dependency-neutral sparse editing. Exact scalar Float VDBs can be extracted from live HOM into `sparse_float_vdb` manifests. In an OpenVDB-enabled build, the C++ `OpenVdbBackend` API reads and writes standalone `.vdb` FloatGrid, Int32Grid, and Vec3SGrid data, while `houio write-manifest` can construct native VDB records inside GEO/BGEO/SCF containers from `sparse_float_vdb`, `sparse_int32_vdb`, or `sparse_vec3f_vdb` explicit voxels and bounded active tiles. The default bundled Houdini package is backend-off, so its primary workflow preserves existing native payloads but does not provide standalone `.vdb` output or constructed sparse records. The extractor rejects ambiguous active topology instead of inferring it.
 
 ## Build
 

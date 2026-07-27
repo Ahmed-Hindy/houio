@@ -17,6 +17,16 @@ namespace houio
         unknown,
         fog_volume,
         level_set,
+        staggered,
+    };
+
+    enum class SparseVectorType
+    {
+        invariant,
+        covariant,
+        covariant_normalize,
+        contravariant_relative,
+        contravariant_absolute,
     };
 
     struct SparseIndexBounds
@@ -43,18 +53,20 @@ namespace houio
     using SparseFloatTile = SparseTile<float>;
     using SparseInt32Voxel = SparseVoxel<sint32>;
     using SparseInt32Tile = SparseTile<sint32>;
+    using SparseVec3fVoxel = SparseVoxel<math::V3f>;
+    using SparseVec3fTile = SparseTile<math::V3f>;
 
     namespace detail
     {
     template<typename Value>
-    class SparseScalarGrid
+    class SparseValueGrid
     {
     public:
         using ValueType = Value;
         using Voxel = SparseVoxel<Value>;
         using Tile = SparseTile<Value>;
 
-        explicit SparseScalarGrid(Value background = Value{});
+        explicit SparseValueGrid(Value background = Value{});
 
         [[nodiscard]] Value background() const noexcept;
         void setBackground(Value value);
@@ -111,15 +123,27 @@ namespace houio
     };
     }
 
-    class SparseFloatGrid final : public detail::SparseScalarGrid<float>
+    class SparseFloatGrid final : public detail::SparseValueGrid<float>
     {
     public:
-        using detail::SparseScalarGrid<float>::SparseScalarGrid;
+        using detail::SparseValueGrid<float>::SparseValueGrid;
     };
 
-    class SparseInt32Grid final : public detail::SparseScalarGrid<sint32>
+    class SparseInt32Grid final : public detail::SparseValueGrid<sint32>
     {
     public:
-        using detail::SparseScalarGrid<sint32>::SparseScalarGrid;
+        using detail::SparseValueGrid<sint32>::SparseValueGrid;
+    };
+
+    class SparseVec3fGrid final : public detail::SparseValueGrid<math::V3f>
+    {
+    public:
+        using detail::SparseValueGrid<math::V3f>::SparseValueGrid;
+
+        [[nodiscard]] SparseVectorType vectorType() const noexcept;
+        void setVectorType(SparseVectorType value) noexcept;
+
+    private:
+        SparseVectorType vector_type_ = SparseVectorType::invariant;
     };
 }

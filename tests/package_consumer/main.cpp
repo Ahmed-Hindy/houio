@@ -59,6 +59,18 @@ int main()
             houio::math::V3i(15, 15, 15)},
         7);
     sparseIntGrid.setVoxel(houio::math::V3i(16, 16, 16), 42);
+    houio::SparseVec3fGrid sparseVecGrid(houio::math::V3f(0.0f));
+    sparseVecGrid.setName("package_velocity");
+    sparseVecGrid.setGridClass(houio::SparseGridClass::staggered);
+    sparseVecGrid.setVectorType(houio::SparseVectorType::contravariant_relative);
+    sparseVecGrid.addActiveTile(
+        houio::SparseIndexBounds{
+            houio::math::V3i(24, 24, 24),
+            houio::math::V3i(31, 31, 31)},
+        houio::math::V3f(1.0f, 2.0f, 3.0f));
+    sparseVecGrid.setVoxel(
+        houio::math::V3i(40, 40, 40),
+        houio::math::V3f(-1.0f, 0.5f, 4.0f));
     const std::vector<houio::ubyte> sampleStream{
         0x20U, 0x42U, 0x44U, 0x56U, 0x01U, 0x02U, 0x03U};
     const auto samplePayload = houio::NativeVdbPayload::encode(sampleStream, 4);
@@ -81,6 +93,11 @@ int main()
             ? houio::OpenVdbBackend::decodeInt32Grid(
                 encodedIntGrid.value, "package_labels")
             : houio::GeometryReadResult<houio::SparseInt32Grid>{};
+        const auto encodedVecGrid = houio::OpenVdbBackend::encodeVec3fGrid(sparseVecGrid);
+        const auto decodedVecGrid = encodedVecGrid
+            ? houio::OpenVdbBackend::decodeVec3fGrid(
+                encodedVecGrid.value, "package_velocity")
+            : houio::GeometryReadResult<houio::SparseVec3fGrid>{};
         compiledBackendWorks = decodedGrid
             && decodedGrid.value.activeVoxelCount() == 1
             && decodedGrid.value.activeTileCount() != 0
@@ -89,7 +106,16 @@ int main()
             && decodedIntGrid
             && decodedIntGrid.value.activeTileCount() != 0
             && decodedIntGrid.value.value(houio::math::V3i(9, 9, 9)) == 7
-            && decodedIntGrid.value.value(houio::math::V3i(16, 16, 16)) == 42;
+            && decodedIntGrid.value.value(houio::math::V3i(16, 16, 16)) == 42
+            && decodedVecGrid
+            && decodedVecGrid.value.gridClass() == houio::SparseGridClass::staggered
+            && decodedVecGrid.value.vectorType()
+                == houio::SparseVectorType::contravariant_relative
+            && decodedVecGrid.value.activeTileCount() != 0
+            && decodedVecGrid.value.value(houio::math::V3i(25, 25, 25))
+                == houio::math::V3f(1.0f, 2.0f, 3.0f)
+            && decodedVecGrid.value.value(houio::math::V3i(40, 40, 40))
+                == houio::math::V3f(-1.0f, 0.5f, 4.0f);
     }
     if (!readResult || readResult.value->primitiveCount() != 1
         || !packedCapability || !packedCapability->writable
@@ -102,6 +128,10 @@ int main()
         || sparseIntGrid.activeVoxelCount() != 1
         || sparseIntGrid.activeTileCount() != 1
         || sparseIntGrid.value(houio::math::V3i(16, 16, 16)) != 42
+        || sparseVecGrid.activeVoxelCount() != 1
+        || sparseVecGrid.activeTileCount() != 1
+        || sparseVecGrid.vectorType()
+            != houio::SparseVectorType::contravariant_relative
         || !sampleRoundTrip || sampleRoundTrip.value != sampleStream
         || !compiledBackendWorks
         || !openVdbMetadataIsValid

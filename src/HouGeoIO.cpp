@@ -1193,6 +1193,14 @@ namespace houio
 							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
 						++topologyVertexOffset;
 					}
+					else if( auto sparseVec3fVdb = std::dynamic_pointer_cast<const HouGeoAdapter::SparseVec3fVdbPrimitive>(primitive) )
+					{
+						if( !exportPrimitive(context, sparseVec3fVdb) )
+							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a sparse Vec3f VDB primitive" );
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
 					else if( auto nativeVdb = std::dynamic_pointer_cast<const HouGeoAdapter::NativeVdbPrimitive>(primitive) )
 					{
 						if( !exportPrimitive(context, nativeVdb) )
@@ -2051,6 +2059,30 @@ namespace houio
 		if( !payload )
 			throwReadFailure(payload.diagnostics,
 				"HouGeoIO could not stream SparseInt32Grid into a Houdini VDB payload");
+
+		auto nativeVdb = std::make_shared<HouGeo::HouVdb>();
+		nativeVdb->setTopologyVertex(sparseVdb->topologyVertex());
+		nativeVdb->setSerializedPayload(payload.value);
+		return exportPrimitive(
+			context,
+			std::static_pointer_cast<const HouGeoAdapter::NativeVdbPrimitive>(nativeVdb));
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::SparseVec3fVdbPrimitive::ConstPtr sparseVdb )
+	{
+		if( !sparseVdb || sparseVdb->topologyVertex() < 0 )
+			return false;
+
+		const auto payload = NativeVdbPayload::encodeStream(
+			[&](std::ostream& output)
+			{
+				return OpenVdbBackend::encodeVec3fGrid(
+					output, sparseVdb->sparseGrid());
+			});
+		if( !payload )
+			throwReadFailure(payload.diagnostics,
+				"HouGeoIO could not stream SparseVec3fGrid into a Houdini VDB payload");
 
 		auto nativeVdb = std::make_shared<HouGeo::HouVdb>();
 		nativeVdb->setTopologyVertex(sparseVdb->topologyVertex());

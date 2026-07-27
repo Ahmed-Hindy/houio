@@ -536,6 +536,30 @@ namespace houio
             SparseInt32Grid sparse_grid_;
         };
 
+        class HouSparseVec3fVdb final : public SparseVec3fVdbPrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouSparseVec3fVdb>;
+            using ConstPtr = std::shared_ptr<const HouSparseVec3fVdb>;
+
+            [[nodiscard]] int topologyVertex() const override;
+            [[nodiscard]] const SparseVec3fGrid& sparseGrid() const override;
+
+            void setTopologyVertex(int topology_vertex) noexcept
+            {
+                topology_vertex_ = topology_vertex;
+            }
+
+            void setSparseGrid(SparseVec3fGrid grid)
+            {
+                sparse_grid_ = std::move(grid);
+            }
+
+        private:
+            int topology_vertex_ = -1;
+            SparseVec3fGrid sparse_grid_;
+        };
+
         class HouVdb final : public NativeVdbPrimitive
         {
         public:
@@ -636,6 +660,7 @@ namespace houio
         void addPrimitive(PackedDiskSequencePrimitive::Ptr packed_disk_sequence);
         void addPrimitive(SparseVdbPrimitive::Ptr sparse_vdb);
         void addPrimitive(SparseInt32VdbPrimitive::Ptr sparse_vdb);
+        void addPrimitive(SparseVec3fVdbPrimitive::Ptr sparse_vdb);
         void addPrimitive(NativeVdbPrimitive::Ptr native_vdb);
         void addPrimitive(PolyPrimitive::Ptr polygon);
         void setTopology(HouTopology::Ptr topology);

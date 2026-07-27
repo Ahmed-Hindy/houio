@@ -4,6 +4,7 @@
 #include <houio/OpenVdbBackend.h>
 #include <houio/SparseGrid.h>
 
+#include <array>
 #include <filesystem>
 #include <limits>
 #include <optional>
@@ -17,6 +18,8 @@ static_assert(std::is_same_v<
     decltype(std::declval<const houio::SparseFloatGrid&>().background()), float>);
 static_assert(std::is_same_v<
     decltype(std::declval<const houio::SparseInt32Grid&>().background()), houio::sint32>);
+static_assert(std::is_same_v<
+    decltype(std::declval<const houio::SparseVec3fGrid&>().background()), houio::math::V3f>);
 
 int main()
 {
@@ -109,6 +112,48 @@ int main()
         || intGrid.value(houio::math::V3i(0, 0, 0)) != -1 )
     {
         return houio::test::fail("SparseInt32Grid topology or values are incorrect");
+    }
+
+    houio::SparseVec3fGrid vecGrid(houio::math::V3f(0.0f));
+    vecGrid.setName("velocity");
+    vecGrid.setGridClass(houio::SparseGridClass::staggered);
+    vecGrid.setVectorType(houio::SparseVectorType::contravariant_relative);
+    vecGrid.setMetadata("creator", "houio_test");
+    vecGrid.setIndexToWorld(transform);
+    vecGrid.addActiveTile(
+        houio::SparseIndexBounds{
+            houio::math::V3i(16, 16, 16),
+            houio::math::V3i(23, 23, 23)},
+        houio::math::V3f(1.0f, 2.0f, 3.0f));
+    vecGrid.setVoxel(
+        houio::math::V3i(18, 18, 18),
+        houio::math::V3f(-1.0f, 4.0f, 0.5f));
+    if( vecGrid.background() != houio::math::V3f(0.0f)
+        || vecGrid.gridClass() != houio::SparseGridClass::staggered
+        || vecGrid.vectorType() != houio::SparseVectorType::contravariant_relative
+        || vecGrid.activeTileCount() != 1
+        || vecGrid.activeVoxelCount() != 1
+        || vecGrid.value(houio::math::V3i(17, 17, 17))
+            != houio::math::V3f(1.0f, 2.0f, 3.0f)
+        || vecGrid.value(houio::math::V3i(18, 18, 18))
+            != houio::math::V3f(-1.0f, 4.0f, 0.5f) )
+    {
+        return houio::test::fail("SparseVec3fGrid topology, values, or semantics are incorrect");
+    }
+
+    if( const int result = houio::test::expectThrows<std::invalid_argument>(
+            [&]()
+            {
+                vecGrid.setVoxel(
+                    houio::math::V3i(0, 0, 0),
+                    houio::math::V3f(
+                        0.0f,
+                        std::numeric_limits<float>::infinity(),
+                        0.0f));
+            },
+            "non-finite Vec3f voxel components must be rejected"); result != 0 )
+    {
+        return result;
     }
 
     const auto bounds = grid.activeBounds();
@@ -255,6 +300,83 @@ int main()
             "compiled OpenVDB pure Int32 tile round-trip changed tile topology");
     }
 
+    const std::array<houio::SparseVectorType, 5> vectorTypes{
+        houio::SparseVectorType::invariant,
+        houio::SparseVectorType::covariant,
+        houio::SparseVectorType::covariant_normalize,
+        houio::SparseVectorType::contravariant_relative,
+        houio::SparseVectorType::contravariant_absolute};
+    for( const houio::SparseVectorType vectorType : vectorTypes )
+    {
+        houio::SparseVec3fGrid semanticGrid(houio::math::V3f(0.25f, -0.5f, 1.0f));
+        semanticGrid.setName("vector_semantics");
+        semanticGrid.setGridClass(houio::SparseGridClass::staggered);
+        semanticGrid.setVectorType(vectorType);
+        semanticGrid.setVoxel(
+            houio::math::V3i(1, 2, 3),
+            houio::math::V3f(4.0f, 5.0f, 6.0f));
+        const auto encodedVectorStream =
+            houio::OpenVdbBackend::encodeVec3fGrid(semanticGrid);
+        const auto vectorRoundTrip = encodedVectorStream
+            ? houio::OpenVdbBackend::decodeVec3fGrid(
+                encodedVectorStream.value, "vector_semantics")
+            : houio::GeometryReadResult<houio::SparseVec3fGrid>{};
+        if( !vectorRoundTrip
+            || vectorRoundTrip.value.gridClass() != houio::SparseGridClass::staggered
+            || vectorRoundTrip.value.vectorType() != vectorType
+            || vectorRoundTrip.value.background()
+                != houio::math::V3f(0.25f, -0.5f, 1.0f)
+            || vectorRoundTrip.value.value(houio::math::V3i(1, 2, 3))
+                != houio::math::V3f(4.0f, 5.0f, 6.0f) )
+        {
+            return houio::test::fail(
+                "compiled OpenVDB Vec3SGrid round-trip changed vector semantics");
+        }
+    }
+
+    houio::SparseVec3fGrid vectorTileGrid(houio::math::V3f(0.0f));
+    vectorTileGrid.setName("vector_tiles");
+    vectorTileGrid.setGridClass(houio::SparseGridClass::staggered);
+    vectorTileGrid.setVectorType(houio::SparseVectorType::contravariant_relative);
+    vectorTileGrid.addActiveTile(
+        houio::SparseIndexBounds{
+            houio::math::V3i(16, 16, 16),
+            houio::math::V3i(23, 23, 23)},
+        houio::math::V3f(1.0f, 2.0f, 3.0f));
+    const auto encodedVectorTileStream =
+        houio::OpenVdbBackend::encodeVec3fGrid(vectorTileGrid);
+    const auto vectorTileRoundTrip = encodedVectorTileStream
+        ? houio::OpenVdbBackend::decodeVec3fGrid(
+            encodedVectorTileStream.value, "vector_tiles")
+        : houio::GeometryReadResult<houio::SparseVec3fGrid>{};
+    if( !vectorTileRoundTrip
+        || vectorTileRoundTrip.value.activeTileCount() == 0
+        || vectorTileRoundTrip.value.activeVoxelCount() != 0
+        || vectorTileRoundTrip.value.value(houio::math::V3i(17, 17, 17))
+            != houio::math::V3f(1.0f, 2.0f, 3.0f) )
+    {
+        return houio::test::fail(
+            "compiled OpenVDB pure Vec3SGrid tile round-trip changed topology");
+    }
+
+    const auto encodedMixedVectorStream =
+        houio::OpenVdbBackend::encodeVec3fGrid(vecGrid);
+    const auto mixedVectorRoundTrip = encodedMixedVectorStream
+        ? houio::OpenVdbBackend::decodeVec3fGrid(
+            encodedMixedVectorStream.value, "velocity")
+        : houio::GeometryReadResult<houio::SparseVec3fGrid>{};
+    if( !mixedVectorRoundTrip
+        || mixedVectorRoundTrip.value.vectorType()
+            != houio::SparseVectorType::contravariant_relative
+        || mixedVectorRoundTrip.value.value(houio::math::V3i(17, 17, 17))
+            != houio::math::V3f(1.0f, 2.0f, 3.0f)
+        || mixedVectorRoundTrip.value.value(houio::math::V3i(18, 18, 18))
+            != houio::math::V3f(-1.0f, 4.0f, 0.5f) )
+    {
+        return houio::test::fail(
+            "compiled OpenVDB mixed Vec3SGrid round-trip changed activity or values");
+    }
+
     const auto encodedTileStream = houio::OpenVdbBackend::encodeFloatGrid(tiledGrid);
     const auto tileRoundTrip = encodedTileStream
         ? houio::OpenVdbBackend::decodeFloatGrid(encodedTileStream.value, "tiles")
@@ -359,6 +481,30 @@ int main()
             "compiled OpenVDB Int32Grid file round-trip changed grid data");
     }
 
+    const std::filesystem::path vec3fVdbPath =
+        std::filesystem::temp_directory_path() / "houio_sparse_vec3f_grid_test.vdb";
+    std::filesystem::remove(vec3fVdbPath, removeError);
+    vectorTileGrid.setIndexToWorld(transform);
+    const auto vec3fWriteResult =
+        houio::OpenVdbBackend::writeVec3fGrid(vec3fVdbPath, vectorTileGrid);
+    if( !vec3fWriteResult )
+        return houio::test::fail("compiled OpenVDB backend failed to write Vec3SGrid");
+    const auto vec3fReadResult =
+        houio::OpenVdbBackend::readVec3fGrid(vec3fVdbPath, "vector_tiles");
+    std::filesystem::remove(vec3fVdbPath, removeError);
+    if( !vec3fReadResult
+        || vec3fReadResult.value.gridClass() != houio::SparseGridClass::staggered
+        || vec3fReadResult.value.vectorType()
+            != houio::SparseVectorType::contravariant_relative
+        || vec3fReadResult.value.activeTileCount() == 0
+        || vec3fReadResult.value.indexToWorld().ma != vectorTileGrid.indexToWorld().ma
+        || vec3fReadResult.value.value(houio::math::V3i(17, 17, 17))
+            != houio::math::V3f(1.0f, 2.0f, 3.0f) )
+    {
+        return houio::test::fail(
+            "compiled OpenVDB Vec3SGrid file round-trip changed grid data");
+    }
+
     const std::filesystem::path vdbPath =
         std::filesystem::temp_directory_path() / "houio_sparse_grid_test.vdb";
     std::filesystem::remove(vdbPath, removeError);
@@ -423,6 +569,24 @@ int main()
     {
         return houio::test::fail(
             "disabled OpenVDB Int32Grid write did not return an unsupported diagnostic");
+    }
+    const auto vec3fReadResult = houio::OpenVdbBackend::readVec3fGrid(
+        std::filesystem::path("missing.vdb"));
+    if( vec3fReadResult || vec3fReadResult.diagnostics.empty()
+        || vec3fReadResult.diagnostics.front().category
+            != houio::DiagnosticCategory::unsupported_input )
+    {
+        return houio::test::fail(
+            "disabled OpenVDB Vec3SGrid read did not return an unsupported diagnostic");
+    }
+    const auto vec3fWriteResult = houio::OpenVdbBackend::writeVec3fGrid(
+        std::filesystem::path("unused_vec3f.vdb"), vecGrid);
+    if( vec3fWriteResult || vec3fWriteResult.diagnostics.empty()
+        || vec3fWriteResult.diagnostics.front().category
+            != houio::DiagnosticCategory::unsupported_input )
+    {
+        return houio::test::fail(
+            "disabled OpenVDB Vec3SGrid write did not return an unsupported diagnostic");
     }
 #endif
 

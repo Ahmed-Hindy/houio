@@ -527,6 +527,146 @@ namespace
         return 0;
     }
 
+    int verifySparseVec3fVdbManifest(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path path = directory / "sparse_vec3f_vdb.json";
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_vec3f_vdb","vertex_offset":0,
+                "name":"velocity","grid_class":"staggered",
+                "vector_type":"contravariant_relative",
+                "background":[0,0,0],
+                "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                "active_indices":[18,18,18,-1,-2,-3],
+                "active_values":[[-1,4,0.5],[2,-3,1]],
+                "active_tiles":[{
+                    "minimum":[16,16,16],"maximum":[23,23,23],
+                    "value":[1,2,3]
+                }],
+                "metadata":{"creator":"houio_vec_test"}
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto result = houio::HomManifest::read(path);
+        if( !result || result.value->primitiveCount() != 1 )
+            return fail("sparse Vec3f VDB manifest failed to load");
+        const auto sparseVdb =
+            std::dynamic_pointer_cast<houio::HouGeo::HouSparseVec3fVdb>(
+                result.value->primitives().front());
+        if( !sparseVdb || sparseVdb->topologyVertex() != 0 )
+            return fail("sparse Vec3f VDB manifest did not create the expected primitive");
+        const houio::SparseVec3fGrid& grid = sparseVdb->sparseGrid();
+        if( grid.name() != "velocity"
+            || grid.gridClass() != houio::SparseGridClass::staggered
+            || grid.vectorType() != houio::SparseVectorType::contravariant_relative
+            || grid.background() != houio::math::V3f(0.0f)
+            || grid.activeVoxelCount() != 2
+            || grid.activeTileCount() != 1
+            || grid.value(houio::math::V3i(17, 17, 17))
+                != houio::math::V3f(1.0f, 2.0f, 3.0f)
+            || grid.value(houio::math::V3i(18, 18, 18))
+                != houio::math::V3f(-1.0f, 4.0f, 0.5f)
+            || grid.metadata("creator")
+                != std::optional<std::string>("houio_vec_test") )
+        {
+            return fail("sparse Vec3f VDB manifest changed grid data or semantics");
+        }
+
+        const std::filesystem::path outputPath = directory / "sparse_vec3f_vdb.bgeo";
+        const houio::WriteResult writeResult = houio::Writer::write(
+            outputPath,
+            std::static_pointer_cast<houio::HouGeoAdapter>(result.value));
+#if HOUIO_HAS_OPENVDB
+        if( !writeResult )
+            return fail("sparse Vec3f VDB manifest failed native writer serialization");
+        const auto writtenGeometry = houio::GeometryIO::readHouGeo(outputPath);
+        const auto nativeVdb = writtenGeometry && writtenGeometry.value->primitiveCount() == 1
+            ? std::dynamic_pointer_cast<houio::HouGeo::HouVdb>(
+                writtenGeometry.value->primitives().front())
+            : houio::HouGeo::HouVdb::Ptr{};
+        const auto stream = nativeVdb && nativeVdb->serializedPayload()
+            ? houio::NativeVdbPayload::decode(nativeVdb->serializedPayload())
+            : houio::GeometryReadResult<std::vector<houio::ubyte>>{};
+        const auto decoded = stream
+            ? houio::OpenVdbBackend::decodeVec3fGrid(stream.value, "velocity")
+            : houio::GeometryReadResult<houio::SparseVec3fGrid>{};
+        if( !decoded
+            || decoded.value.gridClass() != houio::SparseGridClass::staggered
+            || decoded.value.vectorType()
+                != houio::SparseVectorType::contravariant_relative
+            || decoded.value.value(houio::math::V3i(17, 17, 17))
+                != houio::math::V3f(1.0f, 2.0f, 3.0f)
+            || decoded.value.value(houio::math::V3i(18, 18, 18))
+                != houio::math::V3f(-1.0f, 4.0f, 0.5f) )
+        {
+            return fail("sparse Vec3f VDB manifest native round-trip changed data");
+        }
+#else
+        if( writeResult || writeResult.diagnostics.empty()
+            || writeResult.diagnostics.front().category
+                != houio::DiagnosticCategory::unsupported_input
+            || std::filesystem::exists(outputPath) )
+        {
+            return fail("backend-off sparse Vec3f VDB write did not fail cleanly");
+        }
+#endif
+        return 0;
+    }
+
+    int verifyInvalidSparseVec3fVdbManifest(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path path = directory / "invalid_sparse_vec3f_vdb.json";
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_vec3f_vdb","vertex_offset":0,
+                "grid_class":"staggered","vector_type":"invariant",
+                "background":[0,0,0],
+                "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                "active_indices":[1,2,3],"active_values":[[1,2]]
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto tupleResult = houio::HomManifest::read(path);
+        if( tupleResult
+            || !containsCategory(tupleResult.diagnostics, houio::DiagnosticCategory::schema) )
+        {
+            return fail("invalid sparse Vec3f VDB tuple was accepted");
+        }
+
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_vec3f_vdb","vertex_offset":0,
+                "grid_class":"staggered","vector_type":"directionish",
+                "background":[0,0,0],
+                "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto semanticsResult = houio::HomManifest::read(path);
+        if( semanticsResult
+            || !containsCategory(
+                semanticsResult.diagnostics, houio::DiagnosticCategory::schema) )
+        {
+            return fail("invalid sparse Vec3f VDB vector semantics were accepted");
+        }
+        return 0;
+    }
+
     int verifyInvalidSparseInt32VdbManifest(const std::filesystem::path &directory)
     {
         const std::filesystem::path path = directory / "invalid_sparse_int32_vdb.json";
@@ -715,6 +855,10 @@ int main()
     if( const int result = verifySparseVdbManifest(directory); result != 0 )
         return result;
     if( const int result = verifySparseInt32VdbManifest(directory); result != 0 )
+        return result;
+    if( const int result = verifySparseVec3fVdbManifest(directory); result != 0 )
+        return result;
+    if( const int result = verifyInvalidSparseVec3fVdbManifest(directory); result != 0 )
         return result;
     if( const int result = verifyInvalidSparseInt32VdbManifest(directory); result != 0 )
         return result;

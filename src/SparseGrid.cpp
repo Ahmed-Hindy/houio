@@ -11,76 +11,76 @@ namespace houio
 namespace detail
 {
     template<typename Value>
-    SparseScalarGrid<Value>::SparseScalarGrid(Value background)
+    SparseValueGrid<Value>::SparseValueGrid(Value background)
         : background_(background)
     {
         validateValue(background, "background");
     }
 
     template<typename Value>
-    Value SparseScalarGrid<Value>::background() const noexcept
+    Value SparseValueGrid<Value>::background() const noexcept
     {
         return background_;
     }
 
     template<typename Value>
-    void SparseScalarGrid<Value>::setBackground(Value value)
+    void SparseValueGrid<Value>::setBackground(Value value)
     {
         validateValue(value, "background");
         background_ = value;
     }
 
     template<typename Value>
-    SparseGridClass SparseScalarGrid<Value>::gridClass() const noexcept
+    SparseGridClass SparseValueGrid<Value>::gridClass() const noexcept
     {
         return grid_class_;
     }
 
     template<typename Value>
-    void SparseScalarGrid<Value>::setGridClass(SparseGridClass value) noexcept
+    void SparseValueGrid<Value>::setGridClass(SparseGridClass value) noexcept
     {
         grid_class_ = value;
     }
 
     template<typename Value>
-    const std::string& SparseScalarGrid<Value>::name() const noexcept
+    const std::string& SparseValueGrid<Value>::name() const noexcept
     {
         return name_;
     }
 
     template<typename Value>
-    void SparseScalarGrid<Value>::setName(std::string value)
+    void SparseValueGrid<Value>::setName(std::string value)
     {
         name_ = std::move(value);
     }
 
     template<typename Value>
-    const math::M44f& SparseScalarGrid<Value>::indexToWorld() const noexcept
+    const math::M44f& SparseValueGrid<Value>::indexToWorld() const noexcept
     {
         return index_to_world_;
     }
 
     template<typename Value>
-    void SparseScalarGrid<Value>::setIndexToWorld(const math::M44f& value)
+    void SparseValueGrid<Value>::setIndexToWorld(const math::M44f& value)
     {
         if( std::any_of(value.ma.begin(), value.ma.end(),
                 [](float component) { return !std::isfinite(component); }) )
         {
-            throw std::invalid_argument("Sparse scalar grid transform must be finite");
+            throw std::invalid_argument("Sparse value grid transform must be finite");
         }
         index_to_world_ = value;
     }
 
     template<typename Value>
-    void SparseScalarGrid<Value>::setMetadata(std::string key, std::string value)
+    void SparseValueGrid<Value>::setMetadata(std::string key, std::string value)
     {
         if( key.empty() )
-            throw std::invalid_argument("Sparse scalar grid metadata key cannot be empty");
+            throw std::invalid_argument("Sparse value grid metadata key cannot be empty");
         metadata_.insert_or_assign(std::move(key), std::move(value));
     }
 
     template<typename Value>
-    std::optional<std::string> SparseScalarGrid<Value>::metadata(
+    std::optional<std::string> SparseValueGrid<Value>::metadata(
         const std::string& key) const
     {
         const auto entry = metadata_.find(key);
@@ -91,26 +91,26 @@ namespace detail
 
     template<typename Value>
     const std::map<std::string, std::string>&
-    SparseScalarGrid<Value>::metadata() const noexcept
+    SparseValueGrid<Value>::metadata() const noexcept
     {
         return metadata_;
     }
 
     template<typename Value>
-    void SparseScalarGrid<Value>::setVoxel(const math::V3i& index, Value value)
+    void SparseValueGrid<Value>::setVoxel(const math::V3i& index, Value value)
     {
         validateValue(value, "voxel value");
         voxels_.insert_or_assign(index, value);
     }
 
     template<typename Value>
-    bool SparseScalarGrid<Value>::eraseVoxel(const math::V3i& index) noexcept
+    bool SparseValueGrid<Value>::eraseVoxel(const math::V3i& index) noexcept
     {
         return voxels_.erase(index) != 0;
     }
 
     template<typename Value>
-    void SparseScalarGrid<Value>::addActiveTile(
+    void SparseValueGrid<Value>::addActiveTile(
         const SparseIndexBounds& bounds,
         Value value)
     {
@@ -118,20 +118,20 @@ namespace detail
             || bounds.minimum.y > bounds.maximum.y
             || bounds.minimum.z > bounds.maximum.z )
         {
-            throw std::invalid_argument("Sparse scalar grid tile bounds must be ordered");
+            throw std::invalid_argument("Sparse value grid tile bounds must be ordered");
         }
         validateValue(value, "tile value");
         tiles_.push_back(Tile{bounds, value});
     }
 
     template<typename Value>
-    void SparseScalarGrid<Value>::clearActiveTiles() noexcept
+    void SparseValueGrid<Value>::clearActiveTiles() noexcept
     {
         tiles_.clear();
     }
 
     template<typename Value>
-    bool SparseScalarGrid<Value>::isActive(const math::V3i& index) const noexcept
+    bool SparseValueGrid<Value>::isActive(const math::V3i& index) const noexcept
     {
         if( voxels_.contains(index) )
             return true;
@@ -145,7 +145,7 @@ namespace detail
     }
 
     template<typename Value>
-    Value SparseScalarGrid<Value>::value(const math::V3i& index) const noexcept
+    Value SparseValueGrid<Value>::value(const math::V3i& index) const noexcept
     {
         const auto entry = voxels_.find(index);
         if( entry != voxels_.end() )
@@ -163,20 +163,20 @@ namespace detail
     }
 
     template<typename Value>
-    std::size_t SparseScalarGrid<Value>::activeVoxelCount() const noexcept
+    std::size_t SparseValueGrid<Value>::activeVoxelCount() const noexcept
     {
         return voxels_.size();
     }
 
     template<typename Value>
-    std::size_t SparseScalarGrid<Value>::activeTileCount() const noexcept
+    std::size_t SparseValueGrid<Value>::activeTileCount() const noexcept
     {
         return tiles_.size();
     }
 
     template<typename Value>
     std::optional<SparseIndexBounds>
-    SparseScalarGrid<Value>::activeBounds() const noexcept
+    SparseValueGrid<Value>::activeBounds() const noexcept
     {
         if( voxels_.empty() && tiles_.empty() )
             return std::nullopt;
@@ -215,8 +215,8 @@ namespace detail
     }
 
     template<typename Value>
-    std::vector<typename SparseScalarGrid<Value>::Voxel>
-    SparseScalarGrid<Value>::activeVoxels() const
+    std::vector<typename SparseValueGrid<Value>::Voxel>
+    SparseValueGrid<Value>::activeVoxels() const
     {
         std::vector<Voxel> result;
         result.reserve(voxels_.size());
@@ -226,14 +226,14 @@ namespace detail
     }
 
     template<typename Value>
-    const std::vector<typename SparseScalarGrid<Value>::Tile>&
-    SparseScalarGrid<Value>::activeTiles() const noexcept
+    const std::vector<typename SparseValueGrid<Value>::Tile>&
+    SparseValueGrid<Value>::activeTiles() const noexcept
     {
         return tiles_;
     }
 
     template<typename Value>
-    bool SparseScalarGrid<Value>::IndexLess::operator()(
+    bool SparseValueGrid<Value>::IndexLess::operator()(
         const math::V3i& left,
         const math::V3i& right) const noexcept
     {
@@ -245,21 +245,43 @@ namespace detail
     }
 
     template<typename Value>
-    void SparseScalarGrid<Value>::validateValue(Value value, const char* field)
+    void SparseValueGrid<Value>::validateValue(Value value, const char* field)
     {
+        bool finite = true;
         if constexpr( std::is_floating_point_v<Value> )
         {
-            if( !std::isfinite(value) )
-                throw std::invalid_argument(std::string("Sparse scalar grid ") + field + " must be finite");
+            finite = std::isfinite(value);
+        }
+        else if constexpr( std::is_same_v<Value, math::V3f> )
+        {
+            finite = std::isfinite(value.x)
+                && std::isfinite(value.y)
+                && std::isfinite(value.z);
         }
         else
         {
             static_cast<void>(value);
-            static_cast<void>(field);
+        }
+
+        if( !finite )
+        {
+            throw std::invalid_argument(
+                std::string("Sparse value grid ") + field + " must be finite");
         }
     }
 
-    template class SparseScalarGrid<float>;
-    template class SparseScalarGrid<sint32>;
+    template class SparseValueGrid<float>;
+    template class SparseValueGrid<sint32>;
+    template class SparseValueGrid<math::V3f>;
+}
+
+SparseVectorType SparseVec3fGrid::vectorType() const noexcept
+{
+    return vector_type_;
+}
+
+void SparseVec3fGrid::setVectorType(SparseVectorType value) noexcept
+{
+    vector_type_ = value;
 }
 }

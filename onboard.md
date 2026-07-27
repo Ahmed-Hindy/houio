@@ -281,7 +281,7 @@ Embedded `PackedGeometry` records preserve their shared HouGeo payload, topology
 
 ### VDB
 
-The Houdini-oriented model preserves existing native VDB primitive payloads opaquely and losslessly during file round trips. `SparseFloatGrid` and `SparseInt32Grid` provide dependency-neutral sparse voxel and active-tile editing through one typed scalar topology implementation. An opt-in OpenVDB build adds native `.vdb` FloatGrid/Int32Grid I/O and constructs Houdini-native VDB primitive payloads. Live HOM extraction remains Float-only and refuses ambiguous activity instead of flattening or guessing.
+The Houdini-oriented model preserves existing native VDB primitive payloads opaquely and losslessly during file round trips. `SparseFloatGrid`, `SparseInt32Grid`, and `SparseVec3fGrid` provide dependency-neutral sparse voxel and active-tile editing through one typed value-topology implementation. An opt-in OpenVDB build adds native `.vdb` FloatGrid/Int32Grid/Vec3SGrid I/O and constructs Houdini-native VDB primitive payloads. Live HOM extraction remains Float-only and refuses ambiguous activity instead of flattening or guessing.
 
 ### SCF
 
