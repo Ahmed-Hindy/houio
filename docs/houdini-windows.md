@@ -158,7 +158,7 @@ Reports:
 
 ## VDB workflow
 
-HouIO preserves existing native Houdini VDB primitive payloads losslessly during file-to-file GEO/BGEO/SCF round trips. The payload remains opaque because the library does not link OpenVDB, so sparse-tree editing and live-HOM native VDB creation are not available yet.
+HouIO preserves existing native Houdini VDB primitive payloads losslessly during file-to-file GEO/BGEO/SCF round trips. The default build remains independent of OpenVDB, but `SparseFloatGrid` supports dependency-neutral sparse editing and `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid I/O when an SDK is supplied. Live-HOM native VDB creation remains unavailable until that sparse model is converted into Houdini's serialized primitive payload.
 
 The compatibility bridge also supports bounded 32-bit Float grids by converting them explicitly:
 
@@ -242,7 +242,7 @@ Verify that `HOUIO_BLOSC_LIBRARY` expands to the active Houdini installation's `
 
 ### VDB conversion uses too much memory
 
-Use file-to-file native VDB pass-through when possible. The compatibility live-HOM conversion path densifies the grid; reduce its resolution or wait for the optional OpenVDB construction backend.
+Use file-to-file native VDB pass-through when possible. The compatibility live-HOM conversion path densifies the grid; reduce its resolution when using that path. The optional OpenVDB backend avoids dense `.vdb` I/O, but native Houdini record generation is still a separate integration step.
 
 ### Round Trip node times out
 

@@ -89,7 +89,7 @@ The standalone C++ model does not currently preserve these records:
 - NURBS and Bezier curves.
 - Spheres, tubes, tetrahedra, and height fields.
 - Agents, crowds, and instancing records.
-- Constructed or edited OpenVDB sparse trees without an optional OpenVDB backend; existing native VDB payloads are preserved.
+- OpenVDB active tiles, nonlinear transforms, and non-float grids in the optional backend; existing native Houdini VDB payloads remain preserved.
 - Vector VDB construction and editing.
 - Additional volume tile-compression encodings not represented by maintained fixtures.
 
@@ -111,9 +111,11 @@ Use `HouGeo` (`HoudiniGeometry`) or `HouGeoAdapter` when Houdini domain fidelity
 
 ## VDB scope
 
-The standalone library does not link to OpenVDB, but it recognizes native Houdini `VDB` records and preserves their serialized sparse payload opaquely during GEO/BGEO/SCF round trips. This retains active topology, values, transform, class, value type, and metadata without densification. It does not expose sparse-tree construction or editing.
+The default standalone library does not link to OpenVDB, but it recognizes native Houdini `VDB` records and preserves their serialized sparse payload opaquely during GEO/BGEO/SCF round trips. This retains active topology, values, transform, class, value type, and metadata without densification.
 
-The direct HOM manifest cannot currently create that native payload because HOM does not expose the serialized tree. The compatibility bridge can still convert supported Float SDF/Fog grids through dense volumes. A future optional OpenVDB backend is required for native live-session tree construction.
+`SparseFloatGrid` adds dependency-neutral sparse voxel construction and editing. Configuring `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid read/write through `OpenVdbBackend`, including linear transforms, fog/level-set class, names, and string metadata. Active tiles and nonlinear transforms are rejected explicitly in this first backend slice.
+
+The direct HOM manifest still cannot create a Houdini-native VDB primitive payload because HOM does not expose the serialized tree. The compatibility bridge can convert supported Float SDF/Fog grids through dense volumes. Native Houdini record generation from `SparseFloatGrid` remains the next integration step.
 
 ## Distribution status
 

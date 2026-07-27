@@ -1,5 +1,7 @@
 @PACKAGE_INIT@
 
+@HOUIO_CONFIG_FIND_OPENVDB@
+
 include("${CMAKE_CURRENT_LIST_DIR}/houio-targets.cmake")
 
 check_required_components(houio)

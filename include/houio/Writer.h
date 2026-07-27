@@ -12,14 +12,14 @@ namespace houio
 {
     enum class WriterDataType
     {
-        houdini_geometry,
-        simplified_mesh,
-        dense_scalar_volume,
-        packed_geometry,
-        packed_fragment,
-        packed_disk,
-        packed_disk_sequence,
-        sparse_openvdb
+        houdini_geometry = 0,
+        simplified_mesh = 1,
+        dense_scalar_volume = 2,
+        packed_geometry = 3,
+        packed_fragment = 4,
+        packed_disk = 5,
+        sparse_openvdb = 6,
+        packed_disk_sequence = 7
     };
 
     enum class WriterCapabilityLevel

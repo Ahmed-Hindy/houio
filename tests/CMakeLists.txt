@@ -99,6 +99,11 @@ target_link_libraries(houio_test_hom_manifest PRIVATE houio::houio)
 target_compile_features(houio_test_hom_manifest PRIVATE cxx_std_20)
 add_test(NAME houio.hom_manifest COMMAND houio_test_hom_manifest)
 
+add_executable(houio_test_sparse_grid test_sparse_grid.cpp)
+target_link_libraries(houio_test_sparse_grid PRIVATE houio::houio)
+target_compile_features(houio_test_sparse_grid PRIVATE cxx_std_20)
+add_test(NAME houio.sparse_grid COMMAND houio_test_sparse_grid)
+
 if(TARGET houio_cli)
     add_test(NAME houio.cli.capabilities COMMAND $<TARGET_FILE:houio_cli> capabilities --json)
     set_tests_properties(
@@ -108,7 +113,7 @@ if(TARGET houio_cli)
     add_test(NAME houio.cli.diagnose COMMAND $<TARGET_FILE:houio_cli> diagnose --json)
     set_tests_properties(
         houio.cli.diagnose
-        PROPERTIES PASS_REGULAR_EXPRESSION "\"version\""
+        PROPERTIES PASS_REGULAR_EXPRESSION "\"openvdb_backend_compiled\""
     )
     add_test(
         NAME houio.cli.contract

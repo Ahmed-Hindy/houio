@@ -1,6 +1,8 @@
 #include <houio/GeometryIO.h>
 #include <houio/GeometryModels.h>
 #include <houio/HomManifest.h>
+#include <houio/OpenVdbBackend.h>
+#include <houio/SparseGrid.h>
 #include <houio/Writer.h>
 
 #include <filesystem>
@@ -36,13 +38,24 @@ int main()
         houio::Writer::capability(houio::WriterDataType::packed_fragment);
     const auto diskCapability =
         houio::Writer::capability(houio::WriterDataType::packed_disk);
+    const auto sequenceCapability =
+        houio::Writer::capability(houio::WriterDataType::packed_disk_sequence);
     const auto vdbCapability =
         houio::Writer::capability(houio::WriterDataType::sparse_openvdb);
+    houio::SparseFloatGrid sparseGrid(0.0f);
+    sparseGrid.setVoxel(houio::math::V3i(1, 2, 3), 4.0f);
+    const houio::OpenVdbBackendInfo openVdb = houio::OpenVdbBackend::info();
+    const bool openVdbMetadataIsValid =
+        openVdb.compiled ? !openVdb.version.empty() : openVdb.version.empty();
     if (!readResult || readResult.value->primitiveCount() != 1
         || !packedCapability || !packedCapability->writable
         || !fragmentCapability || !fragmentCapability->writable
         || !diskCapability || !diskCapability->writable
-        || !vdbCapability || !vdbCapability->writable)
+        || !sequenceCapability || !sequenceCapability->writable
+        || !vdbCapability || !vdbCapability->writable
+        || sparseGrid.activeVoxelCount() != 1
+        || !openVdbMetadataIsValid
+        || openVdb.detail.empty())
     {
         std::cerr << "failed to import geometry through installed HouIO package\n";
         return 1;
