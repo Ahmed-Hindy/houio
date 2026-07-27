@@ -35,6 +35,7 @@ add_library(
     src/HouGeoAdapter.cpp
     src/HouGeoIO.cpp
     src/json.cpp
+    src/NativeVdbPayload.cpp
     src/OpenVdbBackend.cpp
     src/SparseGrid.cpp
     src/math/Color.cpp

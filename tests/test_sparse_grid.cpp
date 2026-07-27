@@ -1,5 +1,6 @@
 #include "TestSupport.h"
 
+#include <houio/NativeVdbPayload.h>
 #include <houio/OpenVdbBackend.h>
 #include <houio/SparseGrid.h>
 
@@ -20,6 +21,7 @@ int main()
     grid.setName("density");
     grid.setGridClass(houio::SparseGridClass::fog_volume);
     grid.setMetadata("source", "unit_test");
+    grid.setMetadata("creator", "houio_test");
     const houio::math::M44f transform(
         0.5f, 0.0f, 0.0f, 0.0f,
         0.0f, 0.75f, 0.0f, 0.0f,
@@ -104,10 +106,55 @@ int main()
         return result;
     }
 
+    const std::vector<houio::ubyte> streamBytes{
+        0x20U, 0x42U, 0x44U, 0x56U, 0x01U, 0x02U, 0x03U, 0x04U, 0x05U};
+    const auto encodedPayload = houio::NativeVdbPayload::encode(streamBytes, 4);
+    if( !encodedPayload || !encodedPayload.value || encodedPayload.value->size() != 4 )
+        return houio::test::fail("native VDB stream was not tiled correctly");
+    const auto decodedPayload = houio::NativeVdbPayload::decode(encodedPayload.value);
+    if( !decodedPayload || decodedPayload.value != streamBytes )
+        return houio::test::fail("native VDB tiled payload changed stream bytes");
+    const auto invalidPayload = houio::NativeVdbPayload::encode(
+        std::span<const houio::ubyte>(streamBytes).subspan(1), 4);
+    if( invalidPayload || invalidPayload.diagnostics.empty()
+        || invalidPayload.diagnostics.front().category
+            != houio::DiagnosticCategory::malformed_input )
+    {
+        return houio::test::fail("invalid native VDB stream magic was accepted");
+    }
+
     const houio::OpenVdbBackendInfo backend = houio::OpenVdbBackend::info();
 #if HOUIO_HAS_OPENVDB
     if( !backend.compiled || backend.version.empty() )
         return houio::test::fail("compiled OpenVDB backend did not report its version");
+    const auto encodedStream = houio::OpenVdbBackend::encodeFloatGrid(grid);
+    if( !encodedStream || !houio::NativeVdbPayload::hasOpenVdbMagic(encodedStream.value) )
+        return houio::test::fail("compiled OpenVDB backend failed in-memory encoding");
+    const auto memoryRoundTrip = houio::OpenVdbBackend::decodeFloatGrid(
+        encodedStream.value, "density");
+    if( !memoryRoundTrip
+        || memoryRoundTrip.value.activeVoxelCount() != grid.activeVoxelCount()
+        || memoryRoundTrip.value.background() != grid.background()
+        || memoryRoundTrip.value.metadata("creator") != grid.metadata("creator") )
+    {
+        return houio::test::fail("compiled OpenVDB in-memory round-trip changed grid data");
+    }
+    for( const houio::SparseFloatVoxel& voxel : grid.activeVoxels() )
+    {
+        if( !memoryRoundTrip.value.isActive(voxel.index)
+            || memoryRoundTrip.value.value(voxel.index) != voxel.value )
+        {
+            return houio::test::fail(
+                "compiled OpenVDB in-memory round-trip changed voxel topology or values");
+        }
+    }
+    const auto nativePayload = houio::NativeVdbPayload::encode(encodedStream.value);
+    if( !nativePayload )
+        return houio::test::fail("OpenVDB stream could not be wrapped as a native payload");
+    const auto unwrappedStream = houio::NativeVdbPayload::decode(nativePayload.value);
+    if( !unwrappedStream || unwrappedStream.value != encodedStream.value )
+        return houio::test::fail("native Houdini payload wrapping changed OpenVDB bytes");
+
     const std::filesystem::path vdbPath =
         std::filesystem::temp_directory_path() / "houio_sparse_grid_test.vdb";
     std::error_code removeError;

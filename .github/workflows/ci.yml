@@ -103,6 +103,46 @@ jobs:
       - name: Test
         run: ctest --preset ${{ matrix.preset }}
 
+  linux-gcc-openvdb:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install OpenVDB development package
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libopenvdb-dev
+
+      - name: Configure OpenVDB backend
+        shell: bash
+        run: |
+          openvdb_cmake_dir="$(dirname "$(dpkg -L libopenvdb-dev | grep '/FindOpenVDB.cmake$' | head -n 1)")"
+          test -n "$openvdb_cmake_dir"
+          cmake -S . -B build/linux-gcc-openvdb -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_MODULE_PATH="$openvdb_cmake_dir" \
+            -DHOUIO_ENABLE_OPENVDB=ON \
+            -DHOUIO_BUILD_TESTS=ON \
+            -DHOUIO_BUILD_TOOLS=ON \
+            -DHOUIO_WARNINGS_AS_ERRORS=ON
+
+      - name: Build OpenVDB backend
+        run: cmake --build build/linux-gcc-openvdb
+
+      - name: Test OpenVDB backend
+        run: ctest --test-dir build/linux-gcc-openvdb --output-on-failure
+
+      - name: Upload constructed native VDB fixture
+        uses: actions/upload-artifact@v7
+        with:
+          name: houio-constructed-native-vdb
+          path: build/linux-gcc-openvdb/tests/openvdb_constructed.bgeo
+          if-no-files-found: error
+
   linux-clang-fuzzer:
     runs-on: ubuntu-24.04
 

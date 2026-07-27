@@ -1,5 +1,7 @@
 #include <houio/HouGeoIO.h>
 #include <houio/GeometryIO.h>
+#include <houio/NativeVdbPayload.h>
+#include <houio/OpenVdbBackend.h>
 
 #include <algorithm>
 #include <array>
@@ -1175,6 +1177,14 @@ namespace houio
 							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
 						++topologyVertexOffset;
 					}
+					else if( auto sparseVdb = std::dynamic_pointer_cast<const HouGeoAdapter::SparseVdbPrimitive>(primitive) )
+					{
+						if( !exportPrimitive(context, sparseVdb) )
+							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a sparse VDB primitive" );
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
 					else if( auto nativeVdb = std::dynamic_pointer_cast<const HouGeoAdapter::NativeVdbPrimitive>(primitive) )
 					{
 						if( !exportPrimitive(context, nativeVdb) )
@@ -1992,6 +2002,29 @@ namespace houio
 		writer.jsonEndArray();
 		writer.jsonEndArray();
 		return true;
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::SparseVdbPrimitive::ConstPtr sparseVdb )
+	{
+		if( !sparseVdb || sparseVdb->topologyVertex() < 0 )
+			return false;
+
+		const auto encoded = OpenVdbBackend::encodeFloatGrid(sparseVdb->sparseGrid());
+		if( !encoded )
+			throwReadFailure(encoded.diagnostics,
+				"HouGeoIO could not encode SparseFloatGrid as an OpenVDB stream");
+		const auto payload = NativeVdbPayload::encode(encoded.value);
+		if( !payload )
+			throwReadFailure(payload.diagnostics,
+				"HouGeoIO could not wrap the OpenVDB stream as a Houdini VDB payload");
+
+		auto nativeVdb = std::make_shared<HouGeo::HouVdb>();
+		nativeVdb->setTopologyVertex(sparseVdb->topologyVertex());
+		nativeVdb->setSerializedPayload(payload.value);
+		return exportPrimitive(
+			context,
+			std::static_pointer_cast<const HouGeoAdapter::NativeVdbPrimitive>(nativeVdb));
 	}
 
 	bool HouGeoIO::exportPrimitive( ExportContext &context,

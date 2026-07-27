@@ -1,6 +1,7 @@
 #include <houio/GeometryIO.h>
 #include <houio/GeometryModels.h>
 #include <houio/HomManifest.h>
+#include <houio/NativeVdbPayload.h>
 #include <houio/OpenVdbBackend.h>
 #include <houio/SparseGrid.h>
 #include <houio/Writer.h>
@@ -8,6 +9,7 @@
 #include <filesystem>
 #include <iostream>
 #include <type_traits>
+#include <vector>
 
 static_assert(std::is_same_v<houio::HoudiniGeometry, houio::HouGeo>);
 static_assert(std::is_same_v<houio::SimplifiedMesh, houio::Geometry>);
@@ -44,9 +46,27 @@ int main()
         houio::Writer::capability(houio::WriterDataType::sparse_openvdb);
     houio::SparseFloatGrid sparseGrid(0.0f);
     sparseGrid.setVoxel(houio::math::V3i(1, 2, 3), 4.0f);
+    const std::vector<houio::ubyte> sampleStream{
+        0x20U, 0x42U, 0x44U, 0x56U, 0x01U, 0x02U, 0x03U};
+    const auto samplePayload = houio::NativeVdbPayload::encode(sampleStream, 4);
+    const auto sampleRoundTrip = samplePayload
+        ? houio::NativeVdbPayload::decode(samplePayload.value)
+        : houio::GeometryReadResult<std::vector<houio::ubyte>>{};
     const houio::OpenVdbBackendInfo openVdb = houio::OpenVdbBackend::info();
     const bool openVdbMetadataIsValid =
         openVdb.compiled ? !openVdb.version.empty() : openVdb.version.empty();
+    bool compiledBackendWorks = true;
+    if( openVdb.compiled )
+    {
+        sparseGrid.setName("package_consumer");
+        const auto encodedGrid = houio::OpenVdbBackend::encodeFloatGrid(sparseGrid);
+        const auto decodedGrid = encodedGrid
+            ? houio::OpenVdbBackend::decodeFloatGrid(encodedGrid.value, "package_consumer")
+            : houio::GeometryReadResult<houio::SparseFloatGrid>{};
+        compiledBackendWorks = decodedGrid
+            && decodedGrid.value.activeVoxelCount() == 1
+            && decodedGrid.value.value(houio::math::V3i(1, 2, 3)) == 4.0f;
+    }
     if (!readResult || readResult.value->primitiveCount() != 1
         || !packedCapability || !packedCapability->writable
         || !fragmentCapability || !fragmentCapability->writable
@@ -54,6 +74,8 @@ int main()
         || !sequenceCapability || !sequenceCapability->writable
         || !vdbCapability || !vdbCapability->writable
         || sparseGrid.activeVoxelCount() != 1
+        || !sampleRoundTrip || sampleRoundTrip.value != sampleStream
+        || !compiledBackendWorks
         || !openVdbMetadataIsValid
         || openVdb.detail.empty())
     {

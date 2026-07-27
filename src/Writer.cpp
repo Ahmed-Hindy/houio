@@ -96,7 +96,7 @@ namespace houio
                 "Ordered PackedDiskSequence sample references with fractional index, wrap mode, transform, and viewport metadata."},
             {WriterDataType::sparse_openvdb, WriterCapabilityLevel::supported,
                 true, true, "sparse_openvdb",
-                "Lossless opaque Houdini VDB payload pass-through; tree creation and editing require an optional OpenVDB backend."}
+                "Lossless opaque Houdini VDB payload pass-through in every build; SparseFloatGrid construction is serialized as a native Houdini VDB record when the optional OpenVDB backend is compiled."}
         };
         return values;
     }

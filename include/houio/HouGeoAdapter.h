@@ -13,6 +13,7 @@
 #include <type_traits>
 #include <vector>
 
+#include <houio/SparseGrid.h>
 #include <houio/math/Math.h>
 #include <houio/types.h>
 
@@ -261,6 +262,16 @@ namespace houio
             [[nodiscard]] virtual math::M33f transform() const;
             [[nodiscard]] virtual std::string viewportLod() const;
             [[nodiscard]] virtual bool pointInstanceTransform() const;
+        };
+
+        class SparseVdbPrimitive : public Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<SparseVdbPrimitive>;
+            using ConstPtr = std::shared_ptr<const SparseVdbPrimitive>;
+
+            [[nodiscard]] virtual int topologyVertex() const = 0;
+            [[nodiscard]] virtual const SparseFloatGrid& sparseGrid() const = 0;
         };
 
         class NativeVdbPrimitive : public Primitive

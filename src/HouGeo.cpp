@@ -589,6 +589,13 @@ namespace houio
 		m_primitives.push_back(std::move(packedDiskSequence));
 	}
 
+	void HouGeo::addPrimitive( SparseVdbPrimitive::Ptr sparseVdb )
+	{
+		if( !sparseVdb )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null sparse VDB" );
+		m_primitives.push_back(std::move(sparseVdb));
+	}
+
 	void HouGeo::addPrimitive( NativeVdbPrimitive::Ptr nativeVdb )
 	{
 		if( !nativeVdb )
@@ -2084,6 +2091,18 @@ namespace houio
 	bool HouGeo::HouPackedDiskSequence::pointInstanceTransform() const
 	{
 		return point_instance_transform_;
+	}
+
+	// HouGeo::HouSparseVdb ==============================================
+
+	int HouGeo::HouSparseVdb::topologyVertex() const
+	{
+		return topology_vertex_;
+	}
+
+	const SparseFloatGrid& HouGeo::HouSparseVdb::sparseGrid() const
+	{
+		return sparse_grid_;
 	}
 
 	int HouGeo::HouVdb::topologyVertex() const

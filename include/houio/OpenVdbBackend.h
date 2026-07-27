@@ -1,7 +1,9 @@
 #pragma once
 
 #include <filesystem>
+#include <span>
 #include <string>
+#include <vector>
 
 #include <houio/GeometryIO.h>
 #include <houio/SparseGrid.h>
@@ -31,5 +33,12 @@ namespace houio
             const SparseFloatGrid& grid,
             bool overwrite_existing = true,
             bool create_parent_directories = true);
+
+        [[nodiscard]] static GeometryReadResult<std::vector<ubyte>> encodeFloatGrid(
+            const SparseFloatGrid& grid);
+
+        [[nodiscard]] static GeometryReadResult<SparseFloatGrid> decodeFloatGrid(
+            std::span<const ubyte> openvdb_stream,
+            const std::string& grid_name = {});
     };
 }

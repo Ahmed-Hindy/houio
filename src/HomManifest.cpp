@@ -604,6 +604,71 @@ namespace houio
                         std::static_pointer_cast<
                             HouGeoAdapter::PackedDiskSequencePrimitive>(packed));
                 }
+                else if( type == "sparse_float_vdb" )
+                {
+                    const std::string gridClassName =
+                        definition->get<std::string>("grid_class", "unknown");
+                    SparseGridClass gridClass = SparseGridClass::unknown;
+                    if( gridClassName == "fog_volume" )
+                        gridClass = SparseGridClass::fog_volume;
+                    else if( gridClassName == "level_set" )
+                        gridClass = SparseGridClass::level_set;
+                    else if( gridClassName != "unknown" )
+                        failManifest(DiagnosticCategory::schema,
+                            "Sparse VDB grid class is invalid",
+                            path + ".grid_class");
+
+                    SparseFloatGrid grid(
+                        definition->get<real32>("background", 0.0f));
+                    grid.setName(definition->get<std::string>("name", ""));
+                    grid.setGridClass(gridClass);
+                    grid.setIndexToWorld(parseMatrix44(
+                        requireArray(definition, "index_to_world", path),
+                        path + ".index_to_world"));
+
+                    const std::vector<sint32> activeIndices = scalarArray<sint32>(
+                        requireArray(definition, "active_indices", path),
+                        path + ".active_indices");
+                    const std::vector<real32> activeValues = scalarArray<real32>(
+                        requireArray(definition, "active_values", path),
+                        path + ".active_values");
+                    if( activeIndices.size() % 3 != 0
+                        || activeValues.size() != activeIndices.size() / 3 )
+                    {
+                        failManifest(DiagnosticCategory::schema,
+                            "Sparse VDB active indices and values have inconsistent lengths",
+                            path + ".active_indices");
+                    }
+                    for( std::size_t valueIndex = 0;
+                        valueIndex < activeValues.size(); ++valueIndex )
+                    {
+                        const std::size_t coordinateOffset = valueIndex * 3;
+                        grid.setVoxel(
+                            math::V3i(
+                                activeIndices[coordinateOffset],
+                                activeIndices[coordinateOffset + 1],
+                                activeIndices[coordinateOffset + 2]),
+                            activeValues[valueIndex]);
+                    }
+
+                    if( const json::ObjectPtr metadata = definition->object("metadata") )
+                    {
+                        for( const std::string& key : metadata->keys() )
+                        {
+                            if( key.empty() )
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse VDB metadata key cannot be empty",
+                                    path + ".metadata");
+                            grid.setMetadata(key, metadata->get<std::string>(key));
+                        }
+                    }
+
+                    auto sparseVdb = std::make_shared<HouGeo::HouSparseVdb>();
+                    sparseVdb->setTopologyVertex(vertexOffset);
+                    sparseVdb->setSparseGrid(std::move(grid));
+                    geometry->addPrimitive(
+                        std::static_pointer_cast<HouGeoAdapter::SparseVdbPrimitive>(sparseVdb));
+                }
                 else if( type == "dense_volume" )
                 {
                     const json::ArrayPtr resolutionValues = requireArray(

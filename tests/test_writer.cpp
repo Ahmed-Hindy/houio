@@ -1,3 +1,5 @@
+#include <houio/NativeVdbPayload.h>
+#include <houio/OpenVdbBackend.h>
 #include <houio/Writer.h>
 
 #include "TestSupport.h"
@@ -328,6 +330,61 @@ namespace
         {
             return fail("Native VDB serialized payload changed");
         }
+
+        houio::HouGeo::Ptr sparseVdbGeometry = createHouGeo();
+        auto sparseVdbTopology = std::make_shared<houio::HouGeo::HouTopology>();
+        sparseVdbTopology->appendIndex(0);
+        sparseVdbGeometry->setTopology(sparseVdbTopology);
+        houio::SparseFloatGrid sparseGrid(0.0f);
+        sparseGrid.setName("density");
+        sparseGrid.setGridClass(houio::SparseGridClass::fog_volume);
+        sparseGrid.setIndexToWorld(houio::math::M44f(
+            0.5f, 0.0f, 0.0f, 0.0f,
+            0.0f, 0.5f, 0.0f, 0.0f,
+            0.0f, 0.0f, 0.5f, 0.0f,
+            -0.75f, -0.75f, -0.75f, 1.0f));
+        sparseGrid.setVoxel(houio::math::V3i(1, 1, 1), 1.0f);
+        sparseGrid.setVoxel(houio::math::V3i(2, 1, 1), 2.0f);
+        auto sparseVdb = std::make_shared<houio::HouGeo::HouSparseVdb>();
+        sparseVdb->setTopologyVertex(0);
+        sparseVdb->setSparseGrid(std::move(sparseGrid));
+        sparseVdbGeometry->addPrimitive(
+            std::static_pointer_cast<houio::HouGeoAdapter::SparseVdbPrimitive>(sparseVdb));
+        const std::filesystem::path sparseVdbPath = directory / "constructed_vdb.bgeo";
+        const houio::WriteResult sparseWrite = houio::Writer::write(
+            sparseVdbPath,
+            std::static_pointer_cast<houio::HouGeoAdapter>(sparseVdbGeometry));
+#if HOUIO_HAS_OPENVDB
+        if( !sparseWrite )
+            return fail("OpenVDB-enabled writer failed to construct native VDB payload");
+        const auto sparseResult = houio::GeometryIO::readHouGeo(sparseVdbPath);
+        if( !sparseResult || sparseResult.value->primitiveCount() != 1 )
+            return fail("Constructed native VDB payload did not round-trip");
+        const auto constructedVdb = std::dynamic_pointer_cast<houio::HouGeo::HouVdb>(
+            sparseResult.value->primitives().front());
+        if( !constructedVdb || !constructedVdb->serializedPayload() )
+            return fail("Constructed native VDB payload is missing");
+        const auto stream = houio::NativeVdbPayload::decode(
+            constructedVdb->serializedPayload());
+        if( !stream )
+            return fail("Constructed native VDB payload could not be decoded");
+        const auto decodedGrid = houio::OpenVdbBackend::decodeFloatGrid(stream.value, "density");
+        if( !decodedGrid || decodedGrid.value.activeVoxelCount() != 2
+            || decodedGrid.value.value(houio::math::V3i(1, 1, 1)) != 1.0f
+            || decodedGrid.value.value(houio::math::V3i(2, 1, 1)) != 2.0f )
+        {
+            return fail("Constructed native VDB payload changed sparse voxel data");
+        }
+#else
+        if( sparseWrite || sparseWrite.diagnostics.empty()
+            || sparseWrite.diagnostics.front().category
+                != houio::DiagnosticCategory::unsupported_input )
+        {
+            return fail("Backend-off sparse VDB write did not return an unsupported diagnostic");
+        }
+        if( std::filesystem::exists(sparseVdbPath) )
+            return fail("Backend-off sparse VDB write created a partial file");
+#endif
 
         houio::HouGeo::Ptr cyclicGeometry = createHouGeo();
         auto cyclicTopology = std::make_shared<houio::HouGeo::HouTopology>();
