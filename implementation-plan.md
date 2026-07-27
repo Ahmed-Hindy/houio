@@ -1020,6 +1020,25 @@ Goals:
 - Provide dependency-neutral sparse FloatGrid editing in every build and native `.vdb` FloatGrid I/O when OpenVDB is enabled.
 - Generate Houdini's serialized native VDB primitive payload from sparse grids and extract exact scalar Float VDBs through the live-HOM manifest boundary.
 
+### Phase 37 — Active-tile manifest construction
+
+**Status: complete locally.**
+
+Goals:
+
+- Extend `sparse_float_vdb` manifests with optional bounded active FloatGrid tiles.
+- Define inclusive integer bounds and explicit voxel-over-tile value precedence.
+- Reject malformed bounds, missing or non-finite values, and duplicate tile bounds with structured schema diagnostics.
+- Exercise manifest parsing, primary CLI construction, installed-package consumption, and manifest-to-native VDB round trips.
+- Keep live HOM extraction conservative because HOM does not expose exact active-tile topology.
+
+Exit criteria:
+
+- Explicit manifests can construct native tiled FloatGrid payloads without densification.
+- Backend-off builds continue to parse the dependency-neutral sparse model and reject native output cleanly.
+- Capability and compatibility documentation distinguish explicit tile construction from unsupported live extraction.
+- Strict, package-consumer, and OpenVDB-enabled validation pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
@@ -1028,7 +1047,8 @@ The following remain separate from the active product-facing phases unless requi
 - Lossless point/vertex-domain redesign.
 - [x] Dependency-neutral sparse FloatGrid construction/editing and optional OpenVDB `.vdb` I/O.
 - [x] Native Houdini VDB payload generation from sparse grids and exact scalar Float VDB live-HOM extraction.
-- [ ] Active tile, ambiguous-activity, nonlinear transform, integer-grid, and vector-grid support.
+- [x] Active FloatGrid tile representation and explicit manifest construction.
+- [ ] Ambiguous live-HOM activity extraction, nonlinear transforms, integer-grid, and vector-grid support.
 - Performance architecture changes that bypass the JSON tree.
 - Project-wide licensing and third-party provenance resolution.
 

@@ -19,6 +19,13 @@
       ],
       "active_indices": [1, 1, 1, 2, 1, 1],
       "active_values": [1.0, 2.0],
+      "active_tiles": [
+        {
+          "minimum": [-8, -8, -8],
+          "maximum": [-1, -1, -1],
+          "value": 0.25
+        }
+      ],
       "metadata": {
         "creator": "HouIO native VDB construction test"
       }

@@ -4,13 +4,13 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `feat/houdini-native-vdb-payload`
-- Baseline commit: `8aad199` (`master` after merged PR #38).
+- Branch: `feat/vdb-active-tile-manifests`
+- Baseline commit: `c7de60e` (`master` after merged PR #40).
 - Current exact source: MSVC warnings-as-errors/Houdini suite passes **61/61**.
-- Current exact source: Windows AddressSanitizer passes **25/25** and MSVC native analysis is error-clean.
+- Current exact source: Windows AddressSanitizer passes **61/61** and MSVC native analysis is error-clean.
 - The 19-fixture and Houdini package matrices pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Direct scalar Float VDB extraction, including ambiguous-activity rejection, passes in all four maintained Houdini versions.
-- The active branch adds standard-stream/native-payload conversion, constructed sparse VDB primitives, exact live-HOM extraction, and an OpenVDB-enabled Linux CI gate.
+- The active branch extends `sparse_float_vdb` manifests with validated bounded active tiles and verifies manifest-to-native VDB construction without densification.
 
 ## Modernization completed
 
@@ -99,7 +99,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Preserve native sparse VDB primitive payloads without forced densification during file round trips.
 - [x] Add a dependency-neutral sparse FloatGrid model and optional OpenVDB `.vdb` FloatGrid backend.
 - [x] Generate native Houdini VDB primitive payloads from the sparse-grid model and wire exact scalar Float VDB live-HOM extraction.
-- [ ] Continue with curves, instancing, height fields, and other observed records one family at a time.
+- [x] Preserve active FloatGrid tiles in the sparse model and construct them through explicit `houio.hom/1` manifests.
+- [ ] Continue with typed integer/vector VDB grids, then curves, instancing, height fields, and other observed records one family at a time.
 
 ## Modernization completed follow-up
 
@@ -209,7 +210,8 @@ Add fixture-backed support one record type at a time:
 - [ ] Support additional observed compression types.
 - [ ] Investigate additional outer wrappers only when representative fixtures are available.
 - [x] Define an optional public OpenVDB adapter with sparse FloatGrid preservation.
-- [ ] Add active tile, nonlinear transform, ambiguous-activity, integer-grid, and vector-grid support.
+- [x] Add active FloatGrid tile support in the sparse model, optional OpenVDB backend, and explicit manifests.
+- [ ] Add nonlinear transform, ambiguous live-HOM activity extraction, integer-grid, and vector-grid support.
 
 ## P2 — Data model
 

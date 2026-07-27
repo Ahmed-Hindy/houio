@@ -45,6 +45,11 @@ int main()
     const auto vdbCapability =
         houio::Writer::capability(houio::WriterDataType::sparse_openvdb);
     houio::SparseFloatGrid sparseGrid(0.0f);
+    sparseGrid.addActiveTile(
+        houio::SparseIndexBounds{
+            houio::math::V3i(-8, -8, -8),
+            houio::math::V3i(-1, -1, -1)},
+        2.0f);
     sparseGrid.setVoxel(houio::math::V3i(1, 2, 3), 4.0f);
     const std::vector<houio::ubyte> sampleStream{
         0x20U, 0x42U, 0x44U, 0x56U, 0x01U, 0x02U, 0x03U};
@@ -65,6 +70,8 @@ int main()
             : houio::GeometryReadResult<houio::SparseFloatGrid>{};
         compiledBackendWorks = decodedGrid
             && decodedGrid.value.activeVoxelCount() == 1
+            && decodedGrid.value.activeTileCount() != 0
+            && decodedGrid.value.value(houio::math::V3i(-4, -4, -4)) == 2.0f
             && decodedGrid.value.value(houio::math::V3i(1, 2, 3)) == 4.0f;
     }
     if (!readResult || readResult.value->primitiveCount() != 1
@@ -74,6 +81,7 @@ int main()
         || !sequenceCapability || !sequenceCapability->writable
         || !vdbCapability || !vdbCapability->writable
         || sparseGrid.activeVoxelCount() != 1
+        || sparseGrid.activeTileCount() != 1
         || !sampleRoundTrip || sampleRoundTrip.value != sampleStream
         || !compiledBackendWorks
         || !openVdbMetadataIsValid

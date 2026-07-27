@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <fstream>
 #include <limits>
@@ -626,35 +627,125 @@ namespace houio
                         requireArray(definition, "index_to_world", path),
                         path + ".index_to_world"));
 
-                    const std::vector<sint32> activeIndices = scalarArray<sint32>(
-                        requireArray(definition, "active_indices", path),
-                        path + ".active_indices");
-                    const std::vector<real32> activeValues = scalarArray<real32>(
-                        requireArray(definition, "active_values", path),
-                        path + ".active_values");
-                    if( activeIndices.size() % 3 != 0
-                        || activeValues.size() != activeIndices.size() / 3 )
+                    const bool hasActiveIndices = definition->contains("active_indices");
+                    const bool hasActiveValues = definition->contains("active_values");
+                    if( hasActiveIndices != hasActiveValues )
                     {
                         failManifest(DiagnosticCategory::schema,
-                            "Sparse VDB active indices and values have inconsistent lengths",
-                            path + ".active_indices");
+                            "Sparse VDB active_indices and active_values must be provided together",
+                            path);
                     }
-                    for( std::size_t valueIndex = 0;
-                        valueIndex < activeValues.size(); ++valueIndex )
+                    if( hasActiveIndices )
                     {
-                        const std::size_t coordinateOffset = valueIndex * 3;
-                        grid.setVoxel(
-                            math::V3i(
-                                activeIndices[coordinateOffset],
-                                activeIndices[coordinateOffset + 1],
-                                activeIndices[coordinateOffset + 2]),
-                            activeValues[valueIndex]);
-                    }
-                    if( grid.activeVoxelCount() != activeValues.size() )
-                    {
-                        failManifest(DiagnosticCategory::schema,
-                            "Sparse VDB active indices contain duplicate coordinates",
+                        const std::vector<sint32> activeIndices = scalarArray<sint32>(
+                            requireArray(definition, "active_indices", path),
                             path + ".active_indices");
+                        const std::vector<real32> activeValues = scalarArray<real32>(
+                            requireArray(definition, "active_values", path),
+                            path + ".active_values");
+                        if( activeIndices.size() % 3 != 0
+                            || activeValues.size() != activeIndices.size() / 3 )
+                        {
+                            failManifest(DiagnosticCategory::schema,
+                                "Sparse VDB active indices and values have inconsistent lengths",
+                                path + ".active_indices");
+                        }
+                        for( std::size_t valueIndex = 0;
+                            valueIndex < activeValues.size(); ++valueIndex )
+                        {
+                            const std::size_t coordinateOffset = valueIndex * 3;
+                            grid.setVoxel(
+                                math::V3i(
+                                    activeIndices[coordinateOffset],
+                                    activeIndices[coordinateOffset + 1],
+                                    activeIndices[coordinateOffset + 2]),
+                                activeValues[valueIndex]);
+                        }
+                        if( grid.activeVoxelCount() != activeValues.size() )
+                        {
+                            failManifest(DiagnosticCategory::schema,
+                                "Sparse VDB active indices contain duplicate coordinates",
+                                path + ".active_indices");
+                        }
+                    }
+
+                    if( definition->contains("active_tiles") )
+                    {
+                        const json::ArrayPtr activeTiles =
+                            requireArray(definition, "active_tiles", path);
+                        const std::size_t tileCount =
+                            checkedSize(activeTiles->size(), path + ".active_tiles");
+                        std::vector<SparseIndexBounds> parsedBounds;
+                        parsedBounds.reserve(tileCount);
+                        for( std::size_t tileIndex = 0; tileIndex < tileCount; ++tileIndex )
+                        {
+                            const std::string tilePath = path + ".active_tiles["
+                                + std::to_string(tileIndex) + "]";
+                            const json::ObjectPtr tile =
+                                activeTiles->object(static_cast<int>(tileIndex));
+                            if( !tile )
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse VDB active tile must be an object", tilePath);
+
+                            const std::vector<sint32> minimum = scalarArray<sint32>(
+                                requireArray(tile, "minimum", tilePath),
+                                tilePath + ".minimum");
+                            const std::vector<sint32> maximum = scalarArray<sint32>(
+                                requireArray(tile, "maximum", tilePath),
+                                tilePath + ".maximum");
+                            if( minimum.size() != 3 || maximum.size() != 3 )
+                            {
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse VDB active tile bounds must contain three integers",
+                                    tilePath);
+                            }
+                            if( !tile->contains("value") )
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse VDB active tile requires a value",
+                                    tilePath + ".value");
+                            real32 value = 0.0f;
+                            try
+                            {
+                                value = tile->get<real32>("value");
+                            }
+                            catch( const std::exception& exception )
+                            {
+                                failManifest(DiagnosticCategory::schema,
+                                    "Invalid sparse VDB active tile value: "
+                                        + std::string(exception.what()),
+                                    tilePath + ".value");
+                            }
+                            if( !std::isfinite(value) )
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse VDB active tile value must be finite",
+                                    tilePath + ".value");
+
+                            const SparseIndexBounds bounds{
+                                math::V3i(minimum[0], minimum[1], minimum[2]),
+                                math::V3i(maximum[0], maximum[1], maximum[2])};
+                            if( bounds.minimum.x > bounds.maximum.x
+                                || bounds.minimum.y > bounds.maximum.y
+                                || bounds.minimum.z > bounds.maximum.z )
+                            {
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse VDB active tile bounds must be ordered",
+                                    tilePath);
+                            }
+                            const auto duplicate = std::find_if(
+                                parsedBounds.begin(), parsedBounds.end(),
+                                [&](const SparseIndexBounds& existing)
+                                {
+                                    return existing.minimum == bounds.minimum
+                                        && existing.maximum == bounds.maximum;
+                                });
+                            if( duplicate != parsedBounds.end() )
+                                failManifest(DiagnosticCategory::schema,
+                                    "Sparse VDB active tiles contain duplicate bounds",
+                                    tilePath);
+
+                            parsedBounds.push_back(bounds);
+                            grid.addActiveTile(bounds, value);
+                        }
                     }
 
                     if( const json::ObjectPtr metadata = definition->object("metadata") )
