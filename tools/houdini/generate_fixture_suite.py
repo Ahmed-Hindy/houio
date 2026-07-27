@@ -624,6 +624,46 @@ def build_curves_geometry() -> hou.Geometry:
     return geometry
 
 
+def build_quadrics_geometry() -> hou.Geometry:
+    """Build transformed native sphere and capped tapered tube records."""
+    object_context = hou.node("/obj")
+    if object_context is None:
+        raise RuntimeError("Houdini object context is unavailable")
+    container = object_context.createNode("geo", "houio_quadric_fixture")
+    for child in container.children():
+        child.destroy()
+    try:
+        sphere_node = container.createNode("sphere", "sphere")
+        sphere_node.parm("type").set("prim")
+        sphere_node.parmTuple("rad").set((2.0, 3.0, 4.0))
+        sphere_node.parmTuple("t").set((1.0, 2.0, 3.0))
+        sphere_node.parmTuple("r").set((10.0, 20.0, 30.0))
+        sphere_node.cook(force=True)
+
+        tube_node = container.createNode("tube", "tube")
+        tube_node.parm("type").set("prim")
+        tube_node.parm("cap").set(1)
+        tube_node.parm("rad1").set(2.0)
+        tube_node.parm("rad2").set(1.0)
+        tube_node.parm("height").set(5.0)
+        tube_node.parmTuple("t").set((-1.0, 0.5, 2.0))
+        tube_node.parmTuple("r").set((5.0, 15.0, 25.0))
+        tube_node.cook(force=True)
+
+        geometry = hou.Geometry()
+        geometry.merge(sphere_node.geometry())
+        geometry.merge(tube_node.geometry())
+    finally:
+        container.destroy()
+
+    sphere, tube = geometry.prims()
+    kind = geometry.addAttrib(hou.attribType.Prim, "quadric_kind", "")
+    sphere.setAttribValue(kind, "sphere")
+    tube.setAttribValue(kind, "tube")
+    geometry.createPrimGroup("quadrics").add((sphere, tube))
+    return geometry
+
+
 def geometry_summary(geometry: hou.Geometry) -> dict[str, object]:
     """Create a deterministic summary of generated geometry.
 
@@ -680,6 +720,7 @@ def main() -> int:
         ("uv_seam", build_uv_seam_geometry, ()),
         ("multiple_polygon_runs", build_multiple_polygon_runs_geometry, ()),
         ("curves", build_curves_geometry, ()),
+        ("quadrics", build_quadrics_geometry, ()),
         ("global_attributes", build_global_attributes_geometry, ()),
         ("dense_volume", build_dense_volume_geometry, ()),
         ("native_vdb", build_native_vdb_geometry, ()),

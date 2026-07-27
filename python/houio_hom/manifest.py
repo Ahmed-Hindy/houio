@@ -467,6 +467,24 @@ def _primitive_manifest(primitive: hou.Prim) -> dict[str, Any]:
             "treat_as_folder": bool(primitive.intrinsicValue("treatasfolder")),
             "embedded_manifest": geometry_manifest(primitive.getEmbeddedGeometry()),
         }
+    if type_name in {"Sphere", "Tube"}:
+        transform = [float(value) for value in primitive.intrinsicValue("transform")]
+        if len(transform) != 9 or any(not math.isfinite(value) for value in transform):
+            raise UnsupportedHOMDataError(
+                f"{type_name} contains an invalid 3x3 transform"
+            )
+        result: dict[str, Any] = {
+            "type": "sphere" if type_name == "Sphere" else "tube",
+            "vertex_offset": vertex_offset,
+            "transform": transform,
+        }
+        if type_name == "Tube":
+            taper = float(primitive.intrinsicValue("tubetaper"))
+            if not math.isfinite(taper):
+                raise UnsupportedHOMDataError("Tube taper must be finite")
+            result["caps"] = bool(primitive.intrinsicValue("closed"))
+            result["taper"] = taper
+        return result
     if type_name in {"NURBSCurve", "BezierCurve"}:
         if type_name == "NURBSCurve":
             raise UnsupportedHOMDataError(

@@ -174,6 +174,8 @@ namespace houio
                 packed_disk_sequence,
                 native_vdb,
                 curve,
+                sphere,
+                tube,
             };
 
             virtual ~Primitive() = default;
@@ -305,6 +307,33 @@ namespace houio
             /// Opaque Houdini VDB payload retained for lossless file round trips.
             /// Constructing or editing sparse trees requires an optional OpenVDB backend.
             [[nodiscard]] virtual std::shared_ptr<json::Array> serializedPayload() const = 0;
+        };
+
+        class QuadricPrimitive : public Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<QuadricPrimitive>;
+            using ConstPtr = std::shared_ptr<const QuadricPrimitive>;
+
+            [[nodiscard]] virtual int topologyVertex() const = 0;
+            [[nodiscard]] virtual math::M33f transform() const = 0;
+        };
+
+        class SpherePrimitive : public QuadricPrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<SpherePrimitive>;
+            using ConstPtr = std::shared_ptr<const SpherePrimitive>;
+        };
+
+        class TubePrimitive : public QuadricPrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<TubePrimitive>;
+            using ConstPtr = std::shared_ptr<const TubePrimitive>;
+
+            [[nodiscard]] virtual bool hasCaps() const;
+            [[nodiscard]] virtual real32 taper() const;
         };
 
         class CurvePrimitive : public Primitive

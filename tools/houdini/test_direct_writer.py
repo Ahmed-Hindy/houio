@@ -111,6 +111,28 @@ def create_source_geometry(output_directory: Path) -> hou.Geometry:
     packed_sequence.setIntrinsicValue("index", 1.5)
     packed_sequence.setIntrinsicValue("wrap", "mirror")
 
+    quadric_container = obj.createNode("geo", "houio_direct_writer_quadrics")
+    for child in quadric_container.children():
+        child.destroy()
+    sphere_node = quadric_container.createNode("sphere", "sphere")
+    sphere_node.parm("type").set("prim")
+    sphere_node.parmTuple("rad").set((2.0, 3.0, 4.0))
+    sphere_node.parmTuple("t").set((1.0, 2.0, 3.0))
+    sphere_node.cook(force=True)
+    geometry.merge(sphere_node.geometry())
+    tube_node = quadric_container.createNode("tube", "tube")
+    tube_node.parm("type").set("prim")
+    tube_node.parm("cap").set(1)
+    tube_node.parm("rad1").set(2.0)
+    tube_node.parm("rad2").set(1.0)
+    tube_node.parm("height").set(5.0)
+    tube_node.parmTuple("t").set((-1.0, 0.5, 2.0))
+    tube_node.cook(force=True)
+    geometry.merge(tube_node.geometry())
+    quadric_container.destroy()
+    sphere = geometry.prims()[-2]
+    tube = geometry.prims()[-1]
+
     label = geometry.addAttrib(hou.attribType.Point, "label", "")
     for point in geometry.points():
         point.setAttribValue(label, f"point_{point.number()}")
@@ -126,6 +148,8 @@ def create_source_geometry(output_directory: Path) -> hou.Geometry:
     packed.setAttribValue(primitive_kind, "packed")
     packed_disk.setAttribValue(primitive_kind, "packed_disk")
     packed_sequence.setAttribValue(primitive_kind, "packed_sequence")
+    sphere.setAttribValue(primitive_kind, "sphere")
+    tube.setAttribValue(primitive_kind, "tube")
     geometry.setGlobalAttribValue(
         geometry.addAttrib(hou.attribType.Global, "asset", ""),
         "direct_writer",
@@ -137,6 +161,7 @@ def create_source_geometry(output_directory: Path) -> hou.Geometry:
     geometry.createPrimGroup("volumes").add(volume)
     geometry.createPrimGroup("packed_disks").add(packed_disk)
     geometry.createPrimGroup("packed_sequences").add(packed_sequence)
+    geometry.createPrimGroup("quadrics").add((sphere, tube))
     return geometry
 
 
@@ -144,14 +169,14 @@ def validate_output(path: Path) -> None:
     """Use Houdini's reader to verify the file produced by HouIO."""
     result = hou.Geometry()
     result.loadFromFile(str(path))
-    if len(result.points()) != 13:
+    if len(result.points()) != 15:
         raise AssertionError("Direct writer did not preserve point count")
     vertex_count = (
         result.vertexCount()
         if hasattr(result, "vertexCount")
         else sum(len(primitive.vertices()) for primitive in result.prims())
     )
-    if vertex_count != 13 or len(result.prims()) != 6:
+    if vertex_count != 15 or len(result.prims()) != 8:
         raise AssertionError("Direct writer did not preserve topology or primitives")
     if result.findPointAttrib("label") is None:
         raise AssertionError("Direct writer lost point string attributes")
@@ -170,6 +195,7 @@ def validate_output(path: Path) -> None:
         or result.findPrimGroup("volumes") is None
         or result.findPrimGroup("packed_disks") is None
         or result.findPrimGroup("packed_sequences") is None
+        or result.findPrimGroup("quadrics") is None
     ):
         raise AssertionError("Direct writer lost primitive groups")
 
@@ -194,6 +220,26 @@ def validate_output(path: Path) -> None:
         float(bezier_result.vertices()[2].point().attribValue(weights)), 0.5
     ):
         raise AssertionError("Direct writer changed rational curve weights")
+
+    quadrics = [
+        primitive
+        for primitive in result.prims()
+        if primitive.type().name() in {"Sphere", "Tube"}
+    ]
+    if [primitive.type().name() for primitive in quadrics] != ["Sphere", "Tube"]:
+        raise AssertionError("Direct writer did not preserve native quadric records")
+    sphere_result, tube_result = quadrics
+    if tuple(float(value) for value in sphere_result.intrinsicValue("transform")) != (
+        2.0, 0.0, 0.0, 0.0, 0.0, -4.0, 0.0, 3.0, 0.0
+    ):
+        raise AssertionError("Direct writer changed sphere transform")
+    if (
+        tuple(float(value) for value in tube_result.intrinsicValue("transform"))
+        != (1.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 1.0)
+        or int(tube_result.intrinsicValue("closed")) != 1
+        or not math.isclose(float(tube_result.intrinsicValue("tubetaper")), 2.0)
+    ):
+        raise AssertionError("Direct writer changed tube transform, caps, or taper")
 
     packed_primitives = [
         primitive

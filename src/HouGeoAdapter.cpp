@@ -277,6 +277,16 @@ namespace houio
         return false;
     }
 
+    bool HouGeoAdapter::TubePrimitive::hasCaps() const
+    {
+        return false;
+    }
+
+    real32 HouGeoAdapter::TubePrimitive::taper() const
+    {
+        return 1.0f;
+    }
+
     bool HouGeoAdapter::CurvePrimitive::endInterpolation() const
     {
         return true;

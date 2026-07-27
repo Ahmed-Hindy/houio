@@ -159,7 +159,7 @@ Open a SOP network and press **Tab > HouIO**.
 
 Writes the selected cooked SOP through direct HOM extraction and HouIO's custom C++ serializer. The primary path does not call `hou.Geometry.data()` or `hou.Geometry.saveToFile()`.
 
-Supported live records include polygons, Bezier curves, dense scalar volumes, embedded `hou.PackedGeometry`, external `PackedDisk`, and `PackedDiskSequence` references, together with maintained point, vertex, primitive, and global attributes and groups. NURBS curves are supported by file round trips and explicit manifests; direct HOM extraction rejects them because HOM does not expose endpoint-interpolation policy.
+Supported live records include polygons, Bezier curves, native Sphere and Tube records, dense scalar volumes, embedded `hou.PackedGeometry`, external `PackedDisk`, and `PackedDiskSequence` references, together with maintained point, vertex, primitive, and global attributes and groups. NURBS curves are supported by file round trips and explicit manifests; direct HOM extraction rejects them because HOM does not expose endpoint-interpolation policy.
 
 ### HouIO Round Trip
 
@@ -182,11 +182,11 @@ Reports the active package root, Houdini version, primary writer path and `houio
 
 ## Supported data
 
-The package supports HouIO's polygon, NURBS and Bezier curve, embedded `PackedGeometry`, named `PackedFragment`, external `PackedDisk`, `PackedDiskSequence`, numeric/string/dictionary attribute, group, and dense scalar-volume model. Packed-disk authored filenames, expansion frames/policies, transforms, viewport LOD, and flags are preserved without opening or copying the referenced file. Packed-disk sequences additionally preserve their ordered sample lists, fractional index, and wrap mode. Houdini Volume Visualization detail metadata is preserved in both the scalar-attribute layout used by Houdini 20.x and the dictionary layout used by Houdini 21.x and newer.
+The package supports HouIO's polygon, NURBS and Bezier curve, native Sphere and Tube, embedded `PackedGeometry`, named `PackedFragment`, external `PackedDisk`, `PackedDiskSequence`, numeric/string/dictionary attribute, group, and dense scalar-volume model. Packed-disk authored filenames, expansion frames/policies, transforms, viewport LOD, and flags are preserved without opening or copying the referenced file. Packed-disk sequences additionally preserve their ordered sample lists, fractional index, and wrap mode. Houdini Volume Visualization detail metadata is preserved in both the scalar-attribute layout used by Houdini 20.x and the dictionary layout used by Houdini 21.x and newer.
 
 Existing native VDB primitive payloads are preserved losslessly by file-to-file HouIO round trips. The standalone C++ API includes dependency-neutral sparse FloatGrid, Int32Grid, and Vec3fGrid editing. A separately built OpenVDB-enabled library exposes standalone `.vdb` I/O through `OpenVdbBackend` and can construct Houdini-native VDB primitive payloads from all three models, including Vec3 transformation semantics and staggered-grid class. The default distributed Houdini package is backend-off: its CLI preserves existing native payloads but does not expose standalone `.vdb` read/write or constructed sparse VDB output. Live HOM extraction remains limited to exact scalar Float VDBs and rejects ambiguous activity or non-Float value types rather than approximating them. The compatibility round-trip path can still densify supported Float SDF/Fog grids and restore their class.
 
-File-to-file conversion preserves packed fragments, and direct **Write Selected Geometry** supports both `PackedDisk` and `PackedDiskSequence` references. Direct extraction of `hou.PackedFragment` remains unavailable because HOM does not expose its embedded source detail. Other unsupported examples include agents, height fields, ambiguous or tiled live VDB activity, and direct Int32 or Vec3f live-HOM extraction.
+File-to-file conversion preserves packed fragments, and direct **Write Selected Geometry** supports both `PackedDisk` and `PackedDiskSequence` references. Direct extraction of `hou.PackedFragment` remains unavailable because HOM does not expose its embedded source detail. Other unsupported examples include agents, tetrahedra, height fields, ambiguous or tiled live VDB activity, and direct Int32 or Vec3f live-HOM extraction.
 
 ## Runtime model
 

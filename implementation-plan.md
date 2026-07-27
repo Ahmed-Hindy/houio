@@ -65,10 +65,10 @@ Every phase must preserve these constraints:
 
 ## Current validation status
 
-- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **65/65**.
-- Current exact source: Windows AddressSanitizer matrix passes **65/65**.
+- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **69/69**.
+- Current exact source: Windows AddressSanitizer matrix passes **69/69**.
 - MSVC native static analysis is error-clean.
-- The 20-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- The 21-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Exact scalar Float VDB live-HOM extraction and ambiguous-activity rejection pass in all four maintained Houdini versions.
 - Documentation records the primary Writer/CLI/HOM workflow, packed record support, opaque native VDB preservation, constructed native payloads, and remaining sparse-grid limitations.
 - Phases 11–31 are merged into `master` through PRs #31 and #32.
@@ -1085,7 +1085,7 @@ Exit criteria:
 
 ### Phase 40 — Faithful NURBS and Bezier curves
 
-**Status: complete locally on `feat/nurbs-bezier-curves`; pending merge.**
+**Status: complete and merged through PR #44.**
 
 Goals:
 
@@ -1105,6 +1105,29 @@ Exit criteria:
 - Malformed basis names, topology indices, orders, knot vectors, and incompatible Bezier vertex counts are rejected.
 - Explicit manifests construct both curve families, and direct HOM extraction preserves Bezier records without native Houdini file writers.
 - The 20-fixture matrix passes in Houdini 20.0, 20.5, 21.0, and 22.0.
+- Strict, AddressSanitizer, static-analysis, package-consumer, and maintained Houdini validation pass.
+
+### Phase 41 — Native Sphere and Tube records
+
+**Status: complete locally on `feat/spheres-tubes`; pending merge.**
+
+Goals:
+
+- Add a common `QuadricPrimitive` adapter with distinct `SpherePrimitive` and `TubePrimitive` interfaces.
+- Add concrete `HouSphere` and `HouTube` records without changing existing public enum numeric values.
+- Preserve each record's topology vertex and exact 3×3 transform.
+- Preserve Tube cap state and taper without deriving or tessellating geometry.
+- Read and write native `Sphere` and `Tube` Houdini records.
+- Add explicit `sphere` and `tube` manifest construction.
+- Add exact direct HOM extraction from Houdini quadric intrinsics.
+- Add quadric capability reporting and separate CLI sphere/tube counts.
+
+Exit criteria:
+
+- Transformed spheres and capped tapered tubes survive binary, manifest, direct-writer, package, and maintained Houdini round trips.
+- Point, primitive-attribute, and primitive-group domains remain exact.
+- Missing, malformed, out-of-range, and non-finite quadric metadata are rejected.
+- The 21-fixture matrix passes in Houdini 20.0, 20.5, 21.0, and 22.0.
 - Strict, AddressSanitizer, static-analysis, package-consumer, and maintained Houdini validation pass.
 
 ## Deferred work

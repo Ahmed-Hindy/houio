@@ -275,6 +275,10 @@ Topology values are point indices. Primitive records refer to topology ranges, n
 
 `CurvePrimitive` and `HouCurve` preserve NURBS and Bezier basis metadata, topology vertices, closure, order, knots, and NURBS endpoint interpolation. Rational weights remain ordinary `Pw` point attributes. Direct HOM extraction supports Bezier curves; NURBS extraction is rejected because HOM does not expose the serialized endpoint-interpolation flag, so use file round trips or explicit manifests for exact NURBS data.
 
+### Quadrics
+
+`QuadricPrimitive` is the common native-record base for `SpherePrimitive` and `TubePrimitive`. `HouSphere` and `HouTube` preserve one topology vertex and the exact Houdini 3×3 transform; tubes also preserve cap state and taper. Direct HOM extraction and explicit `sphere`/`tube` manifests use those native fields without tessellation.
+
 ### Volumes
 
 `readVolume()` returns the first dense scalar volume and warns when more are present. Use `readVolumes()` when every volume must be retained.

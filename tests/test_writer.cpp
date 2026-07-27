@@ -12,6 +12,7 @@
 static_assert(static_cast<int>(houio::WriterDataType::sparse_openvdb) == 6);
 static_assert(static_cast<int>(houio::WriterDataType::packed_disk_sequence) == 7);
 static_assert(static_cast<int>(houio::WriterDataType::curves) == 8);
+static_assert(static_cast<int>(houio::WriterDataType::quadrics) == 9);
 
 namespace
 {
@@ -586,6 +587,14 @@ namespace
             || curves->detail.find("NURBS") == std::string::npos )
         {
             return fail("Curve capability contract is incorrect");
+        }
+        const auto quadrics = houio::Writer::capability(
+            houio::WriterDataType::quadrics);
+        if( !quadrics || quadrics->level != houio::WriterCapabilityLevel::supported
+            || !quadrics->readable || !quadrics->writable
+            || quadrics->detail.find("Sphere") == std::string::npos )
+        {
+            return fail("Quadric capability contract is incorrect");
         }
         const auto vdb = houio::Writer::capability(
             houio::WriterDataType::sparse_openvdb);

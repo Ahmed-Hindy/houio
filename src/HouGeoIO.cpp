@@ -1209,6 +1209,22 @@ namespace houio
 							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
 						++topologyVertexOffset;
 					}
+					else if( auto sphere = std::dynamic_pointer_cast<const HouGeoAdapter::SpherePrimitive>(primitive) )
+					{
+						if( !exportPrimitive(context, sphere) )
+							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a sphere primitive" );
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
+					else if( auto tube = std::dynamic_pointer_cast<const HouGeoAdapter::TubePrimitive>(primitive) )
+					{
+						if( !exportPrimitive(context, tube) )
+							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a tube primitive" );
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
 					else if( auto curve = std::dynamic_pointer_cast<const HouGeoAdapter::CurvePrimitive>(primitive) )
 					{
 						if( !exportPrimitive(context, curve) )
@@ -2123,6 +2139,64 @@ namespace houio
 		writer.jsonInt32(nativeVdb->topologyVertex());
 		writer.jsonString("vdb");
 		writeJsonValue(writer, json::Value::createArray(nativeVdb->serializedPayload()));
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		return true;
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::SpherePrimitive::ConstPtr sphere )
+	{
+		if( !sphere || sphere->topologyVertex() < 0 )
+			return false;
+		const math::M33f transform = sphere->transform();
+		if( std::any_of(std::begin(transform.ma), std::end(transform.ma),
+				[](real32 value) { return !std::isfinite(value); }) )
+		{
+			return false;
+		}
+		json::BinaryWriter& writer = context.writer;
+		writer.jsonBeginArray();
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString("Sphere");
+		writer.jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonString("vertex");
+		writer.jsonInt32(sphere->topologyVertex());
+		writer.jsonString("transform");
+		writer.jsonUniformArray(std::span<const real32>(transform.ma));
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		return true;
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::TubePrimitive::ConstPtr tube )
+	{
+		if( !tube || tube->topologyVertex() < 0 || !std::isfinite(tube->taper()) )
+			return false;
+		const math::M33f transform = tube->transform();
+		if( std::any_of(std::begin(transform.ma), std::end(transform.ma),
+				[](real32 value) { return !std::isfinite(value); }) )
+		{
+			return false;
+		}
+		json::BinaryWriter& writer = context.writer;
+		writer.jsonBeginArray();
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString("Tube");
+		writer.jsonEndArray();
+		writer.jsonBeginArray();
+		writer.jsonString("vertex");
+		writer.jsonInt32(tube->topologyVertex());
+		writer.jsonString("transform");
+		writer.jsonUniformArray(std::span<const real32>(transform.ma));
+		writer.jsonString("caps");
+		writer.jsonBool(tube->hasCaps());
+		writer.jsonString("taper");
+		writer.jsonReal32(tube->taper());
 		writer.jsonEndArray();
 		writer.jsonEndArray();
 		return true;

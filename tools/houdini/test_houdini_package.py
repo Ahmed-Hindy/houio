@@ -135,6 +135,68 @@ def validate_direct_bezier_writer() -> None:
         output_path.unlink(missing_ok=True)
 
 
+def validate_direct_quadric_writer() -> None:
+    """Validate packaged direct-HOM Sphere and Tube serialization."""
+    object_context = hou.node("/obj")
+    if object_context is None:
+        raise AssertionError("Houdini object context is unavailable")
+    container = object_context.createNode("geo", "houio_package_quadrics")
+    for child in container.children():
+        child.destroy()
+    try:
+        sphere_node = container.createNode("sphere", "sphere")
+        sphere_node.parm("type").set("prim")
+        sphere_node.parmTuple("rad").set((2.0, 3.0, 4.0))
+        sphere_node.parmTuple("t").set((1.0, 2.0, 3.0))
+        sphere_node.cook(force=True)
+
+        tube_node = container.createNode("tube", "tube")
+        tube_node.parm("type").set("prim")
+        tube_node.parm("cap").set(1)
+        tube_node.parm("rad1").set(2.0)
+        tube_node.parm("rad2").set(1.0)
+        tube_node.parm("height").set(5.0)
+        tube_node.parmTuple("t").set((-1.0, 0.5, 2.0))
+        tube_node.cook(force=True)
+
+        geometry = hou.Geometry()
+        geometry.merge(sphere_node.geometry())
+        geometry.merge(tube_node.geometry())
+    finally:
+        container.destroy()
+
+    output_path = Path(os.environ.get("TEMP", os.environ["HOUIO_ROOT"])) / (
+        "houio_package_quadrics_" + hou.applicationVersionString().replace(".", "_") + ".bgeo"
+    )
+    try:
+        result = houio_hom.write_geometry(geometry, output_path)
+        if not result.success:
+            raise AssertionError(
+                "Packaged direct quadric writer failed:\n"
+                + result.stderr
+                + "\n"
+                + result.stdout
+            )
+        candidate = hou.Geometry()
+        candidate.loadFromFile(str(output_path))
+        if [primitive.type().name() for primitive in candidate.prims()] != ["Sphere", "Tube"]:
+            raise AssertionError("Packaged writer did not preserve native quadrics")
+        sphere, tube = candidate.prims()
+        if tuple(float(value) for value in sphere.intrinsicValue("transform")) != (
+            2.0, 0.0, 0.0, 0.0, 0.0, -4.0, 0.0, 3.0, 0.0
+        ):
+            raise AssertionError("Packaged writer changed sphere transform")
+        if (
+            tuple(float(value) for value in tube.intrinsicValue("transform"))
+            != (1.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 1.0)
+            or int(tube.intrinsicValue("closed")) != 1
+            or float(tube.intrinsicValue("tubetaper")) != 2.0
+        ):
+            raise AssertionError("Packaged writer changed tube metadata")
+    finally:
+        output_path.unlink(missing_ok=True)
+
+
 def validate_diagnostics() -> None:
     """Validate non-interactive package diagnostics."""
     diagnostics = houio_tools.package_diagnostics()
@@ -182,6 +244,7 @@ def main() -> int:
     validate_shelf_tools()
     validate_roundtrip_sop()
     validate_direct_bezier_writer()
+    validate_direct_quadric_writer()
     validate_diagnostics()
     print(
         "HouIO Houdini package passed in "

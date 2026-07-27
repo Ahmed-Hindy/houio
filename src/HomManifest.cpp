@@ -373,6 +373,20 @@ namespace houio
                 components[6], components[7], components[8]);
         }
 
+        math::M33f parseFiniteMatrix33(
+            const json::ArrayPtr& values,
+            const std::string& path)
+        {
+            const math::M33f result = parseMatrix33(values, path);
+            if( std::any_of(std::begin(result.ma), std::end(result.ma),
+                    [](real32 value) { return !std::isfinite(value); }) )
+            {
+                failManifest(DiagnosticCategory::schema,
+                    "Matrix33 components must be finite", path);
+            }
+            return result;
+        }
+
         math::V3f parseVector3(
             const json::ArrayPtr &values,
             const std::string &path)
@@ -536,6 +550,37 @@ namespace houio
                     }
                     geometry->addPrimitive(
                         std::static_pointer_cast<HouGeoAdapter::CurvePrimitive>(curve));
+                }
+                else if( type == "sphere" )
+                {
+                    auto sphere = std::make_shared<HouGeo::HouSphere>();
+                    sphere->setTopologyVertex(vertexOffset);
+                    sphere->setTransform(parseFiniteMatrix33(
+                        requireArray(definition, "transform", path),
+                        path + ".transform"));
+                    geometry->addPrimitive(
+                        std::static_pointer_cast<HouGeoAdapter::SpherePrimitive>(sphere));
+                }
+                else if( type == "tube" )
+                {
+                    auto tube = std::make_shared<HouGeo::HouTube>();
+                    tube->setTopologyVertex(vertexOffset);
+                    tube->setTransform(parseFiniteMatrix33(
+                        requireArray(definition, "transform", path),
+                        path + ".transform"));
+                    tube->setCaps(definition->get<bool>("caps", false));
+                    try
+                    {
+                        tube->setTaper(definition->get<real32>("taper", 1.0f));
+                    }
+                    catch( const std::exception& exception )
+                    {
+                        failManifest(DiagnosticCategory::schema,
+                            "Invalid tube definition: " + std::string(exception.what()),
+                            path + ".taper");
+                    }
+                    geometry->addPrimitive(
+                        std::static_pointer_cast<HouGeoAdapter::TubePrimitive>(tube));
                 }
                 else if( type == "packed_geometry" )
                 {

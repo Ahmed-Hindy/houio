@@ -54,6 +54,11 @@ target_link_libraries(houio_test_curves PRIVATE houio::houio)
 target_compile_features(houio_test_curves PRIVATE cxx_std_20)
 add_test(NAME houio.curves COMMAND houio_test_curves)
 
+add_executable(houio_test_quadrics test_quadrics.cpp)
+target_link_libraries(houio_test_quadrics PRIVATE houio::houio)
+target_compile_features(houio_test_quadrics PRIVATE cxx_std_20)
+add_test(NAME houio.quadrics COMMAND houio_test_quadrics)
+
 add_executable(houio_test_groups test_groups.cpp)
 target_link_libraries(houio_test_groups PRIVATE houio::houio)
 target_compile_features(houio_test_groups PRIVATE cxx_std_20)
@@ -308,6 +313,18 @@ if(HOUIO_HYTHON_EXECUTABLE)
             ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
     )
 
+    add_test(
+        NAME houio.hom_quadric_manifest
+        COMMAND
+            "${HOUIO_HYTHON_EXECUTABLE}"
+            "${PROJECT_SOURCE_DIR}/tools/houdini/test_quadric_manifest_extraction.py"
+    )
+    set_tests_properties(
+        houio.hom_quadric_manifest
+        PROPERTIES
+            ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
+    )
+
     if(TARGET houio_cli)
         add_test(
             NAME houio.hom_direct_writer
@@ -387,6 +404,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
         uv_seam
         multiple_polygon_runs
         curves
+        quadrics
         global_attributes
         dense_volume
         native_vdb
@@ -431,6 +449,21 @@ if(HOUIO_HYTHON_EXECUTABLE)
             PROPERTIES
                 FIXTURES_REQUIRED houio_fixture_sources
                 PASS_REGULAR_EXPRESSION "\"curve_records\":2"
+        )
+
+        add_test(
+            NAME houio.fixtures.quadrics.inspect
+            COMMAND
+                $<TARGET_FILE:houio_cli>
+                inspect
+                "${HOUIO_FIXTURE_SOURCE_DIR}/quadrics.bgeo"
+                --json
+        )
+        set_tests_properties(
+            houio.fixtures.quadrics.inspect
+            PROPERTIES
+                FIXTURES_REQUIRED houio_fixture_sources
+                PASS_REGULAR_EXPRESSION "\"sphere_records\":1.*\"tube_records\":1"
         )
     endif()
 
