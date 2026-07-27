@@ -30,7 +30,7 @@ An active voxel may have the same numeric value as the background. Activity and 
 
 `houio::OpenVdbBackend::info()` reports whether the optional backend was compiled and, when available, the OpenVDB version.
 
-`readFloatGrid()` and `writeFloatGrid()` provide the first native backend slice:
+`readFloatGrid()` and `writeFloatGrid()` provide native file I/O. `encodeFloatGrid()` and `decodeFloatGrid()` provide equivalent in-memory OpenVDB streams for Houdini payload construction:
 
 - One OpenVDB `FloatGrid` at a time.
 - Sparse active voxel values without dense conversion.
@@ -38,16 +38,19 @@ An active voxel may have the same numeric value as the background. Activity and 
 - Fog-volume and level-set classes.
 - Grid names and string metadata.
 
-When the backend is disabled, both operations return an `unsupported_input` diagnostic instead of attempting a dense fallback.
+`NativeVdbPayload` validates and converts between one standard OpenVDB stream and Houdini's tiled `vdb` primitive payload. `HouSparseVdb` uses that codec during BGEO/SCF serialization when the optional backend is compiled.
+
+When the backend is disabled, OpenVDB-dependent operations return an `unsupported_input` diagnostic instead of attempting a dense fallback. Opaque native payload pass-through remains available in every build.
 
 ## Current boundary
 
-This foundation does not yet represent active OpenVDB tiles. Reading a `FloatGrid` that contains an active tile returns an explicit unsupported diagnostic rather than expanding an unbounded tile into voxels. Nonlinear/frustum transforms are also rejected.
+This backend does not yet represent active OpenVDB tiles. Reading a `FloatGrid` that contains an active tile returns an explicit unsupported diagnostic rather than expanding an unbounded tile into voxels. Nonlinear/frustum transforms are also rejected.
 
-The next backend increments are:
+Live HOM extraction supports scalar Float VDBs only when exact active topology can be proven from `activeVoxelCount()`, the exclusive active bounding box, and sampled values. It rejects active background-valued voxels, inactive interior values, active tiles, half-float policy, local-space grids, and scan domains larger than 16,777,216 voxels rather than approximating them.
+
+Remaining backend increments are:
 
 1. Active tile representation.
-2. Native Houdini VDB payload generation from `SparseFloatGrid`.
-3. Live HOM VDB extraction.
-4. Integer and vector grid types.
-5. Additional typed metadata.
+2. Integer and vector grid types.
+3. Additional typed metadata and serialization policies.
+4. Exact extraction paths for activity patterns HOM cannot currently expose.

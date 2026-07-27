@@ -72,7 +72,7 @@ Every phase must preserve these constraints:
 - The 18-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Documentation records the primary Writer/CLI/HOM workflow, packed geometry/fragment/disk support, native VDB payload preservation, and remaining backend limitations.
 - Phases 11–31 are merged into `master` through PRs #31 and #32.
-- Phases 32–34 are complete and merged. Phase 35 supports embedded PackedGeometry, named PackedFragment, external PackedDisk, and PackedDiskSequence records. Phase 36 preserves opaque native VDB payloads and now includes dependency-neutral sparse FloatGrid editing plus optional native `.vdb` FloatGrid I/O; Houdini-native payload generation remains open.
+- Phases 32–34 are complete and merged. Phase 35 supports embedded PackedGeometry, named PackedFragment, external PackedDisk, and PackedDiskSequence records. Phase 36 preserves opaque native VDB payloads, provides dependency-neutral sparse FloatGrid editing, optional native `.vdb` I/O, native Houdini payload generation, and exact scalar Float VDB live-HOM extraction.
 
 ## Execution phases
 
@@ -1010,7 +1010,7 @@ Goals:
 
 ### Phase 36 — Native sparse OpenVDB primitives
 
-**Status: lossless opaque native-payload preservation, dependency-neutral sparse FloatGrid editing, and optional native `.vdb` FloatGrid I/O complete; Houdini-native payload generation remains open.**
+**Status: opaque payload preservation, sparse FloatGrid editing, optional native `.vdb` I/O, Houdini-native payload generation, and exact scalar Float VDB live-HOM extraction complete.**
 
 Goals:
 
@@ -1018,7 +1018,7 @@ Goals:
 - Preserve Houdini's serialized native payload, including grid class, value type, transform, metadata, active topology, and sparse values, during file round trips.
 - Keep native OpenVDB file I/O and Houdini payload generation optional at build and package time.
 - Provide dependency-neutral sparse FloatGrid editing in every build and native `.vdb` FloatGrid I/O when OpenVDB is enabled.
-- Generate Houdini's serialized native VDB primitive payload from sparse grids before enabling direct live-HOM native VDB creation.
+- Generate Houdini's serialized native VDB primitive payload from sparse grids and extract exact scalar Float VDBs through the live-HOM manifest boundary.
 
 ## Deferred work
 
@@ -1027,7 +1027,8 @@ The following remain separate from the active product-facing phases unless requi
 - Additional primitive-record families after the packed-reference family.
 - Lossless point/vertex-domain redesign.
 - [x] Dependency-neutral sparse FloatGrid construction/editing and optional OpenVDB `.vdb` I/O.
-- [ ] Native Houdini VDB payload generation from sparse grids.
+- [x] Native Houdini VDB payload generation from sparse grids and exact scalar Float VDB live-HOM extraction.
+- [ ] Active tile, ambiguous-activity, nonlinear transform, integer-grid, and vector-grid support.
 - Performance architecture changes that bypass the JSON tree.
 - Project-wide licensing and third-party provenance resolution.
 
