@@ -27,17 +27,13 @@ namespace houio
         }
 
 #if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
-        openvdb::math::Mat4d toOpenVdbMatrix(const math::M44f& source)
+        openvdb::math::Mat4R toOpenVdbMatrix(const math::M44f& source)
         {
-            openvdb::math::Mat4d result = openvdb::math::Mat4d::identity();
-            for( int row = 0; row < 4; ++row )
+            openvdb::math::Mat4R result = openvdb::math::Mat4R::identity();
+            for( std::size_t row = 0; row < 4; ++row )
             {
-                for( int column = 0; column < 4; ++column )
-                {
-                    const std::size_t offset =
-                        static_cast<std::size_t>(row * 4 + column);
-                    result(row, column) = static_cast<double>(source.ma[offset]);
-                }
+                for( std::size_t column = 0; column < 4; ++column )
+                    result(row, column) = static_cast<openvdb::Real>(source.ma[row * 4 + column]);
             }
             return result;
         }
@@ -45,14 +41,10 @@ namespace houio
         math::M44f fromOpenVdbMatrix(const openvdb::math::Mat4d& source)
         {
             math::M44f result = math::M44f::zero();
-            for( int row = 0; row < 4; ++row )
+            for( std::size_t row = 0; row < 4; ++row )
             {
-                for( int column = 0; column < 4; ++column )
-                {
-                    const std::size_t offset =
-                        static_cast<std::size_t>(row * 4 + column);
-                    result.ma[offset] = static_cast<float>(source(row, column));
-                }
+                for( std::size_t column = 0; column < 4; ++column )
+                    result.ma[row * 4 + column] = static_cast<float>(source(row, column));
             }
             return result;
         }
