@@ -4,13 +4,13 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `feat/packed-disk-support`
-- Baseline commit: `ff4498f` (`master` after merged PR #35).
-- Current exact source: MSVC warnings-as-errors suite passes **57/57**.
-- Current exact source: Windows AddressSanitizer passes **24/24** and MSVC native analysis is error-clean.
-- Full Release/Houdini validation passes **57/57**.
-- Direct custom writing, the 18-fixture matrix, and the Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
-- The active stacked branch establishes dependency-neutral sparse FloatGrid editing, optional OpenVDB package discovery, native `.vdb` FloatGrid I/O, diagnostics, and installed-package propagation.
+- Branch: `feat/houdini-native-vdb-payload`
+- Baseline commit: `8aad199` (`master` after merged PR #38).
+- Current exact source: MSVC warnings-as-errors/Houdini suite passes **61/61**.
+- Current exact source: Windows AddressSanitizer passes **25/25** and MSVC native analysis is error-clean.
+- The 19-fixture and Houdini package matrices pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Direct scalar Float VDB extraction, including ambiguous-activity rejection, passes in all four maintained Houdini versions.
+- The active branch adds standard-stream/native-payload conversion, constructed sparse VDB primitives, exact live-HOM extraction, and an OpenVDB-enabled Linux CI gate.
 
 ## Modernization completed
 
@@ -98,7 +98,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add packed disk sequences with explicit sample lists, fractional index, wrap modes, direct HOM extraction, and four-version fixtures.
 - [x] Preserve native sparse VDB primitive payloads without forced densification during file round trips.
 - [x] Add a dependency-neutral sparse FloatGrid model and optional OpenVDB `.vdb` FloatGrid backend.
-- [ ] Generate native Houdini VDB primitive payloads from the sparse-grid model and wire live HOM extraction.
+- [x] Generate native Houdini VDB primitive payloads from the sparse-grid model and wire exact scalar Float VDB live-HOM extraction.
 - [ ] Continue with curves, instancing, height fields, and other observed records one family at a time.
 
 ## Modernization completed follow-up
@@ -209,7 +209,7 @@ Add fixture-backed support one record type at a time:
 - [ ] Support additional observed compression types.
 - [ ] Investigate additional outer wrappers only when representative fixtures are available.
 - [x] Define an optional public OpenVDB adapter with sparse FloatGrid preservation.
-- [ ] Add active tile, nonlinear transform, integer-grid, and vector-grid support.
+- [ ] Add active tile, nonlinear transform, ambiguous-activity, integer-grid, and vector-grid support.
 
 ## P2 — Data model
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import struct
 from pathlib import Path
 from typing import Any, Iterable, Union
@@ -11,6 +12,7 @@ import hou
 
 PathLike = Union[str, Path]
 _SCHEMA = "houio.hom/1"
+_MAX_VDB_SCAN_VOXELS = 256 * 1024
 
 
 class UnsupportedHOMDataError(ValueError):
@@ -282,6 +284,112 @@ def _volume_local_to_world(primitive: hou.Volume) -> list[float]:
     return [float(value) for value in matrix.asTuple()]
 
 
+def _sparse_vdb_manifest(primitive: hou.VDB, vertex_offset: int) -> dict[str, Any]:
+    """Extract one exact scalar Float VDB without serializing through Houdini."""
+    value_type = str(primitive.intrinsicValue("vdb_value_type"))
+    if value_type != "float":
+        raise UnsupportedHOMDataError(
+            f"Native VDB value type {value_type!r} is not a scalar FloatGrid"
+        )
+    if not math.isclose(float(primitive.intrinsicValue("taper")), 1.0):
+        raise UnsupportedHOMDataError(
+            "Tapered/frustum VDB transforms are not representable by SparseFloatGrid"
+        )
+    if bool(primitive.intrinsicValue("vdb_is_local_space")):
+        raise UnsupportedHOMDataError(
+            "Local-space VDB metadata is not yet represented by SparseFloatGrid"
+        )
+    if bool(primitive.intrinsicValue("vdb_is_saved_as_half_float")):
+        raise UnsupportedHOMDataError(
+            "Half-float VDB serialization policy is not yet represented by SparseFloatGrid"
+        )
+
+    background = float(primitive.intrinsicValue("background"))
+    if not math.isfinite(background):
+        raise UnsupportedHOMDataError("Native VDB background must be finite")
+    transform = [float(value) for value in primitive.intrinsicValue("transform")]
+    if len(transform) != 16 or any(not math.isfinite(value) for value in transform):
+        raise UnsupportedHOMDataError(
+            "Native VDB transform must be a finite 4x4 linear matrix"
+        )
+
+    active_indices: list[int] = []
+    active_values: list[float] = []
+    active_count = int(primitive.activeVoxelCount())
+    if active_count:
+        bounds = primitive.activeVoxelBoundingBox()
+        minimum = [int(value) for value in bounds.minvec()]
+        maximum = [int(value) for value in bounds.maxvec()]
+        dimensions = [maximum[index] - minimum[index] for index in range(3)]
+        if any(value <= 0 for value in dimensions):
+            raise UnsupportedHOMDataError(
+                "Native VDB active bounding box is inconsistent with its active count"
+            )
+        scan_count = dimensions[0] * dimensions[1] * dimensions[2]
+        if scan_count > _MAX_VDB_SCAN_VOXELS:
+            raise UnsupportedHOMDataError(
+                "Native VDB active bounding box exceeds the direct extraction limit "
+                f"({_MAX_VDB_SCAN_VOXELS} voxels)"
+            )
+        values = tuple(float(value) for value in primitive.voxelRangeAsFloat(bounds))
+        if len(values) != scan_count:
+            raise UnsupportedHOMDataError(
+                "Native VDB voxel range size does not match its active bounding box"
+            )
+        value_offset = 0
+        for z_index in range(minimum[2], maximum[2]):
+            for y_index in range(minimum[1], maximum[1]):
+                for x_index in range(minimum[0], maximum[0]):
+                    value = values[value_offset]
+                    value_offset += 1
+                    if not math.isfinite(value):
+                        raise UnsupportedHOMDataError(
+                            "Native VDB contains a non-finite voxel value"
+                        )
+                    if value != background:
+                        active_indices.extend((x_index, y_index, z_index))
+                        active_values.append(value)
+        if len(active_values) != active_count:
+            raise UnsupportedHOMDataError(
+                "HOM cannot expose this VDB's exact active topology: the number of "
+                "voxels differing from the background does not equal activeVoxelCount. "
+                "This includes grids with active background-valued voxels, inactive "
+                "interior values, or active tiles. Use file-level payload preservation."
+            )
+
+    class_name = str(primitive.intrinsicValue("vdb_class"))
+    class_map = {
+        "fog volume": "fog_volume",
+        "level set": "level_set",
+        "unknown": "unknown",
+    }
+    if class_name not in class_map:
+        raise UnsupportedHOMDataError(
+            f"Native VDB class {class_name!r} is unsupported"
+        )
+
+    name = ""
+    name_attribute = primitive.geometry().findPrimAttrib("name")
+    if name_attribute is not None:
+        name = str(primitive.stringAttribValue("name"))
+    metadata: dict[str, str] = {}
+    creator = str(primitive.intrinsicValue("vdb_creator"))
+    if creator:
+        metadata["creator"] = creator
+
+    return {
+        "type": "sparse_float_vdb",
+        "vertex_offset": vertex_offset,
+        "name": name,
+        "grid_class": class_map[class_name],
+        "background": background,
+        "index_to_world": transform,
+        "active_indices": active_indices,
+        "active_values": active_values,
+        "metadata": metadata,
+    }
+
+
 def _primitive_manifest(primitive: hou.Prim) -> dict[str, Any]:
     """Extract one supported primitive without invoking a Houdini file writer."""
     vertices = primitive.vertices()
@@ -360,11 +468,7 @@ def _primitive_manifest(primitive: hou.Prim) -> dict[str, Any]:
             "embedded_manifest": geometry_manifest(primitive.getEmbeddedGeometry()),
         }
     if isinstance(primitive, hou.VDB):
-        raise UnsupportedHOMDataError(
-            "Native sparse OpenVDB extraction is recognized but not implemented; "
-            "file-level HouIO round trips preserve native VDB payloads losslessly, "
-            "while live HOM creation requires an optional OpenVDB backend"
-        )
+        return _sparse_vdb_manifest(primitive, vertex_offset)
     if isinstance(primitive, hou.Volume):
         return {
             "type": "dense_volume",

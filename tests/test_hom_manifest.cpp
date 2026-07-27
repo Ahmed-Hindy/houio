@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace
@@ -342,6 +343,91 @@ namespace
         return 0;
     }
 
+    int verifySparseVdbManifest(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path path = directory / "sparse_float_vdb.json";
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_float_vdb","vertex_offset":0,
+                "name":"density","grid_class":"fog_volume","background":0.0,
+                "index_to_world":[0.5,0,0,0,0,0.5,0,0,0,0,0.5,0,-0.75,-0.75,-0.75,1],
+                "active_indices":[1,1,1,2,1,1],
+                "active_values":[1.0,2.0],
+                "metadata":{"creator":"houio_test"}
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[-0.75,-0.75,-0.75,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto result = houio::HomManifest::read(path);
+        if( !result || result.value->primitiveCount() != 1 )
+            return fail("sparse VDB manifest failed to load");
+        const auto sparseVdb =
+            std::dynamic_pointer_cast<houio::HouGeo::HouSparseVdb>(
+                result.value->primitives().front());
+        if( !sparseVdb || sparseVdb->topologyVertex() != 0 )
+            return fail("sparse VDB manifest did not create the expected primitive");
+        const houio::SparseFloatGrid& grid = sparseVdb->sparseGrid();
+        if( grid.name() != "density"
+            || grid.gridClass() != houio::SparseGridClass::fog_volume
+            || grid.activeVoxelCount() != 2
+            || grid.value(houio::math::V3i(1, 1, 1)) != 1.0f
+            || grid.value(houio::math::V3i(2, 1, 1)) != 2.0f
+            || grid.metadata("creator") != std::optional<std::string>("houio_test") )
+        {
+            return fail("sparse VDB manifest changed grid data");
+        }
+        return 0;
+    }
+
+    int verifyInvalidSparseVdbManifest(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path path = directory / "invalid_sparse_float_vdb.json";
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_float_vdb","vertex_offset":0,
+                "grid_class":"fog_volume","background":0.0,
+                "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                "active_indices":[1,2,3,4],"active_values":[1.0]
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto result = houio::HomManifest::read(path);
+        if( result || !containsCategory(result.diagnostics, houio::DiagnosticCategory::schema) )
+            return fail("invalid sparse VDB manifest did not return a schema diagnostic");
+
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_float_vdb","vertex_offset":0,
+                "grid_class":"fog_volume","background":0.0,
+                "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                "active_indices":[1,2,3,1,2,3],"active_values":[1.0,2.0]
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto duplicateResult = houio::HomManifest::read(path);
+        if( duplicateResult
+            || !containsCategory(
+                duplicateResult.diagnostics, houio::DiagnosticCategory::schema) )
+        {
+            return fail("duplicate sparse VDB coordinates were not rejected");
+        }
+        return 0;
+    }
+
     int verifyUnsupportedRecord(const std::filesystem::path &directory)
     {
         const std::filesystem::path path = directory / "unsupported_curve.json";
@@ -382,6 +468,10 @@ int main()
     if( const int result = verifyPackedDiskManifest(directory); result != 0 )
         return result;
     if( const int result = verifyPackedDiskSequenceManifest(directory); result != 0 )
+        return result;
+    if( const int result = verifySparseVdbManifest(directory); result != 0 )
+        return result;
+    if( const int result = verifyInvalidSparseVdbManifest(directory); result != 0 )
         return result;
     if( const int result = verifyUnsupportedRecord(directory); result != 0 )
         return result;

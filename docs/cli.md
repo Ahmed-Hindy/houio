@@ -70,7 +70,7 @@ A capability is:
 - `recognized`: the family is known but its adapter or fixture-backed schema is incomplete.
 - `unavailable`: the feature requires a backend that is not present.
 
-Embedded `PackedGeometry`, named `PackedFragment`, external `PackedDisk`, `PackedDiskSequence`, and opaque native VDB payload preservation are supported. Dependency-neutral sparse FloatGrid editing is available through the C++ API; an opt-in OpenVDB build adds native `.vdb` FloatGrid I/O. `houio diagnose` reports whether that backend was compiled and its version. `houio inspect` reports separate counts for packed geometry, packed fragments, packed disks, packed disk sequences, and native VDB records.
+Embedded `PackedGeometry`, named `PackedFragment`, external `PackedDisk`, `PackedDiskSequence`, and opaque native VDB payload preservation are supported. Dependency-neutral sparse FloatGrid editing is available through the C++ API. An opt-in OpenVDB build adds standalone `.vdb` I/O through `OpenVdbBackend`; the CLI can use that backend to construct native Houdini VDB records from `sparse_float_vdb` manifests inside GEO/BGEO/SCF output, but does not provide standalone `.vdb` output. `houio diagnose` reports whether that backend was compiled and its version. `houio inspect` reports separate counts for packed geometry, packed fragments, packed disks, packed disk sequences, and native VDB records.
 
 ## Runtime diagnostics
 

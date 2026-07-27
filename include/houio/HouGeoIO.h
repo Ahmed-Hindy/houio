@@ -153,6 +153,9 @@ namespace houio
             HouGeoAdapter::PackedDiskSequencePrimitive::ConstPtr packed_disk_sequence);
         static bool exportPrimitive(
             ExportContext& context,
+            HouGeoAdapter::SparseVdbPrimitive::ConstPtr sparse_vdb);
+        static bool exportPrimitive(
+            ExportContext& context,
             HouGeoAdapter::NativeVdbPrimitive::ConstPtr native_vdb);
         static bool exportPrimitive(
             ExportContext& context,

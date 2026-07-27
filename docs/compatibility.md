@@ -113,9 +113,9 @@ Use `HouGeo` (`HoudiniGeometry`) or `HouGeoAdapter` when Houdini domain fidelity
 
 The default standalone library does not link to OpenVDB, but it recognizes native Houdini `VDB` records and preserves their serialized sparse payload opaquely during GEO/BGEO/SCF round trips. This retains active topology, values, transform, class, value type, and metadata without densification.
 
-`SparseFloatGrid` adds dependency-neutral sparse voxel construction and editing. Configuring `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid read/write through `OpenVdbBackend`, including linear transforms, fog/level-set class, names, and string metadata. Active tiles and nonlinear transforms are rejected explicitly in this first backend slice.
+`SparseFloatGrid` adds dependency-neutral sparse voxel construction and editing. Configuring `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid read/write and in-memory stream encoding through `OpenVdbBackend`, including linear transforms, fog/level-set class, names, creator metadata, and string metadata. `NativeVdbPayload` wraps those streams as Houdini's tiled native VDB primitive payload, allowing `HouSparseVdb` and `sparse_float_vdb` manifests to produce native BGEO/SCF records.
 
-The direct HOM manifest still cannot create a Houdini-native VDB primitive payload because HOM does not expose the serialized tree. The compatibility bridge can convert supported Float SDF/Fog grids through dense volumes. Native Houdini record generation from `SparseFloatGrid` remains the next integration step.
+Direct HOM extraction supports scalar Float VDBs when the sampled non-background voxel count exactly matches Houdini's authoritative active count. It rejects ambiguous topology, active tiles, nonlinear/tapered transforms, local-space and half-float policies, non-float grids, and active bounding boxes larger than 262,144 voxels. The compatibility bridge remains available for supported grids that must pass through a dense workflow.
 
 ## Distribution status
 

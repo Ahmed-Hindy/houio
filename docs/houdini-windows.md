@@ -158,7 +158,7 @@ Reports:
 
 ## VDB workflow
 
-HouIO preserves existing native Houdini VDB primitive payloads losslessly during file-to-file GEO/BGEO/SCF round trips. The default build remains independent of OpenVDB, but `SparseFloatGrid` supports dependency-neutral sparse editing and `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid I/O when an SDK is supplied. Live-HOM native VDB creation remains unavailable until that sparse model is converted into Houdini's serialized primitive payload.
+HouIO preserves existing native Houdini VDB primitive payloads losslessly during file-to-file GEO/BGEO/SCF round trips. The default build remains independent of OpenVDB, but `SparseFloatGrid` supports dependency-neutral sparse editing and `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid I/O plus Houdini-native VDB primitive construction. Live HOM extraction is available for exact scalar Float VDBs and rejects grids whose activity cannot be determined without approximation.
 
 The compatibility bridge also supports bounded 32-bit Float grids by converting them explicitly:
 
@@ -242,7 +242,7 @@ Verify that `HOUIO_BLOSC_LIBRARY` expands to the active Houdini installation's `
 
 ### VDB conversion uses too much memory
 
-Use file-to-file native VDB pass-through when possible. The compatibility live-HOM conversion path densifies the grid; reduce its resolution when using that path. The optional OpenVDB backend avoids dense `.vdb` I/O, but native Houdini record generation is still a separate integration step.
+Use file-to-file native VDB pass-through when possible. Exact scalar Float VDBs can use the sparse live-HOM manifest path with an OpenVDB-enabled HouIO executable. The compatibility live-HOM conversion path remains appropriate when exact sparse activity is unavailable; reduce its resolution when using that dense path.
 
 ### Round Trip node times out
 

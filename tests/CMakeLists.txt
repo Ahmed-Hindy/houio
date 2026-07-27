@@ -104,6 +104,10 @@ target_link_libraries(houio_test_sparse_grid PRIVATE houio::houio)
 target_compile_features(houio_test_sparse_grid PRIVATE cxx_std_20)
 add_test(NAME houio.sparse_grid COMMAND houio_test_sparse_grid)
 
+add_executable(houio_test_native_vdb_payload test_native_vdb_payload.cpp)
+target_link_libraries(houio_test_native_vdb_payload PRIVATE houio::houio)
+target_compile_features(houio_test_native_vdb_payload PRIVATE cxx_std_20)
+
 if(TARGET houio_cli)
     add_test(NAME houio.cli.capabilities COMMAND $<TARGET_FILE:houio_cli> capabilities --json)
     set_tests_properties(
@@ -115,6 +119,35 @@ if(TARGET houio_cli)
         houio.cli.diagnose
         PROPERTIES PASS_REGULAR_EXPRESSION "\"openvdb_backend_compiled\""
     )
+    if(HOUIO_ENABLE_OPENVDB)
+        set(
+            HOUIO_CONSTRUCTED_VDB_FIXTURE
+            "${CMAKE_CURRENT_BINARY_DIR}/openvdb_constructed.bgeo"
+        )
+        add_test(
+            NAME houio.openvdb.construct_native
+            COMMAND
+                $<TARGET_FILE:houio_cli>
+                write-manifest
+                "${CMAKE_CURRENT_SOURCE_DIR}/data/sparse_float_vdb_manifest.json"
+                "${HOUIO_CONSTRUCTED_VDB_FIXTURE}"
+                --json
+        )
+        set_tests_properties(
+            houio.openvdb.construct_native
+            PROPERTIES FIXTURES_SETUP houio_constructed_vdb
+        )
+        add_test(
+            NAME houio.openvdb.inspect_native
+            COMMAND $<TARGET_FILE:houio_cli> inspect "${HOUIO_CONSTRUCTED_VDB_FIXTURE}" --json
+        )
+        set_tests_properties(
+            houio.openvdb.inspect_native
+            PROPERTIES
+                FIXTURES_REQUIRED houio_constructed_vdb
+                PASS_REGULAR_EXPRESSION "\"native_vdb_records\":1"
+        )
+    endif()
     add_test(
         NAME houio.cli.contract
         COMMAND
@@ -136,6 +169,7 @@ add_test(
         "-DHOUIO_BUILD_CONFIG=$<CONFIG>"
         "-DHOUIO_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
         "-DHOUIO_EXPECT_TOOLS=${HOUIO_BUILD_TOOLS}"
+        "-DHOUIO_CMAKE_MODULE_PATH=${CMAKE_MODULE_PATH}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package_consumer.cmake"
 )
 
@@ -187,6 +221,18 @@ if(HOUIO_HYTHON_EXECUTABLE)
     set_tests_properties(
         houio.geometry_io
         PROPERTIES ENVIRONMENT "HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
+    )
+
+    add_test(
+        NAME houio.hom_vdb_manifest
+        COMMAND
+            "${HOUIO_HYTHON_EXECUTABLE}"
+            "${PROJECT_SOURCE_DIR}/tools/houdini/test_vdb_manifest_extraction.py"
+    )
+    set_tests_properties(
+        houio.hom_vdb_manifest
+        PROPERTIES
+            ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
     )
 
     if(TARGET houio_cli)
@@ -285,6 +331,17 @@ if(HOUIO_HYTHON_EXECUTABLE)
             "${HOUIO_FIXTURE_SOURCE_DIR}"
     )
     set_tests_properties(houio.fixtures.generate PROPERTIES FIXTURES_SETUP houio_fixture_sources)
+
+    add_test(
+        NAME houio.fixtures.native_vdb.payload
+        COMMAND
+            $<TARGET_FILE:houio_test_native_vdb_payload>
+            "${HOUIO_FIXTURE_SOURCE_DIR}/native_vdb.bgeo"
+    )
+    set_tests_properties(
+        houio.fixtures.native_vdb.payload
+        PROPERTIES FIXTURES_REQUIRED houio_fixture_sources
+    )
 
     set(HOUIO_FIXTURE_ROUNDTRIP_TESTS)
     foreach(HOUIO_FIXTURE_NAME IN LISTS HOUIO_FIXTURE_NAMES)

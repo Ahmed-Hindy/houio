@@ -66,6 +66,9 @@ endif()
 if(DEFINED HOUIO_CXX_COMPILER AND NOT "${HOUIO_CXX_COMPILER}" STREQUAL "")
     list(APPEND configure_command "-DCMAKE_CXX_COMPILER=${HOUIO_CXX_COMPILER}")
 endif()
+if(DEFINED HOUIO_CMAKE_MODULE_PATH AND NOT "${HOUIO_CMAKE_MODULE_PATH}" STREQUAL "")
+    list(APPEND configure_command "-DCMAKE_MODULE_PATH=${HOUIO_CMAKE_MODULE_PATH}")
+endif()
 
 execute_process(
     COMMAND ${configure_command}
