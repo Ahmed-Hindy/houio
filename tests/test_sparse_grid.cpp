@@ -346,7 +346,7 @@ int main()
     if( !int32WriteResult )
         return houio::test::fail("compiled OpenVDB backend failed to write Int32Grid");
     const auto int32ReadResult =
-        houio::OpenVdbBackend::readInt32Grid(int32VdbPath, "labels");
+        houio::OpenVdbBackend::readInt32Grid(int32VdbPath, "label_tiles");
     std::filesystem::remove(int32VdbPath, removeError);
     if( !int32ReadResult
         || int32ReadResult.value.background() != intTileGrid.background()
