@@ -58,7 +58,7 @@ int main()
             houio::math::V3i(8, 8, 8),
             houio::math::V3i(15, 15, 15)},
         7);
-    sparseIntGrid.setVoxel(houio::math::V3i(10, 10, 10), 42);
+    sparseIntGrid.setVoxel(houio::math::V3i(16, 16, 16), 42);
     const std::vector<houio::ubyte> sampleStream{
         0x20U, 0x42U, 0x44U, 0x56U, 0x01U, 0x02U, 0x03U};
     const auto samplePayload = houio::NativeVdbPayload::encode(sampleStream, 4);
@@ -89,7 +89,7 @@ int main()
             && decodedIntGrid
             && decodedIntGrid.value.activeTileCount() != 0
             && decodedIntGrid.value.value(houio::math::V3i(9, 9, 9)) == 7
-            && decodedIntGrid.value.value(houio::math::V3i(10, 10, 10)) == 42;
+            && decodedIntGrid.value.value(houio::math::V3i(16, 16, 16)) == 42;
     }
     if (!readResult || readResult.value->primitiveCount() != 1
         || !packedCapability || !packedCapability->writable
@@ -101,6 +101,7 @@ int main()
         || sparseGrid.activeTileCount() != 1
         || sparseIntGrid.activeVoxelCount() != 1
         || sparseIntGrid.activeTileCount() != 1
+        || sparseIntGrid.value(houio::math::V3i(16, 16, 16)) != 42
         || !sampleRoundTrip || sampleRoundTrip.value != sampleStream
         || !compiledBackendWorks
         || !openVdbMetadataIsValid

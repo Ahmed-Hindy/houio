@@ -57,7 +57,7 @@ The sparse models represent active OpenVDB tiles as inclusive index-space bounds
 ]
 ```
 
-Bounds are inclusive, must be ordered, and duplicate bound pairs are rejected. `active_indices` and `active_values` are optional, but must appear together when explicit voxels are present. Explicit active voxels take precedence over tile values. The same schema is available as `sparse_float_vdb` for FloatGrid values and `sparse_int32_vdb` for signed 32-bit integer values. Nonlinear/frustum transforms are still rejected.
+Bounds are inclusive, must be ordered, and duplicate bound pairs are rejected. `active_indices` and `active_values` are optional, but must appear together when explicit voxels are present. Explicit active voxels take precedence over tile values. The same schema is available as `sparse_float_vdb` for FloatGrid values and `sparse_int32_vdb` for signed 32-bit integer values. Pure active tiles remain tiles through native OpenVDB round trips. When an explicit voxel overrides a tile inside the same OpenVDB leaf, OpenVDB necessarily refines that leaf; decoding may therefore return an equivalent set of explicit active voxels rather than the original non-canonical tile-plus-override decomposition. Activity and values remain exact. Nonlinear/frustum transforms are still rejected.
 
 Live HOM extraction supports scalar Float VDBs only when exact active topology can be proven from `activeVoxelCount()`, the exclusive active bounding box, and sampled values. It rejects active background-valued voxels, inactive interior values, active tiles, half-float policy, local-space grids, and scan domains larger than 262,144 voxels rather than approximating them.
 

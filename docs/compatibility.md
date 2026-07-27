@@ -89,7 +89,7 @@ The standalone C++ model does not currently preserve these records:
 - NURBS and Bezier curves.
 - Spheres, tubes, tetrahedra, and height fields.
 - Agents, crowds, and instancing records.
-- OpenVDB nonlinear transforms and native grid types other than FloatGrid and Int32Grid in the optional backend; active scalar tiles are represented and round-tripped without forced densification, while existing native Houdini VDB payloads remain preserved.
+- OpenVDB nonlinear transforms and native grid types other than FloatGrid and Int32Grid in the optional backend; pure active scalar tiles are preserved, while an explicit voxel override may refine only its affected OpenVDB leaf. Existing native Houdini VDB payloads remain preserved.
 - Vector VDB construction and editing.
 - Additional volume tile-compression encodings not represented by maintained fixtures.
 
