@@ -453,7 +453,8 @@ namespace
         const auto vdb = houio::Writer::capability(
             houio::WriterDataType::sparse_openvdb);
         if( !vdb || vdb->level != houio::WriterCapabilityLevel::supported
-            || !vdb->readable || !vdb->writable )
+            || !vdb->readable || !vdb->writable
+            || vdb->detail.find("active-tile") == std::string::npos )
         {
             return fail("Sparse OpenVDB capability contract is incorrect");
         }

@@ -1,4 +1,7 @@
+#include <houio/GeometryIO.h>
 #include <houio/HomManifest.h>
+#include <houio/NativeVdbPayload.h>
+#include <houio/OpenVdbBackend.h>
 #include <houio/Writer.h>
 
 #include "TestSupport.h"
@@ -356,6 +359,9 @@ namespace
                 "index_to_world":[0.5,0,0,0,0,0.5,0,0,0,0,0.5,0,-0.75,-0.75,-0.75,1],
                 "active_indices":[1,1,1,2,1,1],
                 "active_values":[1.0,2.0],
+                "active_tiles":[{
+                    "minimum":[-8,-8,-8],"maximum":[-1,-1,-1],"value":0.25
+                }],
                 "metadata":{"creator":"houio_test"}
             }],
             "attributes":{"point":[{"name":"P","kind":"numeric",
@@ -374,12 +380,70 @@ namespace
         if( grid.name() != "density"
             || grid.gridClass() != houio::SparseGridClass::fog_volume
             || grid.activeVoxelCount() != 2
+            || grid.activeTileCount() != 1
             || grid.value(houio::math::V3i(1, 1, 1)) != 1.0f
             || grid.value(houio::math::V3i(2, 1, 1)) != 2.0f
+            || grid.value(houio::math::V3i(-4, -4, -4)) != 0.25f
             || grid.metadata("creator") != std::optional<std::string>("houio_test") )
         {
             return fail("sparse VDB manifest changed grid data");
         }
+
+        const std::filesystem::path tileOnlyPath =
+            directory / "tile_only_sparse_float_vdb.json";
+        writeText(tileOnlyPath, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_float_vdb","vertex_offset":0,
+                "name":"tiles","grid_class":"fog_volume","background":0.0,
+                "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                "active_tiles":[{
+                    "minimum":[-8,-8,-8],"maximum":[-1,-1,-1],"value":0.5
+                }]
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto tileOnlyResult = houio::HomManifest::read(tileOnlyPath);
+        const auto tileOnlyVdb = tileOnlyResult
+            ? std::dynamic_pointer_cast<houio::HouGeo::HouSparseVdb>(
+                tileOnlyResult.value->primitives().front())
+            : nullptr;
+        if( !tileOnlyVdb || tileOnlyVdb->sparseGrid().activeVoxelCount() != 0
+            || tileOnlyVdb->sparseGrid().activeTileCount() != 1
+            || tileOnlyVdb->sparseGrid().value(houio::math::V3i(-4, -4, -4)) != 0.5f )
+        {
+            return fail("tile-only sparse VDB manifest failed to load");
+        }
+
+#if HOUIO_HAS_OPENVDB
+        const std::filesystem::path outputPath = directory / "sparse_float_vdb.bgeo";
+        const houio::WriteResult writeResult = houio::Writer::write(
+            outputPath,
+            std::static_pointer_cast<houio::HouGeoAdapter>(result.value));
+        if( !writeResult )
+            return fail("sparse VDB manifest failed native writer serialization");
+        const auto writtenGeometry = houio::GeometryIO::readHouGeo(outputPath);
+        if( !writtenGeometry || writtenGeometry.value->primitiveCount() != 1 )
+            return fail("sparse VDB manifest output failed to load");
+        const auto nativeVdb = std::dynamic_pointer_cast<houio::HouGeo::HouVdb>(
+            writtenGeometry.value->primitives().front());
+        if( !nativeVdb || !nativeVdb->serializedPayload() )
+            return fail("sparse VDB manifest output has no native payload");
+        const auto stream = houio::NativeVdbPayload::decode(nativeVdb->serializedPayload());
+        const auto decoded = stream
+            ? houio::OpenVdbBackend::decodeFloatGrid(stream.value, "density")
+            : houio::GeometryReadResult<houio::SparseFloatGrid>{};
+        if( !decoded || decoded.value.activeTileCount() == 0
+            || decoded.value.value(houio::math::V3i(-4, -4, -4)) != 0.25f
+            || decoded.value.value(houio::math::V3i(1, 1, 1)) != 1.0f )
+        {
+            return fail("sparse VDB manifest native round-trip changed tile data");
+        }
+#endif
         return 0;
     }
 
@@ -412,6 +476,28 @@ namespace
                 "type":"sparse_float_vdb","vertex_offset":0,
                 "grid_class":"fog_volume","background":0.0,
                 "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                "active_indices":[1,2,3]
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto unpairedActivityResult = houio::HomManifest::read(path);
+        if( unpairedActivityResult
+            || !containsCategory(
+                unpairedActivityResult.diagnostics, houio::DiagnosticCategory::schema) )
+        {
+            return fail("unpaired sparse VDB activity arrays were not rejected");
+        }
+
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_float_vdb","vertex_offset":0,
+                "grid_class":"fog_volume","background":0.0,
+                "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
                 "active_indices":[1,2,3,1,2,3],"active_values":[1.0,2.0]
             }],
             "attributes":{"point":[{"name":"P","kind":"numeric",
@@ -424,6 +510,57 @@ namespace
                 duplicateResult.diagnostics, houio::DiagnosticCategory::schema) )
         {
             return fail("duplicate sparse VDB coordinates were not rejected");
+        }
+
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_float_vdb","vertex_offset":0,
+                "grid_class":"fog_volume","background":0.0,
+                "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                "active_indices":[],"active_values":[],
+                "active_tiles":[{
+                    "minimum":[1,0,0],"maximum":[0,0,0],"value":1.0
+                }]
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto unorderedTileResult = houio::HomManifest::read(path);
+        if( unorderedTileResult
+            || !containsCategory(
+                unorderedTileResult.diagnostics, houio::DiagnosticCategory::schema) )
+        {
+            return fail("unordered sparse VDB tile bounds were not rejected");
+        }
+
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_float_vdb","vertex_offset":0,
+                "grid_class":"fog_volume","background":0.0,
+                "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                "active_indices":[],"active_values":[],
+                "active_tiles":[
+                    {"minimum":[-8,-8,-8],"maximum":[-1,-1,-1],"value":1.0},
+                    {"minimum":[-8,-8,-8],"maximum":[-1,-1,-1],"value":2.0}
+                ]
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto duplicateTileResult = houio::HomManifest::read(path);
+        if( duplicateTileResult
+            || !containsCategory(
+                duplicateTileResult.diagnostics, houio::DiagnosticCategory::schema) )
+        {
+            return fail("duplicate sparse VDB tile bounds were not rejected");
         }
         return 0;
     }
