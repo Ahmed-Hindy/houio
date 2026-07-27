@@ -19,7 +19,8 @@ namespace houio
         packed_fragment = 4,
         packed_disk = 5,
         sparse_openvdb = 6,
-        packed_disk_sequence = 7
+        packed_disk_sequence = 7,
+        curves = 8
     };
 
     enum class WriterCapabilityLevel

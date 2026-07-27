@@ -271,6 +271,10 @@ Topology values are point indices. Primitive records refer to topology ranges, n
 
 `P` is required for simplified mesh conversion. The Houdini-oriented model may contain valid data without a simplified `Geometry` result. Use `HouGeoIO::convertToGeometryResult` when a caller needs explicit split, skipped-attribute, dropped-group, winding, open-polygon closure-loss, and failure diagnostics.
 
+### Curves
+
+`CurvePrimitive` and `HouCurve` preserve NURBS and Bezier basis metadata, topology vertices, closure, order, knots, and NURBS endpoint interpolation. Rational weights remain ordinary `Pw` point attributes. Direct HOM extraction supports Bezier curves; NURBS extraction is rejected because HOM does not expose the serialized endpoint-interpolation flag, so use file round trips or explicit manifests for exact NURBS data.
+
 ### Volumes
 
 `readVolume()` returns the first dense scalar volume and warns when more are present. Use `readVolumes()` when every volume must be retained.

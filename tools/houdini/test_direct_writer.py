@@ -31,6 +31,12 @@ def create_source_geometry(output_directory: Path) -> hou.Geometry:
     for point in points:
         polygon.addVertex(point)
 
+    bezier = geometry.createBezierCurve(6, is_closed=True, order=4)
+    for index, vertex in enumerate(bezier.vertices()):
+        vertex.point().setPosition((float(index), 5.0 + float(index % 2), 0.0))
+    weight = geometry.addAttrib(hou.attribType.Point, "Pw", 1.0)
+    bezier.vertices()[2].point().setAttribValue(weight, 0.5)
+
     volume = geometry.createVolume(2, 1, 1)
     volume.setVoxel((0, 0, 0), 1.25)
     volume.setVoxel((1, 0, 0), -3.5)
@@ -115,6 +121,7 @@ def create_source_geometry(output_directory: Path) -> hou.Geometry:
 
     primitive_kind = geometry.addAttrib(hou.attribType.Prim, "kind", "")
     polygon.setAttribValue(primitive_kind, "polygon")
+    bezier.setAttribValue(primitive_kind, "bezier_curve")
     volume.setAttribValue(primitive_kind, "volume")
     packed.setAttribValue(primitive_kind, "packed")
     packed_disk.setAttribValue(primitive_kind, "packed_disk")
@@ -126,6 +133,7 @@ def create_source_geometry(output_directory: Path) -> hou.Geometry:
 
     geometry.createPointGroup("selected_points").add(points[0])
     geometry.createVertexGroup("selected_vertices").add(polygon.vertices()[1])
+    geometry.createPrimGroup("curves").add(bezier)
     geometry.createPrimGroup("volumes").add(volume)
     geometry.createPrimGroup("packed_disks").add(packed_disk)
     geometry.createPrimGroup("packed_sequences").add(packed_sequence)
@@ -136,14 +144,14 @@ def validate_output(path: Path) -> None:
     """Use Houdini's reader to verify the file produced by HouIO."""
     result = hou.Geometry()
     result.loadFromFile(str(path))
-    if len(result.points()) != 7:
+    if len(result.points()) != 13:
         raise AssertionError("Direct writer did not preserve point count")
     vertex_count = (
         result.vertexCount()
         if hasattr(result, "vertexCount")
         else sum(len(primitive.vertices()) for primitive in result.prims())
     )
-    if vertex_count != 7 or len(result.prims()) != 5:
+    if vertex_count != 13 or len(result.prims()) != 6:
         raise AssertionError("Direct writer did not preserve topology or primitives")
     if result.findPointAttrib("label") is None:
         raise AssertionError("Direct writer lost point string attributes")
@@ -158,11 +166,34 @@ def validate_output(path: Path) -> None:
     if result.findVertexGroup("selected_vertices") is None:
         raise AssertionError("Direct writer lost vertex groups")
     if (
-        result.findPrimGroup("volumes") is None
+        result.findPrimGroup("curves") is None
+        or result.findPrimGroup("volumes") is None
         or result.findPrimGroup("packed_disks") is None
         or result.findPrimGroup("packed_sequences") is None
     ):
         raise AssertionError("Direct writer lost primitive groups")
+
+    curves = [
+        primitive
+        for primitive in result.prims()
+        if primitive.type().name() in {"NURBSCurve", "BezierCurve"}
+    ]
+    if [primitive.type().name() for primitive in curves] != ["BezierCurve"]:
+        raise AssertionError("Direct writer did not preserve the Bezier record")
+    bezier_result = curves[0]
+    if (
+        int(bezier_result.intrinsicValue("order")) != 4
+        or tuple(float(value) for value in bezier_result.intrinsicValue("knots"))
+        != (0.0, 1.0, 2.0)
+        or not bezier_result.isClosed()
+        or int(bezier_result.intrinsicValue("rational")) != 1
+    ):
+        raise AssertionError("Direct writer changed Bezier basis metadata")
+    weights = result.findPointAttrib("Pw")
+    if weights is None or not math.isclose(
+        float(bezier_result.vertices()[2].point().attribValue(weights)), 0.5
+    ):
+        raise AssertionError("Direct writer changed rational curve weights")
 
     packed_primitives = [
         primitive

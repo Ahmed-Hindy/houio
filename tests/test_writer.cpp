@@ -11,6 +11,7 @@
 
 static_assert(static_cast<int>(houio::WriterDataType::sparse_openvdb) == 6);
 static_assert(static_cast<int>(houio::WriterDataType::packed_disk_sequence) == 7);
+static_assert(static_cast<int>(houio::WriterDataType::curves) == 8);
 
 namespace
 {
@@ -577,6 +578,14 @@ namespace
             || !sequence->readable || !sequence->writable )
         {
             return fail("Packed disk sequence capability contract is incorrect");
+        }
+        const auto curves = houio::Writer::capability(
+            houio::WriterDataType::curves);
+        if( !curves || curves->level != houio::WriterCapabilityLevel::supported
+            || !curves->readable || !curves->writable
+            || curves->detail.find("NURBS") == std::string::npos )
+        {
+            return fail("Curve capability contract is incorrect");
         }
         const auto vdb = houio::Writer::capability(
             houio::WriterDataType::sparse_openvdb);

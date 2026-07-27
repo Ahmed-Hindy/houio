@@ -448,7 +448,9 @@ namespace houio
                 const int vertexOffset = checkedCount(
                     definition->get<sint64>("vertex_offset", 0),
                     path + ".vertex_offset");
-                if( type != "polygon"
+                const bool rangePrimitive = type == "polygon"
+                    || type == "nurbs_curve" || type == "bezier_curve";
+                if( !rangePrimitive
                     && static_cast<std::size_t>(vertexOffset) >= topology.size() )
                 {
                     failManifest(DiagnosticCategory::schema,
@@ -480,6 +482,60 @@ namespace houio
                         definition->get<bool>("closed", true));
                     geometry->addPrimitive(
                         std::static_pointer_cast<HouGeoAdapter::PolyPrimitive>(polygon));
+                }
+                else if( type == "nurbs_curve" || type == "bezier_curve" )
+                {
+                    const int vertexCount = checkedCount(
+                        definition->get<sint64>("vertex_count"),
+                        path + ".vertex_count");
+                    if( vertexCount < 2
+                        || static_cast<std::size_t>(vertexOffset) > topology.size()
+                        || static_cast<std::size_t>(vertexCount)
+                            > topology.size() - static_cast<std::size_t>(vertexOffset) )
+                    {
+                        failManifest(DiagnosticCategory::schema,
+                            "Curve vertex range exceeds the topology domain", path);
+                    }
+
+                    const std::vector<real64> knots = scalarArray<real64>(
+                        requireArray(definition, "knots", path),
+                        path + ".knots");
+                    if( knots.empty()
+                        || std::any_of(knots.begin(), knots.end(),
+                            [](real64 value) { return !std::isfinite(value); })
+                        || !std::is_sorted(knots.begin(), knots.end()) )
+                    {
+                        failManifest(DiagnosticCategory::schema,
+                            "Curve knots must be finite, nonempty, and nondecreasing",
+                            path + ".knots");
+                    }
+
+                    std::vector<int> vertexIndices;
+                    vertexIndices.reserve(static_cast<std::size_t>(vertexCount));
+                    for( int vertex = 0; vertex < vertexCount; ++vertex )
+                        vertexIndices.push_back(vertexOffset + vertex);
+
+                    auto curve = std::make_shared<HouGeo::HouCurve>();
+                    try
+                    {
+                        curve->setCurveData(
+                            type == "nurbs_curve"
+                                ? HouGeoAdapter::CurvePrimitive::Basis::nurbs
+                                : HouGeoAdapter::CurvePrimitive::Basis::bezier,
+                            std::move(vertexIndices),
+                            definition->get<bool>("closed", false),
+                            definition->get<int>("order"),
+                            knots,
+                            definition->get<bool>("end_interpolation", true));
+                    }
+                    catch( const std::exception& exception )
+                    {
+                        failManifest(DiagnosticCategory::schema,
+                            "Invalid curve definition: " + std::string(exception.what()),
+                            path);
+                    }
+                    geometry->addPrimitive(
+                        std::static_pointer_cast<HouGeoAdapter::CurvePrimitive>(curve));
                 }
                 else if( type == "packed_geometry" )
                 {

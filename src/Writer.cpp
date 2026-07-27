@@ -94,6 +94,9 @@ namespace houio
             {WriterDataType::packed_disk_sequence, WriterCapabilityLevel::supported,
                 true, true, "packed_disk_sequence",
                 "Ordered PackedDiskSequence sample references with fractional index, wrap mode, transform, and viewport metadata."},
+            {WriterDataType::curves, WriterCapabilityLevel::supported,
+                true, true, "curves",
+                "NURBS and Bezier curve records with topology, closure, order, knots, endpoint interpolation, and rational Pw attributes."},
             {WriterDataType::sparse_openvdb, WriterCapabilityLevel::supported,
                 true, true, "sparse_openvdb",
                 "Lossless opaque Houdini VDB payload pass-through in every build; SparseFloatGrid, SparseInt32Grid, and SparseVec3fGrid voxel and active-tile construction are serialized as native Houdini VDB records when the optional OpenVDB backend is compiled."}

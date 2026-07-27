@@ -1209,6 +1209,18 @@ namespace houio
 							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
 						++topologyVertexOffset;
 					}
+					else if( auto curve = std::dynamic_pointer_cast<const HouGeoAdapter::CurvePrimitive>(primitive) )
+					{
+						if( !exportPrimitive(context, curve) )
+							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a curve primitive" );
+						const std::size_t curveVertexCount = curve->vertexIndices().size();
+						if( curveVertexCount > static_cast<std::size_t>(
+							std::numeric_limits<sint64>::max() - topologyVertexOffset) )
+						{
+							throw std::overflow_error( "HouGeoIO::exportGeometry curve vertex total exceeds sint64 range" );
+						}
+						topologyVertexOffset += static_cast<sint64>(curveVertexCount);
+					}
 					else if( auto polygonRun = std::dynamic_pointer_cast<const HouGeoAdapter::PolyPrimitive>(primitive) )
 					{
 						if( topologyVertexOffset > std::numeric_limits<int>::max() )
@@ -2111,6 +2123,54 @@ namespace houio
 		writer.jsonInt32(nativeVdb->topologyVertex());
 		writer.jsonString("vdb");
 		writeJsonValue(writer, json::Value::createArray(nativeVdb->serializedPayload()));
+		writer.jsonEndArray();
+		writer.jsonEndArray();
+		return true;
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::CurvePrimitive::ConstPtr curve )
+	{
+		if( !curve || curve->vertexIndices().size() < 2
+			|| curve->order() < 2 || curve->knots().empty() )
+		{
+			return false;
+		}
+
+		json::BinaryWriter &writer = context.writer;
+		writer.jsonBeginArray();
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString(curve->basis() == HouGeoAdapter::CurvePrimitive::Basis::nurbs
+			? "NURBCurve" : "BezierCurve");
+		writer.jsonEndArray();
+
+		writer.jsonBeginArray();
+		writer.jsonString("vertex");
+		writer.jsonBeginArray();
+		for( const int vertex : curve->vertexIndices() )
+			writer.jsonInt32(vertex);
+		writer.jsonEndArray();
+		writer.jsonString("closed");
+		writer.jsonBool(curve->isClosed());
+		writer.jsonString("basis");
+		writer.jsonBeginArray();
+		writer.jsonString("type");
+		writer.jsonString(curve->basis() == HouGeoAdapter::CurvePrimitive::Basis::nurbs
+			? "NURBS" : "Bezier");
+		writer.jsonString("order");
+		writer.jsonInt32(curve->order());
+		if( curve->basis() == HouGeoAdapter::CurvePrimitive::Basis::nurbs )
+		{
+			writer.jsonString("endinterpolation");
+			writer.jsonBool(curve->endInterpolation());
+		}
+		writer.jsonString("knots");
+		writer.jsonBeginArray();
+		for( const real64 knot : curve->knots() )
+			writer.jsonReal64(knot);
+		writer.jsonEndArray();
+		writer.jsonEndArray();
 		writer.jsonEndArray();
 		writer.jsonEndArray();
 		return true;

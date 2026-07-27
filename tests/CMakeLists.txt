@@ -49,6 +49,11 @@ target_link_libraries(houio_test_polygon_runs PRIVATE houio::houio)
 target_compile_features(houio_test_polygon_runs PRIVATE cxx_std_20)
 add_test(NAME houio.polygon_runs COMMAND houio_test_polygon_runs)
 
+add_executable(houio_test_curves test_curves.cpp)
+target_link_libraries(houio_test_curves PRIVATE houio::houio)
+target_compile_features(houio_test_curves PRIVATE cxx_std_20)
+add_test(NAME houio.curves COMMAND houio_test_curves)
+
 add_executable(houio_test_groups test_groups.cpp)
 target_link_libraries(houio_test_groups PRIVATE houio::houio)
 target_compile_features(houio_test_groups PRIVATE cxx_std_20)
@@ -291,6 +296,18 @@ if(HOUIO_HYTHON_EXECUTABLE)
             ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
     )
 
+    add_test(
+        NAME houio.hom_curve_manifest
+        COMMAND
+            "${HOUIO_HYTHON_EXECUTABLE}"
+            "${PROJECT_SOURCE_DIR}/tools/houdini/test_curve_manifest_extraction.py"
+    )
+    set_tests_properties(
+        houio.hom_curve_manifest
+        PROPERTIES
+            ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
+    )
+
     if(TARGET houio_cli)
         add_test(
             NAME houio.hom_direct_writer
@@ -369,6 +386,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
         open_polygon
         uv_seam
         multiple_polygon_runs
+        curves
         global_attributes
         dense_volume
         native_vdb
@@ -398,6 +416,23 @@ if(HOUIO_HYTHON_EXECUTABLE)
         houio.fixtures.native_vdb.payload
         PROPERTIES FIXTURES_REQUIRED houio_fixture_sources
     )
+
+    if(TARGET houio_cli)
+        add_test(
+            NAME houio.fixtures.curves.inspect
+            COMMAND
+                $<TARGET_FILE:houio_cli>
+                inspect
+                "${HOUIO_FIXTURE_SOURCE_DIR}/curves.bgeo"
+                --json
+        )
+        set_tests_properties(
+            houio.fixtures.curves.inspect
+            PROPERTIES
+                FIXTURES_REQUIRED houio_fixture_sources
+                PASS_REGULAR_EXPRESSION "\"curve_records\":2"
+        )
+    endif()
 
     set(HOUIO_FIXTURE_ROUNDTRIP_TESTS)
     foreach(HOUIO_FIXTURE_NAME IN LISTS HOUIO_FIXTURE_NAMES)

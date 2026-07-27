@@ -165,6 +165,9 @@ namespace houio
             HouGeoAdapter::NativeVdbPrimitive::ConstPtr native_vdb);
         static bool exportPrimitive(
             ExportContext& context,
+            HouGeoAdapter::CurvePrimitive::ConstPtr curve);
+        static bool exportPrimitive(
+            ExportContext& context,
             HouGeoAdapter::PolyPrimitive::ConstPtr polygon_run,
             int start_vertex);
         static bool exportGroup(
