@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <streambuf>
 
 namespace houio
 {
@@ -22,6 +23,98 @@ namespace houio
                 std::move(path)});
             return result;
         }
+
+        class TileStreamBuffer final : public std::streambuf
+        {
+        public:
+            explicit TileStreamBuffer(std::size_t tileSize)
+                : tile_size_(tileSize)
+            {
+                payload_ = json::Array::create();
+                json::ObjectPtr metadata = json::Object::create();
+                metadata->appendValue("tilesize", static_cast<sint32>(tileSize));
+                payload_->append(metadata);
+                pending_.reserve(tileSize);
+            }
+
+            [[nodiscard]] json::ArrayPtr finish()
+            {
+                flushTile();
+                return first_byte_count_ == first_bytes_.size()
+                    && NativeVdbPayload::hasOpenVdbMagic(first_bytes_)
+                    ? payload_
+                    : json::ArrayPtr{};
+            }
+
+        protected:
+            std::streamsize xsputn(const char* source, std::streamsize count) override
+            {
+                if( count <= 0 )
+                    return 0;
+                const std::size_t requested = static_cast<std::size_t>(count);
+                const auto* bytes = reinterpret_cast<const ubyte*>(source);
+                std::size_t offset = 0;
+                while( offset < requested )
+                {
+                    const std::size_t available = tile_size_ - pending_.size();
+                    const std::size_t chunk = std::min(available, requested - offset);
+                    recordMagic(std::span<const ubyte>(bytes + offset, chunk));
+                    pending_.insert(
+                        pending_.end(), bytes + offset, bytes + offset + chunk);
+                    offset += chunk;
+                    if( pending_.size() == tile_size_ )
+                        flushTile();
+                }
+                return count;
+            }
+
+            int_type overflow(int_type character) override
+            {
+                if( traits_type::eq_int_type(character, traits_type::eof()) )
+                    return traits_type::not_eof(character);
+                const char value = traits_type::to_char_type(character);
+                return xsputn(&value, 1) == 1
+                    ? character
+                    : traits_type::eof();
+            }
+
+            int sync() override
+            {
+                return 0;
+            }
+
+        private:
+            void recordMagic(std::span<const ubyte> bytes)
+            {
+                const std::size_t missing = first_bytes_.size() - first_byte_count_;
+                const std::size_t count = std::min(missing, bytes.size());
+                std::copy_n(
+                    bytes.begin(),
+                    count,
+                    first_bytes_.begin() + static_cast<std::ptrdiff_t>(first_byte_count_));
+                first_byte_count_ += count;
+            }
+
+            void flushTile()
+            {
+                if( pending_.empty() )
+                    return;
+                json::ArrayPtr tile = json::Array::create();
+                const std::span<const ubyte> values(pending_.data(), pending_.size());
+                tile->setUniformStorage(
+                    static_cast<int>(json::variantIndex<ubyte, json::Value::Variant>),
+                    static_cast<sint64>(pending_.size()),
+                    std::as_bytes(values));
+                payload_->append(tile);
+                pending_.clear();
+            }
+
+            std::size_t tile_size_ = 0;
+            json::ArrayPtr payload_;
+            std::vector<ubyte> pending_;
+            std::array<ubyte, 4> first_bytes_{};
+            std::size_t first_byte_count_ = 0;
+        };
 
         GeometryReadResult<std::vector<ubyte>> decodeFailure(
             DiagnosticCategory category,
@@ -79,6 +172,69 @@ namespace houio
         result.value = std::move(payload);
         result.succeeded = true;
         return result;
+    }
+
+    GeometryReadResult<json::ArrayPtr> NativeVdbPayload::encodeStream(
+        const StreamWriter& writer,
+        std::size_t tileSize)
+    {
+        if( !writer )
+        {
+            return encodeFailure(
+                DiagnosticCategory::schema,
+                "Native VDB stream writer cannot be empty",
+                "vdb.writer");
+        }
+        if( tileSize == 0
+            || tileSize > static_cast<std::size_t>(std::numeric_limits<sint32>::max()) )
+        {
+            return encodeFailure(
+                DiagnosticCategory::schema,
+                "Native VDB payload tile size is outside the supported range",
+                "vdb.tilesize");
+        }
+
+        try
+        {
+            TileStreamBuffer buffer(tileSize);
+            std::ostream output(&buffer);
+            GeometryWriteResult writeResult = writer(output);
+            output.flush();
+            if( !writeResult )
+            {
+                GeometryReadResult<json::ArrayPtr> result;
+                result.diagnostics = std::move(writeResult.diagnostics);
+                return result;
+            }
+            if( !output )
+            {
+                return encodeFailure(
+                    DiagnosticCategory::io,
+                    "Native VDB stream writer failed while producing payload bytes",
+                    "vdb.stream");
+            }
+
+            json::ArrayPtr payload = buffer.finish();
+            if( !payload )
+            {
+                return encodeFailure(
+                    DiagnosticCategory::malformed_input,
+                    "Native VDB stream writer did not produce OpenVDB magic",
+                    "vdb.stream");
+            }
+
+            GeometryReadResult<json::ArrayPtr> result;
+            result.value = std::move(payload);
+            result.succeeded = true;
+            return result;
+        }
+        catch( const std::exception& exception )
+        {
+            return encodeFailure(
+                DiagnosticCategory::conversion,
+                std::string("Native VDB stream encoding failed: ") + exception.what(),
+                "vdb.stream");
+        }
     }
 
     GeometryReadResult<std::vector<ubyte>> NativeVdbPayload::decode(

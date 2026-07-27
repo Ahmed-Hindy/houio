@@ -650,6 +650,12 @@ namespace houio
                                 activeIndices[coordinateOffset + 2]),
                             activeValues[valueIndex]);
                     }
+                    if( grid.activeVoxelCount() != activeValues.size() )
+                    {
+                        failManifest(DiagnosticCategory::schema,
+                            "Sparse VDB active indices contain duplicate coordinates",
+                            path + ".active_indices");
+                    }
 
                     if( const json::ObjectPtr metadata = definition->object("metadata") )
                     {

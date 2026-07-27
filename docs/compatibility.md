@@ -115,7 +115,7 @@ The default standalone library does not link to OpenVDB, but it recognizes nativ
 
 `SparseFloatGrid` adds dependency-neutral sparse voxel construction and editing. Configuring `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid read/write and in-memory stream encoding through `OpenVdbBackend`, including linear transforms, fog/level-set class, names, creator metadata, and string metadata. `NativeVdbPayload` wraps those streams as Houdini's tiled native VDB primitive payload, allowing `HouSparseVdb` and `sparse_float_vdb` manifests to produce native BGEO/SCF records.
 
-Direct HOM extraction supports scalar Float VDBs when the sampled non-background voxel count exactly matches Houdini's authoritative active count. It rejects ambiguous topology, active tiles, nonlinear/tapered transforms, local-space and half-float policies, non-float grids, and active bounding boxes larger than 16,777,216 voxels. The compatibility bridge remains available for supported grids that must pass through a dense workflow.
+Direct HOM extraction supports scalar Float VDBs when the sampled non-background voxel count exactly matches Houdini's authoritative active count. It rejects ambiguous topology, active tiles, nonlinear/tapered transforms, local-space and half-float policies, non-float grids, and active bounding boxes larger than 262,144 voxels. The compatibility bridge remains available for supported grids that must pass through a dense workflow.
 
 ## Distribution status
 

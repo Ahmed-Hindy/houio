@@ -2010,14 +2010,15 @@ namespace houio
 		if( !sparseVdb || sparseVdb->topologyVertex() < 0 )
 			return false;
 
-		const auto encoded = OpenVdbBackend::encodeFloatGrid(sparseVdb->sparseGrid());
-		if( !encoded )
-			throwReadFailure(encoded.diagnostics,
-				"HouGeoIO could not encode SparseFloatGrid as an OpenVDB stream");
-		const auto payload = NativeVdbPayload::encode(encoded.value);
+		const auto payload = NativeVdbPayload::encodeStream(
+			[&](std::ostream& output)
+			{
+				return OpenVdbBackend::encodeFloatGrid(
+					output, sparseVdb->sparseGrid());
+			});
 		if( !payload )
 			throwReadFailure(payload.diagnostics,
-				"HouGeoIO could not wrap the OpenVDB stream as a Houdini VDB payload");
+				"HouGeoIO could not stream SparseFloatGrid into a Houdini VDB payload");
 
 		auto nativeVdb = std::make_shared<HouGeo::HouVdb>();
 		nativeVdb->setTopologyVertex(sparseVdb->topologyVertex());

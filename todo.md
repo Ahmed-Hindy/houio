@@ -7,7 +7,9 @@ The long-term roadmap remains below. The active modernization program is summari
 - Branch: `feat/houdini-native-vdb-payload`
 - Baseline commit: `8aad199` (`master` after merged PR #38).
 - Current exact source: MSVC warnings-as-errors/Houdini suite passes **61/61**.
-- Direct scalar Float VDB extraction, including ambiguous-activity rejection, passes with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Current exact source: Windows AddressSanitizer passes **25/25** and MSVC native analysis is error-clean.
+- The 19-fixture and Houdini package matrices pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Direct scalar Float VDB extraction, including ambiguous-activity rejection, passes in all four maintained Houdini versions.
 - The active branch adds standard-stream/native-payload conversion, constructed sparse VDB primitives, exact live-HOM extraction, and an OpenVDB-enabled Linux CI gate.
 
 ## Modernization completed

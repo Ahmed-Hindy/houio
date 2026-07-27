@@ -65,12 +65,12 @@ Every phase must preserve these constraints:
 
 ## Current validation status
 
-- Current exact source: MSVC warnings-as-errors CTest suite passes **57/57**.
-- Current exact source: full Release/Houdini matrix passes **57/57**.
-- Current exact source: Windows AddressSanitizer matrix passes **24/24**.
+- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **61/61**.
+- Current exact source: Windows AddressSanitizer matrix passes **25/25**.
 - MSVC native static analysis is error-clean.
-- The 18-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
-- Documentation records the primary Writer/CLI/HOM workflow, packed geometry/fragment/disk support, native VDB payload preservation, and remaining backend limitations.
+- The 19-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Exact scalar Float VDB live-HOM extraction and ambiguous-activity rejection pass in all four maintained Houdini versions.
+- Documentation records the primary Writer/CLI/HOM workflow, packed record support, opaque native VDB preservation, constructed native payloads, and remaining sparse-grid limitations.
 - Phases 11–31 are merged into `master` through PRs #31 and #32.
 - Phases 32–34 are complete and merged. Phase 35 supports embedded PackedGeometry, named PackedFragment, external PackedDisk, and PackedDiskSequence records. Phase 36 preserves opaque native VDB payloads, provides dependency-neutral sparse FloatGrid editing, optional native `.vdb` I/O, native Houdini payload generation, and exact scalar Float VDB live-HOM extraction.
 

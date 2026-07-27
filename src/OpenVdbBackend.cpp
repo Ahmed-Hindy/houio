@@ -2,7 +2,9 @@
 
 #include <array>
 #include <exception>
+#include <limits>
 #include <sstream>
+#include <streambuf>
 #include <system_error>
 #include <utility>
 
@@ -29,6 +31,18 @@ namespace houio
         }
 
 #if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
+        class SpanInputBuffer final : public std::streambuf
+        {
+        public:
+            explicit SpanInputBuffer(std::span<const ubyte> bytes)
+            {
+                char* first = const_cast<char*>(
+                    reinterpret_cast<const char*>(bytes.data()));
+                setg(first, first,
+                    first + static_cast<std::ptrdiff_t>(bytes.size()));
+            }
+        };
+
         openvdb::math::Mat4R toOpenVdbMatrix(const math::M44f& source)
         {
             openvdb::math::Mat4R result = openvdb::math::Mat4R::identity();
@@ -337,22 +351,30 @@ namespace houio
         return result;
     }
 
-    GeometryReadResult<std::vector<ubyte>> OpenVdbBackend::encodeFloatGrid(
+    GeometryWriteResult OpenVdbBackend::encodeFloatGrid(
+        std::ostream& output,
         const SparseFloatGrid& grid)
     {
-        GeometryReadResult<std::vector<ubyte>> result;
+        GeometryWriteResult result;
 #if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
         try
         {
             openvdb::initialize();
             openvdb::GridPtrVec grids;
             grids.push_back(openVdbFromSparse(grid));
-            std::ostringstream output(std::ios::out | std::ios::binary);
             openvdb::io::Stream archive(output);
             archive.write(grids);
-            const std::string bytes = output.str();
-            const auto* first = reinterpret_cast<const ubyte*>(bytes.data());
-            result.value.assign(first, first + bytes.size());
+            output.flush();
+            if( !output )
+            {
+                result.diagnostics.push_back(Diagnostic{
+                    DiagnosticSeverity::error,
+                    DiagnosticCategory::io,
+                    "OpenVDB stream write failed",
+                    -1,
+                    "openvdb_stream"});
+                return result;
+            }
             result.succeeded = true;
         }
         catch( const std::exception& exception )
@@ -360,14 +382,33 @@ namespace houio
             result.diagnostics.push_back(Diagnostic{
                 DiagnosticSeverity::error,
                 DiagnosticCategory::conversion,
-                std::string("OpenVDB in-memory write failed: ") + exception.what(),
+                std::string("OpenVDB stream write failed: ") + exception.what(),
                 -1,
                 "openvdb_stream"});
         }
 #else
+        static_cast<void>(output);
         static_cast<void>(grid);
         result.diagnostics.push_back(unavailableDiagnostic());
 #endif
+        return result;
+    }
+
+    GeometryReadResult<std::vector<ubyte>> OpenVdbBackend::encodeFloatGrid(
+        const SparseFloatGrid& grid)
+    {
+        GeometryReadResult<std::vector<ubyte>> result;
+        std::ostringstream output(std::ios::out | std::ios::binary);
+        GeometryWriteResult writeResult = encodeFloatGrid(output, grid);
+        if( !writeResult )
+        {
+            result.diagnostics = std::move(writeResult.diagnostics);
+            return result;
+        }
+        const std::string bytes = output.str();
+        const auto* first = reinterpret_cast<const ubyte*>(bytes.data());
+        result.value.assign(first, first + bytes.size());
+        result.succeeded = true;
         return result;
     }
 
@@ -377,13 +418,32 @@ namespace houio
     {
         GeometryReadResult<SparseFloatGrid> result;
 #if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
+        if( openvdbStream.empty() )
+        {
+            result.diagnostics.push_back(Diagnostic{
+                DiagnosticSeverity::error,
+                DiagnosticCategory::malformed_input,
+                "OpenVDB stream cannot be empty",
+                -1,
+                "openvdb_stream"});
+            return result;
+        }
+        if( openvdbStream.size()
+            > static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max()) )
+        {
+            result.diagnostics.push_back(Diagnostic{
+                DiagnosticSeverity::error,
+                DiagnosticCategory::unsupported_input,
+                "OpenVDB stream exceeds this platform's stream-buffer range",
+                -1,
+                "openvdb_stream"});
+            return result;
+        }
         try
         {
             openvdb::initialize();
-            const std::string bytes(
-                reinterpret_cast<const char*>(openvdbStream.data()),
-                openvdbStream.size());
-            std::istringstream input(bytes, std::ios::in | std::ios::binary);
+            SpanInputBuffer inputBuffer(openvdbStream);
+            std::istream input(&inputBuffer);
             openvdb::io::Stream archive(input, false);
             const openvdb::GridPtrVecPtr grids = archive.getGrids();
             openvdb::GridBase::Ptr selected;

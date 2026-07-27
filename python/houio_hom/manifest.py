@@ -12,7 +12,7 @@ import hou
 
 PathLike = Union[str, Path]
 _SCHEMA = "houio.hom/1"
-_MAX_VDB_SCAN_VOXELS = 16 * 1024 * 1024
+_MAX_VDB_SCAN_VOXELS = 256 * 1024
 
 
 class UnsupportedHOMDataError(ValueError):

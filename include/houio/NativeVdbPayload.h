@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
+#include <ostream>
 #include <span>
 #include <vector>
 
@@ -21,8 +23,14 @@ namespace houio
 
         NativeVdbPayload() = delete;
 
+        using StreamWriter = std::function<GeometryWriteResult(std::ostream&)>;
+
         [[nodiscard]] static GeometryReadResult<json::ArrayPtr> encode(
             std::span<const ubyte> openvdb_stream,
+            std::size_t tile_size = defaultTileSize);
+
+        [[nodiscard]] static GeometryReadResult<json::ArrayPtr> encodeStream(
+            const StreamWriter& writer,
             std::size_t tile_size = defaultTileSize);
 
         [[nodiscard]] static GeometryReadResult<std::vector<ubyte>> decode(

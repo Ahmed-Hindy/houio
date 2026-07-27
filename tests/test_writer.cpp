@@ -338,11 +338,12 @@ namespace
         houio::SparseFloatGrid sparseGrid(0.0f);
         sparseGrid.setName("density");
         sparseGrid.setGridClass(houio::SparseGridClass::fog_volume);
-        sparseGrid.setIndexToWorld(houio::math::M44f(
+        const houio::math::M44f sparseVdbTransform(
             0.5f, 0.0f, 0.0f, 0.0f,
             0.0f, 0.5f, 0.0f, 0.0f,
             0.0f, 0.0f, 0.5f, 0.0f,
-            -0.75f, -0.75f, -0.75f, 1.0f));
+            -0.75f, -0.75f, -0.75f, 1.0f);
+        sparseGrid.setIndexToWorld(sparseVdbTransform);
         sparseGrid.setVoxel(houio::math::V3i(1, 1, 1), 1.0f);
         sparseGrid.setVoxel(houio::math::V3i(2, 1, 1), 2.0f);
         auto sparseVdb = std::make_shared<houio::HouGeo::HouSparseVdb>();
@@ -370,6 +371,8 @@ namespace
             return fail("Constructed native VDB payload could not be decoded");
         const auto decodedGrid = houio::OpenVdbBackend::decodeFloatGrid(stream.value, "density");
         if( !decodedGrid || decodedGrid.value.activeVoxelCount() != 2
+            || decodedGrid.value.gridClass() != houio::SparseGridClass::fog_volume
+            || decodedGrid.value.indexToWorld().ma != sparseVdbTransform.ma
             || decodedGrid.value.value(houio::math::V3i(1, 1, 1)) != 1.0f
             || decodedGrid.value.value(houio::math::V3i(2, 1, 1)) != 2.0f )
         {

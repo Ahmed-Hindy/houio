@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <ostream>
 #include <span>
 #include <string>
 #include <vector>
@@ -33,6 +34,10 @@ namespace houio
             const SparseFloatGrid& grid,
             bool overwrite_existing = true,
             bool create_parent_directories = true);
+
+        [[nodiscard]] static GeometryWriteResult encodeFloatGrid(
+            std::ostream& output,
+            const SparseFloatGrid& grid);
 
         [[nodiscard]] static GeometryReadResult<std::vector<ubyte>> encodeFloatGrid(
             const SparseFloatGrid& grid);

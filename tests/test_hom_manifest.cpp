@@ -403,6 +403,28 @@ namespace
         const auto result = houio::HomManifest::read(path);
         if( result || !containsCategory(result.diagnostics, houio::DiagnosticCategory::schema) )
             return fail("invalid sparse VDB manifest did not return a schema diagnostic");
+
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1",
+            "point_count":1,"vertex_count":1,"primitive_count":1,
+            "topology":[0],
+            "primitives":[{
+                "type":"sparse_float_vdb","vertex_offset":0,
+                "grid_class":"fog_volume","background":0.0,
+                "index_to_world":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                "active_indices":[1,2,3,1,2,3],"active_values":[1.0,2.0]
+            }],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":1,
+            "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto duplicateResult = houio::HomManifest::read(path);
+        if( duplicateResult
+            || !containsCategory(
+                duplicateResult.diagnostics, houio::DiagnosticCategory::schema) )
+        {
+            return fail("duplicate sparse VDB coordinates were not rejected");
+        }
         return 0;
     }
 

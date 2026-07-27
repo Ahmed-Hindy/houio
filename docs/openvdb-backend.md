@@ -38,7 +38,7 @@ An active voxel may have the same numeric value as the background. Activity and 
 - Fog-volume and level-set classes.
 - Grid names and string metadata.
 
-`NativeVdbPayload` validates and converts between one standard OpenVDB stream and Houdini's tiled `vdb` primitive payload. `HouSparseVdb` uses that codec during BGEO/SCF serialization when the optional backend is compiled.
+`NativeVdbPayload` validates and converts between one standard OpenVDB stream and Houdini's tiled `vdb` primitive payload. `encodeStream()` accepts a stream-producing callback and emits fixed-size tiles incrementally, so `HouSparseVdb` construction does not retain a second complete OpenVDB byte buffer during BGEO/SCF serialization.
 
 When the backend is disabled, OpenVDB-dependent operations return an `unsupported_input` diagnostic instead of attempting a dense fallback. Opaque native payload pass-through remains available in every build.
 
@@ -46,7 +46,7 @@ When the backend is disabled, OpenVDB-dependent operations return an `unsupporte
 
 This backend does not yet represent active OpenVDB tiles. Reading a `FloatGrid` that contains an active tile returns an explicit unsupported diagnostic rather than expanding an unbounded tile into voxels. Nonlinear/frustum transforms are also rejected.
 
-Live HOM extraction supports scalar Float VDBs only when exact active topology can be proven from `activeVoxelCount()`, the exclusive active bounding box, and sampled values. It rejects active background-valued voxels, inactive interior values, active tiles, half-float policy, local-space grids, and scan domains larger than 16,777,216 voxels rather than approximating them.
+Live HOM extraction supports scalar Float VDBs only when exact active topology can be proven from `activeVoxelCount()`, the exclusive active bounding box, and sampled values. It rejects active background-valued voxels, inactive interior values, active tiles, half-float policy, local-space grids, and scan domains larger than 262,144 voxels rather than approximating them.
 
 Remaining backend increments are:
 
