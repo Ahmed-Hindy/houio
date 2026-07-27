@@ -467,6 +467,32 @@ def _primitive_manifest(primitive: hou.Prim) -> dict[str, Any]:
             "treat_as_folder": bool(primitive.intrinsicValue("treatasfolder")),
             "embedded_manifest": geometry_manifest(primitive.getEmbeddedGeometry()),
         }
+    if type_name in {"NURBSCurve", "BezierCurve"}:
+        if type_name == "NURBSCurve":
+            raise UnsupportedHOMDataError(
+                "Direct HOM extraction cannot preserve a NURBS curve's exact "
+                "endinterpolation policy because HOM does not expose that serialized "
+                "basis flag. Use file-level round-trip preservation or construct an "
+                "explicit nurbs_curve manifest."
+            )
+        knots = [float(value) for value in primitive.intrinsicValue("knots")]
+        if not knots or any(not math.isfinite(value) for value in knots):
+            raise UnsupportedHOMDataError(
+                f"{type_name} contains missing or non-finite knot values"
+            )
+        if any(left > right for left, right in zip(knots, knots[1:])):
+            raise UnsupportedHOMDataError(
+                f"{type_name} contains decreasing knot values"
+            )
+        result: dict[str, Any] = {
+            "type": "bezier_curve",
+            "vertex_offset": vertex_offset,
+            "vertex_count": len(vertices),
+            "closed": bool(primitive.intrinsicValue("closed")),
+            "order": int(primitive.intrinsicValue("order")),
+            "knots": knots,
+        }
+        return result
     if isinstance(primitive, hou.VDB):
         return _sparse_vdb_manifest(primitive, vertex_offset)
     if isinstance(primitive, hou.Volume):

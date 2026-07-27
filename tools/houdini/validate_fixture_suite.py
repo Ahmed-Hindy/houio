@@ -357,6 +357,19 @@ def primitive_summary(geometry: hou.Geometry) -> list[dict[str, Any]]:
                 }
             )
             continue
+        if primitive.type().name() in {"NURBSCurve", "BezierCurve"}:
+            summaries.append(
+                {
+                    "type": primitive.type().name(),
+                    "closed": primitive.isClosed(),
+                    "points": [vertex.point().number() for vertex in primitive.vertices()],
+                    "basis": str(primitive.intrinsicValue("basis")),
+                    "order": int(primitive.intrinsicValue("order")),
+                    "knots": [float(value) for value in primitive.intrinsicValue("knots")],
+                    "rational": int(primitive.intrinsicValue("rational")),
+                }
+            )
+            continue
 
         summaries.append(
             {

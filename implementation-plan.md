@@ -65,10 +65,10 @@ Every phase must preserve these constraints:
 
 ## Current validation status
 
-- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **61/61**.
-- Current exact source: Windows AddressSanitizer matrix passes **61/61**.
+- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **65/65**.
+- Current exact source: Windows AddressSanitizer matrix passes **65/65**.
 - MSVC native static analysis is error-clean.
-- The 19-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- The 20-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Exact scalar Float VDB live-HOM extraction and ambiguous-activity rejection pass in all four maintained Houdini versions.
 - Documentation records the primary Writer/CLI/HOM workflow, packed record support, opaque native VDB preservation, constructed native payloads, and remaining sparse-grid limitations.
 - Phases 11–31 are merged into `master` through PRs #31 and #32.
@@ -1062,7 +1062,7 @@ Exit criteria:
 
 ### Phase 39 — Sparse Vec3f VDB support
 
-**Status: in progress on `feat/sparse-vec3f-vdb`.**
+**Status: complete and merged through PR #43.**
 
 Goals:
 
@@ -1083,6 +1083,30 @@ Exit criteria:
 - OpenVDB-enabled CI validates Vec3f file, stream, manifest, package-consumer, and native Houdini payload round trips.
 - Strict, AddressSanitizer, static-analysis, and maintained Houdini matrices pass.
 
+### Phase 40 — Faithful NURBS and Bezier curves
+
+**Status: complete locally on `feat/nurbs-bezier-curves`; pending merge.**
+
+Goals:
+
+- Add a faithful `CurvePrimitive` adapter and concrete `HouCurve` representation.
+- Preserve NURBS and Bezier basis type, topology vertex indices, closure, order, knots, and NURBS endpoint-interpolation policy.
+- Preserve rational curve weights through the ordinary `Pw` point attribute.
+- Read and write direct `NURBCurve` and `BezierCurve` Houdini records without converting them to polygon curves.
+- Add explicit `nurbs_curve` and `bezier_curve` manifest construction.
+- Add exact direct HOM extraction for Bezier curves.
+- Reject direct NURBS HOM extraction because HOM does not expose the serialized `endinterpolation` flag; keep NURBS exact through file and explicit-manifest workflows.
+- Add curve capability and CLI inspection reporting.
+
+Exit criteria:
+
+- Open and closed NURBS and Bezier records preserve topology, order, knots, closure, attributes, and groups.
+- Rational `Pw` values survive parser/writer and maintained Houdini round trips.
+- Malformed basis names, topology indices, orders, knot vectors, and incompatible Bezier vertex counts are rejected.
+- Explicit manifests construct both curve families, and direct HOM extraction preserves Bezier records without native Houdini file writers.
+- The 20-fixture matrix passes in Houdini 20.0, 20.5, 21.0, and 22.0.
+- Strict, AddressSanitizer, static-analysis, package-consumer, and maintained Houdini validation pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
@@ -1093,7 +1117,8 @@ The following remain separate from the active product-facing phases unless requi
 - [x] Native Houdini VDB payload generation from sparse grids and exact scalar Float VDB live-HOM extraction.
 - [x] Active FloatGrid tile representation and explicit manifest construction.
 - [x] Complete scalar Int32-grid support.
-- [ ] Complete Vec3f vector-grid support, then nonlinear transforms and exact live-HOM extraction for currently ambiguous activity.
+- [x] Complete Vec3f vector-grid support.
+- [ ] Add nonlinear transforms and exact live-HOM extraction for currently ambiguous activity.
 - Performance architecture changes that bypass the JSON tree.
 - Project-wide licensing and third-party provenance resolution.
 

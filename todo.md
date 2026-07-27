@@ -4,13 +4,13 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `feat/sparse-vec3f-vdb`
-- Baseline commit: `cb824ec` (`master` after merged PR #42).
-- Current exact source: MSVC warnings-as-errors/Houdini suite passes **61/61**.
-- Current exact source: Windows AddressSanitizer passes **61/61** and MSVC native analysis is error-clean.
-- The 19-fixture and Houdini package matrices pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Branch: `feat/nurbs-bezier-curves`
+- Baseline commit: `f528c03` (`master` after merged PR #43).
+- Current exact source: MSVC warnings-as-errors/Houdini suite passes **65/65**.
+- Current exact source: Windows AddressSanitizer passes **65/65** and MSVC native analysis is error-clean.
+- The 20-fixture matrix passes with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Direct scalar Float VDB extraction, including ambiguous-activity rejection, passes in all four maintained Houdini versions.
-- The active branch adds dependency-neutral `SparseVec3fGrid`, explicit OpenVDB vector semantics, staggered-grid class support, optional `Vec3SGrid` I/O, and `sparse_vec3f_vdb` manifest construction.
+- The active branch adds faithful NURBS and Bezier records, exact file/manifest round trips, direct Bezier HOM extraction, rational `Pw` preservation, capability reporting, and four-version fixtures.
 
 ## Modernization completed
 
@@ -101,7 +101,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Generate native Houdini VDB primitive payloads from the sparse-grid model and wire exact scalar Float VDB live-HOM extraction.
 - [x] Preserve active FloatGrid tiles in the sparse model and construct them through explicit `houio.hom/1` manifests.
 - [x] Complete scalar Int32 VDB support through merged PR #42.
-- [ ] Add Vec3f VDB values, vector semantics, and staggered-grid support before curves, instancing, height fields, and other observed records.
+- [x] Add Vec3f VDB values, vector semantics, and staggered-grid support through merged PR #43.
+- [ ] Complete and merge faithful NURBS and Bezier curve support before spheres, tubes, instancing, height fields, and other observed records.
 
 ## Modernization completed follow-up
 
@@ -196,7 +197,7 @@ Add fixture-backed support one record type at a time:
 - [x] Named packed fragments
 - [x] External packed disk references
 - [x] Packed disk sequences
-- [ ] NURBS and Bezier curves
+- [ ] NURBS and Bezier curves — complete locally on `feat/nurbs-bezier-curves`, pending merge
 - [ ] Spheres and tubes
 - [ ] Tetrahedra
 - [ ] Height fields
@@ -213,7 +214,8 @@ Add fixture-backed support one record type at a time:
 - [x] Define an optional public OpenVDB adapter with sparse FloatGrid preservation.
 - [x] Add active FloatGrid tile support in the sparse model, optional OpenVDB backend, and explicit manifests.
 - [x] Complete scalar Int32-grid support.
-- [ ] Add Vec3f vector-grid support, then nonlinear transforms and exact live-HOM extraction for currently ambiguous activity.
+- [x] Add Vec3f vector-grid support.
+- [ ] Add nonlinear transforms and exact live-HOM extraction for currently ambiguous activity.
 
 ## P2 — Data model
 

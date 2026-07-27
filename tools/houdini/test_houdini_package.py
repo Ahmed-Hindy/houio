@@ -94,6 +94,47 @@ def validate_roundtrip_sop() -> None:
         geometry_container.destroy()
 
 
+def validate_direct_bezier_writer() -> None:
+    """Validate packaged direct-HOM Bezier extraction and custom serialization."""
+    geometry = hou.Geometry()
+    bezier = geometry.createBezierCurve(6, is_closed=True, order=4)
+    for index, vertex in enumerate(bezier.vertices()):
+        vertex.point().setPosition((float(index), float(index % 2), 0.0))
+    weight = geometry.addAttrib(hou.attribType.Point, "Pw", 1.0)
+    bezier.vertices()[2].point().setAttribValue(weight, 0.5)
+
+    output_path = Path(os.environ.get("TEMP", os.environ["HOUIO_ROOT"])) / (
+        "houio_package_bezier_" + hou.applicationVersionString().replace(".", "_") + ".bgeo"
+    )
+    try:
+        result = houio_hom.write_geometry(geometry, output_path)
+        if not result.success:
+            raise AssertionError(
+                "Packaged direct Bezier writer failed:\n"
+                + result.stderr
+                + "\n"
+                + result.stdout
+            )
+        candidate = hou.Geometry()
+        candidate.loadFromFile(str(output_path))
+        if len(candidate.prims()) != 1 or candidate.prims()[0].type().name() != "BezierCurve":
+            raise AssertionError("Packaged writer did not preserve the Bezier record")
+        curve = candidate.prims()[0]
+        if (
+            int(curve.intrinsicValue("order")) != 4
+            or tuple(float(value) for value in curve.intrinsicValue("knots"))
+            != (0.0, 1.0, 2.0)
+            or not curve.isClosed()
+            or int(curve.intrinsicValue("rational")) != 1
+        ):
+            raise AssertionError("Packaged writer changed Bezier basis metadata")
+        weights = candidate.findPointAttrib("Pw")
+        if weights is None or float(curve.vertices()[2].point().attribValue(weights)) != 0.5:
+            raise AssertionError("Packaged writer changed rational Bezier weights")
+    finally:
+        output_path.unlink(missing_ok=True)
+
+
 def validate_diagnostics() -> None:
     """Validate non-interactive package diagnostics."""
     diagnostics = houio_tools.package_diagnostics()
@@ -140,6 +181,7 @@ def main() -> int:
     validate_environment()
     validate_shelf_tools()
     validate_roundtrip_sop()
+    validate_direct_bezier_writer()
     validate_diagnostics()
     print(
         "HouIO Houdini package passed in "

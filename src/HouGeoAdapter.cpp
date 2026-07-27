@@ -277,6 +277,11 @@ namespace houio
         return false;
     }
 
+    bool HouGeoAdapter::CurvePrimitive::endInterpolation() const
+    {
+        return true;
+    }
+
     int HouGeoAdapter::PolyPrimitive::polygonCount() const
     {
         return 0;

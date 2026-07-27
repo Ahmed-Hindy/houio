@@ -173,6 +173,7 @@ namespace houio
                 packed_disk,
                 packed_disk_sequence,
                 native_vdb,
+                curve,
             };
 
             virtual ~Primitive() = default;
@@ -304,6 +305,26 @@ namespace houio
             /// Opaque Houdini VDB payload retained for lossless file round trips.
             /// Constructing or editing sparse trees requires an optional OpenVDB backend.
             [[nodiscard]] virtual std::shared_ptr<json::Array> serializedPayload() const = 0;
+        };
+
+        class CurvePrimitive : public Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<CurvePrimitive>;
+            using ConstPtr = std::shared_ptr<const CurvePrimitive>;
+
+            enum class Basis
+            {
+                nurbs,
+                bezier,
+            };
+
+            [[nodiscard]] virtual Basis basis() const = 0;
+            [[nodiscard]] virtual std::span<const int> vertexIndices() const = 0;
+            [[nodiscard]] virtual bool isClosed() const = 0;
+            [[nodiscard]] virtual int order() const = 0;
+            [[nodiscard]] virtual std::span<const real64> knots() const = 0;
+            [[nodiscard]] virtual bool endInterpolation() const;
         };
 
         class PolyPrimitive : public Primitive

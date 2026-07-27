@@ -588,6 +588,36 @@ namespace houio
             friend class HouGeo;
         };
 
+        class HouCurve final : public CurvePrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouCurve>;
+            using ConstPtr = std::shared_ptr<const HouCurve>;
+
+            [[nodiscard]] Basis basis() const override;
+            [[nodiscard]] std::span<const int> vertexIndices() const override;
+            [[nodiscard]] bool isClosed() const override;
+            [[nodiscard]] int order() const override;
+            [[nodiscard]] std::span<const real64> knots() const override;
+            [[nodiscard]] bool endInterpolation() const override;
+
+            void setCurveData(
+                Basis basis,
+                std::vector<int> vertex_indices,
+                bool is_closed,
+                int order,
+                std::vector<real64> knots,
+                bool end_interpolation = true);
+
+        private:
+            Basis basis_ = Basis::nurbs;
+            std::vector<int> vertex_indices_;
+            bool is_closed_ = false;
+            int order_ = 4;
+            std::vector<real64> knots_;
+            bool end_interpolation_ = true;
+        };
+
         class HouPoly final : public PolyPrimitive
         {
         public:
@@ -662,6 +692,7 @@ namespace houio
         void addPrimitive(SparseInt32VdbPrimitive::Ptr sparse_vdb);
         void addPrimitive(SparseVec3fVdbPrimitive::Ptr sparse_vdb);
         void addPrimitive(NativeVdbPrimitive::Ptr native_vdb);
+        void addPrimitive(CurvePrimitive::Ptr curve);
         void addPrimitive(PolyPrimitive::Ptr polygon);
         void setTopology(HouTopology::Ptr topology);
 
@@ -729,6 +760,9 @@ namespace houio
         void loadPackedDiskPrimitive(json::ObjectPtr packed_disk);
         void loadPackedDiskSequencePrimitive(json::ObjectPtr packed_disk_sequence);
         void loadNativeVdbPrimitive(json::ObjectPtr native_vdb);
+        void loadCurvePrimitive(
+            json::ObjectPtr curve_object,
+            CurvePrimitive::Basis basis);
         void loadPolyPrimitive(json::ObjectPtr polygon_object);
         void loadPolyPrimitiveRun(
             json::ObjectPtr definition,

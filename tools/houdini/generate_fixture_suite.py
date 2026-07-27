@@ -602,6 +602,28 @@ def build_primitive_groups_geometry() -> hou.Geometry:
     return geometry
 
 
+def build_curves_geometry() -> hou.Geometry:
+    """Build representative rational NURBS and closed Bezier curves."""
+    geometry = hou.Geometry()
+
+    nurbs = geometry.createNURBSCurve(5, is_closed=False, order=4)
+    for index, vertex in enumerate(nurbs.vertices()):
+        vertex.point().setPosition((float(index), float(index % 2), 0.0))
+
+    weight = geometry.addAttrib(hou.attribType.Point, "Pw", 1.0)
+    nurbs.vertices()[2].point().setAttribValue(weight, 0.5)
+
+    bezier = geometry.createBezierCurve(6, is_closed=True, order=4)
+    for index, vertex in enumerate(bezier.vertices()):
+        vertex.point().setPosition((float(index), 3.0 + float(index % 2), 0.0))
+
+    curve_name = geometry.addAttrib(hou.attribType.Prim, "curve_name", "")
+    nurbs.setAttribValue(curve_name, "rational_nurbs")
+    bezier.setAttribValue(curve_name, "closed_bezier")
+    geometry.createPrimGroup("curves").add((nurbs, bezier))
+    return geometry
+
+
 def geometry_summary(geometry: hou.Geometry) -> dict[str, object]:
     """Create a deterministic summary of generated geometry.
 
@@ -616,7 +638,10 @@ def geometry_summary(geometry: hou.Geometry) -> dict[str, object]:
         "vertex_count": sum(len(primitive.vertices()) for primitive in geometry.prims()),
         "primitive_count": len(geometry.prims()),
         "closed": [
-            primitive.isClosed() if isinstance(primitive, hou.Polygon) else None
+            primitive.isClosed()
+            if isinstance(primitive, hou.Polygon)
+            or primitive.type().name() in {"NURBSCurve", "BezierCurve"}
+            else None
             for primitive in geometry.prims()
         ],
         "point_attributes": sorted(attribute.name() for attribute in geometry.pointAttribs()),
@@ -654,6 +679,7 @@ def main() -> int:
         ("open_polygon", build_open_polygon_geometry, ()),
         ("uv_seam", build_uv_seam_geometry, ()),
         ("multiple_polygon_runs", build_multiple_polygon_runs_geometry, ()),
+        ("curves", build_curves_geometry, ()),
         ("global_attributes", build_global_attributes_geometry, ()),
         ("dense_volume", build_dense_volume_geometry, ()),
         ("native_vdb", build_native_vdb_geometry, ()),

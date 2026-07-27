@@ -6,6 +6,7 @@
 
 #include "TestSupport.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -811,13 +812,101 @@ namespace
         return 0;
     }
 
+    int verifyCurveManifest(const std::filesystem::path &directory)
+    {
+        const std::filesystem::path path = directory / "curves.json";
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1","point_count":12,"vertex_count":12,
+            "primitive_count":2,"topology":[0,1,2,3,4,5,6,7,8,9,10,11],
+            "primitives":[
+                {"type":"nurbs_curve","vertex_offset":0,"vertex_count":5,
+                 "closed":false,"order":4,"end_interpolation":true,
+                 "knots":[0,0,0,0,1,2,2,2,2]},
+                {"type":"bezier_curve","vertex_offset":5,"vertex_count":7,
+                 "closed":false,"order":4,"knots":[0,1,2]}
+            ],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":12,
+            "values":[0,0,0,1,1,0,0,1,2,0,0,1,3,0,0,1,4,0,0,1,
+                      0,2,0,1,1,2,0,1,2,2,0,1,3,2,0,1,4,2,0,1,5,2,0,1,6,2,0,1]}],
+            "vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto result = houio::HomManifest::read(path);
+        if( !result || result.value->primitiveCount() != 2 )
+            return fail("curve manifest failed to load");
+        const auto primitives = result.value->primitives();
+        const auto nurbs = std::dynamic_pointer_cast<houio::HouGeo::HouCurve>(primitives[0]);
+        const auto bezier = std::dynamic_pointer_cast<houio::HouGeo::HouCurve>(primitives[1]);
+        if( !nurbs || !bezier
+            || nurbs->basis() != houio::HouGeoAdapter::CurvePrimitive::Basis::nurbs
+            || nurbs->order() != 4 || nurbs->vertexIndices().size() != 5
+            || bezier->basis() != houio::HouGeoAdapter::CurvePrimitive::Basis::bezier
+            || bezier->order() != 4 || bezier->vertexIndices().size() != 7 )
+        {
+            return fail("curve manifest changed basis metadata or topology");
+        }
+
+        const std::filesystem::path outputPath = directory / "curves.bgeo";
+        const houio::WriteResult writeResult = houio::Writer::write(
+            outputPath,
+            std::static_pointer_cast<houio::HouGeoAdapter>(result.value));
+        const auto roundTrip = writeResult
+            ? houio::GeometryIO::readHouGeo(outputPath)
+            : houio::GeometryReadResult<houio::HouGeo::Ptr>{};
+        if( !roundTrip || roundTrip.value->primitiveCount() != 2 )
+            return fail("curve manifest failed writer round-trip");
+
+        const auto roundTripPrimitives = roundTrip.value->primitives();
+        const auto roundTripNurbs =
+            std::dynamic_pointer_cast<houio::HouGeo::HouCurve>(roundTripPrimitives[0]);
+        const auto roundTripBezier =
+            std::dynamic_pointer_cast<houio::HouGeo::HouCurve>(roundTripPrimitives[1]);
+        const std::vector<int> expectedNurbsVertices{0, 1, 2, 3, 4};
+        const std::vector<houio::real64> expectedNurbsKnots{
+            0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 2.0, 2.0, 2.0};
+        const std::vector<int> expectedBezierVertices{5, 6, 7, 8, 9, 10, 11};
+        const std::vector<houio::real64> expectedBezierKnots{0.0, 1.0, 2.0};
+        if( !roundTripNurbs || !roundTripBezier
+            || roundTripNurbs->basis()
+                != houio::HouGeoAdapter::CurvePrimitive::Basis::nurbs
+            || roundTripNurbs->order() != 4 || roundTripNurbs->isClosed()
+            || !roundTripNurbs->endInterpolation()
+            || !std::equal(
+                roundTripNurbs->vertexIndices().begin(),
+                roundTripNurbs->vertexIndices().end(),
+                expectedNurbsVertices.begin(),
+                expectedNurbsVertices.end())
+            || !std::equal(
+                roundTripNurbs->knots().begin(),
+                roundTripNurbs->knots().end(),
+                expectedNurbsKnots.begin(),
+                expectedNurbsKnots.end())
+            || roundTripBezier->basis()
+                != houio::HouGeoAdapter::CurvePrimitive::Basis::bezier
+            || roundTripBezier->order() != 4 || roundTripBezier->isClosed()
+            || !std::equal(
+                roundTripBezier->vertexIndices().begin(),
+                roundTripBezier->vertexIndices().end(),
+                expectedBezierVertices.begin(),
+                expectedBezierVertices.end())
+            || !std::equal(
+                roundTripBezier->knots().begin(),
+                roundTripBezier->knots().end(),
+                expectedBezierKnots.begin(),
+                expectedBezierKnots.end()) )
+        {
+            return fail("curve manifest writer round-trip changed curve metadata");
+        }
+        return 0;
+    }
+
     int verifyUnsupportedRecord(const std::filesystem::path &directory)
     {
-        const std::filesystem::path path = directory / "unsupported_curve.json";
+        const std::filesystem::path path = directory / "unsupported_sphere.json";
         writeText(path, R"JSON({
             "schema":"houio.hom/1","point_count":1,"vertex_count":1,
             "primitive_count":1,"topology":[0],
-            "primitives":[{"type":"nurbs_curve","vertex_offset":0}],
+            "primitives":[{"type":"sphere","vertex_offset":0}],
             "attributes":{"point":[{"name":"P","kind":"numeric",
             "storage":"float32","tuple_size":4,"element_count":1,
             "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
@@ -863,6 +952,8 @@ int main()
     if( const int result = verifyInvalidSparseInt32VdbManifest(directory); result != 0 )
         return result;
     if( const int result = verifyInvalidSparseVdbManifest(directory); result != 0 )
+        return result;
+    if( const int result = verifyCurveManifest(directory); result != 0 )
         return result;
     if( const int result = verifyUnsupportedRecord(directory); result != 0 )
         return result;

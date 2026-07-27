@@ -1,5 +1,7 @@
 #include <houio/HouGeo.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <numeric>
@@ -615,6 +617,13 @@ namespace houio
 		if( !nativeVdb )
 			throw std::invalid_argument( "HouGeo::addPrimitive received a null native VDB" );
 		m_primitives.push_back(std::move(nativeVdb));
+	}
+
+	void HouGeo::addPrimitive( CurvePrimitive::Ptr curve )
+	{
+		if( !curve )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null curve" );
+		m_primitives.push_back(std::move(curve));
 	}
 
 	void HouGeo::addPrimitive( PolyPrimitive::Ptr poly )
@@ -1546,6 +1555,16 @@ namespace houio
 		if( primitiveType=="VDB" )
 			withSchemaPath("data", [&]() { loadNativeVdbPrimitive(toObject(primitive->array(1))); });
 		else
+		if( primitiveType=="NURBCurve" )
+			withSchemaPath("data", [&]() {
+				loadCurvePrimitive(toObject(primitive->array(1)), CurvePrimitive::Basis::nurbs);
+			});
+		else
+		if( primitiveType=="BezierCurve" )
+			withSchemaPath("data", [&]() {
+				loadCurvePrimitive(toObject(primitive->array(1)), CurvePrimitive::Basis::bezier);
+			});
+		else
 		if( primitiveType=="Poly" )
 			withSchemaPath("data", [&]() { loadPolyPrimitive(toObject(primitive->array(1))); });
 		else
@@ -2014,6 +2033,81 @@ namespace houio
 		auto result = std::make_shared<HouVdb>();
 		result->topology_vertex_ = topologyVertex;
 		result->serialized_payload_ = std::move(payload);
+		m_primitives.push_back(std::move(result));
+	}
+
+	void HouGeo::loadCurvePrimitive(
+		json::ObjectPtr curveObject,
+		CurvePrimitive::Basis expectedBasis )
+	{
+		if( !curveObject )
+			throw std::invalid_argument( "HouGeo::loadCurvePrimitive received null data" );
+		if( !m_topology )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"Curve primitive requires topology",
+				-1, "vertex"});
+
+		json::ArrayPtr vertexValues = curveObject->array("vertex");
+		if( !vertexValues )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"Curve primitive is missing vertex indices",
+				-1, "vertex"});
+		const int vertexCount = checkedArrayCount(vertexValues,
+			"HouGeo::loadCurvePrimitive vertex indices");
+		std::vector<int> vertexIndices;
+		vertexIndices.reserve(static_cast<std::size_t>(vertexCount));
+		for( int index = 0; index < vertexCount; ++index )
+		{
+			const int topologyVertex = vertexValues->get<int>(index);
+			if( topologyVertex < 0
+				|| static_cast<sint64>(topologyVertex) >= m_topology->indexCount() )
+			{
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					"Curve topology vertex is outside vertexcount",
+					-1, "vertex"});
+			}
+			vertexIndices.push_back(topologyVertex);
+		}
+
+		json::ObjectPtr basisObject = toObject(curveObject->array("basis"));
+		if( !basisObject )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"Curve primitive is missing basis metadata",
+				-1, "basis"});
+		const std::string basisName = basisObject->get<std::string>("type", "");
+		const std::string expectedName = expectedBasis == CurvePrimitive::Basis::nurbs
+			? "NURBS" : "Bezier";
+		if( basisName != expectedName )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"Curve primitive basis does not match its record type",
+				-1, "basis.type"});
+
+		json::ArrayPtr knotValues = basisObject->array("knots");
+		if( !knotValues )
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"Curve primitive is missing knot values",
+				-1, "basis.knots"});
+		const int knotCount = checkedArrayCount(knotValues,
+			"HouGeo::loadCurvePrimitive knots");
+		std::vector<real64> knots;
+		knots.reserve(static_cast<std::size_t>(knotCount));
+		for( int index = 0; index < knotCount; ++index )
+			knots.push_back(knotValues->get<real64>(index));
+
+		auto result = std::make_shared<HouCurve>();
+		result->setCurveData(
+			expectedBasis,
+			std::move(vertexIndices),
+			curveObject->get<bool>("closed", false),
+			basisObject->get<int>("order", 0),
+			std::move(knots),
+			basisObject->get<bool>("endinterpolation", true));
 		m_primitives.push_back(std::move(result));
 	}
 
@@ -2735,6 +2829,99 @@ namespace houio
 
 		polygonRunPrimitive->m_numPolys = primitiveCount;
 		m_primitives.push_back( polygonRunPrimitive );
+	}
+
+	HouGeoAdapter::CurvePrimitive::Basis HouGeo::HouCurve::basis() const
+	{
+		return basis_;
+	}
+
+	std::span<const int> HouGeo::HouCurve::vertexIndices() const
+	{
+		return vertex_indices_;
+	}
+
+	bool HouGeo::HouCurve::isClosed() const
+	{
+		return is_closed_;
+	}
+
+	int HouGeo::HouCurve::order() const
+	{
+		return order_;
+	}
+
+	std::span<const real64> HouGeo::HouCurve::knots() const
+	{
+		return knots_;
+	}
+
+	bool HouGeo::HouCurve::endInterpolation() const
+	{
+		return end_interpolation_;
+	}
+
+	void HouGeo::HouCurve::setCurveData(
+		Basis basisValue,
+		std::vector<int> vertexIndicesValue,
+		bool isClosedValue,
+		int orderValue,
+		std::vector<real64> knotsValue,
+		bool endInterpolationValue )
+	{
+		if( orderValue < 2 )
+			throw std::invalid_argument("Curve order must be at least two");
+		if( vertexIndicesValue.size() < 2 )
+			throw std::invalid_argument("Curve requires at least two vertices");
+		if( std::any_of(vertexIndicesValue.begin(), vertexIndicesValue.end(),
+				[](int index) { return index < 0; }) )
+		{
+			throw std::invalid_argument("Curve vertex indices cannot be negative");
+		}
+		if( knotsValue.empty() )
+			throw std::invalid_argument("Curve requires knot values");
+		if( std::any_of(knotsValue.begin(), knotsValue.end(),
+				[](real64 value) { return !std::isfinite(value); }) )
+		{
+			throw std::invalid_argument("Curve knots must be finite");
+		}
+		if( !std::is_sorted(knotsValue.begin(), knotsValue.end()) )
+			throw std::invalid_argument("Curve knots must be nondecreasing");
+
+		const std::size_t vertexCount = vertexIndicesValue.size();
+		if( basisValue == Basis::nurbs )
+		{
+			if( vertexCount < static_cast<std::size_t>(orderValue) )
+				throw std::invalid_argument("NURBS curve vertex count must be at least its order");
+			const std::size_t expectedKnotCount = vertexCount
+				+ static_cast<std::size_t>(orderValue);
+			if( knotsValue.size() != expectedKnotCount )
+				throw std::invalid_argument("NURBS curve knot count must equal vertex count plus order");
+		}
+		else
+		{
+			const std::size_t segmentStride = static_cast<std::size_t>(orderValue - 1);
+			const bool compatible = isClosedValue
+				? vertexCount % segmentStride == 0
+				: (vertexCount - 1) % segmentStride == 0;
+			if( !compatible )
+			{
+				throw std::invalid_argument(
+					"Bezier curve vertex count is incompatible with its order and closure");
+			}
+			const std::size_t segmentCount = isClosedValue
+				? vertexCount / segmentStride
+				: (vertexCount - 1) / segmentStride;
+			if( knotsValue.size() != segmentCount + 1 )
+				throw std::invalid_argument("Bezier curve knot count must equal segment count plus one");
+		}
+
+		basis_ = basisValue;
+		vertex_indices_ = std::move(vertexIndicesValue);
+		is_closed_ = isClosedValue;
+		order_ = orderValue;
+		knots_ = std::move(knotsValue);
+		end_interpolation_ = endInterpolationValue;
 	}
 
 	int HouGeo::HouPoly::polygonCount() const

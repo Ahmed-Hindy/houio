@@ -148,9 +148,11 @@ Supported primitive records:
 - `Poly`
 - `Polygon_run`
 - `PolygonCurve_run`
+- `NURBCurve`
+- `BezierCurve`
 - Dense scalar `Volume`
 
-Compact binary aliases are normalized during decoding. Polygon runs support run-length counts and direct per-primitive vertex counts. All primitive ranges are checked against topology and declared primitive totals.
+Compact binary aliases are normalized during decoding. Polygon runs support run-length counts and direct per-primitive vertex counts. Curve records preserve basis family, topology vertices, closure, order, knots, NURBS endpoint interpolation, and rational `Pw` point weights. All primitive ranges are checked against topology and declared primitive totals.
 
 ### Dense volumes
 
@@ -183,7 +185,7 @@ Caller-owned pointers are consumed only during the synchronous write call. HouIO
 
 Every export owns a `BinaryWriter` and `ExportContext` on the stack. Independent files or streams do not share writer state and can be processed concurrently.
 
-Closed polygons are written as `Polygon_run`; open polygons use `PolygonCurve_run`. Three-component floating-point `P` values are emitted with a fourth component of `1` where required by the file representation.
+Closed polygons are written as `Polygon_run`; open polygons use `PolygonCurve_run`. NURBS and Bezier records are written as distinct curve primitives rather than being flattened into polygon curves. Three-component floating-point `P` values are emitted with a fourth component of `1` where required by the file representation.
 
 ## SCF boundary
 
@@ -212,7 +214,7 @@ C-Blosc resolution uses, in order:
 
 Vertex attributes are converted to point attributes by duplicating points at discontinuities such as UV seams. This preserves visible mesh data but is not a lossless representation of every Houdini domain.
 
-Use `HouGeo` when primitive attributes, groups, mixed records, or exact domain separation must be retained.
+Use `HouGeo` when primitive attributes, groups, mixed records, curve basis metadata, or exact domain separation must be retained. The simplified `Geometry` model does not implicitly tessellate NURBS or Bezier curves.
 
 ## Attribute storage
 
@@ -236,13 +238,15 @@ Supported bridge workflows:
 
 - `.geo`, `.bgeo`, and `.bgeo.sc` through `hou.Geometry`
 - In-memory uncompressed BGEO exchange
+- Direct Bezier extraction through the HouIO-owned manifest boundary
+- File and explicit-manifest preservation of NURBS curves
 - Float SDF and Fog VDB conversion to dense volumes
 - Restoration of VDB class through `houio_vdb_class`
 - Python SOP round trips
 - Shelf-tool file conversion
 - Package diagnostics
 
-Sparse VDB topology is not preserved by the C++ model. Densification is explicit and may significantly increase memory use.
+The compatibility bridge may densify supported VDBs explicitly, while the faithful Houdini-oriented model preserves opaque native payloads and offers optional typed sparse-grid construction. Direct NURBS HOM extraction is rejected because HOM does not expose the serialized endpoint-interpolation flag.
 
 ## Testing architecture
 

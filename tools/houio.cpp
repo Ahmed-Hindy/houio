@@ -249,6 +249,7 @@ namespace
         }
 
         std::size_t polygonRecords = 0;
+        std::size_t curveRecords = 0;
         std::size_t denseVolumes = 0;
         std::size_t packedGeometryRecords = 0;
         std::size_t packedFragmentRecords = 0;
@@ -259,6 +260,8 @@ namespace
         {
             if( std::dynamic_pointer_cast<houio::HouGeoAdapter::PolyPrimitive>(primitive) )
                 ++polygonRecords;
+            else if( std::dynamic_pointer_cast<houio::HouGeoAdapter::CurvePrimitive>(primitive) )
+                ++curveRecords;
             else if( std::dynamic_pointer_cast<houio::HouGeoAdapter::VolumePrimitive>(primitive) )
                 ++denseVolumes;
             else if( std::dynamic_pointer_cast<houio::HouGeoAdapter::PackedFragmentPrimitive>(primitive) )
@@ -281,6 +284,7 @@ namespace
                 << ",\"vertices\":" << result.value->vertexCount()
                 << ",\"primitives\":" << result.value->primitiveCount()
                 << ",\"polygon_records\":" << polygonRecords
+                << ",\"curve_records\":" << curveRecords
                 << ",\"dense_volumes\":" << denseVolumes
                 << ",\"packed_geometry_records\":" << packedGeometryRecords
                 << ",\"packed_fragment_records\":" << packedFragmentRecords
@@ -313,6 +317,7 @@ namespace
                 << "vertices=" << result.value->vertexCount() << '\n'
                 << "primitives=" << result.value->primitiveCount() << '\n'
                 << "polygon_records=" << polygonRecords << '\n'
+                << "curve_records=" << curveRecords << '\n'
                 << "dense_volumes=" << denseVolumes << '\n'
                 << "packed_geometry_records=" << packedGeometryRecords << '\n'
                 << "packed_fragment_records=" << packedFragmentRecords << '\n'

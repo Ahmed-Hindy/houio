@@ -224,6 +224,10 @@ int main()
          R"JSON(["pointcount", 1, "vertexcount", 1, "primitivecount", 1, "topology", ["pointref", ["indices", [0]]], "primitives", [[["type", "Poly"], ["vertex", [1], "closed", true]]]])JSON"},
         {"polygon run exceeds topology",
          R"JSON(["pointcount", 1, "vertexcount", 1, "primitivecount", 1, "topology", ["pointref", ["indices", [0]]], "primitives", [[["type", "p_r"], ["s_v", 0, "n_p", 1, "n_v", [2]]]]])JSON"},
+        {"curve basis does not match record",
+         R"JSON(["pointcount",4,"vertexcount",4,"primitivecount",1,"topology",["pointref",["indices",[0,1,2,3]]],"primitives",[[["type","NURBCurve"],["vertex",[0,1,2,3],"closed",false,"basis",["type","Bezier","order",4,"knots",[0,1]]]]]])JSON"},
+        {"Bezier curve vertex count incompatible with order",
+         R"JSON(["pointcount",5,"vertexcount",5,"primitivecount",1,"topology",["pointref",["indices",[0,1,2,3,4]]],"primitives",[[["type","BezierCurve"],["vertex",[0,1,2,3,4],"closed",false,"basis",["type","Bezier","order",4,"knots",[0,1]]]]]])JSON"},
         {"packed disk missing filename",
          R"JSON(["pointcount", 1, "vertexcount", 1, "primitivecount", 1, "topology", ["pointref", ["indices", [0]]], "primitives", [[["type", "PackedDisk"], ["parameters", ["filename", ""], "vertex", 0]]]])JSON"},
     };
