@@ -46,6 +46,42 @@ int main()
     if( grid.value(houio::math::V3i(10, 10, 10)) != 3.5f )
         return houio::test::fail("inactive voxels did not return the background value");
 
+    houio::SparseFloatGrid tiledGrid(0.0f);
+    tiledGrid.setName("tiles");
+    tiledGrid.addActiveTile(
+        houio::SparseIndexBounds{
+            houio::math::V3i(-8, -8, -8),
+            houio::math::V3i(-1, -1, -1)},
+        2.0f);
+    tiledGrid.setVoxel(houio::math::V3i(-4, -4, -4), 5.0f);
+    if( tiledGrid.activeTileCount() != 1
+        || !tiledGrid.isActive(houio::math::V3i(-8, -8, -8))
+        || tiledGrid.value(houio::math::V3i(-2, -2, -2)) != 2.0f
+        || tiledGrid.value(houio::math::V3i(-4, -4, -4)) != 5.0f )
+    {
+        return houio::test::fail("active tile lookup or voxel override is incorrect");
+    }
+    const auto tiledBounds = tiledGrid.activeBounds();
+    if( !tiledBounds
+        || tiledBounds->minimum != houio::math::V3i(-8, -8, -8)
+        || tiledBounds->maximum != houio::math::V3i(-1, -1, -1) )
+    {
+        return houio::test::fail("active tile bounds are incorrect");
+    }
+    if( const int result = houio::test::expectThrows<std::invalid_argument>(
+            [&]()
+            {
+                tiledGrid.addActiveTile(
+                    houio::SparseIndexBounds{
+                        houio::math::V3i(1, 0, 0),
+                        houio::math::V3i(0, 0, 0)},
+                    1.0f);
+            },
+            "unordered active tile bounds must be rejected"); result != 0 )
+    {
+        return result;
+    }
+
     const auto bounds = grid.activeBounds();
     if( !bounds || bounds->minimum != houio::math::V3i(-2, -1, 0)
         || bounds->maximum != houio::math::V3i(3, 4, 7) )
@@ -153,6 +189,18 @@ int main()
     {
         return houio::test::fail("empty OpenVDB stream was not rejected explicitly");
     }
+    const auto encodedTileStream = houio::OpenVdbBackend::encodeFloatGrid(tiledGrid);
+    const auto tileRoundTrip = encodedTileStream
+        ? houio::OpenVdbBackend::decodeFloatGrid(encodedTileStream.value, "tiles")
+        : houio::GeometryReadResult<houio::SparseFloatGrid>{};
+    if( !tileRoundTrip || tileRoundTrip.value.activeTileCount() == 0
+        || !tileRoundTrip.value.isActive(houio::math::V3i(-8, -8, -8))
+        || tileRoundTrip.value.value(houio::math::V3i(-2, -2, -2)) != 2.0f
+        || tileRoundTrip.value.value(houio::math::V3i(-4, -4, -4)) != 5.0f )
+    {
+        return houio::test::fail("compiled OpenVDB active tile round-trip changed topology or values");
+    }
+
     const auto encodedStream = houio::OpenVdbBackend::encodeFloatGrid(grid);
     if( !encodedStream || !houio::NativeVdbPayload::hasOpenVdbMagic(encodedStream.value) )
         return houio::test::fail("compiled OpenVDB backend failed in-memory encoding");

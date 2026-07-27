@@ -167,19 +167,21 @@ namespace houio
 
             for( auto iterator = grid->cbeginValueOn(); iterator; ++iterator )
             {
-                if( !iterator.isVoxelValue() )
+                if( iterator.isVoxelValue() )
                 {
-                    result.diagnostics.push_back(Diagnostic{
-                        DiagnosticSeverity::error,
-                        DiagnosticCategory::unsupported_input,
-                        "HouIO SparseFloatGrid does not yet represent active OpenVDB tiles",
-                        -1,
-                        "tree"});
-                    return result;
+                    const openvdb::Coord coordinate = iterator.getCoord();
+                    sparse.setVoxel(
+                        math::V3i(coordinate.x(), coordinate.y(), coordinate.z()),
+                        *iterator);
+                    continue;
                 }
-                const openvdb::Coord coordinate = iterator.getCoord();
-                sparse.setVoxel(
-                    math::V3i(coordinate.x(), coordinate.y(), coordinate.z()),
+
+                openvdb::CoordBBox bounds;
+                iterator.getBoundingBox(bounds);
+                sparse.addActiveTile(
+                    SparseIndexBounds{
+                        math::V3i(bounds.min().x(), bounds.min().y(), bounds.min().z()),
+                        math::V3i(bounds.max().x(), bounds.max().y(), bounds.max().z())},
                     *iterator);
             }
 
@@ -201,6 +203,22 @@ namespace houio
             {
                 if( !isReservedMetadataName(key) )
                     vdbGrid->insertMeta(key, openvdb::StringMetadata(value));
+            }
+
+            for( const SparseFloatTile& tile : grid.activeTiles() )
+            {
+                vdbGrid->fill(
+                    openvdb::CoordBBox(
+                        openvdb::Coord(
+                            tile.bounds.minimum.x,
+                            tile.bounds.minimum.y,
+                            tile.bounds.minimum.z),
+                        openvdb::Coord(
+                            tile.bounds.maximum.x,
+                            tile.bounds.maximum.y,
+                            tile.bounds.maximum.z)),
+                    tile.value,
+                    true);
             }
 
             openvdb::FloatGrid::Accessor accessor = vdbGrid->getAccessor();

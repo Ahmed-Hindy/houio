@@ -44,7 +44,7 @@ When the backend is disabled, OpenVDB-dependent operations return an `unsupporte
 
 ## Current boundary
 
-This backend does not yet represent active OpenVDB tiles. Reading a `FloatGrid` that contains an active tile returns an explicit unsupported diagnostic rather than expanding an unbounded tile into voxels. Nonlinear/frustum transforms are also rejected.
+The sparse model represents active OpenVDB tiles as inclusive index-space bounds plus one float value. Reads preserve active tiles without densifying them; writes reconstruct the active regions through OpenVDB tree filling and then apply explicit voxel overrides. Nonlinear/frustum transforms are still rejected.
 
 Live HOM extraction supports scalar Float VDBs only when exact active topology can be proven from `activeVoxelCount()`, the exclusive active bounding box, and sampled values. It rejects active background-valued voxels, inactive interior values, active tiles, half-float policy, local-space grids, and scan domains larger than 262,144 voxels rather than approximating them.
 
