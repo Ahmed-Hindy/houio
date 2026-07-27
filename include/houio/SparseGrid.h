@@ -30,6 +30,12 @@ namespace houio
         float value = 0.0f;
     };
 
+    struct SparseFloatTile
+    {
+        SparseIndexBounds bounds;
+        float value = 0.0f;
+    };
+
     class SparseFloatGrid final
     {
     public:
@@ -53,11 +59,15 @@ namespace houio
 
         void setVoxel(const math::V3i& index, float value);
         bool eraseVoxel(const math::V3i& index) noexcept;
+        void addActiveTile(const SparseIndexBounds& bounds, float value);
+        void clearActiveTiles() noexcept;
         [[nodiscard]] bool isActive(const math::V3i& index) const noexcept;
         [[nodiscard]] float value(const math::V3i& index) const noexcept;
         [[nodiscard]] std::size_t activeVoxelCount() const noexcept;
+        [[nodiscard]] std::size_t activeTileCount() const noexcept;
         [[nodiscard]] std::optional<SparseIndexBounds> activeBounds() const noexcept;
         [[nodiscard]] std::vector<SparseFloatVoxel> activeVoxels() const;
+        [[nodiscard]] const std::vector<SparseFloatTile>& activeTiles() const noexcept;
 
         template<typename Callable>
         void forEachActiveVoxel(Callable&& callable) const
@@ -78,5 +88,6 @@ namespace houio
         math::M44f index_to_world_ = math::M44f::identity();
         std::map<std::string, std::string> metadata_;
         std::map<math::V3i, float, IndexLess> voxels_;
+        std::vector<SparseFloatTile> tiles_;
     };
 }
