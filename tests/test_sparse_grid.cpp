@@ -259,12 +259,35 @@ int main()
     const auto tileRoundTrip = encodedTileStream
         ? houio::OpenVdbBackend::decodeFloatGrid(encodedTileStream.value, "tiles")
         : houio::GeometryReadResult<houio::SparseFloatGrid>{};
-    if( !tileRoundTrip || tileRoundTrip.value.activeTileCount() == 0
+    if( !tileRoundTrip
         || !tileRoundTrip.value.isActive(houio::math::V3i(-8, -8, -8))
         || tileRoundTrip.value.value(houio::math::V3i(-2, -2, -2)) != 2.0f
         || tileRoundTrip.value.value(houio::math::V3i(-4, -4, -4)) != 5.0f )
     {
-        return houio::test::fail("compiled OpenVDB active tile round-trip changed topology or values");
+        return houio::test::fail(
+            "compiled OpenVDB mixed FloatGrid tile round-trip changed activity or values");
+    }
+
+    houio::SparseFloatGrid pureFloatTileGrid(0.0f);
+    pureFloatTileGrid.setName("float_tiles");
+    pureFloatTileGrid.addActiveTile(
+        houio::SparseIndexBounds{
+            houio::math::V3i(-8, -8, -8),
+            houio::math::V3i(-1, -1, -1)},
+        2.0f);
+    const auto encodedPureFloatTileStream =
+        houio::OpenVdbBackend::encodeFloatGrid(pureFloatTileGrid);
+    const auto pureFloatTileRoundTrip = encodedPureFloatTileStream
+        ? houio::OpenVdbBackend::decodeFloatGrid(
+            encodedPureFloatTileStream.value, "float_tiles")
+        : houio::GeometryReadResult<houio::SparseFloatGrid>{};
+    if( !pureFloatTileRoundTrip
+        || pureFloatTileRoundTrip.value.activeTileCount() == 0
+        || pureFloatTileRoundTrip.value.activeVoxelCount() != 0
+        || pureFloatTileRoundTrip.value.value(houio::math::V3i(-2, -2, -2)) != 2.0f )
+    {
+        return houio::test::fail(
+            "compiled OpenVDB pure FloatGrid tile round-trip changed tile topology");
     }
 
     const auto encodedStream = houio::OpenVdbBackend::encodeFloatGrid(grid);
