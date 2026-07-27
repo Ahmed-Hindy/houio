@@ -278,7 +278,7 @@ Current constraints that affect future work:
 
 - The generic JSON tree and `HouGeo` model duplicate some input memory.
 - The simplified mesh cannot represent every Houdini domain losslessly.
-- Dependency-neutral sparse FloatGrid and Int32Grid editing is part of the standalone library. Native `.vdb` I/O and Houdini-native VDB payload generation are isolated behind the optional OpenVDB backend; exact live-HOM extraction currently remains limited to scalar Float VDBs.
+- Dependency-neutral sparse FloatGrid, Int32Grid, and Vec3fGrid editing is part of the standalone library. Native `.vdb` I/O and Houdini-native VDB payload generation are isolated behind the optional OpenVDB backend; exact live-HOM extraction currently remains limited to scalar Float VDBs.
 - Unsigned attribute storage is not modeled; attribute definition scope and nested semantic `options` metadata are preserved by the Houdini-oriented model.
 - Some public math layouts use anonymous unions for source compatibility.
 - Compatibility wrappers expose multiple error styles; new path APIs should use owned result objects.

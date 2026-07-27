@@ -89,8 +89,8 @@ The standalone C++ model does not currently preserve these records:
 - NURBS and Bezier curves.
 - Spheres, tubes, tetrahedra, and height fields.
 - Agents, crowds, and instancing records.
-- OpenVDB nonlinear transforms and native grid types other than FloatGrid and Int32Grid in the optional backend; pure active scalar tiles are preserved, while an explicit voxel override may refine only its affected OpenVDB leaf. Existing native Houdini VDB payloads remain preserved.
-- Vector VDB construction and editing.
+- OpenVDB nonlinear transforms and native grid types other than FloatGrid, Int32Grid, and Vec3SGrid in the optional backend; pure active tiles are preserved, while an explicit voxel override may refine only its affected OpenVDB leaf. Existing native Houdini VDB payloads remain preserved.
+- Vector VDB construction and editing beyond Vec3f values.
 - Additional volume tile-compression encodings not represented by maintained fixtures.
 
 Unsupported recognized input should produce an `unsupported_input` diagnostic rather than silent data loss. File-level `PackedFragment` records are supported, while direct HOM extraction remains unavailable because HOM does not expose the fragment's embedded source detail. `PackedDisk` and `PackedDiskSequence` references are supported in file and direct-HOM workflows. HouIO preserves ordinary packed-disk authored paths and sequence sample lists without requiring targets to exist during serialization.
@@ -113,7 +113,7 @@ Use `HouGeo` (`HoudiniGeometry`) or `HouGeoAdapter` when Houdini domain fidelity
 
 The default standalone library does not link to OpenVDB, but it recognizes native Houdini `VDB` records and preserves their serialized sparse payload opaquely during GEO/BGEO/SCF round trips. This retains active topology, values, transform, class, value type, and metadata without densification.
 
-`SparseFloatGrid` and `SparseInt32Grid` add dependency-neutral sparse voxel and active-tile construction and editing. Configuring `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid and Int32Grid read/write plus in-memory stream encoding through `OpenVdbBackend`, including active tiles, linear transforms, class, names, creator metadata, and string metadata. `NativeVdbPayload` wraps those streams as Houdini's tiled native VDB primitive payload, allowing `HouSparseVdb`, `HouSparseInt32Vdb`, `sparse_float_vdb`, and `sparse_int32_vdb` manifests to produce native BGEO/SCF records.
+`SparseFloatGrid`, `SparseInt32Grid`, and `SparseVec3fGrid` add dependency-neutral sparse voxel and active-tile construction and editing. Configuring `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid, Int32Grid, and Vec3SGrid read/write plus in-memory stream encoding through `OpenVdbBackend`, including active tiles, linear transforms, class, names, creator metadata, and string metadata. Vec3f grids additionally preserve all OpenVDB vector transformation modes and staggered-grid class. `NativeVdbPayload` wraps those streams as Houdini's tiled native VDB primitive payload, allowing the corresponding sparse primitive adapters and manifest types to produce native BGEO/SCF records.
 
 Direct HOM extraction supports scalar Float VDBs when the sampled non-background voxel count exactly matches Houdini's authoritative active count. It rejects ambiguous topology, active tiles, nonlinear/tapered transforms, local-space and half-float policies, non-Float value types (including Int32), and active bounding boxes larger than 262,144 voxels. The compatibility bridge remains available for supported grids that must pass through a dense workflow.
 

@@ -448,6 +448,75 @@ namespace
             return fail("Backend-off sparse Int32 VDB write created a partial file");
 #endif
 
+        houio::HouGeo::Ptr sparseVec3fGeometry = createHouGeo();
+        auto sparseVec3fTopology = std::make_shared<houio::HouGeo::HouTopology>();
+        sparseVec3fTopology->appendIndex(0);
+        sparseVec3fGeometry->setTopology(sparseVec3fTopology);
+        houio::SparseVec3fGrid sparseVec3fGrid(houio::math::V3f(0.0f));
+        sparseVec3fGrid.setName("velocity");
+        sparseVec3fGrid.setGridClass(houio::SparseGridClass::staggered);
+        sparseVec3fGrid.setVectorType(
+            houio::SparseVectorType::contravariant_relative);
+        sparseVec3fGrid.setIndexToWorld(houio::math::M44f::identity());
+        sparseVec3fGrid.addActiveTile(
+            houio::SparseIndexBounds{
+                houio::math::V3i(16, 16, 16),
+                houio::math::V3i(23, 23, 23)},
+            houio::math::V3f(1.0f, 2.0f, 3.0f));
+        sparseVec3fGrid.setVoxel(
+            houio::math::V3i(32, 32, 32),
+            houio::math::V3f(-1.0f, 4.0f, 0.5f));
+        auto sparseVec3fVdb = std::make_shared<houio::HouGeo::HouSparseVec3fVdb>();
+        sparseVec3fVdb->setTopologyVertex(0);
+        sparseVec3fVdb->setSparseGrid(std::move(sparseVec3fGrid));
+        sparseVec3fGeometry->addPrimitive(
+            std::static_pointer_cast<
+                houio::HouGeoAdapter::SparseVec3fVdbPrimitive>(sparseVec3fVdb));
+        const std::filesystem::path sparseVec3fPath =
+            directory / "constructed_vec3f_vdb.bgeo";
+        const houio::WriteResult sparseVec3fWrite = houio::Writer::write(
+            sparseVec3fPath,
+            std::static_pointer_cast<houio::HouGeoAdapter>(sparseVec3fGeometry));
+#if HOUIO_HAS_OPENVDB
+        if( !sparseVec3fWrite )
+            return fail("OpenVDB-enabled writer failed to construct Vec3f VDB payload");
+        const auto sparseVec3fResult = houio::GeometryIO::readHouGeo(sparseVec3fPath);
+        const auto constructedVec3fVdb =
+            sparseVec3fResult && sparseVec3fResult.value->primitiveCount() == 1
+            ? std::dynamic_pointer_cast<houio::HouGeo::HouVdb>(
+                sparseVec3fResult.value->primitives().front())
+            : houio::HouGeo::HouVdb::Ptr{};
+        const auto vec3fStream = constructedVec3fVdb
+            && constructedVec3fVdb->serializedPayload()
+            ? houio::NativeVdbPayload::decode(
+                constructedVec3fVdb->serializedPayload())
+            : houio::GeometryReadResult<std::vector<houio::ubyte>>{};
+        const auto decodedVec3fGrid = vec3fStream
+            ? houio::OpenVdbBackend::decodeVec3fGrid(vec3fStream.value, "velocity")
+            : houio::GeometryReadResult<houio::SparseVec3fGrid>{};
+        if( !decodedVec3fGrid
+            || decodedVec3fGrid.value.gridClass()
+                != houio::SparseGridClass::staggered
+            || decodedVec3fGrid.value.vectorType()
+                != houio::SparseVectorType::contravariant_relative
+            || decodedVec3fGrid.value.value(houio::math::V3i(17, 17, 17))
+                != houio::math::V3f(1.0f, 2.0f, 3.0f)
+            || decodedVec3fGrid.value.value(houio::math::V3i(32, 32, 32))
+                != houio::math::V3f(-1.0f, 4.0f, 0.5f) )
+        {
+            return fail("Constructed native Vec3f VDB payload changed sparse data");
+        }
+#else
+        if( sparseVec3fWrite || sparseVec3fWrite.diagnostics.empty()
+            || sparseVec3fWrite.diagnostics.front().category
+                != houio::DiagnosticCategory::unsupported_input )
+        {
+            return fail("Backend-off sparse Vec3f VDB write did not return an unsupported diagnostic");
+        }
+        if( std::filesystem::exists(sparseVec3fPath) )
+            return fail("Backend-off sparse Vec3f VDB write created a partial file");
+#endif
+
         houio::HouGeo::Ptr cyclicGeometry = createHouGeo();
         auto cyclicTopology = std::make_shared<houio::HouGeo::HouTopology>();
         cyclicTopology->appendIndex(0);

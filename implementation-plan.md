@@ -1041,7 +1041,7 @@ Exit criteria:
 
 ### Phase 38 — Scalar Int32 sparse VDB support
 
-**Status: in progress on `feat/sparse-int32-vdb`.**
+**Status: complete and merged through PR #42.**
 
 Goals:
 
@@ -1060,6 +1060,29 @@ Exit criteria:
 - OpenVDB-enabled CI validates Int32 file, stream, manifest, and native Houdini payload round trips.
 - Strict, AddressSanitizer, static-analysis, package-consumer, and maintained Houdini matrices pass.
 
+### Phase 39 — Sparse Vec3f VDB support
+
+**Status: in progress on `feat/sparse-vec3f-vdb`.**
+
+Goals:
+
+- Add dependency-neutral `SparseVec3fGrid` values, active tiles, metadata, class, and linear transforms.
+- Preserve all OpenVDB Vec3 transformation modes: invariant, covariant, normalized covariant, relative contravariant, and absolute contravariant.
+- Add `staggered` to the sparse grid-class model for velocity-style vector grids.
+- Add optional OpenVDB `Vec3SGrid` file and stream read/write support.
+- Add `SparseVec3fVdbPrimitive`, faithful `HouSparseVec3fVdb`, and native Houdini payload generation.
+- Add explicit `sparse_vec3f_vdb` manifest construction with three-component values and bounded active tiles.
+- Keep live HOM extraction Float-only until exact vector values, semantics, and activity can be proven through maintained HOM APIs.
+
+Exit criteria:
+
+- Every vector transformation mode survives file and in-memory OpenVDB round trips.
+- Staggered-grid class, background, metadata, linear transform, activity, and values remain exact.
+- Non-finite components, malformed tuples, invalid semantics, malformed bounds, and duplicate coordinates are rejected.
+- Backend-off builds expose dependency-neutral Vec3f editing and reject native output without partial files.
+- OpenVDB-enabled CI validates Vec3f file, stream, manifest, package-consumer, and native Houdini payload round trips.
+- Strict, AddressSanitizer, static-analysis, and maintained Houdini matrices pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
@@ -1069,7 +1092,8 @@ The following remain separate from the active product-facing phases unless requi
 - [x] Dependency-neutral sparse FloatGrid construction/editing and optional OpenVDB `.vdb` I/O.
 - [x] Native Houdini VDB payload generation from sparse grids and exact scalar Float VDB live-HOM extraction.
 - [x] Active FloatGrid tile representation and explicit manifest construction.
-- [ ] Complete scalar Int32-grid support, then add vector-grid support, nonlinear transforms, and exact live-HOM extraction for currently ambiguous activity.
+- [x] Complete scalar Int32-grid support.
+- [ ] Complete Vec3f vector-grid support, then nonlinear transforms and exact live-HOM extraction for currently ambiguous activity.
 - Performance architecture changes that bypass the JSON tree.
 - Project-wide licensing and third-party provenance resolution.
 
