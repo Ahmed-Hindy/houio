@@ -45,5 +45,26 @@ namespace houio
         [[nodiscard]] static GeometryReadResult<SparseFloatGrid> decodeFloatGrid(
             std::span<const ubyte> openvdb_stream,
             const std::string& grid_name = {});
+
+        [[nodiscard]] static GeometryReadResult<SparseInt32Grid> readInt32Grid(
+            const std::filesystem::path& path,
+            const std::string& grid_name = {});
+
+        [[nodiscard]] static GeometryWriteResult writeInt32Grid(
+            const std::filesystem::path& path,
+            const SparseInt32Grid& grid,
+            bool overwrite_existing = true,
+            bool create_parent_directories = true);
+
+        [[nodiscard]] static GeometryWriteResult encodeInt32Grid(
+            std::ostream& output,
+            const SparseInt32Grid& grid);
+
+        [[nodiscard]] static GeometryReadResult<std::vector<ubyte>> encodeInt32Grid(
+            const SparseInt32Grid& grid);
+
+        [[nodiscard]] static GeometryReadResult<SparseInt32Grid> decodeInt32Grid(
+            std::span<const ubyte> openvdb_stream,
+            const std::string& grid_name = {});
     };
 }

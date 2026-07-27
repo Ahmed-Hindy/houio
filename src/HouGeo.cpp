@@ -596,6 +596,13 @@ namespace houio
 		m_primitives.push_back(std::move(sparseVdb));
 	}
 
+	void HouGeo::addPrimitive( SparseInt32VdbPrimitive::Ptr sparseVdb )
+	{
+		if( !sparseVdb )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null sparse Int32 VDB" );
+		m_primitives.push_back(std::move(sparseVdb));
+	}
+
 	void HouGeo::addPrimitive( NativeVdbPrimitive::Ptr nativeVdb )
 	{
 		if( !nativeVdb )
@@ -2101,6 +2108,16 @@ namespace houio
 	}
 
 	const SparseFloatGrid& HouGeo::HouSparseVdb::sparseGrid() const
+	{
+		return sparse_grid_;
+	}
+
+	int HouGeo::HouSparseInt32Vdb::topologyVertex() const
+	{
+		return topology_vertex_;
+	}
+
+	const SparseInt32Grid& HouGeo::HouSparseInt32Vdb::sparseGrid() const
 	{
 		return sparse_grid_;
 	}

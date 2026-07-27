@@ -1,0 +1,49 @@
+{
+  "schema": "houio.hom/1",
+  "point_count": 1,
+  "vertex_count": 1,
+  "primitive_count": 1,
+  "topology": [0],
+  "primitives": [
+    {
+      "type": "sparse_int32_vdb",
+      "vertex_offset": 0,
+      "name": "labels",
+      "grid_class": "unknown",
+      "background": -1,
+      "index_to_world": [
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+      ],
+      "active_indices": [10, 10, 10, -1, -2, -3],
+      "active_values": [42, -9],
+      "active_tiles": [
+        {
+          "minimum": [8, 8, 8],
+          "maximum": [15, 15, 15],
+          "value": 7
+        }
+      ],
+      "metadata": {
+        "creator": "HouIO Int32 VDB construction test"
+      }
+    }
+  ],
+  "attributes": {
+    "point": [
+      {
+        "name": "P",
+        "kind": "numeric",
+        "storage": "float32",
+        "tuple_size": 4,
+        "element_count": 1,
+        "values": [0.0, 0.0, 0.0, 1.0]
+      }
+    ],
+    "vertex": [],
+    "primitive": [],
+    "global": []
+  }
+}

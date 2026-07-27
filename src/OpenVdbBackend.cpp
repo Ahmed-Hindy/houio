@@ -30,6 +30,26 @@ namespace houio
                 "openvdb_backend"};
         }
 
+        template<typename SparseGrid, typename Encoder>
+        GeometryReadResult<std::vector<ubyte>> encodeGridBytes(
+            const SparseGrid& grid,
+            Encoder&& encoder)
+        {
+            GeometryReadResult<std::vector<ubyte>> result;
+            std::ostringstream output(std::ios::out | std::ios::binary);
+            GeometryWriteResult writeResult = encoder(output, grid);
+            if( !writeResult )
+            {
+                result.diagnostics = std::move(writeResult.diagnostics);
+                return result;
+            }
+            const std::string bytes = output.str();
+            const auto* first = reinterpret_cast<const ubyte*>(bytes.data());
+            result.value.assign(first, first + bytes.size());
+            result.succeeded = true;
+            return result;
+        }
+
 #if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
         class SpanInputBuffer final : public std::streambuf
         {
@@ -106,11 +126,13 @@ namespace houio
             return false;
         }
 
-        GeometryReadResult<SparseFloatGrid> sparseFromGrid(
+        template<typename OpenGrid, typename SparseGrid>
+        GeometryReadResult<SparseGrid> sparseFromGrid(
             const openvdb::GridBase::Ptr& baseGrid,
-            const std::string& missingMessage)
+            const std::string& missingMessage,
+            const char* gridTypeName)
         {
-            GeometryReadResult<SparseFloatGrid> result;
+            GeometryReadResult<SparseGrid> result;
             if( !baseGrid )
             {
                 result.diagnostics.push_back(Diagnostic{
@@ -122,13 +144,13 @@ namespace houio
                 return result;
             }
 
-            openvdb::FloatGrid::Ptr grid = openvdb::gridPtrCast<openvdb::FloatGrid>(baseGrid);
+            typename OpenGrid::Ptr grid = openvdb::gridPtrCast<OpenGrid>(baseGrid);
             if( !grid )
             {
                 result.diagnostics.push_back(Diagnostic{
                     DiagnosticSeverity::error,
                     DiagnosticCategory::unsupported_input,
-                    "Requested OpenVDB grid is not a FloatGrid",
+                    std::string("Requested OpenVDB grid is not a ") + gridTypeName,
                     -1,
                     "grid"});
                 return result;
@@ -138,13 +160,14 @@ namespace houio
                 result.diagnostics.push_back(Diagnostic{
                     DiagnosticSeverity::error,
                     DiagnosticCategory::unsupported_input,
-                    "HouIO SparseFloatGrid currently supports only linear OpenVDB transforms",
+                    std::string("HouIO sparse ") + gridTypeName
+                        + " currently supports only linear OpenVDB transforms",
                     -1,
                     "transform"});
                 return result;
             }
 
-            SparseFloatGrid sparse(grid->background());
+            SparseGrid sparse(grid->background());
             sparse.setName(grid->getName());
             sparse.setGridClass(fromOpenVdbClass(grid->getGridClass()));
             if( !grid->getCreator().empty() )
@@ -190,9 +213,10 @@ namespace houio
             return result;
         }
 
-        openvdb::FloatGrid::Ptr openVdbFromSparse(const SparseFloatGrid& grid)
+        template<typename OpenGrid, typename SparseGrid>
+        typename OpenGrid::Ptr openVdbFromSparse(const SparseGrid& grid)
         {
-            openvdb::FloatGrid::Ptr vdbGrid = openvdb::FloatGrid::create(grid.background());
+            typename OpenGrid::Ptr vdbGrid = OpenGrid::create(grid.background());
             vdbGrid->setName(grid.name());
             vdbGrid->setGridClass(toOpenVdbClass(grid.gridClass()));
             vdbGrid->setTransform(openvdb::math::Transform::createLinearTransform(
@@ -205,7 +229,7 @@ namespace houio
                     vdbGrid->insertMeta(key, openvdb::StringMetadata(value));
             }
 
-            for( const SparseFloatTile& tile : grid.activeTiles() )
+            for( const auto& tile : grid.activeTiles() )
             {
                 vdbGrid->fill(
                     openvdb::CoordBBox(
@@ -221,15 +245,251 @@ namespace houio
                     true);
             }
 
-            openvdb::FloatGrid::Accessor accessor = vdbGrid->getAccessor();
+            typename OpenGrid::Accessor accessor = vdbGrid->getAccessor();
             grid.forEachActiveVoxel(
-                [&](const SparseFloatVoxel& voxel)
+                [&](const auto& voxel)
                 {
                     accessor.setValueOn(
                         openvdb::Coord(voxel.index.x, voxel.index.y, voxel.index.z),
                         voxel.value);
                 });
             return vdbGrid;
+        }
+
+        template<typename OpenGrid, typename SparseGrid>
+        GeometryReadResult<SparseGrid> readGridFile(
+            const std::filesystem::path& path,
+            const std::string& gridName,
+            const char* gridTypeName)
+        {
+            GeometryReadResult<SparseGrid> result;
+            try
+            {
+                openvdb::initialize();
+                openvdb::io::File file(path.string());
+                file.open();
+
+                openvdb::GridBase::Ptr baseGrid;
+                if( !gridName.empty() )
+                {
+                    baseGrid = file.readGrid(gridName);
+                }
+                else
+                {
+                    for( auto iterator = file.beginName(); iterator != file.endName(); ++iterator )
+                    {
+                        openvdb::GridBase::Ptr probe =
+                            file.readGridMetadata(iterator.gridName());
+                        if( probe && probe->isType<OpenGrid>() )
+                        {
+                            baseGrid = file.readGrid(iterator.gridName());
+                            break;
+                        }
+                    }
+                }
+                file.close();
+
+                const std::string typeName(gridTypeName);
+                return sparseFromGrid<OpenGrid, SparseGrid>(
+                    baseGrid,
+                    gridName.empty()
+                        ? "OpenVDB file contains no " + typeName
+                        : "OpenVDB file contains no requested " + typeName
+                            + " named '" + gridName + "'",
+                    gridTypeName);
+            }
+            catch( const std::exception& exception )
+            {
+                result.diagnostics.push_back(Diagnostic{
+                    DiagnosticSeverity::error,
+                    DiagnosticCategory::io,
+                    std::string("OpenVDB ") + gridTypeName
+                        + " read failed: " + exception.what(),
+                    -1,
+                    "file"});
+            }
+            return result;
+        }
+
+        template<typename OpenGrid, typename SparseGrid>
+        GeometryWriteResult writeGridFile(
+            const std::filesystem::path& path,
+            const SparseGrid& grid,
+            bool overwriteExisting,
+            bool createParentDirectories,
+            const char* gridTypeName)
+        {
+            GeometryWriteResult result;
+            try
+            {
+                if( path.empty() )
+                {
+                    result.diagnostics.push_back(Diagnostic{
+                        DiagnosticSeverity::error,
+                        DiagnosticCategory::io,
+                        "OpenVDB output path cannot be empty",
+                        -1,
+                        "file"});
+                    return result;
+                }
+                if( !overwriteExisting && std::filesystem::exists(path) )
+                {
+                    result.diagnostics.push_back(Diagnostic{
+                        DiagnosticSeverity::error,
+                        DiagnosticCategory::io,
+                        "OpenVDB output already exists and overwrite is disabled",
+                        -1,
+                        "file"});
+                    return result;
+                }
+                if( createParentDirectories && path.has_parent_path() )
+                {
+                    std::error_code error;
+                    std::filesystem::create_directories(path.parent_path(), error);
+                    if( error )
+                    {
+                        result.diagnostics.push_back(Diagnostic{
+                            DiagnosticSeverity::error,
+                            DiagnosticCategory::io,
+                            "Could not create OpenVDB output directory: " + error.message(),
+                            -1,
+                            "file"});
+                        return result;
+                    }
+                }
+
+                openvdb::initialize();
+                openvdb::GridPtrVec grids;
+                grids.push_back(openVdbFromSparse<OpenGrid>(grid));
+                openvdb::io::File file(path.string());
+                file.write(grids);
+                file.close();
+                result.succeeded = true;
+            }
+            catch( const std::exception& exception )
+            {
+                result.diagnostics.push_back(Diagnostic{
+                    DiagnosticSeverity::error,
+                    DiagnosticCategory::io,
+                    std::string("OpenVDB ") + gridTypeName
+                        + " write failed: " + exception.what(),
+                    -1,
+                    "file"});
+            }
+            return result;
+        }
+
+        template<typename OpenGrid, typename SparseGrid>
+        GeometryWriteResult encodeGridStream(
+            std::ostream& output,
+            const SparseGrid& grid,
+            const char* gridTypeName)
+        {
+            GeometryWriteResult result;
+            try
+            {
+                openvdb::initialize();
+                openvdb::GridPtrVec grids;
+                grids.push_back(openVdbFromSparse<OpenGrid>(grid));
+                openvdb::io::Stream archive(output);
+                archive.write(grids);
+                output.flush();
+                if( !output )
+                {
+                    result.diagnostics.push_back(Diagnostic{
+                        DiagnosticSeverity::error,
+                        DiagnosticCategory::io,
+                        std::string("OpenVDB ") + gridTypeName + " stream write failed",
+                        -1,
+                        "openvdb_stream"});
+                    return result;
+                }
+                result.succeeded = true;
+            }
+            catch( const std::exception& exception )
+            {
+                result.diagnostics.push_back(Diagnostic{
+                    DiagnosticSeverity::error,
+                    DiagnosticCategory::conversion,
+                    std::string("OpenVDB ") + gridTypeName
+                        + " stream write failed: " + exception.what(),
+                    -1,
+                    "openvdb_stream"});
+            }
+            return result;
+        }
+
+        template<typename OpenGrid, typename SparseGrid>
+        GeometryReadResult<SparseGrid> decodeGridStream(
+            std::span<const ubyte> openvdbStream,
+            const std::string& gridName,
+            const char* gridTypeName)
+        {
+            GeometryReadResult<SparseGrid> result;
+            if( openvdbStream.empty() )
+            {
+                result.diagnostics.push_back(Diagnostic{
+                    DiagnosticSeverity::error,
+                    DiagnosticCategory::malformed_input,
+                    "OpenVDB stream cannot be empty",
+                    -1,
+                    "openvdb_stream"});
+                return result;
+            }
+            if( openvdbStream.size()
+                > static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max()) )
+            {
+                result.diagnostics.push_back(Diagnostic{
+                    DiagnosticSeverity::error,
+                    DiagnosticCategory::unsupported_input,
+                    "OpenVDB stream exceeds this platform's stream-buffer range",
+                    -1,
+                    "openvdb_stream"});
+                return result;
+            }
+
+            try
+            {
+                openvdb::initialize();
+                SpanInputBuffer inputBuffer(openvdbStream);
+                std::istream input(&inputBuffer);
+                openvdb::io::Stream archive(input, false);
+                const openvdb::GridPtrVecPtr grids = archive.getGrids();
+                openvdb::GridBase::Ptr selected;
+                if( grids )
+                {
+                    for( const openvdb::GridBase::Ptr& candidate : *grids )
+                    {
+                        if( !candidate || !candidate->isType<OpenGrid>() )
+                            continue;
+                        if( gridName.empty() || candidate->getName() == gridName )
+                        {
+                            selected = candidate;
+                            break;
+                        }
+                    }
+                }
+
+                const std::string typeName(gridTypeName);
+                return sparseFromGrid<OpenGrid, SparseGrid>(
+                    selected,
+                    gridName.empty()
+                        ? "OpenVDB stream contains no " + typeName
+                        : "OpenVDB stream contains no requested " + typeName
+                            + " named '" + gridName + "'",
+                    gridTypeName);
+            }
+            catch( const std::exception& exception )
+            {
+                result.diagnostics.push_back(Diagnostic{
+                    DiagnosticSeverity::error,
+                    DiagnosticCategory::malformed_input,
+                    std::string("OpenVDB ") + gridTypeName
+                        + " in-memory read failed: " + exception.what(),
+                    -1,
+                    "openvdb_stream"});
+            }
+            return result;
         }
 #endif
     }
@@ -240,7 +500,7 @@ namespace houio
         return OpenVdbBackendInfo{
             true,
             OPENVDB_LIBRARY_VERSION_STRING,
-            "Optional OpenVDB backend is compiled; FloatGrid read and write are available."};
+            "Optional OpenVDB backend is compiled; FloatGrid and Int32Grid read and write are available."};
 #else
         return OpenVdbBackendInfo{
             false,
@@ -253,55 +513,16 @@ namespace houio
         const std::filesystem::path& path,
         const std::string& gridName)
     {
-        GeometryReadResult<SparseFloatGrid> result;
 #if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
-        try
-        {
-            openvdb::initialize();
-            openvdb::io::File file(path.string());
-            file.open();
-
-            openvdb::GridBase::Ptr baseGrid;
-            if( !gridName.empty() )
-            {
-                baseGrid = file.readGrid(gridName);
-            }
-            else
-            {
-                for( auto iterator = file.beginName(); iterator != file.endName(); ++iterator )
-                {
-                    openvdb::GridBase::Ptr probe =
-                        file.readGridMetadata(iterator.gridName());
-                    if( probe && probe->isType<openvdb::FloatGrid>() )
-                    {
-                        baseGrid = file.readGrid(iterator.gridName());
-                        break;
-                    }
-                }
-            }
-            file.close();
-
-            return sparseFromGrid(
-                baseGrid,
-                gridName.empty()
-                    ? "OpenVDB file contains no FloatGrid"
-                    : "OpenVDB file contains no requested FloatGrid named '" + gridName + "'");
-        }
-        catch( const std::exception& exception )
-        {
-            result.diagnostics.push_back(Diagnostic{
-                DiagnosticSeverity::error,
-                DiagnosticCategory::io,
-                std::string("OpenVDB read failed: ") + exception.what(),
-                -1,
-                "file"});
-        }
+        return readGridFile<openvdb::FloatGrid, SparseFloatGrid>(
+            path, gridName, "FloatGrid");
 #else
         static_cast<void>(path);
         static_cast<void>(gridName);
+        GeometryReadResult<SparseFloatGrid> result;
         result.diagnostics.push_back(unavailableDiagnostic());
-#endif
         return result;
+#endif
     }
 
     GeometryWriteResult OpenVdbBackend::writeFloatGrid(
@@ -310,202 +531,135 @@ namespace houio
         bool overwriteExisting,
         bool createParentDirectories)
     {
-        GeometryWriteResult result;
 #if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
-        try
-        {
-            if( path.empty() )
-            {
-                result.diagnostics.push_back(Diagnostic{
-                    DiagnosticSeverity::error,
-                    DiagnosticCategory::io,
-                    "OpenVDB output path cannot be empty",
-                    -1,
-                    "file"});
-                return result;
-            }
-            if( !overwriteExisting && std::filesystem::exists(path) )
-            {
-                result.diagnostics.push_back(Diagnostic{
-                    DiagnosticSeverity::error,
-                    DiagnosticCategory::io,
-                    "OpenVDB output already exists and overwrite is disabled",
-                    -1,
-                    "file"});
-                return result;
-            }
-            if( createParentDirectories && path.has_parent_path() )
-            {
-                std::error_code error;
-                std::filesystem::create_directories(path.parent_path(), error);
-                if( error )
-                {
-                    result.diagnostics.push_back(Diagnostic{
-                        DiagnosticSeverity::error,
-                        DiagnosticCategory::io,
-                        "Could not create OpenVDB output directory: " + error.message(),
-                        -1,
-                        "file"});
-                    return result;
-                }
-            }
-
-            openvdb::initialize();
-            openvdb::GridPtrVec grids;
-            grids.push_back(openVdbFromSparse(grid));
-            openvdb::io::File file(path.string());
-            file.write(grids);
-            file.close();
-            result.succeeded = true;
-        }
-        catch( const std::exception& exception )
-        {
-            result.diagnostics.push_back(Diagnostic{
-                DiagnosticSeverity::error,
-                DiagnosticCategory::io,
-                std::string("OpenVDB write failed: ") + exception.what(),
-                -1,
-                "file"});
-        }
+        return writeGridFile<openvdb::FloatGrid>(
+            path, grid, overwriteExisting, createParentDirectories, "FloatGrid");
 #else
         static_cast<void>(path);
         static_cast<void>(grid);
         static_cast<void>(overwriteExisting);
         static_cast<void>(createParentDirectories);
+        GeometryWriteResult result;
         result.diagnostics.push_back(unavailableDiagnostic());
-#endif
         return result;
+#endif
     }
 
     GeometryWriteResult OpenVdbBackend::encodeFloatGrid(
         std::ostream& output,
         const SparseFloatGrid& grid)
     {
-        GeometryWriteResult result;
 #if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
-        try
-        {
-            openvdb::initialize();
-            openvdb::GridPtrVec grids;
-            grids.push_back(openVdbFromSparse(grid));
-            openvdb::io::Stream archive(output);
-            archive.write(grids);
-            output.flush();
-            if( !output )
-            {
-                result.diagnostics.push_back(Diagnostic{
-                    DiagnosticSeverity::error,
-                    DiagnosticCategory::io,
-                    "OpenVDB stream write failed",
-                    -1,
-                    "openvdb_stream"});
-                return result;
-            }
-            result.succeeded = true;
-        }
-        catch( const std::exception& exception )
-        {
-            result.diagnostics.push_back(Diagnostic{
-                DiagnosticSeverity::error,
-                DiagnosticCategory::conversion,
-                std::string("OpenVDB stream write failed: ") + exception.what(),
-                -1,
-                "openvdb_stream"});
-        }
+        return encodeGridStream<openvdb::FloatGrid>(output, grid, "FloatGrid");
 #else
         static_cast<void>(output);
         static_cast<void>(grid);
+        GeometryWriteResult result;
         result.diagnostics.push_back(unavailableDiagnostic());
-#endif
         return result;
+#endif
     }
 
     GeometryReadResult<std::vector<ubyte>> OpenVdbBackend::encodeFloatGrid(
         const SparseFloatGrid& grid)
     {
-        GeometryReadResult<std::vector<ubyte>> result;
-        std::ostringstream output(std::ios::out | std::ios::binary);
-        GeometryWriteResult writeResult = encodeFloatGrid(output, grid);
-        if( !writeResult )
-        {
-            result.diagnostics = std::move(writeResult.diagnostics);
-            return result;
-        }
-        const std::string bytes = output.str();
-        const auto* first = reinterpret_cast<const ubyte*>(bytes.data());
-        result.value.assign(first, first + bytes.size());
-        result.succeeded = true;
-        return result;
+        return encodeGridBytes(grid,
+            [](std::ostream& output, const SparseFloatGrid& value)
+            {
+                return OpenVdbBackend::encodeFloatGrid(output, value);
+            });
     }
 
     GeometryReadResult<SparseFloatGrid> OpenVdbBackend::decodeFloatGrid(
         std::span<const ubyte> openvdbStream,
         const std::string& gridName)
     {
-        GeometryReadResult<SparseFloatGrid> result;
 #if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
-        if( openvdbStream.empty() )
-        {
-            result.diagnostics.push_back(Diagnostic{
-                DiagnosticSeverity::error,
-                DiagnosticCategory::malformed_input,
-                "OpenVDB stream cannot be empty",
-                -1,
-                "openvdb_stream"});
-            return result;
-        }
-        if( openvdbStream.size()
-            > static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max()) )
-        {
-            result.diagnostics.push_back(Diagnostic{
-                DiagnosticSeverity::error,
-                DiagnosticCategory::unsupported_input,
-                "OpenVDB stream exceeds this platform's stream-buffer range",
-                -1,
-                "openvdb_stream"});
-            return result;
-        }
-        try
-        {
-            openvdb::initialize();
-            SpanInputBuffer inputBuffer(openvdbStream);
-            std::istream input(&inputBuffer);
-            openvdb::io::Stream archive(input, false);
-            const openvdb::GridPtrVecPtr grids = archive.getGrids();
-            openvdb::GridBase::Ptr selected;
-            if( grids )
-            {
-                for( const openvdb::GridBase::Ptr& candidate : *grids )
-                {
-                    if( !candidate || !candidate->isType<openvdb::FloatGrid>() )
-                        continue;
-                    if( gridName.empty() || candidate->getName() == gridName )
-                    {
-                        selected = candidate;
-                        break;
-                    }
-                }
-            }
-            return sparseFromGrid(
-                selected,
-                gridName.empty()
-                    ? "OpenVDB stream contains no FloatGrid"
-                    : "OpenVDB stream contains no requested FloatGrid named '" + gridName + "'");
-        }
-        catch( const std::exception& exception )
-        {
-            result.diagnostics.push_back(Diagnostic{
-                DiagnosticSeverity::error,
-                DiagnosticCategory::malformed_input,
-                std::string("OpenVDB in-memory read failed: ") + exception.what(),
-                -1,
-                "openvdb_stream"});
-        }
+        return decodeGridStream<openvdb::FloatGrid, SparseFloatGrid>(
+            openvdbStream, gridName, "FloatGrid");
 #else
         static_cast<void>(openvdbStream);
         static_cast<void>(gridName);
+        GeometryReadResult<SparseFloatGrid> result;
         result.diagnostics.push_back(unavailableDiagnostic());
-#endif
         return result;
+#endif
+    }
+
+    GeometryReadResult<SparseInt32Grid> OpenVdbBackend::readInt32Grid(
+        const std::filesystem::path& path,
+        const std::string& gridName)
+    {
+#if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
+        return readGridFile<openvdb::Int32Grid, SparseInt32Grid>(
+            path, gridName, "Int32Grid");
+#else
+        static_cast<void>(path);
+        static_cast<void>(gridName);
+        GeometryReadResult<SparseInt32Grid> result;
+        result.diagnostics.push_back(unavailableDiagnostic());
+        return result;
+#endif
+    }
+
+    GeometryWriteResult OpenVdbBackend::writeInt32Grid(
+        const std::filesystem::path& path,
+        const SparseInt32Grid& grid,
+        bool overwriteExisting,
+        bool createParentDirectories)
+    {
+#if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
+        return writeGridFile<openvdb::Int32Grid>(
+            path, grid, overwriteExisting, createParentDirectories, "Int32Grid");
+#else
+        static_cast<void>(path);
+        static_cast<void>(grid);
+        static_cast<void>(overwriteExisting);
+        static_cast<void>(createParentDirectories);
+        GeometryWriteResult result;
+        result.diagnostics.push_back(unavailableDiagnostic());
+        return result;
+#endif
+    }
+
+    GeometryWriteResult OpenVdbBackend::encodeInt32Grid(
+        std::ostream& output,
+        const SparseInt32Grid& grid)
+    {
+#if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
+        return encodeGridStream<openvdb::Int32Grid>(output, grid, "Int32Grid");
+#else
+        static_cast<void>(output);
+        static_cast<void>(grid);
+        GeometryWriteResult result;
+        result.diagnostics.push_back(unavailableDiagnostic());
+        return result;
+#endif
+    }
+
+    GeometryReadResult<std::vector<ubyte>> OpenVdbBackend::encodeInt32Grid(
+        const SparseInt32Grid& grid)
+    {
+        return encodeGridBytes(grid,
+            [](std::ostream& output, const SparseInt32Grid& value)
+            {
+                return OpenVdbBackend::encodeInt32Grid(output, value);
+            });
+    }
+
+    GeometryReadResult<SparseInt32Grid> OpenVdbBackend::decodeInt32Grid(
+        std::span<const ubyte> openvdbStream,
+        const std::string& gridName)
+    {
+#if defined(HOUIO_HAS_OPENVDB) && HOUIO_HAS_OPENVDB
+        return decodeGridStream<openvdb::Int32Grid, SparseInt32Grid>(
+            openvdbStream, gridName, "Int32Grid");
+#else
+        static_cast<void>(openvdbStream);
+        static_cast<void>(gridName);
+        GeometryReadResult<SparseInt32Grid> result;
+        result.diagnostics.push_back(unavailableDiagnostic());
+        return result;
+#endif
     }
 }

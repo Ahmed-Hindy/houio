@@ -2,9 +2,9 @@
 
 ## Scope
 
-This plan tracks the staged modernization work through branch `refactor/modernization-phases-17-20`, based on the complete Phases 11–16 stack at `e00d4b6`. Integration PR #31 consolidates that stack onto `master`.
+This plan records the completed legacy-core modernization program and the current product/data-type expansion phases on top of `master`.
 
-The objective is to modernize the retained HouIO core without changing supported file-format behavior, Houdini interoperability, package layout, or documented row-vector matrix semantics. Compatibility aliases are removed only after every in-tree caller has migrated and regression guards are in place.
+The objective is to keep the retained HouIO core modern and stable while extending the custom writer one fixture-backed data family at a time. New work must preserve supported file-format behavior, Houdini interoperability, package layout, documented row-vector matrix semantics, and the established diagnostic contracts.
 
 ## Engineering invariants
 
@@ -66,7 +66,7 @@ Every phase must preserve these constraints:
 ## Current validation status
 
 - Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **61/61**.
-- Current exact source: Windows AddressSanitizer matrix passes **25/25**.
+- Current exact source: Windows AddressSanitizer matrix passes **61/61**.
 - MSVC native static analysis is error-clean.
 - The 19-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Exact scalar Float VDB live-HOM extraction and ambiguous-activity rejection pass in all four maintained Houdini versions.
@@ -486,7 +486,7 @@ Exit criteria:
 
 ### Phase 17 — Field coordinate and transform contract
 
-**Status: complete locally.**
+**Status: complete and merged.**
 
 Target files:
 
@@ -513,7 +513,7 @@ Exit criteria:
 
 ### Phase 18 — Explicit hierarchy and exception contracts
 
-**Status: complete locally.**
+**Status: complete and merged.**
 
 Target files:
 
@@ -539,7 +539,7 @@ Exit criteria:
 
 ### Phase 19 — Retired implementation-comment cleanup
 
-**Status: complete locally.**
+**Status: complete and merged.**
 
 Target files:
 
@@ -564,7 +564,7 @@ Exit criteria:
 
 ### Phase 20 — Houdini compatibility and maintained project contracts
 
-**Status: complete locally.**
+**Status: complete and merged.**
 
 Target files:
 
@@ -1022,7 +1022,7 @@ Goals:
 
 ### Phase 37 — Active-tile manifest construction
 
-**Status: complete locally.**
+**Status: complete and merged through PR #41.**
 
 Goals:
 
@@ -1039,6 +1039,27 @@ Exit criteria:
 - Capability and compatibility documentation distinguish explicit tile construction from unsupported live extraction.
 - Strict, package-consumer, and OpenVDB-enabled validation pass.
 
+### Phase 38 — Scalar Int32 sparse VDB support
+
+**Status: in progress on `feat/sparse-int32-vdb`.**
+
+Goals:
+
+- Introduce a shared typed sparse-scalar topology implementation while preserving `SparseFloatGrid` as an established public type.
+- Add dependency-neutral `SparseInt32Grid` voxels, active tiles, metadata, class, and linear transforms.
+- Add optional OpenVDB `Int32Grid` file and stream read/write support.
+- Add `SparseInt32VdbPrimitive`, faithful `HouSparseInt32Vdb`, and native Houdini payload generation.
+- Add explicit `sparse_int32_vdb` manifest construction with integer voxels and bounded active tiles.
+- Keep live HOM extraction Float-only until exact Int32 activity and values can be proven through maintained HOM APIs.
+
+Exit criteria:
+
+- Float sparse-grid source behavior and validation remain unchanged.
+- Int32 voxel and tile precedence is identical to FloatGrid semantics.
+- Backend-off builds expose dependency-neutral Int32 editing and reject native output without partial files.
+- OpenVDB-enabled CI validates Int32 file, stream, manifest, and native Houdini payload round trips.
+- Strict, AddressSanitizer, static-analysis, package-consumer, and maintained Houdini matrices pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
@@ -1048,7 +1069,7 @@ The following remain separate from the active product-facing phases unless requi
 - [x] Dependency-neutral sparse FloatGrid construction/editing and optional OpenVDB `.vdb` I/O.
 - [x] Native Houdini VDB payload generation from sparse grids and exact scalar Float VDB live-HOM extraction.
 - [x] Active FloatGrid tile representation and explicit manifest construction.
-- [ ] Ambiguous live-HOM activity extraction, nonlinear transforms, integer-grid, and vector-grid support.
+- [ ] Complete scalar Int32-grid support, then add vector-grid support, nonlinear transforms, and exact live-HOM extraction for currently ambiguous activity.
 - Performance architecture changes that bypass the JSON tree.
 - Project-wide licensing and third-party provenance resolution.
 

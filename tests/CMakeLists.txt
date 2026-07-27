@@ -147,6 +147,34 @@ if(TARGET houio_cli)
                 FIXTURES_REQUIRED houio_constructed_vdb
                 PASS_REGULAR_EXPRESSION "\"native_vdb_records\":1"
         )
+
+        set(
+            HOUIO_CONSTRUCTED_INT32_VDB_FIXTURE
+            "${CMAKE_CURRENT_BINARY_DIR}/openvdb_int32_constructed.bgeo"
+        )
+        add_test(
+            NAME houio.openvdb.construct_int32_native
+            COMMAND
+                $<TARGET_FILE:houio_cli>
+                write-manifest
+                "${CMAKE_CURRENT_SOURCE_DIR}/data/sparse_int32_vdb_manifest.json"
+                "${HOUIO_CONSTRUCTED_INT32_VDB_FIXTURE}"
+                --json
+        )
+        set_tests_properties(
+            houio.openvdb.construct_int32_native
+            PROPERTIES FIXTURES_SETUP houio_constructed_int32_vdb
+        )
+        add_test(
+            NAME houio.openvdb.inspect_int32_native
+            COMMAND $<TARGET_FILE:houio_cli> inspect "${HOUIO_CONSTRUCTED_INT32_VDB_FIXTURE}" --json
+        )
+        set_tests_properties(
+            houio.openvdb.inspect_int32_native
+            PROPERTIES
+                FIXTURES_REQUIRED houio_constructed_int32_vdb
+                PASS_REGULAR_EXPRESSION "\"native_vdb_records\":1"
+        )
     endif()
     add_test(
         NAME houio.cli.contract

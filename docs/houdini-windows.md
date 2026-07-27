@@ -158,7 +158,7 @@ Reports:
 
 ## VDB workflow
 
-HouIO preserves existing native Houdini VDB primitive payloads losslessly during file-to-file GEO/BGEO/SCF round trips. The default build remains independent of OpenVDB, but `SparseFloatGrid` supports dependency-neutral sparse editing and `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid I/O plus Houdini-native VDB primitive construction. Live HOM extraction is available for exact scalar Float VDBs and rejects grids whose activity cannot be determined without approximation.
+HouIO preserves existing native Houdini VDB primitive payloads losslessly during file-to-file GEO/BGEO/SCF round trips. The default build remains independent of OpenVDB, but `SparseFloatGrid` and `SparseInt32Grid` support dependency-neutral sparse editing and `HOUIO_ENABLE_OPENVDB=ON` adds native `.vdb` FloatGrid/Int32Grid I/O plus Houdini-native VDB primitive construction. Live HOM extraction remains limited to exact scalar Float VDBs and rejects grids whose activity or value type cannot be represented without approximation.
 
 The compatibility bridge also supports bounded 32-bit Float grids by converting them explicitly:
 
