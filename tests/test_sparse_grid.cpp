@@ -9,7 +9,14 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
+
+static_assert(std::is_same_v<
+    decltype(std::declval<const houio::SparseFloatGrid&>().background()), float>);
+static_assert(std::is_same_v<
+    decltype(std::declval<const houio::SparseInt32Grid&>().background()), houio::sint32>);
 
 int main()
 {
@@ -80,6 +87,28 @@ int main()
             "unordered active tile bounds must be rejected"); result != 0 )
     {
         return result;
+    }
+
+    houio::SparseInt32Grid intGrid(-1);
+    intGrid.setName("labels");
+    intGrid.setGridClass(houio::SparseGridClass::unknown);
+    intGrid.setMetadata("creator", "houio_test");
+    intGrid.setIndexToWorld(transform);
+    intGrid.addActiveTile(
+        houio::SparseIndexBounds{
+            houio::math::V3i(8, 8, 8),
+            houio::math::V3i(15, 15, 15)},
+        7);
+    intGrid.setVoxel(houio::math::V3i(10, 10, 10), 42);
+    intGrid.setVoxel(houio::math::V3i(-1, -2, -3), -9);
+    if( intGrid.background() != -1
+        || intGrid.activeTileCount() != 1
+        || intGrid.activeVoxelCount() != 2
+        || intGrid.value(houio::math::V3i(9, 9, 9)) != 7
+        || intGrid.value(houio::math::V3i(10, 10, 10)) != 42
+        || intGrid.value(houio::math::V3i(0, 0, 0)) != -1 )
+    {
+        return houio::test::fail("SparseInt32Grid topology or values are incorrect");
     }
 
     const auto bounds = grid.activeBounds();
@@ -189,16 +218,76 @@ int main()
     {
         return houio::test::fail("empty OpenVDB stream was not rejected explicitly");
     }
+    const auto encodedInt32Stream = houio::OpenVdbBackend::encodeInt32Grid(intGrid);
+    const auto int32RoundTrip = encodedInt32Stream
+        ? houio::OpenVdbBackend::decodeInt32Grid(encodedInt32Stream.value, "labels")
+        : houio::GeometryReadResult<houio::SparseInt32Grid>{};
+    if( !int32RoundTrip
+        || int32RoundTrip.value.background() != -1
+        || !int32RoundTrip.value.isActive(houio::math::V3i(9, 9, 9))
+        || int32RoundTrip.value.value(houio::math::V3i(9, 9, 9)) != 7
+        || int32RoundTrip.value.value(houio::math::V3i(10, 10, 10)) != 42
+        || int32RoundTrip.value.value(houio::math::V3i(-1, -2, -3)) != -9 )
+    {
+        return houio::test::fail(
+            "compiled OpenVDB Int32Grid round-trip changed activity or values");
+    }
+
+    houio::SparseInt32Grid intTileGrid(-1);
+    intTileGrid.setName("label_tiles");
+    intTileGrid.addActiveTile(
+        houio::SparseIndexBounds{
+            houio::math::V3i(8, 8, 8),
+            houio::math::V3i(15, 15, 15)},
+        7);
+    const auto encodedInt32TileStream =
+        houio::OpenVdbBackend::encodeInt32Grid(intTileGrid);
+    const auto int32TileRoundTrip = encodedInt32TileStream
+        ? houio::OpenVdbBackend::decodeInt32Grid(
+            encodedInt32TileStream.value, "label_tiles")
+        : houio::GeometryReadResult<houio::SparseInt32Grid>{};
+    if( !int32TileRoundTrip
+        || int32TileRoundTrip.value.activeTileCount() == 0
+        || int32TileRoundTrip.value.activeVoxelCount() != 0
+        || int32TileRoundTrip.value.value(houio::math::V3i(9, 9, 9)) != 7 )
+    {
+        return houio::test::fail(
+            "compiled OpenVDB pure Int32 tile round-trip changed tile topology");
+    }
+
     const auto encodedTileStream = houio::OpenVdbBackend::encodeFloatGrid(tiledGrid);
     const auto tileRoundTrip = encodedTileStream
         ? houio::OpenVdbBackend::decodeFloatGrid(encodedTileStream.value, "tiles")
         : houio::GeometryReadResult<houio::SparseFloatGrid>{};
-    if( !tileRoundTrip || tileRoundTrip.value.activeTileCount() == 0
+    if( !tileRoundTrip
         || !tileRoundTrip.value.isActive(houio::math::V3i(-8, -8, -8))
         || tileRoundTrip.value.value(houio::math::V3i(-2, -2, -2)) != 2.0f
         || tileRoundTrip.value.value(houio::math::V3i(-4, -4, -4)) != 5.0f )
     {
-        return houio::test::fail("compiled OpenVDB active tile round-trip changed topology or values");
+        return houio::test::fail(
+            "compiled OpenVDB mixed FloatGrid tile round-trip changed activity or values");
+    }
+
+    houio::SparseFloatGrid pureFloatTileGrid(0.0f);
+    pureFloatTileGrid.setName("float_tiles");
+    pureFloatTileGrid.addActiveTile(
+        houio::SparseIndexBounds{
+            houio::math::V3i(-8, -8, -8),
+            houio::math::V3i(-1, -1, -1)},
+        2.0f);
+    const auto encodedPureFloatTileStream =
+        houio::OpenVdbBackend::encodeFloatGrid(pureFloatTileGrid);
+    const auto pureFloatTileRoundTrip = encodedPureFloatTileStream
+        ? houio::OpenVdbBackend::decodeFloatGrid(
+            encodedPureFloatTileStream.value, "float_tiles")
+        : houio::GeometryReadResult<houio::SparseFloatGrid>{};
+    if( !pureFloatTileRoundTrip
+        || pureFloatTileRoundTrip.value.activeTileCount() == 0
+        || pureFloatTileRoundTrip.value.activeVoxelCount() != 0
+        || pureFloatTileRoundTrip.value.value(houio::math::V3i(-2, -2, -2)) != 2.0f )
+    {
+        return houio::test::fail(
+            "compiled OpenVDB pure FloatGrid tile round-trip changed tile topology");
     }
 
     const auto encodedStream = houio::OpenVdbBackend::encodeFloatGrid(grid);
@@ -247,9 +336,31 @@ int main()
     if( !unwrappedStream || unwrappedStream.value != encodedStream.value )
         return houio::test::fail("native Houdini payload wrapping changed OpenVDB bytes");
 
+    const std::filesystem::path int32VdbPath =
+        std::filesystem::temp_directory_path() / "houio_sparse_int32_grid_test.vdb";
+    std::error_code removeError;
+    std::filesystem::remove(int32VdbPath, removeError);
+    intTileGrid.setIndexToWorld(transform);
+    const auto int32WriteResult =
+        houio::OpenVdbBackend::writeInt32Grid(int32VdbPath, intTileGrid);
+    if( !int32WriteResult )
+        return houio::test::fail("compiled OpenVDB backend failed to write Int32Grid");
+    const auto int32ReadResult =
+        houio::OpenVdbBackend::readInt32Grid(int32VdbPath, "label_tiles");
+    std::filesystem::remove(int32VdbPath, removeError);
+    if( !int32ReadResult
+        || int32ReadResult.value.background() != intTileGrid.background()
+        || int32ReadResult.value.activeTileCount() == 0
+        || int32ReadResult.value.activeVoxelCount() != 0
+        || int32ReadResult.value.indexToWorld().ma != intTileGrid.indexToWorld().ma
+        || int32ReadResult.value.value(houio::math::V3i(9, 9, 9)) != 7 )
+    {
+        return houio::test::fail(
+            "compiled OpenVDB Int32Grid file round-trip changed grid data");
+    }
+
     const std::filesystem::path vdbPath =
         std::filesystem::temp_directory_path() / "houio_sparse_grid_test.vdb";
-    std::error_code removeError;
     std::filesystem::remove(vdbPath, removeError);
     const auto writeResult = houio::OpenVdbBackend::writeFloatGrid(vdbPath, grid);
     if( !writeResult )
@@ -294,6 +405,24 @@ int main()
     {
         return houio::test::fail(
             "disabled OpenVDB write did not return an unsupported diagnostic");
+    }
+    const auto int32ReadResult = houio::OpenVdbBackend::readInt32Grid(
+        std::filesystem::path("missing.vdb"));
+    if( int32ReadResult || int32ReadResult.diagnostics.empty()
+        || int32ReadResult.diagnostics.front().category
+            != houio::DiagnosticCategory::unsupported_input )
+    {
+        return houio::test::fail(
+            "disabled OpenVDB Int32Grid read did not return an unsupported diagnostic");
+    }
+    const auto int32WriteResult = houio::OpenVdbBackend::writeInt32Grid(
+        std::filesystem::path("unused_int32.vdb"), intGrid);
+    if( int32WriteResult || int32WriteResult.diagnostics.empty()
+        || int32WriteResult.diagnostics.front().category
+            != houio::DiagnosticCategory::unsupported_input )
+    {
+        return houio::test::fail(
+            "disabled OpenVDB Int32Grid write did not return an unsupported diagnostic");
     }
 #endif
 

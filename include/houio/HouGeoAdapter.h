@@ -274,6 +274,16 @@ namespace houio
             [[nodiscard]] virtual const SparseFloatGrid& sparseGrid() const = 0;
         };
 
+        class SparseInt32VdbPrimitive : public Primitive
+        {
+        public:
+            using Ptr = std::shared_ptr<SparseInt32VdbPrimitive>;
+            using ConstPtr = std::shared_ptr<const SparseInt32VdbPrimitive>;
+
+            [[nodiscard]] virtual int topologyVertex() const = 0;
+            [[nodiscard]] virtual const SparseInt32Grid& sparseGrid() const = 0;
+        };
+
         class NativeVdbPrimitive : public Primitive
         {
         public:

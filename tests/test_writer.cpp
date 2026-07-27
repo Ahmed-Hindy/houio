@@ -389,6 +389,65 @@ namespace
             return fail("Backend-off sparse VDB write created a partial file");
 #endif
 
+        houio::HouGeo::Ptr sparseInt32Geometry = createHouGeo();
+        auto sparseInt32Topology = std::make_shared<houio::HouGeo::HouTopology>();
+        sparseInt32Topology->appendIndex(0);
+        sparseInt32Geometry->setTopology(sparseInt32Topology);
+        houio::SparseInt32Grid sparseInt32Grid(-1);
+        sparseInt32Grid.setName("labels");
+        sparseInt32Grid.setIndexToWorld(houio::math::M44f::identity());
+        sparseInt32Grid.addActiveTile(
+            houio::SparseIndexBounds{
+                houio::math::V3i(8, 8, 8),
+                houio::math::V3i(15, 15, 15)},
+            7);
+        sparseInt32Grid.setVoxel(houio::math::V3i(10, 10, 10), 42);
+        auto sparseInt32Vdb = std::make_shared<houio::HouGeo::HouSparseInt32Vdb>();
+        sparseInt32Vdb->setTopologyVertex(0);
+        sparseInt32Vdb->setSparseGrid(std::move(sparseInt32Grid));
+        sparseInt32Geometry->addPrimitive(
+            std::static_pointer_cast<
+                houio::HouGeoAdapter::SparseInt32VdbPrimitive>(sparseInt32Vdb));
+        const std::filesystem::path sparseInt32Path =
+            directory / "constructed_int32_vdb.bgeo";
+        const houio::WriteResult sparseInt32Write = houio::Writer::write(
+            sparseInt32Path,
+            std::static_pointer_cast<houio::HouGeoAdapter>(sparseInt32Geometry));
+#if HOUIO_HAS_OPENVDB
+        if( !sparseInt32Write )
+            return fail("OpenVDB-enabled writer failed to construct Int32 VDB payload");
+        const auto sparseInt32Result = houio::GeometryIO::readHouGeo(sparseInt32Path);
+        const auto constructedInt32Vdb =
+            sparseInt32Result && sparseInt32Result.value->primitiveCount() == 1
+            ? std::dynamic_pointer_cast<houio::HouGeo::HouVdb>(
+                sparseInt32Result.value->primitives().front())
+            : houio::HouGeo::HouVdb::Ptr{};
+        const auto int32Stream = constructedInt32Vdb
+            && constructedInt32Vdb->serializedPayload()
+            ? houio::NativeVdbPayload::decode(
+                constructedInt32Vdb->serializedPayload())
+            : houio::GeometryReadResult<std::vector<houio::ubyte>>{};
+        const auto decodedInt32Grid = int32Stream
+            ? houio::OpenVdbBackend::decodeInt32Grid(int32Stream.value, "labels")
+            : houio::GeometryReadResult<houio::SparseInt32Grid>{};
+        if( !decodedInt32Grid
+            || decodedInt32Grid.value.background() != -1
+            || decodedInt32Grid.value.value(houio::math::V3i(9, 9, 9)) != 7
+            || decodedInt32Grid.value.value(houio::math::V3i(10, 10, 10)) != 42 )
+        {
+            return fail("Constructed native Int32 VDB payload changed sparse data");
+        }
+#else
+        if( sparseInt32Write || sparseInt32Write.diagnostics.empty()
+            || sparseInt32Write.diagnostics.front().category
+                != houio::DiagnosticCategory::unsupported_input )
+        {
+            return fail("Backend-off sparse Int32 VDB write did not return an unsupported diagnostic");
+        }
+        if( std::filesystem::exists(sparseInt32Path) )
+            return fail("Backend-off sparse Int32 VDB write created a partial file");
+#endif
+
         houio::HouGeo::Ptr cyclicGeometry = createHouGeo();
         auto cyclicTopology = std::make_shared<houio::HouGeo::HouTopology>();
         cyclicTopology->appendIndex(0);

@@ -1180,7 +1180,15 @@ namespace houio
 					else if( auto sparseVdb = std::dynamic_pointer_cast<const HouGeoAdapter::SparseVdbPrimitive>(primitive) )
 					{
 						if( !exportPrimitive(context, sparseVdb) )
-							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a sparse VDB primitive" );
+							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a sparse Float VDB primitive" );
+						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
+							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
+						++topologyVertexOffset;
+					}
+					else if( auto sparseInt32Vdb = std::dynamic_pointer_cast<const HouGeoAdapter::SparseInt32VdbPrimitive>(primitive) )
+					{
+						if( !exportPrimitive(context, sparseInt32Vdb) )
+							throw std::runtime_error( "HouGeoIO::exportGeometry could not serialize a sparse Int32 VDB primitive" );
 						if( topologyVertexOffset == std::numeric_limits<sint64>::max() )
 							throw std::overflow_error( "HouGeoIO::exportGeometry topology offset exceeds sint64 range" );
 						++topologyVertexOffset;
@@ -2019,6 +2027,30 @@ namespace houio
 		if( !payload )
 			throwReadFailure(payload.diagnostics,
 				"HouGeoIO could not stream SparseFloatGrid into a Houdini VDB payload");
+
+		auto nativeVdb = std::make_shared<HouGeo::HouVdb>();
+		nativeVdb->setTopologyVertex(sparseVdb->topologyVertex());
+		nativeVdb->setSerializedPayload(payload.value);
+		return exportPrimitive(
+			context,
+			std::static_pointer_cast<const HouGeoAdapter::NativeVdbPrimitive>(nativeVdb));
+	}
+
+	bool HouGeoIO::exportPrimitive( ExportContext &context,
+		HouGeoAdapter::SparseInt32VdbPrimitive::ConstPtr sparseVdb )
+	{
+		if( !sparseVdb || sparseVdb->topologyVertex() < 0 )
+			return false;
+
+		const auto payload = NativeVdbPayload::encodeStream(
+			[&](std::ostream& output)
+			{
+				return OpenVdbBackend::encodeInt32Grid(
+					output, sparseVdb->sparseGrid());
+			});
+		if( !payload )
+			throwReadFailure(payload.diagnostics,
+				"HouGeoIO could not stream SparseInt32Grid into a Houdini VDB payload");
 
 		auto nativeVdb = std::make_shared<HouGeo::HouVdb>();
 		nativeVdb->setTopologyVertex(sparseVdb->topologyVertex());
