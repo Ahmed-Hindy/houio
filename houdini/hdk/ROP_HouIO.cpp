@@ -16,8 +16,11 @@
 #include <UT/UT_Interrupt.h>
 
 #include <houio/NativePolygonWriter.h>
+#include <houio/NativeSceneWriter.h>
 
+#include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
@@ -103,6 +106,35 @@ namespace
         PRM_Template()
     };
 
+    [[nodiscard]] bool endsWith(const std::string& value, const char* suffix)
+    {
+        const std::size_t suffix_length = std::char_traits<char>::length(suffix);
+        return value.size() >= suffix_length
+            && value.compare(value.size() - suffix_length, suffix_length, suffix) == 0;
+    }
+
+    [[nodiscard]] RopOutputFormat detectOutputFormat(std::string path)
+    {
+        std::transform(
+            path.begin(),
+            path.end(),
+            path.begin(),
+            [](unsigned char character) {
+                return static_cast<char>(std::tolower(character));
+            });
+        if (endsWith(path, ".bgeo") || endsWith(path, ".bgeo.sc"))
+            return RopOutputFormat::bgeo;
+        if (endsWith(path, ".abc"))
+            return RopOutputFormat::alembic;
+        if (endsWith(path, ".usd")
+            || endsWith(path, ".usda")
+            || endsWith(path, ".usdc"))
+        {
+            return RopOutputFormat::usd;
+        }
+        return RopOutputFormat::unsupported;
+    }
+
     PRM_Template* getTemplates()
     {
         static PRM_Template* templates = nullptr;
@@ -179,7 +211,19 @@ ROP_HouIO::ROP_HouIO(
         indirect_ = allocIndirect(indirect_count);
 }
 
-ROP_HouIO::~ROP_HouIO() = default;
+ROP_HouIO::~ROP_HouIO()
+{
+    resetArchive();
+}
+
+void ROP_HouIO::resetArchive() noexcept
+{
+    if (archive_writer_ != nullptr)
+    {
+        houio_destroy_native_scene_archive(archive_writer_);
+        archive_writer_ = nullptr;
+    }
+}
 
 void ROP_HouIO::evaluateString(
     UT_String& value,
@@ -197,9 +241,9 @@ bool ROP_HouIO::evaluateToggle(const char* name, int index, fpreal time)
 
 int ROP_HouIO::startRender(int, fpreal start_time, fpreal end_time)
 {
-    archive_writer_.reset();
+    resetArchive();
     archive_destination_.clear();
-    render_format_ = NativeOutputFormat::unsupported;
+    render_format_ = RopOutputFormat::unsupported;
     end_time_ = end_time;
 
     if (error() < UT_ERROR_ABORT && !executePreRenderScript(start_time))
@@ -207,61 +251,66 @@ int ROP_HouIO::startRender(int, fpreal start_time, fpreal end_time)
     if (error() >= UT_ERROR_ABORT)
         return 0;
 
-    try
+    UT_String output_path;
+    evaluateString(output_path, "sopoutput", indirect_output, start_time);
+    if (!output_path.isstring())
     {
-        UT_String output_path;
-        evaluateString(output_path, "sopoutput", indirect_output, start_time);
-        if (!output_path.isstring())
-        {
-            addError(ROP_MESSAGE, "Output File is empty");
-            return 0;
-        }
+        addError(ROP_MESSAGE, "Output File is empty");
+        return 0;
+    }
 
-        archive_destination_ = output_path.toStdString();
-        render_format_ = detectNativeOutputFormat(archive_destination_);
-        if (render_format_ == NativeOutputFormat::unsupported)
+    archive_destination_ = output_path.toStdString();
+    render_format_ = detectOutputFormat(archive_destination_);
+    if (render_format_ == RopOutputFormat::unsupported)
+    {
+        addError(
+            ROP_MESSAGE,
+            "HouIO Geometry supports .bgeo, .bgeo.sc, .abc, .usd, .usda, and .usdc output files");
+        return 0;
+    }
+
+    if (render_format_ == RopOutputFormat::alembic
+        || render_format_ == RopOutputFormat::usd)
+    {
+        if (HOM().isApprentice())
         {
             addError(
                 ROP_MESSAGE,
-                "HouIO Geometry supports .bgeo, .bgeo.sc, .abc, .usd, .usda, and .usdc output files");
+                "Alembic and USD export are unavailable in Houdini Apprentice; use a permitted Houdini license");
             return 0;
         }
 
-        if (render_format_ == NativeOutputFormat::alembic
-            || render_format_ == NativeOutputFormat::usd)
-        {
-            if (HOM().isApprentice())
-            {
-                addError(
-                    ROP_MESSAGE,
-                    "Alembic and USD export are unavailable in Houdini Apprentice; use a permitted Houdini license");
-                return 0;
-            }
+        HouIONativeSceneArchiveOptions options = {};
+        options.destination_utf8 = archive_destination_.c_str();
+        options.frames_per_second = CHgetManager()->getSamplesPerSec();
+        options.start_frame = CHgetSampleFromTime(start_time);
+        options.create_parent_directories = evaluateToggle(
+            "createdirs", indirect_create_directories, start_time)
+            ? 1U
+            : 0U;
+        options.overwrite_existing = evaluateToggle(
+            "overwrite", indirect_overwrite, start_time)
+            ? 1U
+            : 0U;
+        options.atomic_replace = evaluateToggle(
+            "atomic", indirect_atomic, start_time)
+            ? 1U
+            : 0U;
 
-            SceneArchiveOptions options;
-            options.destination = archive_destination_;
-            options.frames_per_second = CHgetManager()->getSamplesPerSec();
-            options.start_frame = CHgetSampleFromTime(start_time);
-            options.create_parent_directories = evaluateToggle(
-                "createdirs", indirect_create_directories, start_time);
-            options.overwrite_existing = evaluateToggle(
-                "overwrite", indirect_overwrite, start_time);
-            options.atomic_replace = evaluateToggle(
-                "atomic", indirect_atomic, start_time);
-            archive_writer_ = createSceneArchiveWriter(render_format_, options);
+        std::array<char, 4096> error_buffer = {};
+        archive_writer_ = houio_create_native_scene_archive(
+            &options,
+            error_buffer.data(),
+            error_buffer.size());
+        if (archive_writer_ == nullptr)
+        {
+            addError(
+                ROP_MESSAGE,
+                error_buffer[0] != '\0'
+                    ? error_buffer.data()
+                    : "HouIO scene archive creation failed without a diagnostic");
+            return 0;
         }
-    }
-    catch (const std::exception& exception)
-    {
-        addError(ROP_MESSAGE, exception.what());
-        archive_writer_.reset();
-        return 0;
-    }
-    catch (...)
-    {
-        addError(ROP_MESSAGE, "HouIO archive initialization failed with an unknown error");
-        archive_writer_.reset();
-        return 0;
     }
 
     return error() < UT_ERROR_ABORT ? 1 : 0;
@@ -311,7 +360,7 @@ ROP_RENDER_CODE ROP_HouIO::renderFrame(fpreal time, UT_Interrupt* interrupt)
         }
 
         const std::string destination = output_path.toStdString();
-        const NativeOutputFormat frame_format = detectNativeOutputFormat(destination);
+        const RopOutputFormat frame_format = detectOutputFormat(destination);
         if (frame_format != render_format_)
         {
             addError(
@@ -321,7 +370,7 @@ ROP_RENDER_CODE ROP_HouIO::renderFrame(fpreal time, UT_Interrupt* interrupt)
         }
 
         const NativePolygonDetail geometry = adaptDetail(*detail, interrupt);
-        if (render_format_ == NativeOutputFormat::bgeo)
+        if (render_format_ == RopOutputFormat::bgeo)
         {
             const char* blosc_library = std::getenv("HOUIO_BLOSC_LIBRARY");
 
@@ -370,16 +419,42 @@ ROP_RENDER_CODE ROP_HouIO::renderFrame(fpreal time, UT_Interrupt* interrupt)
         }
         else
         {
-            if (!archive_writer_)
+            if (archive_writer_ == nullptr)
                 throw std::runtime_error("HouIO scene archive writer is not initialized");
             if (destination != archive_destination_)
             {
                 throw std::runtime_error(
                     "Alembic and USD output paths must remain constant across the render range");
             }
-            archive_writer_->writeSample(
-                geometry,
-                CHgetSampleFromTime(time));
+
+            HouIONativePolygonWriteRequest sample_request = {};
+            sample_request.positions_xyzw = geometry.positions_xyzw.empty()
+                ? nullptr
+                : geometry.positions_xyzw.data();
+            sample_request.point_count = geometry.positions_xyzw.size() / 4U;
+            sample_request.topology = geometry.topology.empty()
+                ? nullptr
+                : geometry.topology.data();
+            sample_request.vertex_count = geometry.topology.size();
+            sample_request.polygons = geometry.polygons.empty()
+                ? nullptr
+                : geometry.polygons.data();
+            sample_request.polygon_count = geometry.polygons.size();
+
+            std::array<char, 4096> error_buffer = {};
+            const int write_status = houio_write_native_scene_sample(
+                archive_writer_,
+                &sample_request,
+                CHgetSampleFromTime(time),
+                error_buffer.data(),
+                error_buffer.size());
+            if (write_status != 0)
+            {
+                throw std::runtime_error(
+                    error_buffer[0] != '\0'
+                        ? error_buffer.data()
+                        : "HouIO scene sample write failed without a diagnostic");
+            }
         }
     }
     catch (const std::exception& exception)
@@ -400,26 +475,25 @@ ROP_RENDER_CODE ROP_HouIO::renderFrame(fpreal time, UT_Interrupt* interrupt)
 
 ROP_RENDER_CODE ROP_HouIO::endRender()
 {
-    if (archive_writer_)
+    if (archive_writer_ != nullptr)
     {
         if (error() < UT_ERROR_ABORT)
         {
-            try
-            {
-                archive_writer_->finish();
-            }
-            catch (const std::exception& exception)
-            {
-                addError(ROP_MESSAGE, exception.what());
-            }
-            catch (...)
+            std::array<char, 4096> error_buffer = {};
+            const int finish_status = houio_finish_native_scene_archive(
+                archive_writer_,
+                error_buffer.data(),
+                error_buffer.size());
+            if (finish_status != 0)
             {
                 addError(
                     ROP_MESSAGE,
-                    "HouIO scene archive finalization failed with an unknown error");
+                    error_buffer[0] != '\0'
+                        ? error_buffer.data()
+                        : "HouIO scene archive finalization failed without a diagnostic");
             }
         }
-        archive_writer_.reset();
+        resetArchive();
     }
 
     if (error() < UT_ERROR_ABORT && !executePostRenderScript(end_time_))

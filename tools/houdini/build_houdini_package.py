@@ -22,6 +22,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--converter", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--runtime-root", type=Path)
     return parser.parse_args()
 
 
@@ -53,7 +54,13 @@ def write_package_file(destination: Path, version: str) -> None:
     )
 
 
-def build_package(cli: Path, converter: Path, output: Path, version: str) -> Path:
+def build_package(
+    cli: Path,
+    converter: Path,
+    output: Path,
+    version: str,
+    runtime_root: Path | None = None,
+) -> Path:
     """Build a ZIP archive installable through Houdini's Package Browser.
 
     Args:
@@ -61,6 +68,9 @@ def build_package(cli: Path, converter: Path, output: Path, version: str) -> Pat
         converter: Compiled legacy ``houio_convert`` executable.
         output: Destination ZIP path.
         version: HouIO package version.
+        runtime_root: Optional bundled dependency prefix. Its runtime ``bin``,
+            ``lib``, ``plugin``, and ``share`` trees are copied into the HouIO
+            package with the same relative layout.
 
     Returns:
         The resolved archive path.
@@ -71,6 +81,7 @@ def build_package(cli: Path, converter: Path, output: Path, version: str) -> Pat
     cli = cli.resolve()
     converter = converter.resolve()
     output = output.resolve()
+    runtime_root = runtime_root.resolve() if runtime_root is not None else None
     if not cli.is_file():
         raise FileNotFoundError(f"HouIO CLI does not exist: {cli}")
     if not converter.is_file():
@@ -83,6 +94,8 @@ def build_package(cli: Path, converter: Path, output: Path, version: str) -> Pat
         raise FileNotFoundError(f"Installer does not exist: {INSTALLER_PATH}")
     if not BOOTSTRAP_PATH.is_file():
         raise FileNotFoundError(f"Bootstrap script does not exist: {BOOTSTRAP_PATH}")
+    if runtime_root is not None and not runtime_root.is_dir():
+        raise FileNotFoundError(f"Runtime dependency prefix does not exist: {runtime_root}")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
@@ -98,6 +111,17 @@ def build_package(cli: Path, converter: Path, output: Path, version: str) -> Pat
         binary_root.mkdir(parents=True, exist_ok=True)
         shutil.copy2(cli, binary_root / cli.name)
         shutil.copy2(converter, binary_root / converter.name)
+        if runtime_root is not None:
+            for directory_name in ("bin", "lib", "plugin", "share"):
+                source_directory = runtime_root / directory_name
+                if not source_directory.is_dir():
+                    continue
+                destination_directory = content_root / directory_name
+                shutil.copytree(
+                    source_directory,
+                    destination_directory,
+                    dirs_exist_ok=True,
+                )
         shutil.copy2(INSTALLER_PATH, staging_root / INSTALLER_PATH.name)
         shutil.copy2(BOOTSTRAP_PATH, staging_root / BOOTSTRAP_PATH.name)
         write_package_file(staging_root / "houio.json", version)
@@ -124,6 +148,7 @@ def main() -> int:
         arguments.converter,
         arguments.output,
         arguments.version,
+        arguments.runtime_root,
     )
     print(archive_path)
     return 0

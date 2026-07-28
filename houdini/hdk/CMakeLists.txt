@@ -25,48 +25,7 @@ add_library(
     houio_houdini_rop
     SHARED
     HoudiniGeometryAdapter.cpp
-    SceneArchiveWriter.cpp
     ROP_HouIO.cpp
-)
-
-set(
-    HOUIO_HOUDINI_DSOLIB_DIRECTORY
-    "${HOUIO_HOUDINI_ROOT}/custom/houdini/dsolib"
-)
-file(
-    GLOB
-    HOUIO_HOUDINI_PYTHON_IMPORT_LIBRARIES
-    "${HOUIO_HOUDINI_ROOT}/python*/libs/python*.lib"
-)
-list(
-    FILTER HOUIO_HOUDINI_PYTHON_IMPORT_LIBRARIES
-    EXCLUDE REGEX "[/\\\\]python3\\.lib$|stub\\.lib$"
-)
-list(LENGTH HOUIO_HOUDINI_PYTHON_IMPORT_LIBRARIES HOUIO_HOUDINI_PYTHON_LIBRARY_COUNT)
-if(NOT HOUIO_HOUDINI_PYTHON_LIBRARY_COUNT EQUAL 1)
-    message(FATAL_ERROR
-        "Expected exactly one Houdini Python import library, found: "
-        "${HOUIO_HOUDINI_PYTHON_IMPORT_LIBRARIES}")
-endif()
-list(GET HOUIO_HOUDINI_PYTHON_IMPORT_LIBRARIES 0 HOUIO_HOUDINI_PYTHON_IMPORT_LIBRARY)
-
-set(HOUIO_HOUDINI_OPTIONAL_USD_LIBRARIES)
-if(EXISTS "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_boost.lib")
-    list(APPEND HOUIO_HOUDINI_OPTIONAL_USD_LIBRARIES
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_boost.lib")
-endif()
-if(EXISTS "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_python.lib")
-    list(APPEND HOUIO_HOUDINI_OPTIONAL_USD_LIBRARIES
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_python.lib")
-endif()
-file(
-    GLOB
-    HOUIO_HOUDINI_BOOST_PYTHON_LIBRARIES
-    "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/hboost_python*-mt-x64.lib"
-)
-list(APPEND
-    HOUIO_HOUDINI_OPTIONAL_USD_LIBRARIES
-    ${HOUIO_HOUDINI_BOOST_PYTHON_LIBRARIES}
 )
 
 target_link_libraries(
@@ -74,30 +33,12 @@ target_link_libraries(
     PRIVATE
         "$<LINK_ONLY:houio::houio>"
         Houdini
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/Alembic_sidefx.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_arch.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_ar.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_gf.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_js.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_kind.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_pcp.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_plug.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_sdf.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_tf.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_trace.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_usd.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_usdGeom.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_vt.lib"
-        "${HOUIO_HOUDINI_DSOLIB_DIRECTORY}/libpxr_work.lib"
-        ${HOUIO_HOUDINI_OPTIONAL_USD_LIBRARIES}
-        "${HOUIO_HOUDINI_PYTHON_IMPORT_LIBRARY}"
 )
 target_include_directories(
     houio_houdini_rop
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${PROJECT_SOURCE_DIR}/include
-        "${HOUIO_HOUDINI_ROOT}/toolkit/include/Imath"
 )
 target_compile_definitions(
     houio_houdini_rop
