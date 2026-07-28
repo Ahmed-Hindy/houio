@@ -900,13 +900,71 @@ namespace
         return 0;
     }
 
+    int verifyQuadricManifest(const std::filesystem::path& directory)
+    {
+        const std::filesystem::path path = directory / "quadrics.json";
+        writeText(path, R"JSON({
+            "schema":"houio.hom/1","point_count":2,"vertex_count":2,
+            "primitive_count":2,"topology":[0,1],
+            "primitives":[
+                {"type":"sphere","vertex_offset":0,
+                 "transform":[2,0,0,0,3,0,0,0,4]},
+                {"type":"tube","vertex_offset":1,
+                 "transform":[1,0,0,0,5,0,0,0,2],
+                 "caps":true,"taper":0.5}
+            ],
+            "attributes":{"point":[{"name":"P","kind":"numeric",
+            "storage":"float32","tuple_size":4,"element_count":2,
+            "values":[1,2,3,1,-1,0.5,2,1]}],
+            "vertex":[],"primitive":[],"global":[]}
+        })JSON");
+        const auto result = houio::HomManifest::read(path);
+        if( !result || result.value->primitiveCount() != 2 )
+            return fail("quadric manifest failed to load");
+        const auto primitives = result.value->primitives();
+        const auto sphere = std::dynamic_pointer_cast<houio::HouGeo::HouSphere>(primitives[0]);
+        const auto tube = std::dynamic_pointer_cast<houio::HouGeo::HouTube>(primitives[1]);
+        if( !sphere || !tube || sphere->topologyVertex() != 0
+            || tube->topologyVertex() != 1 || !tube->hasCaps()
+            || tube->taper() != 0.5f || sphere->transform().ma[0] != 2.0f
+            || sphere->transform().ma[4] != 3.0f || sphere->transform().ma[8] != 4.0f
+            || tube->transform().ma[4] != 5.0f || tube->transform().ma[8] != 2.0f )
+        {
+            return fail("quadric manifest changed native metadata");
+        }
+
+        const std::filesystem::path outputPath = directory / "quadrics.bgeo";
+        const houio::WriteResult writeResult = houio::Writer::write(
+            outputPath,
+            std::static_pointer_cast<houio::HouGeoAdapter>(result.value));
+        const auto roundTrip = writeResult
+            ? houio::GeometryIO::readHouGeo(outputPath)
+            : houio::GeometryReadResult<houio::HouGeo::Ptr>{};
+        if( !roundTrip || roundTrip.value->primitiveCount() != 2 )
+            return fail("quadric manifest failed writer round-trip");
+        const auto roundTripPrimitives = roundTrip.value->primitives();
+        const auto roundTripSphere =
+            std::dynamic_pointer_cast<houio::HouGeo::HouSphere>(roundTripPrimitives[0]);
+        const auto roundTripTube =
+            std::dynamic_pointer_cast<houio::HouGeo::HouTube>(roundTripPrimitives[1]);
+        if( !roundTripSphere || !roundTripTube || roundTripSphere->topologyVertex() != 0
+            || roundTripTube->topologyVertex() != 1 || !roundTripTube->hasCaps()
+            || roundTripTube->taper() != 0.5f
+            || roundTripSphere->transform().ma[8] != 4.0f
+            || roundTripTube->transform().ma[4] != 5.0f )
+        {
+            return fail("quadric manifest writer round-trip changed metadata");
+        }
+        return 0;
+    }
+
     int verifyUnsupportedRecord(const std::filesystem::path &directory)
     {
-        const std::filesystem::path path = directory / "unsupported_sphere.json";
+        const std::filesystem::path path = directory / "unsupported_tetrahedron.json";
         writeText(path, R"JSON({
             "schema":"houio.hom/1","point_count":1,"vertex_count":1,
             "primitive_count":1,"topology":[0],
-            "primitives":[{"type":"sphere","vertex_offset":0}],
+            "primitives":[{"type":"tetrahedron","vertex_offset":0}],
             "attributes":{"point":[{"name":"P","kind":"numeric",
             "storage":"float32","tuple_size":4,"element_count":1,
             "values":[0,0,0,1]}],"vertex":[],"primitive":[],"global":[]}
@@ -954,6 +1012,8 @@ int main()
     if( const int result = verifyInvalidSparseVdbManifest(directory); result != 0 )
         return result;
     if( const int result = verifyCurveManifest(directory); result != 0 )
+        return result;
+    if( const int result = verifyQuadricManifest(directory); result != 0 )
         return result;
     if( const int result = verifyUnsupportedRecord(directory); result != 0 )
         return result;

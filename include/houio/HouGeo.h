@@ -588,6 +588,61 @@ namespace houio
             friend class HouGeo;
         };
 
+        class HouSphere final : public SpherePrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouSphere>;
+            using ConstPtr = std::shared_ptr<const HouSphere>;
+
+            [[nodiscard]] int topologyVertex() const override;
+            [[nodiscard]] math::M33f transform() const override;
+
+            void setTopologyVertex(int topology_vertex) noexcept
+            {
+                topology_vertex_ = topology_vertex;
+            }
+
+            void setTransform(const math::M33f& transform) noexcept
+            {
+                transform_ = transform;
+            }
+
+        private:
+            int topology_vertex_ = -1;
+            math::M33f transform_ = math::M33f::identity();
+        };
+
+        class HouTube final : public TubePrimitive
+        {
+        public:
+            using Ptr = std::shared_ptr<HouTube>;
+            using ConstPtr = std::shared_ptr<const HouTube>;
+
+            [[nodiscard]] int topologyVertex() const override;
+            [[nodiscard]] math::M33f transform() const override;
+            [[nodiscard]] bool hasCaps() const override;
+            [[nodiscard]] real32 taper() const override;
+
+            void setTopologyVertex(int topology_vertex) noexcept
+            {
+                topology_vertex_ = topology_vertex;
+            }
+
+            void setTransform(const math::M33f& transform) noexcept
+            {
+                transform_ = transform;
+            }
+
+            void setCaps(bool has_caps) noexcept { has_caps_ = has_caps; }
+            void setTaper(real32 taper);
+
+        private:
+            int topology_vertex_ = -1;
+            math::M33f transform_ = math::M33f::identity();
+            bool has_caps_ = false;
+            real32 taper_ = 1.0f;
+        };
+
         class HouCurve final : public CurvePrimitive
         {
         public:
@@ -692,6 +747,8 @@ namespace houio
         void addPrimitive(SparseInt32VdbPrimitive::Ptr sparse_vdb);
         void addPrimitive(SparseVec3fVdbPrimitive::Ptr sparse_vdb);
         void addPrimitive(NativeVdbPrimitive::Ptr native_vdb);
+        void addPrimitive(SpherePrimitive::Ptr sphere);
+        void addPrimitive(TubePrimitive::Ptr tube);
         void addPrimitive(CurvePrimitive::Ptr curve);
         void addPrimitive(PolyPrimitive::Ptr polygon);
         void setTopology(HouTopology::Ptr topology);
@@ -760,6 +817,8 @@ namespace houio
         void loadPackedDiskPrimitive(json::ObjectPtr packed_disk);
         void loadPackedDiskSequencePrimitive(json::ObjectPtr packed_disk_sequence);
         void loadNativeVdbPrimitive(json::ObjectPtr native_vdb);
+        void loadSpherePrimitive(json::ObjectPtr sphere);
+        void loadTubePrimitive(json::ObjectPtr tube);
         void loadCurvePrimitive(
             json::ObjectPtr curve_object,
             CurvePrimitive::Basis basis);

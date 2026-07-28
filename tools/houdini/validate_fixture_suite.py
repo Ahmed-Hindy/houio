@@ -357,6 +357,18 @@ def primitive_summary(geometry: hou.Geometry) -> list[dict[str, Any]]:
                 }
             )
             continue
+        if primitive.type().name() in {"Sphere", "Tube"}:
+            summary = {
+                "type": primitive.type().name(),
+                "closed": None,
+                "points": [vertex.point().number() for vertex in primitive.vertices()],
+                "transform": [float(value) for value in primitive.intrinsicValue("transform")],
+            }
+            if primitive.type().name() == "Tube":
+                summary["caps"] = int(primitive.intrinsicValue("closed"))
+                summary["taper"] = float(primitive.intrinsicValue("tubetaper"))
+            summaries.append(summary)
+            continue
         if primitive.type().name() in {"NURBSCurve", "BezierCurve"}:
             summaries.append(
                 {

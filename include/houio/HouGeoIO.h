@@ -165,6 +165,12 @@ namespace houio
             HouGeoAdapter::NativeVdbPrimitive::ConstPtr native_vdb);
         static bool exportPrimitive(
             ExportContext& context,
+            HouGeoAdapter::SpherePrimitive::ConstPtr sphere);
+        static bool exportPrimitive(
+            ExportContext& context,
+            HouGeoAdapter::TubePrimitive::ConstPtr tube);
+        static bool exportPrimitive(
+            ExportContext& context,
             HouGeoAdapter::CurvePrimitive::ConstPtr curve);
         static bool exportPrimitive(
             ExportContext& context,

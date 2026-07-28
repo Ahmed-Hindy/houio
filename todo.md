@@ -4,13 +4,13 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `feat/nurbs-bezier-curves`
-- Baseline commit: `f528c03` (`master` after merged PR #43).
-- Current exact source: MSVC warnings-as-errors/Houdini suite passes **65/65**.
-- Current exact source: Windows AddressSanitizer passes **65/65** and MSVC native analysis is error-clean.
-- The 20-fixture matrix passes with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Branch: `feat/spheres-tubes`
+- Baseline commit: `b06cb76` (`master` after merged PR #44).
+- MSVC warnings-as-errors/Houdini and Windows AddressSanitizer suites pass **69/69**; MSVC native analysis is error-clean.
+- The 21-fixture and Houdini package matrices pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Focused native-quadric parser, manifest, direct-HOM, direct-writer, CLI, and Houdini fixture tests pass locally.
 - Direct scalar Float VDB extraction, including ambiguous-activity rejection, passes in all four maintained Houdini versions.
-- The active branch adds faithful NURBS and Bezier records, exact file/manifest round trips, direct Bezier HOM extraction, rational `Pw` preservation, capability reporting, and four-version fixtures.
+- The active branch adds faithful native Sphere and Tube records, exact transforms, tube caps and taper, explicit manifests, direct HOM extraction, capability reporting, and four-version fixtures.
 
 ## Modernization completed
 
@@ -102,7 +102,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Preserve active FloatGrid tiles in the sparse model and construct them through explicit `houio.hom/1` manifests.
 - [x] Complete scalar Int32 VDB support through merged PR #42.
 - [x] Add Vec3f VDB values, vector semantics, and staggered-grid support through merged PR #43.
-- [ ] Complete and merge faithful NURBS and Bezier curve support before spheres, tubes, instancing, height fields, and other observed records.
+- [x] Complete faithful NURBS and Bezier curve support through merged PR #44.
+- [ ] Complete and merge native Sphere and Tube support before tetrahedra, instancing, height fields, and other observed records.
 
 ## Modernization completed follow-up
 
@@ -197,8 +198,8 @@ Add fixture-backed support one record type at a time:
 - [x] Named packed fragments
 - [x] External packed disk references
 - [x] Packed disk sequences
-- [ ] NURBS and Bezier curves — complete locally on `feat/nurbs-bezier-curves`, pending merge
-- [ ] Spheres and tubes
+- [x] NURBS and Bezier curves — merged through PR #44
+- [ ] Spheres and tubes — complete locally on `feat/spheres-tubes`, pending merge
 - [ ] Tetrahedra
 - [ ] Height fields
 - [ ] Agents and crowds

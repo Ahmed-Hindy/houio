@@ -26,6 +26,31 @@ namespace houio
 			return static_cast<int>(count);
 		}
 
+		math::M33f parseFiniteMatrix33(
+			const json::ArrayPtr& transformValues,
+			const std::string& primitiveName )
+		{
+			if( !transformValues || transformValues->size() != 9 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					primitiveName + " transform requires nine values",
+					-1, "transform"});
+			std::array<real32, 9> values{};
+			for( int index = 0; index < 9; ++index )
+			{
+				values[static_cast<std::size_t>(index)] = transformValues->get<real32>(index);
+				if( !std::isfinite(values[static_cast<std::size_t>(index)]) )
+					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+						DiagnosticCategory::schema,
+						primitiveName + " transform values must be finite",
+						-1, "transform"});
+			}
+			return math::M33f(
+				values[0], values[1], values[2],
+				values[3], values[4], values[5],
+				values[6], values[7], values[8]);
+		}
+
 		std::vector<int> expandPagedIntValues(
 			json::ObjectPtr values,
 			sint64 elementCount,
@@ -617,6 +642,20 @@ namespace houio
 		if( !nativeVdb )
 			throw std::invalid_argument( "HouGeo::addPrimitive received a null native VDB" );
 		m_primitives.push_back(std::move(nativeVdb));
+	}
+
+	void HouGeo::addPrimitive( SpherePrimitive::Ptr sphere )
+	{
+		if( !sphere )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null sphere" );
+		m_primitives.push_back(std::move(sphere));
+	}
+
+	void HouGeo::addPrimitive( TubePrimitive::Ptr tube )
+	{
+		if( !tube )
+			throw std::invalid_argument( "HouGeo::addPrimitive received a null tube" );
+		m_primitives.push_back(std::move(tube));
 	}
 
 	void HouGeo::addPrimitive( CurvePrimitive::Ptr curve )
@@ -1555,6 +1594,12 @@ namespace houio
 		if( primitiveType=="VDB" )
 			withSchemaPath("data", [&]() { loadNativeVdbPrimitive(toObject(primitive->array(1))); });
 		else
+		if( primitiveType=="Sphere" )
+			withSchemaPath("data", [&]() { loadSpherePrimitive(toObject(primitive->array(1))); });
+		else
+		if( primitiveType=="Tube" )
+			withSchemaPath("data", [&]() { loadTubePrimitive(toObject(primitive->array(1))); });
+		else
 		if( primitiveType=="NURBCurve" )
 			withSchemaPath("data", [&]() {
 				loadCurvePrimitive(toObject(primitive->array(1)), CurvePrimitive::Basis::nurbs);
@@ -2033,6 +2078,46 @@ namespace houio
 		auto result = std::make_shared<HouVdb>();
 		result->topology_vertex_ = topologyVertex;
 		result->serialized_payload_ = std::move(payload);
+		m_primitives.push_back(std::move(result));
+	}
+
+	void HouGeo::loadSpherePrimitive( json::ObjectPtr sphere )
+	{
+		if( !sphere )
+			throw std::invalid_argument( "HouGeo::loadSpherePrimitive received null data" );
+		const int topologyVertex = sphere->get<int>("vertex", -1);
+		if( topologyVertex < 0 || !m_topology
+			|| static_cast<sint64>(topologyVertex) >= m_topology->indexCount() )
+		{
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"Sphere topology vertex is outside vertexcount",
+				-1, "vertex"});
+		}
+		auto result = std::make_shared<HouSphere>();
+		result->setTopologyVertex(topologyVertex);
+		result->setTransform(parseFiniteMatrix33(sphere->array("transform"), "Sphere"));
+		m_primitives.push_back(std::move(result));
+	}
+
+	void HouGeo::loadTubePrimitive( json::ObjectPtr tube )
+	{
+		if( !tube )
+			throw std::invalid_argument( "HouGeo::loadTubePrimitive received null data" );
+		const int topologyVertex = tube->get<int>("vertex", -1);
+		if( topologyVertex < 0 || !m_topology
+			|| static_cast<sint64>(topologyVertex) >= m_topology->indexCount() )
+		{
+			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+				DiagnosticCategory::schema,
+				"Tube topology vertex is outside vertexcount",
+				-1, "vertex"});
+		}
+		auto result = std::make_shared<HouTube>();
+		result->setTopologyVertex(topologyVertex);
+		result->setTransform(parseFiniteMatrix33(tube->array("transform"), "Tube"));
+		result->setCaps(tube->get<bool>("caps", false));
+		result->setTaper(tube->get<real32>("taper", 1.0f));
 		m_primitives.push_back(std::move(result));
 	}
 
@@ -2829,6 +2914,43 @@ namespace houio
 
 		polygonRunPrimitive->m_numPolys = primitiveCount;
 		m_primitives.push_back( polygonRunPrimitive );
+	}
+
+	int HouGeo::HouSphere::topologyVertex() const
+	{
+		return topology_vertex_;
+	}
+
+	math::M33f HouGeo::HouSphere::transform() const
+	{
+		return transform_;
+	}
+
+	int HouGeo::HouTube::topologyVertex() const
+	{
+		return topology_vertex_;
+	}
+
+	math::M33f HouGeo::HouTube::transform() const
+	{
+		return transform_;
+	}
+
+	bool HouGeo::HouTube::hasCaps() const
+	{
+		return has_caps_;
+	}
+
+	real32 HouGeo::HouTube::taper() const
+	{
+		return taper_;
+	}
+
+	void HouGeo::HouTube::setTaper( real32 taperValue )
+	{
+		if( !std::isfinite(taperValue) )
+			throw std::invalid_argument("Tube taper must be finite");
+		taper_ = taperValue;
 	}
 
 	HouGeoAdapter::CurvePrimitive::Basis HouGeo::HouCurve::basis() const

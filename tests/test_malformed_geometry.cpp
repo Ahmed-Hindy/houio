@@ -230,6 +230,12 @@ int main()
          R"JSON(["pointcount",5,"vertexcount",5,"primitivecount",1,"topology",["pointref",["indices",[0,1,2,3,4]]],"primitives",[[["type","BezierCurve"],["vertex",[0,1,2,3,4],"closed",false,"basis",["type","Bezier","order",4,"knots",[0,1]]]]]])JSON"},
         {"packed disk missing filename",
          R"JSON(["pointcount", 1, "vertexcount", 1, "primitivecount", 1, "topology", ["pointref", ["indices", [0]]], "primitives", [[["type", "PackedDisk"], ["parameters", ["filename", ""], "vertex", 0]]]])JSON"},
+        {"sphere transform count mismatch",
+         R"JSON(["pointcount",1,"vertexcount",1,"primitivecount",1,"topology",["pointref",["indices",[0]]],"primitives",[[["type","Sphere"],["vertex",0,"transform",[1,0,0,0,1,0,0,0]]]]])JSON"},
+        {"tube topology vertex out of range",
+         R"JSON(["pointcount",1,"vertexcount",1,"primitivecount",1,"topology",["pointref",["indices",[0]]],"primitives",[[["type","Tube"],["vertex",1,"transform",[1,0,0,0,1,0,0,0,1],"caps",true,"taper",1]]]])JSON"},
+        {"tube taper type mismatch",
+         R"JSON(["pointcount",1,"vertexcount",1,"primitivecount",1,"topology",["pointref",["indices",[0]]],"primitives",[[["type","Tube"],["vertex",0,"transform",[1,0,0,0,1,0,0,0,1],"caps",false,"taper","invalid"]]]])JSON"},
     };
 
     for (const auto& [name, sourceText] : malformedCases)

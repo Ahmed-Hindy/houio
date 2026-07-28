@@ -97,6 +97,9 @@ namespace houio
             {WriterDataType::curves, WriterCapabilityLevel::supported,
                 true, true, "curves",
                 "NURBS and Bezier curve records with topology, closure, order, knots, endpoint interpolation, and rational Pw attributes."},
+            {WriterDataType::quadrics, WriterCapabilityLevel::supported,
+                true, true, "quadrics",
+                "Native Sphere and Tube records with topology, exact 3x3 transforms, tube caps, and taper."},
             {WriterDataType::sparse_openvdb, WriterCapabilityLevel::supported,
                 true, true, "sparse_openvdb",
                 "Lossless opaque Houdini VDB payload pass-through in every build; SparseFloatGrid, SparseInt32Grid, and SparseVec3fGrid voxel and active-tile construction are serialized as native Houdini VDB records when the optional OpenVDB backend is compiled."}

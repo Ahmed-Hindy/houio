@@ -46,6 +46,8 @@ int main()
         houio::Writer::capability(houio::WriterDataType::sparse_openvdb);
     const auto curveCapability =
         houio::Writer::capability(houio::WriterDataType::curves);
+    const auto quadricCapability =
+        houio::Writer::capability(houio::WriterDataType::quadrics);
     houio::SparseFloatGrid sparseGrid(0.0f);
     sparseGrid.addActiveTile(
         houio::SparseIndexBounds{
@@ -126,6 +128,7 @@ int main()
         || !sequenceCapability || !sequenceCapability->writable
         || !vdbCapability || !vdbCapability->writable
         || !curveCapability || !curveCapability->readable || !curveCapability->writable
+        || !quadricCapability || !quadricCapability->readable || !quadricCapability->writable
         || sparseGrid.activeVoxelCount() != 1
         || sparseGrid.activeTileCount() != 1
         || sparseIntGrid.activeVoxelCount() != 1

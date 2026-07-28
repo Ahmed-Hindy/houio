@@ -19,7 +19,7 @@ The minimum supported Houdini line is 20.0. Compatibility is established by the 
 
 ## What the fixture matrix validates
 
-The generated suite contains 20 deterministic fixtures and compares the source and HouIO output inside each supported Houdini version. It validates:
+The generated suite contains 21 deterministic fixtures and compares the source and HouIO output inside each supported Houdini version. It validates:
 
 - Empty and point-only geometry.
 - Point, vertex, primitive, and global attribute domains.
@@ -30,6 +30,7 @@ The generated suite contains 20 deterministic fixtures and compares the source a
 - Triangles, quads, mixed polygon sizes, and n-gons.
 - Open polygons and multiple polygon-run records.
 - Rational NURBS and closed Bezier curves, including basis, order, knots, closure, attributes, and groups.
+- Native transformed spheres and capped tapered tubes, including attributes and primitive groups.
 - Vertex UV seams.
 - Point, vertex, and primitive groups.
 - Dense scalar-volume resolution, transform, position, and voxel values.
@@ -71,6 +72,7 @@ The Houdini-oriented `HouGeo` model currently supports:
 - `Polygon_run`.
 - `PolygonCurve_run`.
 - `NURBCurve` and `BezierCurve` records with closure, order, knots, NURBS endpoint interpolation, and rational `Pw` point weights.
+- Native `Sphere` and `Tube` records with topology vertices, exact transforms, tube caps, and taper.
 - Dense scalar `Volume` records.
 - Embedded `PackedGeometry` records and shared geometry payloads.
 - Named `PackedFragment` records with fragment attribute/name, bounds, transform, and embedded geometry payloads.
@@ -88,13 +90,13 @@ SCF outer compression is supported through a compatible C-Blosc runtime.
 
 The standalone C++ model does not currently preserve these records:
 
-- Spheres, tubes, tetrahedra, and height fields.
+- Tetrahedra and height fields.
 - Agents, crowds, and instancing records.
 - OpenVDB nonlinear transforms and native grid types other than FloatGrid, Int32Grid, and Vec3SGrid in the optional backend; pure active tiles are preserved, while an explicit voxel override may refine only its affected OpenVDB leaf. Existing native Houdini VDB payloads remain preserved.
 - Vector VDB construction and editing beyond Vec3f values.
 - Additional volume tile-compression encodings not represented by maintained fixtures.
 
-Unsupported recognized input should produce an `unsupported_input` diagnostic rather than silent data loss. File-level `PackedFragment` records are supported, while direct HOM extraction remains unavailable because HOM does not expose the fragment's embedded source detail. `PackedDisk` and `PackedDiskSequence` references are supported in file and direct-HOM workflows. Bezier curves are supported in direct HOM workflows; NURBS curves are supported through file round trips and explicit manifests, but direct HOM extraction is rejected because the serialized `endinterpolation` policy is not exposed. HouIO preserves ordinary packed-disk authored paths and sequence sample lists without requiring targets to exist during serialization.
+Unsupported recognized input should produce an `unsupported_input` diagnostic rather than silent data loss. File-level `PackedFragment` records are supported, while direct HOM extraction remains unavailable because HOM does not expose the fragment's embedded source detail. `PackedDisk` and `PackedDiskSequence` references are supported in file and direct-HOM workflows. Bezier curves, spheres, and tubes are supported in direct HOM workflows; NURBS curves are supported through file round trips and explicit manifests, but direct HOM extraction is rejected because the serialized `endinterpolation` policy is not exposed. HouIO preserves ordinary packed-disk authored paths and sequence sample lists without requiring targets to exist during serialization.
 
 ## Lossless and simplified representations
 
