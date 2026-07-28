@@ -31,6 +31,7 @@ The first native vertical slice preserves:
 
 To prevent silent data loss, this initial implementation rejects:
 
+- output paths other than `.bgeo` and `.bgeo.sc`;
 - non-polygon primitives;
 - public point attributes other than `P`;
 - public vertex, primitive, or detail attributes;

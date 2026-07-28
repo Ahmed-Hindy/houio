@@ -15,7 +15,9 @@
 
 #include <houio/NativePolygonWriter.h>
 
+#include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
@@ -100,6 +102,23 @@ namespace
         PRM_Template(PRM_TOGGLE, 1, &atomic_name, PRMoneDefaults),
         PRM_Template()
     };
+
+    bool hasSupportedOutputExtension(std::string path)
+    {
+        std::transform(
+            path.begin(),
+            path.end(),
+            path.begin(),
+            [](unsigned char character) {
+                return static_cast<char>(std::tolower(character));
+            });
+        const auto ends_with = [&path](const char* suffix) {
+            const std::size_t suffix_length = std::char_traits<char>::length(suffix);
+            return path.size() >= suffix_length
+                && path.compare(path.size() - suffix_length, suffix_length, suffix) == 0;
+        };
+        return ends_with(".bgeo") || ends_with(".bgeo.sc");
+    }
 
     PRM_Template* getTemplates()
     {
@@ -242,8 +261,16 @@ ROP_RENDER_CODE ROP_HouIO::renderFrame(fpreal time, UT_Interrupt* interrupt)
             return ROP_ABORT_RENDER;
         }
 
-        const NativePolygonDetail geometry = adaptDetail(*detail, interrupt);
         const std::string destination = output_path.toStdString();
+        if (!hasSupportedOutputExtension(destination))
+        {
+            addError(
+                ROP_MESSAGE,
+                "HouIO Geometry currently supports only .bgeo and .bgeo.sc output files");
+            return ROP_ABORT_RENDER;
+        }
+
+        const NativePolygonDetail geometry = adaptDetail(*detail, interrupt);
         const char* blosc_library = std::getenv("HOUIO_BLOSC_LIBRARY");
 
         HouIONativePolygonWriteRequest request = {};
