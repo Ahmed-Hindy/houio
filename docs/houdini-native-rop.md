@@ -88,6 +88,23 @@ Inside Houdini:
 5. Set **Output File**, for example `$HIP/geo/$OS.$F4.bgeo.sc`.
 6. Select the frame mode and render.
 
+## Explorable demo HIP
+
+Generate a Houdini 20.0-compatible demo scene after building the version-matched DSO:
+
+```powershell
+$Version = "20.0.653"
+$env:HOUDINI_DSO_PATH = "$PWD/build/native-rop/$Version/houdini/hdk/dso;&"
+$env:HOUIO_BLOSC_LIBRARY = `
+  "C:/Program Files/Side Effects Software/Houdini $Version/bin/blosc.dll"
+
+& "C:/Program Files/Side Effects Software/Houdini $Version/bin/hython.exe" `
+  .\tools\houdini\generate_native_rop_demo.py `
+  .\build\native-rop-demo\houio_native_rop_demo.hip
+```
+
+The scene contains an animated supported polygon/polyline source, a cache read-back network, configured successful and failing ROPs, and comments describing the expected behavior.
+
 ## Maintained validation matrix
 
 Build and execute the native ROP in every maintained Houdini version:
