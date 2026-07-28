@@ -21,6 +21,26 @@ function Invoke-NativeCommand {
     }
 }
 
+function Invoke-CapturedNativeCommand {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Executable,
+
+        [Parameter(Mandatory)]
+        [string[]]$Arguments
+    )
+
+    $output = @(& $Executable @Arguments 2>&1)
+    $exitCode = $LASTEXITCODE
+    foreach ($line in $output) {
+        Write-Host $line
+    }
+    if ($exitCode -ne 0) {
+        throw "Command failed with exit code ${exitCode}: $Executable $($Arguments -join ' ')"
+    }
+    return ($output -join "`n")
+}
+
 function Get-HoudiniRoot {
     param(
         [Parameter(Mandatory)]
@@ -90,10 +110,13 @@ foreach ($validationVersion in $ValidationVersions) {
     $env:HOUIO_BLOSC_LIBRARY = $blosc
 
     Write-Host "Testing native HouIO ROP with Houdini $validationVersion"
-    Invoke-NativeCommand -Executable $hython -Arguments @(
+    $testOutput = Invoke-CapturedNativeCommand -Executable $hython -Arguments @(
         $testScript,
         $outputDirectory
     )
+    if ($testOutput -match "OPUI_DialogPRM2|stepped on") {
+        throw "Native ROP parameter dialog emitted duplicate-symbol warnings in Houdini $validationVersion"
+    }
 }
 
 Write-Host "Native HouIO ROP matrix succeeded."

@@ -22,6 +22,48 @@ def load_geometry(path: Path) -> hou.Geometry:
     return geometry
 
 
+def flatten_templates(
+    templates: tuple[hou.ParmTemplate, ...],
+) -> list[hou.ParmTemplate]:
+    """Return parameter templates recursively in dialog order."""
+    flattened: list[hou.ParmTemplate] = []
+    for template in templates:
+        flattened.append(template)
+        if isinstance(template, hou.FolderParmTemplate):
+            flattened.extend(flatten_templates(template.parmTemplates()))
+    return flattened
+
+
+def validate_parameter_layout(node_type: hou.NodeType) -> None:
+    """Validate the native ROP dialog structure and symbol uniqueness."""
+    group = node_type.parmTemplateGroup()
+    group.asDialogScript()
+    top_level = group.parmTemplates()
+    if [template.name() for template in top_level[:2]] != [
+        "execute",
+        "renderdialog",
+    ]:
+        raise AssertionError("Native ROP render controls are not first in the dialog")
+
+    folders = [
+        template
+        for template in top_level
+        if isinstance(template, hou.FolderParmTemplate)
+    ]
+    if [folder.label() for folder in folders] != ["Export", "Scripts"]:
+        raise AssertionError(
+            "Native ROP tabs are not arranged as Export and Scripts: "
+            + repr([folder.label() for folder in folders])
+        )
+
+    names = [template.name() for template in flatten_templates(top_level)]
+    for expected_name in ("execute", "renderdialog", "trange", "f", "take"):
+        if names.count(expected_name) != 1:
+            raise AssertionError(
+                f"Parameter symbol {expected_name!r} appears {names.count(expected_name)} times"
+            )
+
+
 def validate(output_directory: Path) -> None:
     """Create, render, and validate the native HouIO Geometry ROP."""
     output_directory.mkdir(parents=True, exist_ok=True)
@@ -31,6 +73,7 @@ def validate(output_directory: Path) -> None:
             "The native houio::geometry ROP was not registered. Available HouIO types: "
             + repr(sorted(name for name in node_types if "houio" in name.lower()))
         )
+    validate_parameter_layout(node_types["houio::geometry"])
 
     object_context = hou.node("/obj")
     output_context = hou.node("/out")

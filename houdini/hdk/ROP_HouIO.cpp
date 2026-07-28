@@ -28,6 +28,7 @@ namespace
     {
         parameter_render,
         parameter_render_control,
+        parameter_switcher,
         parameter_time_range,
         parameter_frame_range,
         parameter_take,
@@ -59,6 +60,12 @@ namespace
         indirect_overwrite,
         indirect_atomic,
         indirect_count
+    };
+
+    PRM_Name switcher_name("houio_tabs");
+    PRM_Default switcher_defaults[] = {
+        PRM_Default(8, "Export"),
+        PRM_Default(12, "Scripts"),
     };
 
     PRM_Name sop_path_name("soppath", "SOP Path");
@@ -103,6 +110,11 @@ namespace
         templates = new PRM_Template[parameter_count + 1];
         templates[parameter_render] = theRopTemplates[ROP_RENDER_TPLATE];
         templates[parameter_render_control] = theRopTemplates[ROP_RENDERDIALOG_TPLATE];
+        templates[parameter_switcher] = PRM_Template(
+            PRM_SWITCHER,
+            static_cast<int>(std::size(switcher_defaults)),
+            &switcher_name,
+            switcher_defaults);
         templates[parameter_time_range] = theRopTemplates[ROP_TRANGE_TPLATE];
         templates[parameter_frame_range] = theRopTemplates[ROP_FRAMERANGE_TPLATE];
         templates[parameter_take] = theRopTemplates[ROP_TAKENAME_TPLATE];
@@ -135,10 +147,7 @@ OP_TemplatePair* ROP_HouIO::getTemplatePair()
 {
     static OP_TemplatePair* pair = nullptr;
     if (pair == nullptr)
-    {
-        auto* custom = new OP_TemplatePair(getTemplates());
-        pair = new OP_TemplatePair(ROP_Node::getROPbaseTemplate(), custom);
-    }
+        pair = new OP_TemplatePair(getTemplates());
     return pair;
 }
 
