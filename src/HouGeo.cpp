@@ -26,6 +26,31 @@ namespace houio
 			return static_cast<int>(count);
 		}
 
+		math::M33f parseFiniteMatrix33(
+			const json::ArrayPtr& transformValues,
+			const std::string& primitiveName )
+		{
+			if( !transformValues || transformValues->size() != 9 )
+				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+					DiagnosticCategory::schema,
+					primitiveName + " transform requires nine values",
+					-1, "transform"});
+			std::array<real32, 9> values{};
+			for( int index = 0; index < 9; ++index )
+			{
+				values[static_cast<std::size_t>(index)] = transformValues->get<real32>(index);
+				if( !std::isfinite(values[static_cast<std::size_t>(index)]) )
+					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
+						DiagnosticCategory::schema,
+						primitiveName + " transform values must be finite",
+						-1, "transform"});
+			}
+			return math::M33f(
+				values[0], values[1], values[2],
+				values[3], values[4], values[5],
+				values[6], values[7], values[8]);
+		}
+
 		std::vector<int> expandPagedIntValues(
 			json::ObjectPtr values,
 			sint64 elementCount,
@@ -2069,28 +2094,9 @@ namespace houio
 				"Sphere topology vertex is outside vertexcount",
 				-1, "vertex"});
 		}
-		json::ArrayPtr transformValues = sphere->array("transform");
-		if( !transformValues || transformValues->size() != 9 )
-			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
-				DiagnosticCategory::schema,
-				"Sphere transform requires nine values",
-				-1, "transform"});
-		std::array<real32, 9> values{};
-		for( int index = 0; index < 9; ++index )
-		{
-			values[static_cast<std::size_t>(index)] = transformValues->get<real32>(index);
-			if( !std::isfinite(values[static_cast<std::size_t>(index)]) )
-				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
-					DiagnosticCategory::schema,
-					"Sphere transform values must be finite",
-					-1, "transform"});
-		}
 		auto result = std::make_shared<HouSphere>();
 		result->setTopologyVertex(topologyVertex);
-		result->setTransform(math::M33f(
-			values[0], values[1], values[2],
-			values[3], values[4], values[5],
-			values[6], values[7], values[8]));
+		result->setTransform(parseFiniteMatrix33(sphere->array("transform"), "Sphere"));
 		m_primitives.push_back(std::move(result));
 	}
 
@@ -2107,28 +2113,9 @@ namespace houio
 				"Tube topology vertex is outside vertexcount",
 				-1, "vertex"});
 		}
-		json::ArrayPtr transformValues = tube->array("transform");
-		if( !transformValues || transformValues->size() != 9 )
-			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
-				DiagnosticCategory::schema,
-				"Tube transform requires nine values",
-				-1, "transform"});
-		std::array<real32, 9> values{};
-		for( int index = 0; index < 9; ++index )
-		{
-			values[static_cast<std::size_t>(index)] = transformValues->get<real32>(index);
-			if( !std::isfinite(values[static_cast<std::size_t>(index)]) )
-				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error,
-					DiagnosticCategory::schema,
-					"Tube transform values must be finite",
-					-1, "transform"});
-		}
 		auto result = std::make_shared<HouTube>();
 		result->setTopologyVertex(topologyVertex);
-		result->setTransform(math::M33f(
-			values[0], values[1], values[2],
-			values[3], values[4], values[5],
-			values[6], values[7], values[8]));
+		result->setTransform(parseFiniteMatrix33(tube->array("transform"), "Tube"));
 		result->setCaps(tube->get<bool>("caps", false));
 		result->setTaper(tube->get<real32>("taper", 1.0f));
 		m_primitives.push_back(std::move(result));

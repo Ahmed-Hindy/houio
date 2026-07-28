@@ -117,6 +117,7 @@ def create_source_geometry(output_directory: Path) -> hou.Geometry:
     sphere_node = quadric_container.createNode("sphere", "sphere")
     sphere_node.parm("type").set("prim")
     sphere_node.parmTuple("rad").set((2.0, 3.0, 4.0))
+    sphere_node.parmTuple("r").set((17.0, -23.0, 31.0))
     sphere_node.parmTuple("t").set((1.0, 2.0, 3.0))
     sphere_node.cook(force=True)
     geometry.merge(sphere_node.geometry())
@@ -126,6 +127,7 @@ def create_source_geometry(output_directory: Path) -> hou.Geometry:
     tube_node.parm("rad1").set(2.0)
     tube_node.parm("rad2").set(1.0)
     tube_node.parm("height").set(5.0)
+    tube_node.parmTuple("r").set((-11.0, 29.0, 7.0))
     tube_node.parmTuple("t").set((-1.0, 0.5, 2.0))
     tube_node.cook(force=True)
     geometry.merge(tube_node.geometry())
@@ -165,7 +167,11 @@ def create_source_geometry(output_directory: Path) -> hou.Geometry:
     return geometry
 
 
-def validate_output(path: Path) -> None:
+def validate_output(
+    path: Path,
+    expected_sphere_transform: tuple[float, ...],
+    expected_tube_transform: tuple[float, ...],
+) -> None:
     """Use Houdini's reader to verify the file produced by HouIO."""
     result = hou.Geometry()
     result.loadFromFile(str(path))
@@ -229,13 +235,23 @@ def validate_output(path: Path) -> None:
     if [primitive.type().name() for primitive in quadrics] != ["Sphere", "Tube"]:
         raise AssertionError("Direct writer did not preserve native quadric records")
     sphere_result, tube_result = quadrics
-    if tuple(float(value) for value in sphere_result.intrinsicValue("transform")) != (
-        2.0, 0.0, 0.0, 0.0, 0.0, -4.0, 0.0, 3.0, 0.0
+    actual_sphere_transform = tuple(
+        float(value) for value in sphere_result.intrinsicValue("transform")
+    )
+    if len(actual_sphere_transform) != len(expected_sphere_transform) or not all(
+        math.isclose(actual, expected, rel_tol=1.0e-6, abs_tol=1.0e-6)
+        for actual, expected in zip(actual_sphere_transform, expected_sphere_transform)
     ):
         raise AssertionError("Direct writer changed sphere transform")
+    actual_tube_transform = tuple(
+        float(value) for value in tube_result.intrinsicValue("transform")
+    )
     if (
-        tuple(float(value) for value in tube_result.intrinsicValue("transform"))
-        != (1.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 1.0)
+        len(actual_tube_transform) != len(expected_tube_transform)
+        or not all(
+            math.isclose(actual, expected, rel_tol=1.0e-6, abs_tol=1.0e-6)
+            for actual, expected in zip(actual_tube_transform, expected_tube_transform)
+        )
         or int(tube_result.intrinsicValue("closed")) != 1
         or not math.isclose(float(tube_result.intrinsicValue("tubetaper")), 2.0)
     ):
@@ -311,9 +327,21 @@ def main() -> int:
     arguments = parse_arguments()
     arguments.output_directory.mkdir(parents=True, exist_ok=True)
     output_path = arguments.output_directory / "direct_writer.bgeo"
-    write_result = write_geometry(
-        create_source_geometry(arguments.output_directory), output_path
+    source_geometry = create_source_geometry(arguments.output_directory)
+    source_quadrics = [
+        primitive
+        for primitive in source_geometry.prims()
+        if primitive.type().name() in {"Sphere", "Tube"}
+    ]
+    if [primitive.type().name() for primitive in source_quadrics] != ["Sphere", "Tube"]:
+        raise AssertionError("Source geometry is missing native quadrics")
+    expected_sphere_transform = tuple(
+        float(value) for value in source_quadrics[0].intrinsicValue("transform")
     )
+    expected_tube_transform = tuple(
+        float(value) for value in source_quadrics[1].intrinsicValue("transform")
+    )
+    write_result = write_geometry(source_geometry, output_path)
     if not write_result.success:
         raise AssertionError(
             "HouIO direct writer failed:\n"
@@ -321,7 +349,11 @@ def main() -> int:
             + "\n"
             + write_result.stdout
         )
-    validate_output(output_path)
+    validate_output(
+        output_path,
+        expected_sphere_transform,
+        expected_tube_transform,
+    )
     print(output_path)
     return 0
 

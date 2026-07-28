@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from pathlib import Path
 
@@ -147,6 +148,7 @@ def validate_direct_quadric_writer() -> None:
         sphere_node = container.createNode("sphere", "sphere")
         sphere_node.parm("type").set("prim")
         sphere_node.parmTuple("rad").set((2.0, 3.0, 4.0))
+        sphere_node.parmTuple("r").set((17.0, -23.0, 31.0))
         sphere_node.parmTuple("t").set((1.0, 2.0, 3.0))
         sphere_node.cook(force=True)
 
@@ -156,12 +158,20 @@ def validate_direct_quadric_writer() -> None:
         tube_node.parm("rad1").set(2.0)
         tube_node.parm("rad2").set(1.0)
         tube_node.parm("height").set(5.0)
+        tube_node.parmTuple("r").set((-11.0, 29.0, 7.0))
         tube_node.parmTuple("t").set((-1.0, 0.5, 2.0))
         tube_node.cook(force=True)
 
         geometry = hou.Geometry()
         geometry.merge(sphere_node.geometry())
         geometry.merge(tube_node.geometry())
+        source_sphere, source_tube = geometry.prims()
+        expected_sphere_transform = tuple(
+            float(value) for value in source_sphere.intrinsicValue("transform")
+        )
+        expected_tube_transform = tuple(
+            float(value) for value in source_tube.intrinsicValue("transform")
+        )
     finally:
         container.destroy()
 
@@ -182,13 +192,23 @@ def validate_direct_quadric_writer() -> None:
         if [primitive.type().name() for primitive in candidate.prims()] != ["Sphere", "Tube"]:
             raise AssertionError("Packaged writer did not preserve native quadrics")
         sphere, tube = candidate.prims()
-        if tuple(float(value) for value in sphere.intrinsicValue("transform")) != (
-            2.0, 0.0, 0.0, 0.0, 0.0, -4.0, 0.0, 3.0, 0.0
+        actual_sphere_transform = tuple(
+            float(value) for value in sphere.intrinsicValue("transform")
+        )
+        if len(actual_sphere_transform) != len(expected_sphere_transform) or not all(
+            math.isclose(actual, expected, rel_tol=1.0e-6, abs_tol=1.0e-6)
+            for actual, expected in zip(actual_sphere_transform, expected_sphere_transform)
         ):
             raise AssertionError("Packaged writer changed sphere transform")
+        actual_tube_transform = tuple(
+            float(value) for value in tube.intrinsicValue("transform")
+        )
         if (
-            tuple(float(value) for value in tube.intrinsicValue("transform"))
-            != (1.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 1.0)
+            len(actual_tube_transform) != len(expected_tube_transform)
+            or not all(
+                math.isclose(actual, expected, rel_tol=1.0e-6, abs_tol=1.0e-6)
+                for actual, expected in zip(actual_tube_transform, expected_tube_transform)
+            )
             or int(tube.intrinsicValue("closed")) != 1
             or float(tube.intrinsicValue("tubetaper")) != 2.0
         ):
