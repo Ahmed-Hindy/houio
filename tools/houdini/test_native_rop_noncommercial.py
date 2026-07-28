@@ -88,6 +88,40 @@ def validate(source_hipnc: Path, output_directory: Path) -> None:
         if sum(1 for primitive in geometry.prims() if not primitive.isClosed()) != 1:
             raise AssertionError("Non-commercial output lost the open polyline")
 
+    for extension in ("abc", "usd"):
+        archive_path = output_directory / f"apprentice_must_not_write.{extension}"
+        temporary_path = archive_path.with_name(
+            archive_path.stem + ".houio.tmp" + archive_path.suffix
+        )
+        archive_path.unlink(missing_ok=True)
+        temporary_path.unlink(missing_ok=True)
+        archive_rop = output_context.createNode(
+            "houio::geometry",
+            f"HOUIO_APPRENTICE_REJECT_{extension.upper()}",
+        )
+        archive_rop.parm("soppath").set(merge.path())
+        archive_rop.parm("sopoutput").set(str(archive_path))
+        archive_rop.parm("createdirs").set(1)
+        archive_rop.parm("overwrite").set(1)
+        archive_rop.parm("atomic").set(1)
+        try:
+            archive_rop.render(frame_range=(1, 2, 1))
+        except hou.Error:
+            pass
+        else:
+            raise AssertionError(
+                f"Apprentice mode unexpectedly exported .{extension}"
+            )
+        error_text = "\n".join(archive_rop.errors())
+        if "unavailable in Houdini Apprentice" not in error_text:
+            raise AssertionError(
+                f"Apprentice .{extension} rejection was not actionable: {error_text}"
+            )
+        if archive_path.exists() or temporary_path.exists():
+            raise AssertionError(
+                f"Apprentice .{extension} rejection left an output file"
+            )
+
     saved_copy = output_directory / "houio_native_rop_noncommercial_test.hipnc"
     hou.hipFile.save(file_name=str(saved_copy), save_to_recent_files=False)
     if not saved_copy.is_file() or saved_copy.suffix.lower() != ".hipnc":

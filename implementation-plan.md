@@ -1155,6 +1155,23 @@ Exit criteria:
 - The ordinary strict, AddressSanitizer, and static-analysis suites remain green with the HDK target disabled by default.
 - Native DSO packaging remains a separate version-aware distribution phase because HDK binaries are ABI-specific.
 
+### Phase 43 — Native Alembic and USD archives
+
+**Status: implemented on stacked branch `feat/native-abc-usd`.**
+
+Goals and completed work:
+
+- [x] Detect `.abc`, `.usd`, `.usda`, and `.usdc` from the native ROP output path.
+- [x] Link against the Alembic and USD libraries shipped with each maintained Houdini SDK.
+- [x] Open one scene archive in `startRender`, append animated samples in `renderFrame`, and finalize atomically in `endRender`.
+- [x] Preserve closed polygon meshes and open polylines as Alembic `OPolyMesh`/`OCurves` and USD `UsdGeomMesh`/`UsdGeomBasisCurves`.
+- [x] Compact mesh-only point storage and remap face indices without adding unused points.
+- [x] Enforce constant topology and a constant destination path within each animated archive.
+- [x] Preserve frame rate, start/end time codes, and per-frame point animation.
+- [x] Respect SideFX licensing by rejecting Alembic and USD export in Houdini Apprentice before creating destination or temporary files.
+- [x] Validate `.abc`, `.usd`, `.usda`, and `.usdc` in Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368.
+- [x] Reload Alembic through Houdini's Alembic SOP and USD through the bundled `pxr` runtime.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:

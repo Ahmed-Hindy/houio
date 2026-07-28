@@ -154,7 +154,7 @@ def validate(output_directory: Path) -> None:
         if unsupported_path.exists():
             raise AssertionError("Unsupported primitive failure left a partial output")
 
-        misnamed_path = output_directory / "must_not_be_bgeo_payload.abc"
+        misnamed_path = output_directory / "unsupported_output.obj"
         misnamed_path.unlink(missing_ok=True)
         sop_path.set(transform.path())
         output_path.set(str(misnamed_path))
@@ -163,15 +163,15 @@ def validate(output_directory: Path) -> None:
         except hou.Error:
             pass
         else:
-            raise AssertionError("Native HouIO ROP accepted an unsupported .abc output")
+            raise AssertionError("Native HouIO ROP accepted an unsupported .obj output")
         extension_error = "\n".join(rop.errors())
-        if "only .bgeo and .bgeo.sc" not in extension_error:
+        if ".abc, .usd, .usda, and .usdc" not in extension_error:
             raise AssertionError(
                 "Unsupported output extension failure was not actionable: "
                 + extension_error
             )
         if misnamed_path.exists():
-            raise AssertionError("Unsupported .abc output left a disguised BGEO file")
+            raise AssertionError("Unsupported .obj output left a partial file")
     finally:
         rop.destroy()
         container.destroy()

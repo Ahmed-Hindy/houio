@@ -69,6 +69,7 @@ if (-not (Test-Path -LiteralPath $cmake -PathType Leaf)) {
 }
 
 $testScript = Join-Path $repositoryRoot "tools\houdini\test_native_rop.py"
+$sceneFormatTestScript = Join-Path $repositoryRoot "tools\houdini\test_native_scene_formats.py"
 foreach ($validationVersion in $ValidationVersions) {
     Write-Host "Building native HouIO ROP for Houdini $validationVersion"
     $houdiniRoot = Get-HoudiniRoot -Version $validationVersion
@@ -116,6 +117,16 @@ foreach ($validationVersion in $ValidationVersions) {
     )
     if ($testOutput -match "OPUI_DialogPRM2|stepped on") {
         throw "Native ROP parameter dialog emitted duplicate-symbol warnings in Houdini $validationVersion"
+    }
+
+    $sceneOutputDirectory = Join-Path $repositoryRoot "build\native-scene-test\$validationVersion"
+    Write-Host "Testing native Alembic/USD exports with Houdini $validationVersion"
+    $sceneTestOutput = Invoke-CapturedNativeCommand -Executable $hython -Arguments @(
+        $sceneFormatTestScript,
+        $sceneOutputDirectory
+    )
+    if ($sceneTestOutput -match "OPUI_DialogPRM2|stepped on") {
+        throw "Native scene-format test emitted duplicate-symbol warnings in Houdini $validationVersion"
     }
 }
 

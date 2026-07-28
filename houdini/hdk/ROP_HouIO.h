@@ -1,6 +1,11 @@
 #pragma once
 
+#include "SceneArchiveWriter.h"
+
 #include <ROP/ROP_Node.h>
+
+#include <memory>
+#include <string>
 
 class OP_TemplatePair;
 class OP_VariablePair;
@@ -22,7 +27,7 @@ namespace houio::hdk
             OP_Network* network,
             const char* name,
             OP_Operator* operator_entry);
-        ~ROP_HouIO() override = default;
+        ~ROP_HouIO() override;
 
         int startRender(int frame_count, fpreal start_time, fpreal end_time) override;
         ROP_RENDER_CODE renderFrame(fpreal time, UT_Interrupt* interrupt) override;
@@ -34,6 +39,9 @@ namespace houio::hdk
         [[nodiscard]] bool evaluateToggle(const char* name, int index, fpreal time);
 
         static int* indirect_;
+        std::unique_ptr<SceneArchiveWriter> archive_writer_;
+        std::string archive_destination_;
+        NativeOutputFormat render_format_ = NativeOutputFormat::unsupported;
         fpreal end_time_ = 0.0;
     };
 }

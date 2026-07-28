@@ -2,18 +2,22 @@
 
 HouIO includes an optional HDK plugin that registers a genuine **HouIO Geometry** output driver in Houdini's `/out` context. It is a compiled `ROP_Node`, not an HDA, Python SOP, or HOM-generated operator.
 
-The native path is:
+The native paths are:
 
 ```text
 cooked SOP GU_Detail
   -> HDK polygon extraction
   -> dependency-neutral C ABI
-  -> HouIO C++ geometry model
-  -> HouIO serializer
+  -> HouIO C++ geometry model and serializer
   -> .bgeo or .bgeo.sc
+
+cooked SOP GU_Detail
+  -> HDK polygon extraction
+  -> Houdini-shipped Alembic or USD libraries
+  -> .abc, .usd, .usda, or .usdc
 ```
 
-It does not call `hou.Geometry.saveToFile()`, create a temporary HOM manifest, start `houio.exe`, or use Houdini's geometry file writer.
+It does not call `hou.Geometry.saveToFile()`, create a temporary HOM manifest, start `houio.exe`, or invoke Houdini's Geometry, Alembic, or USD ROP nodes.
 
 ## Current scope
 
@@ -24,6 +28,10 @@ The first native vertical slice preserves:
 - point order and vertex-to-point topology;
 - canonical point position `P` as four-component Float32 data;
 - current-frame and frame-range evaluation through the standard ROP lifecycle;
+- per-frame `.bgeo` and `.bgeo.sc` output;
+- single-file animated Alembic and USD archives with time samples;
+- `.abc`, `.usd`, `.usda`, and `.usdc` scene output through libraries shipped with each Houdini SDK;
+- polygon meshes and linear nonperiodic curves in Alembic and USD;
 - output path expansion such as `$HIP`, `$OS`, `$F`, and `$F4`;
 - create-directory, overwrite, and atomic-replacement policies;
 - standard pre-render, pre-frame, post-frame, and post-render scripts;
@@ -31,7 +39,10 @@ The first native vertical slice preserves:
 
 To prevent silent data loss, this initial implementation rejects:
 
-- output paths other than `.bgeo` and `.bgeo.sc`;
+- output paths other than `.bgeo`, `.bgeo.sc`, `.abc`, `.usd`, `.usda`, and `.usdc`;
+- changing polygon or curve topology within one Alembic or USD archive;
+- frame-varying Alembic or USD destination paths;
+- Alembic or USD export from Houdini Apprentice, matching SideFX's product restrictions;
 - non-polygon primitives;
 - public point attributes other than `P`;
 - public vertex, primitive, or detail attributes;
@@ -126,7 +137,11 @@ The matrix currently covers Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368. 
 - renders an animated box for two frames;
 - loads the generated files back through Houdini;
 - verifies geometry counts and per-frame SOP evaluation;
-- confirms that an unsupported native sphere fails with an actionable node error.
+- confirms that an unsupported native sphere fails with an actionable node error;
+- writes animated `.abc`, `.usd`, `.usda`, and `.usdc` archives;
+- reloads Alembic through Houdini's Alembic SOP;
+- reloads USD through Houdini's bundled `pxr` runtime;
+- verifies mesh faces, open curves, time samples, and animation.
 
 ## Non-commercial HIP validation
 
@@ -144,7 +159,7 @@ $env:HOUIO_BLOSC_LIBRARY = `
   .\build\native-rop-test\noncommercial
 ```
 
-The test requires loading the source file to switch the process to `licenseCategoryType.Apprentice`, verifies `hou.isApprentice()`, renders through `houio::geometry`, and saves `houio_native_rop_noncommercial_test.hipnc`.
+The test requires loading the source file to switch the process to `licenseCategoryType.Apprentice`, verifies `hou.isApprentice()`, renders BGEO through `houio::geometry`, confirms `.abc` and `.usd` are rejected without destination or temporary files, and saves `houio_native_rop_noncommercial_test.hipnc`.
 
 ## Distribution status
 

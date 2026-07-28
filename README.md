@@ -232,7 +232,7 @@ The Houdini bridge uses `houio write-manifest <manifest.json> <output>` internal
 
 HouIO can optionally build a genuine HDK `ROP_Node` named **HouIO Geometry** in Houdini's `/out` context. The native node cooks the selected SOP at each render time and writes directly through HouIO's C++ serializer; it does not use an HDA, HOM geometry writer, temporary manifest, or external writer process.
 
-The first vertical slice supports polygons and polylines with canonical point position `P`. It rejects other public attributes, groups, and primitive families explicitly rather than silently dropping them. Build and run the maintained Houdini 20.0, 20.5, 21.0, and 22.0 matrix with:
+The native ROP supports polygon meshes and open polylines with canonical point position `P`. It writes per-frame `.bgeo`/`.bgeo.sc` files through HouIO's serializer and animated `.abc`/`.usd`/`.usda`/`.usdc` archives through Alembic and USD libraries shipped with each Houdini SDK. Other public attributes, groups, primitive families, and scene-archive topology changes are rejected explicitly rather than silently dropped. Alembic and USD export are blocked in Houdini Apprentice to respect SideFX's product restrictions. Build and run the maintained Houdini 20.0, 20.5, 21.0, and 22.0 matrix with:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
