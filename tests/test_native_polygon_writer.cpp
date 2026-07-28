@@ -114,6 +114,30 @@ int main()
         return fail("native polygon writer accepted incomplete polygon ranges");
     }
 
+    const std::array<HouIONativePolygon, 1> short_open_polyline = {
+        HouIONativePolygon{0, 1, 0},
+    };
+    request.vertex_count = 1;
+    request.polygons = short_open_polyline.data();
+    error.fill('\0');
+    if (houio_write_native_polygons(&request, error.data(), error.size()) == 0
+        || std::string(error.data()).find("at least 2 vertices") == std::string::npos)
+    {
+        return fail("native polygon writer accepted a one-vertex open polyline");
+    }
+
+    const std::array<HouIONativePolygon, 1> short_closed_polygon = {
+        HouIONativePolygon{0, 2, 1},
+    };
+    request.vertex_count = 2;
+    request.polygons = short_closed_polygon.data();
+    error.fill('\0');
+    if (houio_write_native_polygons(&request, error.data(), error.size()) == 0
+        || std::string(error.data()).find("at least 3 vertices") == std::string::npos)
+    {
+        return fail("native polygon writer accepted a two-vertex closed polygon");
+    }
+
     std::filesystem::remove_all(directory);
     return 0;
 }

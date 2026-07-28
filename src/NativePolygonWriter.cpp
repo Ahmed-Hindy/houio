@@ -130,6 +130,17 @@ namespace
                     "Native polygon range exceeds the topology domain");
             }
 
+            const std::size_t minimum_vertex_count = input_polygon.closed != 0
+                ? 3U
+                : 2U;
+            if (input_polygon.vertex_count < minimum_vertex_count)
+            {
+                throw std::invalid_argument(
+                    input_polygon.closed != 0
+                        ? "Native closed polygon requires at least 3 vertices"
+                        : "Native open polyline requires at least 2 vertices");
+            }
+
             const int polygon_vertex_count = checkedInt(
                 input_polygon.vertex_count,
                 "Native polygon vertex count");

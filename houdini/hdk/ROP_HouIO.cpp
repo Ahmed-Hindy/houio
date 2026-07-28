@@ -294,6 +294,11 @@ ROP_RENDER_CODE ROP_HouIO::renderFrame(fpreal time, UT_Interrupt* interrupt)
         addError(ROP_MESSAGE, exception.what());
         return ROP_ABORT_RENDER;
     }
+    catch (...)
+    {
+        addError(ROP_MESSAGE, "HouIO native geometry export failed with an unknown error");
+        return ROP_ABORT_RENDER;
+    }
 
     if (error() < UT_ERROR_ABORT && !executePostFrameScript(time))
         return ROP_ABORT_RENDER;
