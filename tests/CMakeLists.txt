@@ -118,6 +118,11 @@ add_executable(houio_test_native_vdb_payload test_native_vdb_payload.cpp)
 target_link_libraries(houio_test_native_vdb_payload PRIVATE houio::houio)
 target_compile_features(houio_test_native_vdb_payload PRIVATE cxx_std_20)
 
+add_executable(houio_test_native_polygon_writer test_native_polygon_writer.cpp)
+target_link_libraries(houio_test_native_polygon_writer PRIVATE houio::houio)
+target_compile_features(houio_test_native_polygon_writer PRIVATE cxx_std_20)
+add_test(NAME houio.native_polygon_writer COMMAND houio_test_native_polygon_writer)
+
 if(TARGET houio_cli)
     add_test(NAME houio.cli.capabilities COMMAND $<TARGET_FILE:houio_cli> capabilities --json)
     set_tests_properties(
