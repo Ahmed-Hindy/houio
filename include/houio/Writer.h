@@ -21,7 +21,9 @@ namespace houio
         sparse_openvdb = 6,
         packed_disk_sequence = 7,
         curves = 8,
-        quadrics = 9
+        quadrics = 9,
+        alembic_scene = 10,
+        usd_scene = 11
     };
 
     enum class WriterCapabilityLevel

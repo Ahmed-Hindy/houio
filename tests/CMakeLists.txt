@@ -104,6 +104,16 @@ target_link_libraries(houio_test_writer PRIVATE houio::houio)
 target_compile_features(houio_test_writer PRIVATE cxx_std_20)
 add_test(NAME houio.writer COMMAND houio_test_writer)
 
+add_executable(houio_test_scene_geometry_adapter test_scene_geometry_adapter.cpp)
+target_link_libraries(houio_test_scene_geometry_adapter PRIVATE houio::houio)
+target_compile_features(houio_test_scene_geometry_adapter PRIVATE cxx_std_20)
+add_test(NAME houio.scene_geometry_adapter COMMAND houio_test_scene_geometry_adapter)
+
+add_executable(houio_test_scene_writer test_scene_writer.cpp)
+target_link_libraries(houio_test_scene_writer PRIVATE houio::houio)
+target_compile_features(houio_test_scene_writer PRIVATE cxx_std_20)
+add_test(NAME houio.scene_writer COMMAND houio_test_scene_writer)
+
 add_executable(houio_test_hom_manifest test_hom_manifest.cpp)
 target_link_libraries(houio_test_hom_manifest PRIVATE houio::houio)
 target_compile_features(houio_test_hom_manifest PRIVATE cxx_std_20)

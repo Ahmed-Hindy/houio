@@ -88,7 +88,8 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Expose a small HOM API for writing cooked node geometry through the custom writer.
 - [x] Add a primary **Write Selected Geometry** shelf action and retain diagnostics/conversion tools.
 - [x] Add the first native HDK **HouIO Geometry** ROP vertical slice for polygon sequence export.
-- [x] Add native animated Alembic and USD archive output through Houdini-shipped libraries, with Apprentice license enforcement.
+- [x] Move animated Alembic and USD archive ownership into HouIO's public writer API and C ABI; keep the HDK plugin as a geometry-adapter consumer.
+- [ ] Build and package pinned upstream Alembic and OpenUSD dependencies for standalone HouIO releases without redistributing SideFX binaries.
 - [x] Document the first successful custom-write workflow before advanced internals.
 
 ### Data-type expansion after the product surface

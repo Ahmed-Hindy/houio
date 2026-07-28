@@ -1,17 +1,24 @@
 #pragma once
 
-#include "SceneArchiveWriter.h"
-
 #include <ROP/ROP_Node.h>
 
-#include <memory>
 #include <string>
+
+struct HouIONativeSceneArchive;
 
 class OP_TemplatePair;
 class OP_VariablePair;
 
 namespace houio::hdk
 {
+    enum class RopOutputFormat
+    {
+        bgeo,
+        alembic,
+        usd,
+        unsupported,
+    };
+
     class ROP_HouIO final : public ROP_Node
     {
     public:
@@ -37,11 +44,12 @@ namespace houio::hdk
     private:
         void evaluateString(UT_String& value, const char* name, int index, fpreal time);
         [[nodiscard]] bool evaluateToggle(const char* name, int index, fpreal time);
+        void resetArchive() noexcept;
 
         static int* indirect_;
-        std::unique_ptr<SceneArchiveWriter> archive_writer_;
+        HouIONativeSceneArchive* archive_writer_ = nullptr;
         std::string archive_destination_;
-        NativeOutputFormat render_format_ = NativeOutputFormat::unsupported;
+        RopOutputFormat render_format_ = RopOutputFormat::unsupported;
         fpreal end_time_ = 0.0;
     };
 }

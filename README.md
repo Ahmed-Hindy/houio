@@ -219,6 +219,8 @@ const auto result = houio::GeometryIO::readHouGeo("asset.bgeo", options);
 
 ```powershell
 houio write input.bgeo output.bgeo.sc
+houio convert input.bgeo output.abc
+houio convert input.bgeo output.usdc
 houio inspect output.bgeo.sc
 houio inspect output.bgeo.sc --json
 houio validate output.bgeo.sc
@@ -228,11 +230,24 @@ houio diagnose --json
 
 The Houdini bridge uses `houio write-manifest <manifest.json> <output>` internally. `houio_convert input output` remains available for compatibility. Use `HOUIO_BLOSC_LIBRARY` or `GeometryWriteOptions::bloscLibraryPath` when C-Blosc cannot be resolved automatically.
 
+## Alembic and USD writers
+
+Alembic and USD are HouIO writer backends, not HDK-only implementations. The public `SceneArchiveWriter` API supports animated samples, while the primary `Writer` facade and CLI write static `.abc`, `.usd`, `.usda`, and `.usdc` files based on the destination extension. The native Houdini ROP consumes the same implementation through HouIO's dependency-neutral C ABI.
+
+Scene dependencies are selected with `HOUIO_SCENE_IO_PROVIDER`:
+
+- `disabled`: dependency-free build with explicit unavailable-backend diagnostics;
+- `houdini`: temporary development validation against a matching Houdini SDK;
+- `system`: externally installed upstream Alembic and OpenUSD packages;
+- `bundled`: the release provider using HouIO's pinned packaged dependencies.
+
+See [Alembic and USD writers](docs/scene-writers.md) for API, build-provider, packaging, and current-scope details.
+
 ## Native Houdini ROP
 
 HouIO can optionally build a genuine HDK `ROP_Node` named **HouIO Geometry** in Houdini's `/out` context. The native node cooks the selected SOP at each render time and writes directly through HouIO's C++ serializer; it does not use an HDA, HOM geometry writer, temporary manifest, or external writer process.
 
-The native ROP supports polygon meshes and open polylines with canonical point position `P`. It writes per-frame `.bgeo`/`.bgeo.sc` files through HouIO's serializer and animated `.abc`/`.usd`/`.usda`/`.usdc` archives through Alembic and USD libraries shipped with each Houdini SDK. Other public attributes, groups, primitive families, and scene-archive topology changes are rejected explicitly rather than silently dropped. Alembic and USD export are blocked in Houdini Apprentice to respect SideFX's product restrictions. Build and run the maintained Houdini 20.0, 20.5, 21.0, and 22.0 matrix with:
+The native ROP supports polygon meshes and open polylines with canonical point position `P`. It writes per-frame `.bgeo`/`.bgeo.sc` files and animated `.abc`/`.usd`/`.usda`/`.usdc` archives through HouIO's core writers. The HDK layer only cooks and adapts `GU_Detail`; it does not construct Alembic or USD archives. Other public attributes, groups, primitive families, and scene-archive topology changes are rejected explicitly rather than silently dropped. Alembic and USD export are blocked in Houdini Apprentice to respect SideFX's product restrictions. Build and run the maintained Houdini 20.0, 20.5, 21.0, and 22.0 matrix with:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `

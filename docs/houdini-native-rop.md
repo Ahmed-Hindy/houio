@@ -13,7 +13,8 @@ cooked SOP GU_Detail
 
 cooked SOP GU_Detail
   -> HDK polygon extraction
-  -> Houdini-shipped Alembic or USD libraries
+  -> dependency-neutral HouIO scene C ABI
+  -> HouIO Alembic or USD writer
   -> .abc, .usd, .usda, or .usdc
 ```
 
@@ -30,7 +31,7 @@ The first native vertical slice preserves:
 - current-frame and frame-range evaluation through the standard ROP lifecycle;
 - per-frame `.bgeo` and `.bgeo.sc` output;
 - single-file animated Alembic and USD archives with time samples;
-- `.abc`, `.usd`, `.usda`, and `.usdc` scene output through libraries shipped with each Houdini SDK;
+- `.abc`, `.usd`, `.usda`, and `.usdc` scene output through HouIO's core writer backends;
 - polygon meshes and linear nonperiodic curves in Alembic and USD;
 - output path expansion such as `$HIP`, `$OS`, `$F`, and `$F4`;
 - create-directory, overwrite, and atomic-replacement policies;
@@ -48,7 +49,7 @@ To prevent silent data loss, this initial implementation rejects:
 - public vertex, primitive, or detail attributes;
 - point, vertex, or primitive groups.
 
-This is deliberately narrower than the standalone HouIO writer and HOM package. Native attribute, group, packed-primitive, curve, quadric, volume, and VDB adapters should be added incrementally with exact HDK-backed tests.
+The HDK layer is deliberately narrower than HouIO's public writer API. Native attribute, group, packed-primitive, curve, quadric, volume, and VDB adapters should be added incrementally with exact HDK-backed tests. The archive implementation itself lives in `src/SceneArchive.cpp`, not under `houdini/hdk`.
 
 ## Build one Houdini version
 
