@@ -21,6 +21,8 @@ option(HOUIO_ENABLE_MSVC_ANALYSIS "Enable the MSVC native static analyzer" OFF)
 option(HOUIO_BUILD_FUZZ_TARGETS "Build optional Clang libFuzzer targets" OFF)
 option(HOUIO_BUILD_BENCHMARKS "Build opt-in HouIO performance baselines" OFF)
 option(HOUIO_ENABLE_OPENVDB "Enable the optional OpenVDB FloatGrid backend" OFF)
+option(HOUIO_BUILD_HOUDINI_PLUGIN "Build the native Houdini ROP plugin" OFF)
+set(HOUIO_HOUDINI_ROOT "" CACHE PATH "Houdini installation root used for the native HDK plugin")
 set(HOUIO_HYTHON_EXECUTABLE "" CACHE FILEPATH "Optional hython executable for Houdini integration tests")
 
 add_library(
@@ -36,6 +38,7 @@ add_library(
     src/HouGeoIO.cpp
     src/json.cpp
     src/NativeVdbPayload.cpp
+    src/NativePolygonWriter.cpp
     src/OpenVdbBackend.cpp
     src/SparseGrid.cpp
     src/math/Color.cpp
@@ -78,6 +81,7 @@ set_target_properties(
         CXX_EXTENSIONS OFF
         DEBUG_POSTFIX d
         EXPORT_NAME houio
+        POSITION_INDEPENDENT_CODE ON
 )
 
 if(MSVC)
@@ -157,6 +161,15 @@ if(HOUIO_BUILD_TOOLS)
             )
         endif()
     endif()
+endif()
+
+if(HOUIO_BUILD_HOUDINI_PLUGIN)
+    if(NOT HOUIO_HOUDINI_ROOT)
+        message(FATAL_ERROR "HOUIO_BUILD_HOUDINI_PLUGIN=ON requires HOUIO_HOUDINI_ROOT")
+    endif()
+    set(Houdini_DIR "${HOUIO_HOUDINI_ROOT}/toolkit/cmake")
+    find_package(Houdini CONFIG REQUIRED)
+    add_subdirectory(houdini/hdk)
 endif()
 
 if(HOUIO_BUILD_TESTS)

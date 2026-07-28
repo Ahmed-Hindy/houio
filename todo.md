@@ -4,13 +4,12 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ## Active branch
 
-- Branch: `feat/spheres-tubes`
-- Baseline commit: `b06cb76` (`master` after merged PR #44).
-- MSVC warnings-as-errors/Houdini and Windows AddressSanitizer suites pass **69/69**; MSVC native analysis is error-clean.
+- Branch: `feat/native-houdini-rop`
+- Baseline commit: `34718b9` (`master` after merged PR #45).
+- MSVC warnings-as-errors/Houdini and Windows AddressSanitizer suites pass **70/70**; MSVC native analysis is error-clean.
 - The 21-fixture and Houdini package matrices pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
-- Focused native-quadric parser, manifest, direct-HOM, direct-writer, CLI, and Houdini fixture tests pass locally.
-- Direct scalar Float VDB extraction, including ambiguous-activity rejection, passes in all four maintained Houdini versions.
-- The active branch adds faithful native Sphere and Tube records, exact transforms, tube caps and taper, explicit manifests, direct HOM extraction, capability reporting, and four-version fixtures.
+- The native `houio::geometry` HDK ROP builds and renders an animated two-frame polygon sequence in all four maintained Houdini versions.
+- The active branch adds a real `/out` operator, direct `GU_Detail` polygon extraction, a C ABI separating SideFX's C++17 SDKs from HouIO's C++20 core, standard ROP frame/script controls, explicit loss rejection, and versioned runtime tests.
 
 ## Modernization completed
 
@@ -88,6 +87,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add package self-diagnostics for the primary writer, compatibility converter, and C-Blosc runtime.
 - [x] Expose a small HOM API for writing cooked node geometry through the custom writer.
 - [x] Add a primary **Write Selected Geometry** shelf action and retain diagnostics/conversion tools.
+- [x] Add the first native HDK **HouIO Geometry** ROP vertical slice for polygon sequence export.
 - [x] Document the first successful custom-write workflow before advanced internals.
 
 ### Data-type expansion after the product surface
@@ -103,7 +103,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Complete scalar Int32 VDB support through merged PR #42.
 - [x] Add Vec3f VDB values, vector semantics, and staggered-grid support through merged PR #43.
 - [x] Complete faithful NURBS and Bezier curve support through merged PR #44.
-- [ ] Complete and merge native Sphere and Tube support before tetrahedra, instancing, height fields, and other observed records.
+- [x] Complete native Sphere and Tube support through merged PR #45.
 
 ## Modernization completed follow-up
 
@@ -199,7 +199,7 @@ Add fixture-backed support one record type at a time:
 - [x] External packed disk references
 - [x] Packed disk sequences
 - [x] NURBS and Bezier curves — merged through PR #44
-- [ ] Spheres and tubes — complete locally on `feat/spheres-tubes`, pending merge
+- [x] Spheres and tubes — merged through PR #45
 - [ ] Tetrahedra
 - [ ] Height fields
 - [ ] Agents and crowds

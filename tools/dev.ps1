@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("help", "build", "test", "fixtures", "package", "benchmarks", "validate-all")]
+    [ValidateSet("help", "build", "test", "fixtures", "package", "native-rop", "benchmarks", "validate-all")]
     [string]$Command = "help",
 
     [string]$Preset = "windows-msvc-release",
@@ -121,11 +121,12 @@ function Show-Help {
     Write-Host "  .\tools\dev.ps1 test [-Preset windows-msvc-release] [-HoudiniVersion 21.0.631]"
     Write-Host "  .\tools\dev.ps1 fixtures"
     Write-Host "  .\tools\dev.ps1 package [-HoudiniVersion 21.0.631]"
+    Write-Host "  .\tools\dev.ps1 native-rop"
     Write-Host "  .\tools\dev.ps1 benchmarks"
     Write-Host "  .\tools\dev.ps1 validate-all [-SkipHoudini]"
     Write-Host ""
     Write-Host "validate-all runs warnings-as-errors, static analysis, AddressSanitizer,"
-    Write-Host "and, unless -SkipHoudini is supplied, the four-version fixture and package matrices."
+    Write-Host "and, unless -SkipHoudini is supplied, the four-version fixture, package, and native ROP matrices."
 }
 
 if ($Command -eq "help") {
@@ -163,6 +164,15 @@ switch ($Command) {
         Initialize-Preset -Name "windows-msvc-release" -Hython $hython
         Build-Preset -Name "windows-msvc-release" -Targets @("houio_houdini_package")
     }
+    "native-rop" {
+        Invoke-NativeCommand -Executable "powershell.exe" -Arguments @(
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            (Join-Path $repositoryRoot "tools\houdini\run_native_rop_matrix.ps1")
+        )
+    }
     "benchmarks" {
         Initialize-Preset -Name "windows-msvc-benchmarks"
         Build-Preset -Name "windows-msvc-benchmarks"
@@ -195,6 +205,13 @@ switch ($Command) {
                 "Bypass",
                 "-File",
                 (Join-Path $repositoryRoot "tools\houdini\run_package_matrix.ps1")
+            )
+            Invoke-NativeCommand -Executable "powershell.exe" -Arguments @(
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                (Join-Path $repositoryRoot "tools\houdini\run_native_rop_matrix.ps1")
             )
         }
     }

@@ -228,6 +228,19 @@ houio diagnose --json
 
 The Houdini bridge uses `houio write-manifest <manifest.json> <output>` internally. `houio_convert input output` remains available for compatibility. Use `HOUIO_BLOSC_LIBRARY` or `GeometryWriteOptions::bloscLibraryPath` when C-Blosc cannot be resolved automatically.
 
+## Native Houdini ROP
+
+HouIO can optionally build a genuine HDK `ROP_Node` named **HouIO Geometry** in Houdini's `/out` context. The native node cooks the selected SOP at each render time and writes directly through HouIO's C++ serializer; it does not use an HDA, HOM geometry writer, temporary manifest, or external writer process.
+
+The first vertical slice supports polygons and polylines with canonical point position `P`. It rejects other public attributes, groups, and primitive families explicitly rather than silently dropping them. Build and run the maintained Houdini 20.0, 20.5, 21.0, and 22.0 matrix with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\tools\houdini\run_native_rop_matrix.ps1
+```
+
+See [Native Houdini Geometry ROP](docs/houdini-native-rop.md) for architecture, build, loading, parameters, current limitations, and validation.
+
 ## Houdini package
 
 The primary live-session API is:
@@ -320,6 +333,13 @@ Validate the generated Houdini package across the maintained matrix:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\run_package_matrix.ps1
+```
+
+Validate the native HDK ROP across the same maintained versions:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\tools\houdini\run_native_rop_matrix.ps1
 ```
 
 See [Fixture generation and validation](docs/fixtures.md) for the manifest, known-loss, and extension workflow.

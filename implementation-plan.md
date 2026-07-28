@@ -65,9 +65,10 @@ Every phase must preserve these constraints:
 
 ## Current validation status
 
-- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **69/69**.
-- Current exact source: Windows AddressSanitizer matrix passes **69/69**.
+- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **70/70**.
+- Current exact source: Windows AddressSanitizer matrix passes **70/70**.
 - MSVC native static analysis is error-clean.
+- The native HDK ROP warnings-as-errors build/runtime matrix passes in Houdini **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - The 21-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Exact scalar Float VDB live-HOM extraction and ambiguous-activity rejection pass in all four maintained Houdini versions.
 - Documentation records the primary Writer/CLI/HOM workflow, packed record support, opaque native VDB preservation, constructed native payloads, and remaining sparse-grid limitations.
@@ -1109,7 +1110,7 @@ Exit criteria:
 
 ### Phase 41 — Native Sphere and Tube records
 
-**Status: complete locally on `feat/spheres-tubes`; pending merge.**
+**Status: complete and merged through PR #45.**
 
 Goals:
 
@@ -1129,6 +1130,30 @@ Exit criteria:
 - Missing, malformed, out-of-range, and non-finite quadric metadata are rejected.
 - The 21-fixture matrix passes in Houdini 20.0, 20.5, 21.0, and 22.0.
 - Strict, AddressSanitizer, static-analysis, package-consumer, and maintained Houdini validation pass.
+
+### Phase 42 — Native Houdini Geometry ROP
+
+**Status: first polygon vertical slice complete on `feat/native-houdini-rop`.**
+
+Goals:
+
+- Add an optional HDK DSO target that registers `houio::geometry` as a genuine `ROP_Node` in Houdini's `/out` context.
+- Use the standard ROP render, frame-range, take, dependency, script-hook, cancellation, and node-diagnostic lifecycle.
+- Cook the configured SOP directly through HDK and avoid HOM, HDAs, temporary manifests, external writer processes, and Houdini's native geometry writer.
+- Extract polygon/polyline topology, closure, and canonical point position `P` from a read-locked `GU_Detail`.
+- Reject unsupported attributes, groups, and primitive families explicitly rather than completing a lossy write.
+- Keep Houdini 20.0 through 21.0 translation units at the SideFX-required C++17 level while linking HouIO's C++20 core behind a dependency-neutral C ABI.
+- Add current-frame and frame-range output, `$F` path expansion, directory creation, overwrite, atomic replacement, and `.bgeo.sc` C-Blosc resolution.
+- Add a four-version build/runtime matrix and a dependency-free unit test for the native polygon bridge.
+
+Exit criteria:
+
+- Houdini registers **HouIO Geometry** in `/out` without an HDA or Python node definition.
+- A two-frame animated polygon source writes distinct, readable outputs in Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368.
+- Unsupported native primitives fail with an actionable ROP error and no partial success claim.
+- No C++ standard-library object crosses the HDK/core compatibility boundary.
+- The ordinary strict, AddressSanitizer, and static-analysis suites remain green with the HDK target disabled by default.
+- Native DSO packaging remains a separate version-aware distribution phase because HDK binaries are ABI-specific.
 
 ## Deferred work
 
