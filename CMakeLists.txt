@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.24)
 project(
     houio
     VERSION 0.2.0
-    DESCRIPTION "Standalone reader and writer for Houdini GEO and BGEO geometry files"
+    DESCRIPTION "Standalone Houdini geometry, Alembic, and USD I/O library and tools"
     LANGUAGES CXX
 )
 
@@ -25,6 +25,8 @@ option(HOUIO_BUILD_HOUDINI_PLUGIN "Build the native Houdini ROP plugin" OFF)
 set(HOUIO_HOUDINI_ROOT "" CACHE PATH "Houdini installation root used for the native HDK plugin")
 set(HOUIO_HYTHON_EXECUTABLE "" CACHE FILEPATH "Optional hython executable for Houdini integration tests")
 
+include(cmake/houio-scene-io.cmake)
+
 add_library(
     houio
     STATIC
@@ -39,7 +41,9 @@ add_library(
     src/json.cpp
     src/NativeVdbPayload.cpp
     src/NativePolygonWriter.cpp
+    src/NativeSceneWriter.cpp
     src/OpenVdbBackend.cpp
+    src/SceneGeometryAdapter.cpp
     src/SparseGrid.cpp
     src/math/Color.cpp
     src/math/Math.cpp
@@ -48,13 +52,77 @@ add_library(
 )
 add_library(houio::houio ALIAS houio)
 
+if(HOUIO_HAS_ALEMBIC_VALUE OR HOUIO_HAS_USD_VALUE)
+    add_library(houio_scene_backend OBJECT src/SceneArchive.cpp)
+    if(HOUIO_SCENE_BACKEND_COMPILE_TARGETS)
+        target_link_libraries(
+            houio_scene_backend
+            PRIVATE
+                ${HOUIO_SCENE_BACKEND_COMPILE_TARGETS}
+        )
+    endif()
+    target_include_directories(
+        houio_scene_backend
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${HOUIO_SCENE_IO_INCLUDE_DIRECTORIES}
+    )
+    target_compile_definitions(
+        houio_scene_backend
+        PRIVATE
+            HOUIO_HAS_ALEMBIC=1
+            HOUIO_HAS_USD=1
+            NOMINMAX
+            WIN32_LEAN_AND_MEAN
+    )
+    if(NOT HOUIO_EFFECTIVE_SCENE_IO_PROVIDER STREQUAL "houdini")
+        target_compile_features(houio_scene_backend PRIVATE cxx_std_20)
+    endif()
+    set_target_properties(
+        houio_scene_backend
+        PROPERTIES
+            CXX_EXTENSIONS OFF
+            POSITION_INDEPENDENT_CODE ON
+    )
+    if(MSVC)
+        target_compile_options(
+            houio_scene_backend
+            PRIVATE
+                /W4
+                /permissive-
+                /Zc:__cplusplus
+                /utf-8
+                /wd4251
+                /wd4275
+                /wd4702
+        )
+        if(HOUIO_WARNINGS_AS_ERRORS)
+            target_compile_options(houio_scene_backend PRIVATE /WX)
+        endif()
+    endif()
+    target_sources(houio PRIVATE $<TARGET_OBJECTS:houio_scene_backend>)
+else()
+    target_sources(houio PRIVATE src/SceneArchive.cpp)
+endif()
+
 target_compile_features(houio PUBLIC cxx_std_20)
 target_include_directories(
     houio
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    PRIVATE
+        ${HOUIO_SCENE_IO_INCLUDE_DIRECTORIES}
 )
+target_compile_definitions(
+    houio
+    PUBLIC
+        HOUIO_HAS_ALEMBIC=${HOUIO_HAS_ALEMBIC_VALUE}
+        HOUIO_HAS_USD=${HOUIO_HAS_USD_VALUE}
+)
+if(HOUIO_SCENE_IO_LIBRARIES)
+    target_link_libraries(houio PRIVATE ${HOUIO_SCENE_IO_LIBRARIES})
+endif()
 
 if(HOUIO_ENABLE_OPENVDB)
     find_package(OpenVDB QUIET)
@@ -137,6 +205,20 @@ if(HOUIO_BUILD_TOOLS)
                 "${CMAKE_CURRENT_SOURCE_DIR}/houdini/package/*"
                 "${CMAKE_CURRENT_SOURCE_DIR}/python/houio_hom/*"
             )
+            set(HOUIO_HOUDINI_PACKAGE_RUNTIME_ARGS)
+            set(HOUIO_HOUDINI_PACKAGE_RUNTIME_SOURCES)
+            if(HOUIO_EFFECTIVE_SCENE_IO_PROVIDER STREQUAL "bundled")
+                list(APPEND HOUIO_HOUDINI_PACKAGE_RUNTIME_ARGS
+                    --runtime-root "${HOUIO_BUNDLED_SCENE_IO_ROOT}")
+                file(
+                    GLOB_RECURSE HOUIO_HOUDINI_PACKAGE_RUNTIME_SOURCES
+                    CONFIGURE_DEPENDS
+                    "${HOUIO_BUNDLED_SCENE_IO_ROOT}/bin/*"
+                    "${HOUIO_BUNDLED_SCENE_IO_ROOT}/lib/*"
+                    "${HOUIO_BUNDLED_SCENE_IO_ROOT}/plugin/*"
+                    "${HOUIO_BUNDLED_SCENE_IO_ROOT}/share/*"
+                )
+            endif()
             add_custom_command(
                 OUTPUT "${HOUIO_HOUDINI_PACKAGE_ARCHIVE}"
                 COMMAND
@@ -146,10 +228,12 @@ if(HOUIO_BUILD_TOOLS)
                     --converter "$<TARGET_FILE:houio_convert>"
                     --output "${HOUIO_HOUDINI_PACKAGE_ARCHIVE}"
                     --version "${PROJECT_VERSION}"
+                    ${HOUIO_HOUDINI_PACKAGE_RUNTIME_ARGS}
                 DEPENDS
                     houio_cli
                     houio_convert
                     ${HOUIO_HOUDINI_PACKAGE_SOURCES}
+                    ${HOUIO_HOUDINI_PACKAGE_RUNTIME_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/build_houdini_package.py"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/bootstrap_houdini_package.ps1"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/install_houdini_package.ps1"
@@ -164,11 +248,6 @@ if(HOUIO_BUILD_TOOLS)
 endif()
 
 if(HOUIO_BUILD_HOUDINI_PLUGIN)
-    if(NOT HOUIO_HOUDINI_ROOT)
-        message(FATAL_ERROR "HOUIO_BUILD_HOUDINI_PLUGIN=ON requires HOUIO_HOUDINI_ROOT")
-    endif()
-    set(Houdini_DIR "${HOUIO_HOUDINI_ROOT}/toolkit/cmake")
-    find_package(Houdini CONFIG REQUIRED)
     add_subdirectory(houdini/hdk)
 endif()
 
@@ -239,6 +318,23 @@ install(
     FILES tools/houdini/install_hom_bridge.ps1
     DESTINATION ${CMAKE_INSTALL_DATADIR}/houio/houdini
 )
+
+if(HOUIO_EFFECTIVE_SCENE_IO_PROVIDER STREQUAL "bundled")
+    foreach(dependency_directory IN ITEMS bin lib include plugin share)
+        if(EXISTS "${HOUIO_BUNDLED_SCENE_IO_ROOT}/${dependency_directory}")
+            install(
+                DIRECTORY "${HOUIO_BUNDLED_SCENE_IO_ROOT}/${dependency_directory}/"
+                DESTINATION "${dependency_directory}"
+            )
+        endif()
+    endforeach()
+    if(EXISTS "${HOUIO_BUNDLED_SCENE_IO_ROOT}/houio-scene-dependencies.json")
+        install(
+            FILES "${HOUIO_BUNDLED_SCENE_IO_ROOT}/houio-scene-dependencies.json"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/houio/licenses
+        )
+    endif()
+endif()
 foreach(tool_target IN ITEMS houio_cli houio_convert)
     if(TARGET ${tool_target})
         install(TARGETS ${tool_target} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -1155,22 +1155,28 @@ Exit criteria:
 - The ordinary strict, AddressSanitizer, and static-analysis suites remain green with the HDK target disabled by default.
 - Native DSO packaging remains a separate version-aware distribution phase because HDK binaries are ABI-specific.
 
-### Phase 43 — Native Alembic and USD archives
+### Phase 43 — HouIO-owned Alembic and USD archives
 
-**Status: implemented on stacked branch `feat/native-abc-usd`.**
+**Status: core ownership and provider abstraction implemented on `feat/standalone-abc-usd`; bundled upstream dependency build remains open.**
 
 Goals and completed work:
 
-- [x] Detect `.abc`, `.usd`, `.usda`, and `.usdc` from the native ROP output path.
-- [x] Link against the Alembic and USD libraries shipped with each maintained Houdini SDK.
-- [x] Open one scene archive in `startRender`, append animated samples in `renderFrame`, and finalize atomically in `endRender`.
+- [x] Move the archive implementation from `houdini/hdk` into HouIO core under `src/SceneArchive.cpp`.
+- [x] Add public `SceneArchiveWriter`, `SceneGeometrySample`, and `SceneGeometryAdapter` APIs.
+- [x] Add a dependency-neutral animated scene C ABI consumed by the HDK plugin.
+- [x] Route `.abc`, `.usd`, `.usda`, and `.usdc` through the primary `Writer` facade and standalone CLI.
+- [x] Open one scene archive, append animated samples, and finalize atomically.
 - [x] Preserve closed polygon meshes and open polylines as Alembic `OPolyMesh`/`OCurves` and USD `UsdGeomMesh`/`UsdGeomBasisCurves`.
 - [x] Compact mesh-only point storage and remap face indices without adding unused points.
 - [x] Enforce constant topology and a constant destination path within each animated archive.
 - [x] Preserve frame rate, start/end time codes, and per-frame point animation.
-- [x] Respect SideFX licensing by rejecting Alembic and USD export in Houdini Apprentice before creating destination or temporary files.
-- [x] Validate `.abc`, `.usd`, `.usda`, and `.usdc` in Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368.
-- [x] Reload Alembic through Houdini's Alembic SOP and USD through the bundled `pxr` runtime.
+- [x] Add `disabled`, `houdini`, `system`, and `bundled` scene dependency providers.
+- [x] Keep Houdini SDK linkage as a temporary integration provider rather than the release ownership boundary.
+- [x] Respect SideFX licensing in the HDK consumer by rejecting Alembic and USD export in Houdini Apprentice before creating files.
+- [x] Validate `.abc`, `.usd`, `.usda`, and `.usdc` through the ROP in Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368.
+- [x] Validate standalone CLI output with `abcinfo` and `usdchecker` using the temporary integration provider.
+- [ ] Fetch, build, pin, and package upstream Alembic and OpenUSD for the `bundled` release provider.
+- [ ] Add release-package consumer tests proving no Houdini installation is required.
 
 ## Deferred work
 

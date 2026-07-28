@@ -1,5 +1,9 @@
 #include <houio/Writer.h>
 
+#include <houio/SceneArchive.h>
+#include <houio/SceneGeometryAdapter.h>
+
+#include <exception>
 #include <type_traits>
 #include <utility>
 
@@ -7,16 +11,84 @@ namespace houio
 {
     namespace
     {
-        GeometryWriteResult invalidRequest(std::string message, std::string path)
+        GeometryWriteResult failure(
+            DiagnosticCategory category,
+            std::string message,
+            std::string path)
         {
             GeometryWriteResult result;
             result.diagnostics.push_back(Diagnostic{
                 DiagnosticSeverity::error,
-                DiagnosticCategory::malformed_input,
+                category,
                 std::move(message),
                 -1,
                 std::move(path)});
             return result;
+        }
+
+        GeometryWriteResult invalidRequest(std::string message, std::string path)
+        {
+            return failure(
+                DiagnosticCategory::malformed_input,
+                std::move(message),
+                std::move(path));
+        }
+
+        GeometryWriteResult writeSceneArchive(
+            const std::filesystem::path& destination,
+            const SceneGeometrySample& geometry,
+            const GeometryWriteOptions& write_options)
+        {
+            const SceneArchiveFormat format = detectSceneArchiveFormat(destination);
+            if (format == SceneArchiveFormat::unsupported)
+            {
+                return failure(
+                    DiagnosticCategory::unsupported_input,
+                    "Scene writer destination must use .abc, .usd, .usda, or .usdc",
+                    "request.destination");
+            }
+            if (!sceneArchiveFormatAvailable(format))
+            {
+                return failure(
+                    DiagnosticCategory::unsupported_input,
+                    format == SceneArchiveFormat::alembic
+                        ? "HouIO was built without Alembic writer support"
+                        : "HouIO was built without USD writer support",
+                    "request.destination");
+            }
+
+            try
+            {
+                SceneArchiveOptions options;
+                options.destination = destination;
+                options.format = format;
+                options.createParentDirectories = write_options.createParentDirectories;
+                options.overwriteExisting = write_options.overwriteExisting;
+                options.atomicReplace = write_options.atomicReplace;
+
+                std::unique_ptr<SceneArchiveWriter> writer =
+                    createSceneArchiveWriter(options);
+                writer->writeSample(geometry, 1.0);
+                writer->finish();
+
+                GeometryWriteResult result;
+                result.succeeded = true;
+                return result;
+            }
+            catch (const std::exception& exception)
+            {
+                return failure(
+                    DiagnosticCategory::conversion,
+                    exception.what(),
+                    "scene_archive");
+            }
+            catch (...)
+            {
+                return failure(
+                    DiagnosticCategory::conversion,
+                    "Scene archive writer failed with an unknown error",
+                    "scene_archive");
+            }
         }
     }
 
@@ -25,8 +97,10 @@ namespace houio
         if( request.destination.empty() )
             return invalidRequest("Writer destination cannot be empty", "request.destination");
 
+        const SceneArchiveFormat scene_format =
+            detectSceneArchiveFormat(request.destination);
         return std::visit(
-            [&request](const auto &source) -> WriteResult
+            [&request, scene_format](const auto &source) -> WriteResult
             {
                 using Source = std::decay_t<decltype(source)>;
                 if constexpr( std::is_same_v<Source, std::monostate> )
@@ -35,16 +109,65 @@ namespace houio
                 }
                 else if constexpr( std::is_same_v<Source, HouGeoAdapter::Ptr> )
                 {
+                    if (scene_format != SceneArchiveFormat::unsupported)
+                    {
+                        if (!source)
+                            return invalidRequest(
+                                "Scene writer geometry cannot be null",
+                                "request.source");
+                        try
+                        {
+                            return writeSceneArchive(
+                                request.destination,
+                                adaptSceneGeometry(*source),
+                                request.options);
+                        }
+                        catch (const std::exception& exception)
+                        {
+                            return failure(
+                                DiagnosticCategory::conversion,
+                                exception.what(),
+                                "scene_adapter");
+                        }
+                    }
                     return GeometryIO::writeHouGeo(
                         request.destination, source, request.options);
                 }
                 else if constexpr( std::is_same_v<Source, Geometry::Ptr> )
                 {
+                    if (scene_format != SceneArchiveFormat::unsupported)
+                    {
+                        if (!source)
+                            return invalidRequest(
+                                "Scene writer geometry cannot be null",
+                                "request.source");
+                        try
+                        {
+                            return writeSceneArchive(
+                                request.destination,
+                                adaptSceneGeometry(*source),
+                                request.options);
+                        }
+                        catch (const std::exception& exception)
+                        {
+                            return failure(
+                                DiagnosticCategory::conversion,
+                                exception.what(),
+                                "scene_adapter");
+                        }
+                    }
                     return GeometryIO::writeGeometry(
                         request.destination, source, request.options);
                 }
                 else
                 {
+                    if (scene_format != SceneArchiveFormat::unsupported)
+                    {
+                        return failure(
+                            DiagnosticCategory::unsupported_input,
+                            "Alembic and USD scene export does not yet support volume sources",
+                            "request.source");
+                    }
                     return GeometryIO::writeVolume(
                         request.destination, source, request.options);
                 }
@@ -102,7 +225,27 @@ namespace houio
                 "Native Sphere and Tube records with topology, exact 3x3 transforms, tube caps, and taper."},
             {WriterDataType::sparse_openvdb, WriterCapabilityLevel::supported,
                 true, true, "sparse_openvdb",
-                "Lossless opaque Houdini VDB payload pass-through in every build; SparseFloatGrid, SparseInt32Grid, and SparseVec3fGrid voxel and active-tile construction are serialized as native Houdini VDB records when the optional OpenVDB backend is compiled."}
+                "Lossless opaque Houdini VDB payload pass-through in every build; SparseFloatGrid, SparseInt32Grid, and SparseVec3fGrid voxel and active-tile construction are serialized as native Houdini VDB records when the optional OpenVDB backend is compiled."},
+            {WriterDataType::alembic_scene,
+                sceneArchiveFormatAvailable(SceneArchiveFormat::alembic)
+                    ? WriterCapabilityLevel::supported
+                    : WriterCapabilityLevel::unavailable,
+                false,
+                sceneArchiveFormatAvailable(SceneArchiveFormat::alembic),
+                "alembic_scene",
+                sceneArchiveFormatAvailable(SceneArchiveFormat::alembic)
+                    ? "Animated polygon mesh and polygonal polyline archives written by HouIO's Alembic backend."
+                    : "Alembic writer backend is not compiled into this HouIO build."},
+            {WriterDataType::usd_scene,
+                sceneArchiveFormatAvailable(SceneArchiveFormat::usd)
+                    ? WriterCapabilityLevel::supported
+                    : WriterCapabilityLevel::unavailable,
+                false,
+                sceneArchiveFormatAvailable(SceneArchiveFormat::usd),
+                "usd_scene",
+                sceneArchiveFormatAvailable(SceneArchiveFormat::usd)
+                    ? "Animated polygon mesh and polygonal polyline stages written by HouIO's OpenUSD backend."
+                    : "USD writer backend is not compiled into this HouIO build."}
         };
         return values;
     }

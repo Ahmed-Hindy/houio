@@ -1,14 +1,16 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("help", "build", "test", "fixtures", "package", "native-rop", "benchmarks", "validate-all")]
+    [ValidateSet("help", "build", "test", "fixtures", "package", "native-rop", "scene-deps", "benchmarks", "validate-all")]
     [string]$Command = "help",
 
     [string]$Preset = "windows-msvc-release",
 
     [string]$HoudiniVersion = "21.0.631",
 
-    [switch]$SkipHoudini
+    [switch]$SkipHoudini,
+
+    [switch]$ConfirmLargeDownload
 )
 
 Set-StrictMode -Version Latest
@@ -122,6 +124,7 @@ function Show-Help {
     Write-Host "  .\tools\dev.ps1 fixtures"
     Write-Host "  .\tools\dev.ps1 package [-HoudiniVersion 21.0.631]"
     Write-Host "  .\tools\dev.ps1 native-rop"
+    Write-Host "  .\tools\dev.ps1 scene-deps -ConfirmLargeDownload"
     Write-Host "  .\tools\dev.ps1 benchmarks"
     Write-Host "  .\tools\dev.ps1 validate-all [-SkipHoudini]"
     Write-Host ""
@@ -172,6 +175,19 @@ switch ($Command) {
             "-File",
             (Join-Path $repositoryRoot "tools\houdini\run_native_rop_matrix.ps1")
         )
+    }
+    "scene-deps" {
+        $arguments = @(
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            (Join-Path $repositoryRoot "tools\dependencies\build_scene_io.ps1")
+        )
+        if ($ConfirmLargeDownload) {
+            $arguments += "-ConfirmLargeDownload"
+        }
+        Invoke-NativeCommand -Executable "powershell.exe" -Arguments $arguments
     }
     "benchmarks" {
         Initialize-Preset -Name "windows-msvc-benchmarks"
