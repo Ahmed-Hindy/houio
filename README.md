@@ -30,6 +30,7 @@ The minimum supported Houdini version is **20.0**. The file, large-asset, and pa
 HouIO currently supports:
 
 - Point, vertex, primitive, and global attribute domains
+- Unsigned UInt8 storage
 - Signed Int32 and Int64 storage
 - Float16, Float32, and Float64 storage
 - Indexed string attributes, including Houdini's empty-string sentinel

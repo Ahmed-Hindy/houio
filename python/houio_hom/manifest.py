@@ -56,6 +56,8 @@ def _numeric_storage(attribute: hou.Attrib) -> str:
         return "float64"
     if numeric_type.endswith("Float32"):
         return "float32"
+    if numeric_type.endswith("UInt8"):
+        return "uint8"
     if numeric_type.endswith("Int64"):
         return "int64"
     if numeric_type.endswith(("Int8", "Int16", "Int32")):

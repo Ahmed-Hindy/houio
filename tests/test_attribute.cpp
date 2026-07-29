@@ -193,6 +193,24 @@ int verifyCopyAppendAndDuplicate()
         return fail("Attribute shrink did not preserve the retained prefix");
     }
 
+    auto uint8_source = std::make_shared<houio::Attribute>(
+        1, houio::Attribute::ComponentType::uint8);
+    uint8_source->appendElement<houio::ubyte>(static_cast<houio::ubyte>(128));
+    uint8_source->appendElement<houio::ubyte>(static_cast<houio::ubyte>(255));
+    houio::Attribute::Ptr uint8_copy = uint8_source->copy();
+    const unsigned int uint8_duplicated = uint8_copy->duplicateElement(1);
+    auto uint8_destination = std::make_shared<houio::Attribute>(
+        1, houio::Attribute::ComponentType::uint8);
+    uint8_destination->append(*uint8_copy);
+    if (uint8_duplicated != 2
+        || uint8_destination->numElements() != 3
+        || uint8_destination->get<houio::ubyte>(0) != static_cast<houio::ubyte>(128)
+        || uint8_destination->get<houio::ubyte>(1) != static_cast<houio::ubyte>(255)
+        || uint8_destination->get<houio::ubyte>(2) != static_cast<houio::ubyte>(255))
+    {
+        return fail("UInt8 copy, duplicate, or append changed storage values");
+    }
+
     const houio::math::Matrix33f matrix = houio::math::Matrix33f::rotation(
         houio::math::Vec3f(0.0f, 0.0f, 1.0f), 0.5f);
     houio::Attribute::Ptr matrix_attribute = houio::Attribute::createM33f();

@@ -180,7 +180,7 @@ Priority levels:
 
 ### Attributes
 
-- [ ] Add unsigned integer storage where the file format uses it.
+- [x] Add exact UInt8 attribute storage where Houdini's GA format uses unsigned integers.
 - [x] Preserve complete attribute type and semantic metadata.
 - [x] Extend string-table coverage to every supported domain and maintained page layout.
 

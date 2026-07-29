@@ -1228,6 +1228,28 @@ Exit criteria:
 - Documentation states that third-party component licenses do not license HouIO as a combined work.
 - Public release remains blocked until upstream permission or a documented independently licensable replacement is established.
 
+### Phase 46 — Exact UInt8 attribute storage
+
+**Status: complete on `feat/unsigned-attribute-storage`.**
+
+Goals and completed work:
+
+- [x] Add `Attribute::ComponentType::uint8` and `AttributeAdapter::Storage::uint8` without inventing unsigned GA types that Houdini does not provide.
+- [x] Parse and serialize the canonical Houdini storage name `uint8`.
+- [x] Preserve raw UInt8 tuples through HouGeo import/export, simplified conversion, copying, merging, and public typed attribute access.
+- [x] Preserve binary uniform arrays with the existing `JID_UINT8` token.
+- [x] Accept `uint8` numeric attributes in explicit HOM manifests.
+- [x] Map `hou.numericData.UInt8` to `uint8` in direct HOM extraction on Houdini versions that expose exact numeric storage metadata.
+- [x] Keep position and UV adaptation restricted to floating-point storage.
+- [x] Validate values above signed 8-bit range, including `128` and `255`.
+
+Exit criteria:
+
+- Public API, manifest, native BGEO, and simplified-model tests preserve UInt8 metadata and values.
+- A genuine Houdini `GA_STORE_UINT8` attribute survives native-file conversion and the direct HOM custom-writer path.
+- Houdini reload reports `hou.numericData.UInt8` with unchanged values.
+- Strict, sanitizer, analysis, package, and Houdini integration matrices remain green.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:

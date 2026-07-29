@@ -10,6 +10,13 @@ namespace
 {
 using houio::test::fail;
 
+houio::ubyte readUInt8(const houio::HouGeoAdapter::AttributeAdapter::Ptr& attribute, int index)
+{
+    if (index < 0)
+        throw std::out_of_range("UInt8 attribute index cannot be negative");
+    return attribute->rawData().read<houio::ubyte>(static_cast<size_t>(index));
+}
+
 houio::uword readHalfBits(const houio::HouGeoAdapter::AttributeAdapter::Ptr& attribute, int index)
 {
     if (index < 0)
@@ -41,6 +48,23 @@ int verifyHalfConversion()
         {
             return fail("Float16 conversion did not preserve all 16-bit encodings");
         }
+    }
+    return 0;
+}
+
+int verifyUInt8Attribute(const houio::HouGeo::Ptr& geometry)
+{
+    houio::HouGeoAdapter::AttributeAdapter::Ptr attribute = geometry->pointAttribute("mask");
+    if (!attribute
+        || attribute->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::uint8
+        || attribute->tupleSize().value() != 1 || attribute->elementCount() != 2)
+    {
+        return fail("UInt8 attribute metadata was not preserved");
+    }
+    if (readUInt8(attribute, 0) != static_cast<houio::ubyte>(128)
+        || readUInt8(attribute, 1) != static_cast<houio::ubyte>(255))
+    {
+        return fail("UInt8 attribute values were signed, narrowed, or changed");
     }
     return 0;
 }
@@ -118,6 +142,12 @@ int main()
     positions->appendElement(houio::math::V3f(1.0f, 0.0f, 0.0f));
     geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("P", positions));
 
+    houio::Attribute::Ptr maskValues = std::make_shared<houio::Attribute>(
+        1, houio::Attribute::ComponentType::uint8);
+    maskValues->appendElement<houio::ubyte>(static_cast<houio::ubyte>(128));
+    maskValues->appendElement<houio::ubyte>(static_cast<houio::ubyte>(255));
+    geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("mask", maskValues));
+
     houio::Attribute::Ptr identifiers = std::make_shared<houio::Attribute>(
         1, houio::Attribute::ComponentType::int64);
     identifiers->appendElement<houio::sint64>(1099511627776LL);
@@ -136,6 +166,10 @@ int main()
     preciseValues->appendElement<houio::real64>(-123456789.125);
     geometry->setPointAttribute(std::make_shared<houio::HouGeo::HouAttribute>("precise_value", preciseValues));
 
+    if (const int result = verifyUInt8Attribute(geometry); result != 0)
+    {
+        return result;
+    }
     if (const int result = verifyInt64Attribute(geometry); result != 0)
     {
         return result;
@@ -157,6 +191,10 @@ int main()
 
     std::istringstream input(output.str(), std::ios::in | std::ios::binary);
     houio::HouGeo::Ptr imported = houio::HouGeoIO::import(input);
+    if (const int result = verifyUInt8Attribute(imported); result != 0)
+    {
+        return result;
+    }
     if (const int result = verifyInt64Attribute(imported); result != 0)
     {
         return result;
@@ -172,6 +210,16 @@ int main()
 
     houio::Geometry::Ptr converted = houio::HouGeoIO::convertToGeometry(
         imported, houio::HouGeoAdapter::Primitive::Ptr());
+    houio::Attribute::Ptr convertedUInt8 = converted ? converted->attribute("mask") : nullptr;
+    if (!convertedUInt8
+        || convertedUInt8->elementComponentType() != houio::Attribute::ComponentType::uint8
+        || convertedUInt8->numElements() != 2
+        || convertedUInt8->get<houio::ubyte>(0) != static_cast<houio::ubyte>(128)
+        || convertedUInt8->get<houio::ubyte>(1) != static_cast<houio::ubyte>(255))
+    {
+        return fail("simplified conversion did not preserve UInt8 attribute storage");
+    }
+
     houio::Attribute::Ptr convertedHalf = converted ? converted->attribute("half_value") : nullptr;
     if (!convertedHalf
         || convertedHalf->elementComponentType() != houio::Attribute::ComponentType::float16

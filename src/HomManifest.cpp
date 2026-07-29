@@ -172,6 +172,10 @@ namespace houio
                 Attribute::Ptr numeric;
                 switch( storage )
                 {
+                case HouGeoAdapter::AttributeAdapter::Storage::uint8:
+                    numeric = numericAttribute<ubyte>(values, tupleSize, elementCount,
+                        Attribute::ComponentType::uint8, path);
+                    break;
                 case HouGeoAdapter::AttributeAdapter::Storage::float16:
                     numeric = numericAttribute<uword>(values, tupleSize, elementCount,
                         Attribute::ComponentType::float16, path);

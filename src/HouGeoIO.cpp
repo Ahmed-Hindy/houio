@@ -563,7 +563,13 @@ namespace houio
 					attr->appendElement(uv);
 				}
 			}else
-			if( storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
+			if( storage == HouGeoAdapter::AttributeAdapter::Storage::uint8 )
+			{
+				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
+				attr = Attribute::create(numComponents, Attribute::ComponentType::uint8,
+					raw_data.bytes(), houAttr->elementCount());
+			}
+			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attr = Attribute::create(numComponents, Attribute::ComponentType::float16,
@@ -670,7 +676,13 @@ namespace houio
 					attr->appendElement(uv);
 				}
 			}else
-			if( storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
+			if( storage == HouGeoAdapter::AttributeAdapter::Storage::uint8 )
+			{
+				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
+				attr = Attribute::create(numComponents, Attribute::ComponentType::uint8,
+					raw_data.bytes(), houAttr->elementCount());
+			}
+			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 			{
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attr = Attribute::create(numComponents, Attribute::ComponentType::float16,
@@ -1531,6 +1543,8 @@ namespace houio
 				else
 					throw std::runtime_error( "HouGeoIO::exportAttribute: unsupported three-component P storage" );
 			}
+			else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::uint8 )
+				writer.jsonUniformArray(copyRawValues<ubyte>(raw_data, scalar_count, name));
 			else if( attribute_storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
 			{
 				const std::vector<uword> values = copyRawValues<uword>(raw_data, scalar_count, name);

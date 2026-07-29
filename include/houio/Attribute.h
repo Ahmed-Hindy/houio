@@ -81,6 +81,7 @@ namespace houio
             float64,
             int64,
             float16,
+            uint8,
         };
 
         explicit Attribute(
@@ -185,7 +186,9 @@ namespace houio
     {
         using Value = std::remove_cv_t<T>;
         using Scalar = std::remove_cv_t<typename detail::AttributeValueLayout<Value>::Scalar>;
-        if constexpr (std::is_same_v<Scalar, sint32>)
+        if constexpr (std::is_same_v<Scalar, ubyte>)
+            return ComponentType::uint8;
+        else if constexpr (std::is_same_v<Scalar, sint32>)
             return ComponentType::int32;
         else if constexpr (std::is_same_v<Scalar, real32>)
             return ComponentType::float32;
