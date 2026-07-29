@@ -159,7 +159,7 @@ function Assert-NoSideFxImports(
     $dumpbin = Resolve-Dumpbin
     $forbidden = "(?i)(houdini|sidefx|alembic_sidefx|libpxr_|hboost_|python3[0-9]*\.dll)"
     $binaries = Get-ChildItem -LiteralPath $Root -Recurse -File |
-        Where-Object { $_.Extension -in @(".exe", ".dll") }
+        Where-Object { $_.Extension -in @(".exe", ".dll", ".pyd") }
     if (-not $binaries) {
         throw "The package contains no executable or DLL files"
     }
