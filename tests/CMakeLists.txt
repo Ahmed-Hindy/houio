@@ -254,6 +254,49 @@ add_test(
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package_consumer.cmake"
 )
 
+if(WIN32
+   AND HOUIO_EFFECTIVE_SCENE_IO_PROVIDER STREQUAL "bundled"
+   AND TARGET houio_cli)
+    set(
+        HOUIO_BUNDLED_PACKAGE_TEST_ROOT
+        "${CMAKE_CURRENT_BINARY_DIR}/bundled_package"
+    )
+    add_test(
+        NAME houio.bundled_package.install
+        COMMAND
+            "${CMAKE_COMMAND}"
+            "-DHOUIO_BINARY_DIR=${PROJECT_BINARY_DIR}"
+            "-DHOUIO_INSTALL_ROOT=${HOUIO_BUNDLED_PACKAGE_TEST_ROOT}"
+            "-DHOUIO_BUILD_CONFIG=$<CONFIG>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/install_bundled_package.cmake"
+    )
+    set_tests_properties(
+        houio.bundled_package.install
+        PROPERTIES
+            FIXTURES_SETUP houio_bundled_package
+            RUN_SERIAL TRUE
+    )
+
+    add_test(
+        NAME houio.bundled_package.validate
+        COMMAND
+            powershell.exe
+            -NoProfile
+            -ExecutionPolicy Bypass
+            -File "${PROJECT_SOURCE_DIR}/tools/dependencies/validate_bundled_scene_io.ps1"
+            -PackageRoot "${HOUIO_BUNDLED_PACKAGE_TEST_ROOT}"
+            -ManifestPath "${PROJECT_SOURCE_DIR}/tests/data/scene_writer_manifest.json"
+            -WorkDirectory "${CMAKE_CURRENT_BINARY_DIR}/bundled_package_validation"
+    )
+    set_tests_properties(
+        houio.bundled_package.validate
+        PROPERTIES
+            FIXTURES_REQUIRED houio_bundled_package
+            RUN_SERIAL TRUE
+            PASS_REGULAR_EXPRESSION "\"status\"[ \t]*:[ \t]*\"success\""
+    )
+endif()
+
 if(WIN32 AND TARGET houio_houdini_package)
     add_test(
         NAME houio.houdini_package.bootstrap

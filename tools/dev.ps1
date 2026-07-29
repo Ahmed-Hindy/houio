@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("help", "build", "test", "fixtures", "package", "native-rop", "scene-deps", "benchmarks", "validate-all")]
+    [ValidateSet("help", "build", "test", "fixtures", "package", "native-rop", "scene-deps", "scene-package", "benchmarks", "validate-all")]
     [string]$Command = "help",
 
     [string]$Preset = "windows-msvc-release",
@@ -17,9 +17,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$visualStudioShell = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1"
-$visualStudioCMake = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-$visualStudioCTest = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\ctest.exe"
+$visualStudioShell = ""
+$visualStudioCMake = ""
+$visualStudioCTest = ""
 
 function Invoke-NativeCommand {
     param(
@@ -125,6 +125,7 @@ function Show-Help {
     Write-Host "  .\tools\dev.ps1 package [-HoudiniVersion 21.0.631]"
     Write-Host "  .\tools\dev.ps1 native-rop"
     Write-Host "  .\tools\dev.ps1 scene-deps -ConfirmLargeDownload"
+    Write-Host "  .\tools\dev.ps1 scene-package"
     Write-Host "  .\tools\dev.ps1 benchmarks"
     Write-Host "  .\tools\dev.ps1 validate-all [-SkipHoudini]"
     Write-Host ""
@@ -136,6 +137,30 @@ if ($Command -eq "help") {
     Show-Help
     exit 0
 }
+
+$vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
+    throw "Visual Studio Installer discovery tool was not found: $vswhere"
+}
+$visualStudioRoot = (& $vswhere `
+    -latest `
+    -products "*" `
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -property installationPath).Trim()
+if (-not $visualStudioRoot) {
+    throw "No Visual Studio installation with the MSVC x64 toolchain was found"
+}
+$visualStudioShell = Join-Path $visualStudioRoot "Common7\Tools\Launch-VsDevShell.ps1"
+$kitwareCMakeDirectory = "C:\Program Files\CMake\bin"
+$visualStudioCMakeDirectory = Join-Path $visualStudioRoot "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin"
+if (Test-Path -LiteralPath (Join-Path $kitwareCMakeDirectory "cmake.exe") -PathType Leaf) {
+    $preferredCMakeDirectory = $kitwareCMakeDirectory
+}
+else {
+    $preferredCMakeDirectory = $visualStudioCMakeDirectory
+}
+$visualStudioCMake = Join-Path $preferredCMakeDirectory "cmake.exe"
+$visualStudioCTest = Join-Path $preferredCMakeDirectory "ctest.exe"
 
 Initialize-Toolchain
 Set-Location $repositoryRoot
@@ -188,6 +213,19 @@ switch ($Command) {
             $arguments += "-ConfirmLargeDownload"
         }
         Invoke-NativeCommand -Executable "powershell.exe" -Arguments $arguments
+    }
+    "scene-package" {
+        $dependencyRoot = Join-Path $repositoryRoot "build\dependencies\scene-io\install"
+        $dependencyManifest = Join-Path $dependencyRoot "houio-scene-dependencies.json"
+        if (-not (Test-Path -LiteralPath $dependencyManifest -PathType Leaf)) {
+            throw "Bundled scene dependencies are not ready. Run .\tools\dev.ps1 scene-deps -ConfirmLargeDownload first."
+        }
+        $env:HOUIO_BUNDLED_SCENE_IO_ROOT = $dependencyRoot
+        $env:PATH = "$(Join-Path $dependencyRoot 'bin');$env:PATH"
+        Initialize-Preset -Name "windows-msvc-release-bundled"
+        Build-Preset -Name "windows-msvc-release-bundled"
+        Test-Preset -Name "windows-msvc-release-bundled"
+        Build-Preset -Name "windows-msvc-release-bundled" -Targets @("houio_portable_package")
     }
     "benchmarks" {
         Initialize-Preset -Name "windows-msvc-benchmarks"

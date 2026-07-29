@@ -320,7 +320,7 @@ install(
 )
 
 if(HOUIO_EFFECTIVE_SCENE_IO_PROVIDER STREQUAL "bundled")
-    foreach(dependency_directory IN ITEMS bin lib include plugin share)
+    foreach(dependency_directory IN ITEMS bin lib include plugin share cmake)
         if(EXISTS "${HOUIO_BUNDLED_SCENE_IO_ROOT}/${dependency_directory}")
             install(
                 DIRECTORY "${HOUIO_BUNDLED_SCENE_IO_ROOT}/${dependency_directory}/"
@@ -328,6 +328,12 @@ if(HOUIO_EFFECTIVE_SCENE_IO_PROVIDER STREQUAL "bundled")
             )
         endif()
     endforeach()
+    if(EXISTS "${HOUIO_BUNDLED_SCENE_IO_ROOT}/pxrConfig.cmake")
+        install(
+            FILES "${HOUIO_BUNDLED_SCENE_IO_ROOT}/pxrConfig.cmake"
+            DESTINATION .
+        )
+    endif()
     if(EXISTS "${HOUIO_BUNDLED_SCENE_IO_ROOT}/houio-scene-dependencies.json")
         install(
             FILES "${HOUIO_BUNDLED_SCENE_IO_ROOT}/houio-scene-dependencies.json"
@@ -364,3 +370,37 @@ install(
         ${CMAKE_CURRENT_BINARY_DIR}/houio-config-version.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/houio
 )
+
+if(PROJECT_IS_TOP_LEVEL)
+    set(CPACK_PACKAGE_NAME "houio")
+    set(CPACK_PACKAGE_VENDOR "HouIO")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_GENERATOR "ZIP")
+    set(CPACK_PACKAGE_CHECKSUM "SHA256")
+    set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
+    if(WIN32)
+        set(CPACK_PACKAGE_FILE_NAME
+            "houio-${PROJECT_VERSION}-windows-x86_64")
+    else()
+        set(CPACK_PACKAGE_FILE_NAME
+            "houio-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    include(CPack)
+
+    set(HOUIO_PORTABLE_PACKAGE_DEPENDENCIES houio)
+    foreach(portable_target IN ITEMS houio_cli houio_convert)
+        if(TARGET ${portable_target})
+            list(APPEND HOUIO_PORTABLE_PACKAGE_DEPENDENCIES ${portable_target})
+        endif()
+    endforeach()
+    add_custom_target(
+        houio_portable_package
+        COMMAND
+            "${CMAKE_CPACK_COMMAND}"
+            -G ZIP
+            --config "${CMAKE_CURRENT_BINARY_DIR}/CPackConfig.cmake"
+        DEPENDS ${HOUIO_PORTABLE_PACKAGE_DEPENDENCIES}
+        USES_TERMINAL
+        VERBATIM
+    )
+endif()

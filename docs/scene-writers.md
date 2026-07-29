@@ -69,7 +69,47 @@ Configure `HOUIO_SCENE_IO_PROVIDER` with one of:
 | `system` | Build against externally installed upstream Alembic and OpenUSD CMake packages. |
 | `bundled` | Release build against HouIO's pinned dependency prefix supplied through `HOUIO_BUNDLED_SCENE_IO_ROOT`. |
 
-The bundled provider is the intended release configuration. HouIO must package upstream Alembic/OpenUSD outputs and their notices; it must not copy or redistribute SideFX libraries.
+The bundled provider is the intended release configuration. It packages upstream Alembic/OpenUSD outputs and their notices; it does not copy or redistribute SideFX libraries.
+
+## Bundled release build
+
+Pinned versions are maintained in `cmake/scene-io-versions.cmake`. The Windows dependency builder downloads and compiles:
+
+- OpenUSD 26.05;
+- Alembic 1.8.12;
+- Imath 3.2.2;
+- oneTBB 2021.12.0 through OpenUSD's official builder.
+
+Prerequisites are Visual Studio 2022 with the x64 C++ toolchain, CMake 3.29 or newer, Git, and `uv`. The large download and compile require explicit confirmation:
+
+```powershell
+.\tools\dev.ps1 scene-deps -ConfirmLargeDownload
+```
+
+After the dependency prefix exists, build, test, validate, and package HouIO with:
+
+```powershell
+.\tools\dev.ps1 scene-package
+```
+
+This produces:
+
+```text
+build/windows-msvc-release-bundled/houio-<version>-windows-x86_64.zip
+build/windows-msvc-release-bundled/houio-<version>-windows-x86_64.zip.sha256
+```
+
+The ZIP is a portable SDK/runtime package containing:
+
+- `houio.exe`, `houio_convert.exe`, and `houio.lib`;
+- upstream runtime DLLs beside the executables;
+- Alembic, Imath, OpenUSD, and oneTBB headers/import libraries;
+- relocatable Alembic/OpenUSD CMake package metadata;
+- OpenUSD plugin/resource registries;
+- required third-party license and notice files;
+- a dependency manifest with exact Git revisions and SHA-256 hashes for every packaged runtime DLL.
+
+`tools/dependencies/validate_bundled_scene_io.ps1` removes Houdini, PXR, and Python environment variables, reduces `PATH` to the package plus Windows system directories, writes Alembic/USDA/USDC, verifies dependency hashes and notices, and rejects SideFX/Houdini binary imports.
 
 ## Current geometry scope
 
@@ -96,10 +136,11 @@ To avoid silent loss, it currently rejects:
 
 ## Validation
 
-The implementation is tested at three boundaries:
+The implementation is tested at four boundaries:
 
 1. Dependency-neutral sample adaptation and failure behavior.
 2. Standalone `Writer`, C ABI, and CLI output.
 3. Native Houdini ROP animated round trips across maintained Houdini versions.
+4. Extracted portable-package execution with no Houdini path, variables, or binary imports.
 
-Generated Alembic files are checked independently with `abcinfo`; USD files are checked with `usdchecker` in the integration environment.
+The bundled Windows configuration passes the complete 32-test suite, an installed downstream CMake consumer, archive extraction, third-party notice checks, 43 runtime DLL SHA-256 checks, and clean Alembic/USDA/USDC writes. Generated Alembic files are also checked with Alembic tooling; USD output is validated through the upstream runtime and Houdini integration tests.

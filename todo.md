@@ -89,7 +89,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add a primary **Write Selected Geometry** shelf action and retain diagnostics/conversion tools.
 - [x] Add the first native HDK **HouIO Geometry** ROP vertical slice for polygon sequence export.
 - [x] Move animated Alembic and USD archive ownership into HouIO's public writer API and C ABI; keep the HDK plugin as a geometry-adapter consumer.
-- [ ] Build and package pinned upstream Alembic and OpenUSD dependencies for standalone HouIO releases without redistributing SideFX binaries.
+- [x] Build, validate, and package pinned upstream Alembic, OpenUSD, Imath, and oneTBB dependencies for standalone HouIO releases without redistributing SideFX binaries.
 - [x] Document the first successful custom-write workflow before advanced internals.
 
 ### Data-type expansion after the product surface

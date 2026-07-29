@@ -1,0 +1,130 @@
+name: Bundled scene IO
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - ".github/workflows/bundled-scene-io.yml"
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - "cmake/houio-config.cmake.in"
+      - "cmake/houio-scene-io.cmake"
+      - "cmake/scene-io-versions.cmake"
+      - "include/houio/SceneArchive.h"
+      - "src/SceneArchive.cpp"
+      - "src/Writer.cpp"
+      - "tests/CMakeLists.txt"
+      - "tests/data/scene_writer_manifest.json"
+      - "tests/install_bundled_package.cmake"
+      - "tests/run_package_consumer.cmake"
+      - "tests/test_scene_writer.cpp"
+      - "tools/dependencies/build_scene_io.ps1"
+      - "tools/dependencies/validate_bundled_scene_io.ps1"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-bundled-scene-io:
+    runs-on: windows-2022
+    timeout-minutes: 180
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Configure MSVC environment
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
+          $installationPath = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          if (-not $installationPath) {
+            throw "A Visual Studio installation with the x64 C++ toolchain was not found"
+          }
+
+          $developerCommand = Join-Path $installationPath "Common7/Tools/VsDevCmd.bat"
+          $environment = & $env:ComSpec /d /s /c `
+            "`"$developerCommand`" -no_logo -arch=x64 -host_arch=x64 && set"
+          if ($LASTEXITCODE -ne 0) {
+            throw "VsDevCmd.bat failed with exit code $LASTEXITCODE"
+          }
+
+          foreach ($line in $environment) {
+            $separator = $line.IndexOf("=")
+            if ($separator -le 0) {
+              continue
+            }
+            $name = $line.Substring(0, $separator)
+            $value = $line.Substring($separator + 1)
+            [System.IO.File]::AppendAllText(
+              $env:GITHUB_ENV,
+              "$name=$value$([Environment]::NewLine)")
+          }
+
+      - name: Cache pinned scene dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/dependencies/scene-io
+          key: windows-scene-io-${{ hashFiles('cmake/scene-io-versions.cmake', 'tools/dependencies/build_scene_io.ps1') }}
+
+      - name: Build pinned Alembic and OpenUSD dependencies
+        shell: pwsh
+        run: |
+          .\tools\dependencies\build_scene_io.ps1 -ConfirmLargeDownload
+
+      - name: Export bundled dependency environment
+        shell: pwsh
+        run: |
+          $root = (Resolve-Path "build/dependencies/scene-io/install").Path
+          "HOUIO_BUNDLED_SCENE_IO_ROOT=$root" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          (Join-Path $root "bin") | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Configure bundled release
+        run: cmake --preset windows-msvc-release-bundled
+
+      - name: Build bundled release
+        run: cmake --build --preset windows-msvc-release-bundled
+
+      - name: Test bundled release
+        run: ctest --preset windows-msvc-release-bundled
+
+      - name: Build portable ZIP
+        run: cmake --build --preset windows-msvc-release-bundled --target houio_portable_package
+
+      - name: Validate extracted ZIP
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem "build/windows-msvc-release-bundled/houio-*-windows-x86_64.zip" |
+            Select-Object -First 1
+          if (-not $zip) {
+            throw "The bundled HouIO ZIP was not generated"
+          }
+          $extract = Join-Path $env:RUNNER_TEMP "houio-portable-package"
+          Remove-Item $extract -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath $extract -Force
+          $packageRoot = (Get-ChildItem $extract -Directory | Select-Object -First 1).FullName
+          .\tools\dependencies\validate_bundled_scene_io.ps1 `
+            -PackageRoot $packageRoot `
+            -ManifestPath .\tests\data\scene_writer_manifest.json `
+            -WorkDirectory (Join-Path $env:RUNNER_TEMP "houio-scene-validation")
+
+      - name: Upload portable package
+        uses: actions/upload-artifact@v7
+        with:
+          name: houio-bundled-scene-io-windows-x86_64
+          path: |
+            build/windows-msvc-release-bundled/houio-*-windows-x86_64.zip
+            build/windows-msvc-release-bundled/houio-*-windows-x86_64.zip.sha256
+          if-no-files-found: error
