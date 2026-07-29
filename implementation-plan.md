@@ -859,7 +859,7 @@ Exit criteria:
 
 ### Phase 29 — Single n-gon simplified conversion
 
-**Status: complete.**
+**Status: complete; its multi-n-gon limitation was removed by Phase 44.**
 
 Target files:
 
@@ -1180,6 +1180,29 @@ Goals and completed work:
 - [x] Package runtime DLLs, headers, import libraries, CMake metadata, USD resources, dependency revisions, SHA-256 hashes, and third-party notices.
 - [x] Add installed-SDK and extracted-ZIP consumer tests proving no Houdini installation or SideFX binary is required.
 - [x] Add a cached Windows release workflow that builds, tests, validates, packages, and uploads the portable ZIP and checksum.
+
+### Phase 44 — Variable-size simplified polygon topology
+
+**Status: complete on `feat/variable-polygon-topology`.**
+
+Goals and completed work:
+
+- [x] Extend `Geometry` with exact per-polygon vertex counts while preserving fixed-size topology APIs.
+- [x] Add `addPolygon`, `primitiveVertexCount`, and immutable `primitiveVertexCounts` accessors.
+- [x] Keep `addPolygonVertex` source-compatible as a builder for the last polygon.
+- [x] Return the common count from `verticesPerPrimitive()` and zero when polygon sizes differ.
+- [x] Reverse and merge multiple variable-size polygons without crossing primitive boundaries.
+- [x] Convert multiple Houdini polygon faces with different vertex counts into one simplified mesh.
+- [x] Preserve exact polygon boundaries through simplified-to-HouGeo adaptation and public BGEO write/read round trips.
+- [x] Preserve exact polygon boundaries when adapting simplified meshes to Alembic/USD scene samples.
+- [x] Continue rejecting mixed line/face runs whose closure semantics cannot be represented faithfully.
+
+Exit criteria:
+
+- A five-vertex face and a three-vertex face coexist in one `SimplifiedMesh` with counts `{5, 3}`.
+- Merge, reverse, HouGeo conversion, scene adaptation, and BGEO round trips retain both boundaries.
+- Existing fixed-size and single-polygon callers remain source-compatible.
+- Strict, sanitizer, analysis, package, and Houdini compatibility matrices remain green.
 
 ## Deferred work
 

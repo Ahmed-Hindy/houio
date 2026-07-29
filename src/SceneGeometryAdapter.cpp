@@ -228,6 +228,38 @@ namespace houio
             output.topology.push_back(static_cast<std::int32_t>(point_index));
         }
 
+        if (geometry.primitiveType() == Geometry::PrimitiveType::polygon)
+        {
+            const std::span<const unsigned int> polygon_counts =
+                geometry.primitiveVertexCounts();
+            if (polygon_counts.size() != geometry.primitiveCount())
+            {
+                throw std::runtime_error(
+                    "Simplified scene polygon counts do not match primitive count");
+            }
+            std::size_t offset = 0;
+            for (const unsigned int vertex_count : polygon_counts)
+            {
+                if (vertex_count == 0U
+                    || static_cast<std::size_t>(vertex_count) > indices.size() - offset)
+                {
+                    throw std::runtime_error(
+                        "Simplified scene polygon topology does not match primitive counts");
+                }
+                output.polygons.push_back(ScenePolygon{
+                    offset,
+                    static_cast<std::size_t>(vertex_count),
+                    true});
+                offset += vertex_count;
+            }
+            if (offset != indices.size())
+            {
+                throw std::runtime_error(
+                    "Simplified scene polygon topology contains trailing vertices");
+            }
+            return output;
+        }
+
         bool closed = true;
         std::size_t vertices_per_primitive = geometry.verticesPerPrimitive();
         switch (geometry.primitiveType())
@@ -242,12 +274,11 @@ namespace houio
         case Geometry::PrimitiveType::quad:
             vertices_per_primitive = 4U;
             break;
-        case Geometry::PrimitiveType::polygon:
-            vertices_per_primitive = indices.size();
-            break;
         case Geometry::PrimitiveType::point:
             throw std::runtime_error(
                 "Scene export does not yet support points-only simplified geometry");
+        case Geometry::PrimitiveType::polygon:
+            throw std::logic_error("Polygon scene topology was not handled");
         }
 
         if (vertices_per_primitive == 0U

@@ -98,6 +98,19 @@ namespace houio
         throw std::invalid_argument("Unknown Geometry primitive type");
     }
 
+    unsigned int Geometry::commonPolygonVertexCount() const noexcept
+    {
+        if (primitive_vertex_counts_.empty())
+            return 0;
+        const unsigned int common_count = primitive_vertex_counts_.front();
+        for (const unsigned int count : primitive_vertex_counts_)
+        {
+            if (count != common_count)
+                return 0;
+        }
+        return common_count;
+    }
+
     Attribute::Ptr Geometry::attribute(const std::string& name)
     {
         const auto attribute = attributes_.find(name);
@@ -140,6 +153,17 @@ namespace houio
     void Geometry::removeAttribute(const std::string& name)
     {
         attributes_.erase(name);
+    }
+
+    unsigned int Geometry::primitiveVertexCount(unsigned int primitive_index) const
+    {
+        if (primitive_index >= primitive_count_)
+            throw std::out_of_range("Geometry primitive index is out of range");
+        if (primitive_type_ != PrimitiveType::polygon)
+            return vertices_per_primitive_;
+        if (primitive_vertex_counts_.size() != primitive_count_)
+            throw std::runtime_error("Geometry polygon counts do not match its primitive count");
+        return primitive_vertex_counts_[primitive_index];
     }
 
     void Geometry::appendFixedPrimitive(std::span<const Index> point_indices)
@@ -202,22 +226,87 @@ namespace houio
         return primitive_index;
     }
 
+    unsigned int Geometry::addPolygon(std::span<const Index> point_indices)
+    {
+        if (primitive_type_ != PrimitiveType::polygon)
+            throw std::logic_error("Polygons require polygon Geometry");
+        if (point_indices.empty())
+            throw std::invalid_argument("Geometry::addPolygon requires at least one vertex");
+        if (primitive_count_ == std::numeric_limits<unsigned int>::max())
+            throw std::overflow_error("Geometry polygon count exceeds unsigned int range");
+
+        const unsigned int vertex_count = checkedIndex(
+            point_indices.size(),
+            "Polygon vertex count");
+        const std::size_t required_index_count = checkedSum(
+            indices_.size(),
+            point_indices.size(),
+            "Geometry polygon topology");
+        indices_.reserve(required_index_count);
+        primitive_vertex_counts_.reserve(
+            static_cast<std::size_t>(primitive_count_) + 1U);
+
+        const unsigned int primitive_index = primitive_count_;
+        indices_.insert(indices_.end(), point_indices.begin(), point_indices.end());
+        primitive_vertex_counts_.push_back(vertex_count);
+        ++primitive_count_;
+        vertices_per_primitive_ = commonPolygonVertexCount();
+        return primitive_index;
+    }
+
     unsigned int Geometry::addPolygonVertex(Index point_index)
     {
         if (primitive_type_ != PrimitiveType::polygon)
             throw std::logic_error("Polygon vertices require polygon Geometry");
-        if (vertices_per_primitive_ == std::numeric_limits<unsigned int>::max())
+
+        const std::size_t required_index_count = checkedSum(
+            indices_.size(),
+            1U,
+            "Geometry polygon topology");
+        indices_.reserve(required_index_count);
+        if (primitive_vertex_counts_.empty())
+        {
+            primitive_vertex_counts_.reserve(1);
+            primitive_vertex_counts_.push_back(0);
+            primitive_count_ = 1;
+        }
+        if (primitive_vertex_counts_.back() == std::numeric_limits<unsigned int>::max())
             throw std::overflow_error("Polygon vertex count exceeds unsigned int range");
+
         indices_.push_back(point_index);
-        ++vertices_per_primitive_;
-        primitive_count_ = 1;
-        return 0;
+        ++primitive_vertex_counts_.back();
+        vertices_per_primitive_ = commonPolygonVertexCount();
+        return primitive_count_ - 1U;
     }
 
     void Geometry::reverse()
     {
         if (primitive_count_ == 0)
             return;
+
+        if (primitive_type_ == PrimitiveType::polygon)
+        {
+            if (primitive_vertex_counts_.size() != primitive_count_)
+                throw std::runtime_error("Geometry polygon counts do not match its primitive count");
+            std::size_t primitive_offset = 0;
+            for (const unsigned int vertex_count : primitive_vertex_counts_)
+            {
+                if (vertex_count == 0
+                    || static_cast<std::size_t>(vertex_count) > indices_.size() - primitive_offset)
+                {
+                    throw std::runtime_error(
+                        "Geometry polygon topology does not match its primitive counts");
+                }
+                const auto first = indices_.begin()
+                    + static_cast<std::ptrdiff_t>(primitive_offset);
+                std::reverse(first, first + vertex_count);
+                primitive_offset += vertex_count;
+            }
+            if (primitive_offset != indices_.size())
+                throw std::runtime_error("Geometry polygon topology contains trailing vertices");
+            return;
+        }
+
         if (vertices_per_primitive_ == 0)
             throw std::runtime_error("Geometry has primitives without vertices");
         const std::size_t expected_index_count =
@@ -398,6 +487,7 @@ namespace houio
     {
         attributes_.clear();
         indices_.clear();
+        primitive_vertex_counts_.clear();
         primitive_count_ = 0;
         vertices_per_primitive_ = fixedVertexCount(primitive_type_);
     }
@@ -917,10 +1007,41 @@ namespace houio
 
             if (geometry->primitiveType() == PrimitiveType::polygon)
             {
-                if (result->primitive_count_ != 0 && geometry->primitive_count_ != 0)
-                    throw std::invalid_argument("Geometry::merge cannot combine multiple polygon records");
-                for (const Index index : geometry->indices_)
-                    result->addPolygonVertex(index + point_offset);
+                if (geometry->primitive_vertex_counts_.size() != geometry->primitive_count_)
+                {
+                    throw std::runtime_error(
+                        "Geometry::merge source polygon counts do not match its primitive count");
+                }
+                std::size_t primitive_offset = 0;
+                for (const unsigned int vertex_count : geometry->primitive_vertex_counts_)
+                {
+                    if (vertex_count == 0
+                        || static_cast<std::size_t>(vertex_count)
+                            > geometry->indices_.size() - primitive_offset)
+                    {
+                        throw std::runtime_error(
+                            "Geometry::merge source polygon topology is inconsistent");
+                    }
+                    std::vector<Index> adjusted_indices;
+                    adjusted_indices.reserve(vertex_count);
+                    for (unsigned int local_index = 0; local_index < vertex_count; ++local_index)
+                    {
+                        const Index index = geometry->indices_[primitive_offset + local_index];
+                        if (index > std::numeric_limits<Index>::max() - point_offset)
+                        {
+                            throw std::overflow_error(
+                                "Geometry::merge polygon index exceeds unsigned int range");
+                        }
+                        adjusted_indices.push_back(index + point_offset);
+                    }
+                    result->addPolygon(adjusted_indices);
+                    primitive_offset += vertex_count;
+                }
+                if (primitive_offset != geometry->indices_.size())
+                {
+                    throw std::runtime_error(
+                        "Geometry::merge source polygon topology contains trailing vertices");
+                }
             }
             else
             {

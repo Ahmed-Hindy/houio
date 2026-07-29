@@ -3,6 +3,7 @@
 
 #include "TestSupport.h"
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -132,6 +133,58 @@ int verifyScfRoundtrip(const std::filesystem::path &directory)
     return 0;
 }
 
+int verifyVariablePolygonRoundtrip(const std::filesystem::path &directory)
+{
+    const houio::Geometry::Ptr geometry = houio::Geometry::createPolyGeometry();
+    for (unsigned int pointIndex = 0; pointIndex < 8; ++pointIndex)
+    {
+        geometry->attribute("P")->appendElement(houio::math::V3f(
+            static_cast<float>(pointIndex),
+            0.0f,
+            0.0f));
+    }
+    const std::array<houio::Geometry::Index, 5> pentagon = {0, 1, 2, 3, 4};
+    const std::array<houio::Geometry::Index, 3> triangle = {5, 6, 7};
+    geometry->addPolygon(pentagon);
+    geometry->addPolygon(triangle);
+
+    const std::filesystem::path path = directory / "variable_polygons.bgeo";
+    const houio::GeometryWriteResult writeResult =
+        houio::GeometryIO::writeGeometry(path, geometry);
+    if (!writeResult)
+        return fail("variable polygon write failed");
+
+    const houio::GeometryReadResult<houio::HouGeo::Ptr> faithfulRead =
+        houio::GeometryIO::readHouGeo(path);
+    if (!faithfulRead || faithfulRead.value->primitiveCount() != 2)
+        return fail("variable polygon faithful read returned incorrect primitive count");
+    const houio::HouGeo& faithfulGeometry = *faithfulRead.value;
+    const std::vector<houio::HouGeoAdapter::Primitive::ConstPtr> primitives =
+        faithfulGeometry.primitives();
+    const auto polygons = primitives.empty()
+        ? houio::HouGeo::HouPoly::ConstPtr()
+        : std::dynamic_pointer_cast<const houio::HouGeo::HouPoly>(primitives.front());
+    if (primitives.size() != 1 || !polygons || polygons->polygonCount() != 2
+        || polygons->polygonVertexCount(0) != 5
+        || polygons->polygonVertexCount(1) != 3)
+    {
+        return fail("variable polygon write lost exact primitive boundaries");
+    }
+
+    const houio::GeometryReadResult<houio::Geometry::Ptr> simplifiedRead =
+        houio::GeometryIO::readGeometry(path);
+    const std::span<const unsigned int> counts = simplifiedRead.value
+        ? simplifiedRead.value->primitiveVertexCounts() : std::span<const unsigned int>();
+    if (!simplifiedRead
+        || simplifiedRead.value->primitiveType() != houio::Geometry::PrimitiveType::polygon
+        || simplifiedRead.value->primitiveCount() != 2
+        || counts.size() != 2 || counts[0] != 5 || counts[1] != 3)
+    {
+        return fail("variable polygon simplified round-trip lost primitive boundaries");
+    }
+    return 0;
+}
+
 int verifyMultipleVolumes(const std::filesystem::path &directory)
 {
     houio::ScalarField::Ptr first = houio::ScalarField::create(houio::math::V3i(2, 1, 1));
@@ -240,6 +293,8 @@ int main()
     if( const int result = verifyRawRoundtrip(testDirectory); result != 0 )
         return result;
     if( const int result = verifyScfRoundtrip(testDirectory); result != 0 )
+        return result;
+    if( const int result = verifyVariablePolygonRoundtrip(testDirectory); result != 0 )
         return result;
     if( const int result = verifyMultipleVolumes(testDirectory); result != 0 )
         return result;

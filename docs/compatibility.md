@@ -105,7 +105,7 @@ Use `HouGeo` (`HoudiniGeometry`) or `HouGeoAdapter` when Houdini domain fidelity
 - Vertex-domain discontinuities may require point duplication.
 - Point identity can therefore change even when rendered attribute values are preserved.
 - Mixed primitive families are not silently collapsed into one mesh.
-- One arbitrary n-gon is supported; multiple variable-size polygons are not represented by a single `SimplifiedMesh`.
+- Multiple variable-size polygon faces preserve exact per-primitive vertex counts in one `SimplifiedMesh`; `verticesPerPrimitive()` returns zero when those counts differ, and `primitiveVertexCounts()` exposes the exact boundaries.
 - Open polygons with three or more vertices become closed simplified faces; `GeometryConversionReport::polygonClosureLost` and a conversion warning expose that loss.
 - Native VDB payloads are retained by the Houdini-oriented model but are not converted into a simplified mesh.
 - Unsupported primitive records are not converted implicitly.

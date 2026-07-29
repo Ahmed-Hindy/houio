@@ -68,9 +68,20 @@ namespace houio
             return primitive_count_;
         }
 
+        /// Return the fixed/common vertex count, or zero for variable-size polygons.
         [[nodiscard]] unsigned int verticesPerPrimitive() const noexcept
         {
             return vertices_per_primitive_;
+        }
+
+        /// Return the exact vertex count for one primitive.
+        [[nodiscard]] unsigned int primitiveVertexCount(
+            unsigned int primitive_index) const;
+
+        /// Exact polygon boundaries. Fixed-size primitive types return an empty span.
+        [[nodiscard]] std::span<const unsigned int> primitiveVertexCounts() const noexcept
+        {
+            return primitive_vertex_counts_;
         }
 
         [[nodiscard]] std::span<const Index> indexBuffer() const noexcept
@@ -89,6 +100,9 @@ namespace houio
             Index point_index1,
             Index point_index2,
             Index point_index3);
+        /// Append one complete polygon and return its primitive index.
+        unsigned int addPolygon(std::span<const Index> point_indices);
+        /// Compatibility builder that appends a vertex to the last polygon.
         unsigned int addPolygonVertex(Index point_index);
 
         [[nodiscard]] static Ptr createPointGeometry();
@@ -127,11 +141,13 @@ namespace houio
         template<typename Pointer>
         [[nodiscard]] static Ptr mergeRange(std::span<const Pointer> geometries);
         [[nodiscard]] static unsigned int fixedVertexCount(PrimitiveType primitive_type);
+        [[nodiscard]] unsigned int commonPolygonVertexCount() const noexcept;
         void appendFixedPrimitive(std::span<const Index> point_indices);
 
         AttributeMap attributes_;
         PrimitiveType primitive_type_;
         std::vector<Index> indices_;
+        std::vector<unsigned int> primitive_vertex_counts_;
         unsigned int primitive_count_ = 0;
         unsigned int vertices_per_primitive_ = 0;
     };

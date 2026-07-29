@@ -49,7 +49,7 @@ HouIO currently supports:
 - Exact live-HOM extraction of scalar Float VDBs whose active topology is fully observable
 - SCF compression through C-Blosc
 
-The simplified `Geometry` API is intentionally render-oriented and may split points at vertex-attribute discontinuities. It supports fixed-size point, line, triangle, and quad sets plus one arbitrary n-gon; multiple variable-size polygons remain a Houdini-oriented-model concern. Use `HouGeo` and `HouGeoAdapter` when domain fidelity matters.
+The simplified `Geometry` API is intentionally render-oriented and may split points at vertex-attribute discontinuities. It supports fixed-size point, line, triangle, and quad sets plus multiple variable-size polygon faces with exact primitive boundaries. Use `HouGeo` and `HouGeoAdapter` when point/vertex-domain identity or mixed primitive-family fidelity matters.
 
 `<houio/GeometryModels.h>` provides intention-revealing, non-breaking aliases: `HoudiniGeometry` for the supported Houdini-oriented model and `SimplifiedMesh` for the render-oriented convenience model.
 

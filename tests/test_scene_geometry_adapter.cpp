@@ -3,6 +3,7 @@
 
 #include "TestSupport.h"
 
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -78,6 +79,34 @@ namespace
             || sample.polygons.front().closed)
         {
             return fail("Simplified line did not adapt to one open scene polyline");
+        }
+
+        const houio::Geometry::Ptr polygons = houio::Geometry::createPolyGeometry();
+        for (unsigned int point_index = 0; point_index < 8; ++point_index)
+        {
+            polygons->attribute("P")->appendElement(houio::math::V3f(
+                static_cast<float>(point_index),
+                0.0F,
+                0.0F));
+        }
+        const std::array<houio::Geometry::Index, 5> pentagon = {0, 1, 2, 3, 4};
+        const std::array<houio::Geometry::Index, 3> triangle = {5, 6, 7};
+        polygons->addPolygon(pentagon);
+        polygons->addPolygon(triangle);
+
+        const houio::SceneGeometrySample polygon_sample =
+            houio::adaptSceneGeometry(*polygons);
+        if (polygon_sample.topology
+                != std::vector<std::int32_t>{0, 1, 2, 3, 4, 5, 6, 7}
+            || polygon_sample.polygons.size() != 2U
+            || polygon_sample.polygons[0].vertexOffset != 0U
+            || polygon_sample.polygons[0].vertexCount != 5U
+            || !polygon_sample.polygons[0].closed
+            || polygon_sample.polygons[1].vertexOffset != 5U
+            || polygon_sample.polygons[1].vertexCount != 3U
+            || !polygon_sample.polygons[1].closed)
+        {
+            return fail("Simplified variable polygons lost scene primitive boundaries");
         }
         return 0;
     }
