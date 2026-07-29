@@ -241,6 +241,22 @@ Scene dependencies are selected with `HOUIO_SCENE_IO_PROVIDER`:
 - `system`: externally installed upstream Alembic and OpenUSD packages;
 - `bundled`: the release provider using HouIO's pinned packaged dependencies.
 
+Build the pinned upstream dependencies and the portable Windows package with:
+
+```powershell
+.\tools\dev.ps1 scene-deps -ConfirmLargeDownload
+.\tools\dev.ps1 scene-package
+```
+
+The dependency build requires Visual Studio 2022 with the x64 C++ toolchain, CMake 3.29 or newer, Git, and `uv`. The generated release archive and checksum are:
+
+```text
+build/windows-msvc-release-bundled/houio-<version>-windows-x86_64.zip
+build/windows-msvc-release-bundled/houio-<version>-windows-x86_64.zip.sha256
+```
+
+The package contains upstream Alembic, OpenUSD, Imath, and oneTBB runtimes, CMake package metadata, USD plugin resources, exact source revisions, runtime SHA-256 hashes, and third-party notices. Its validation runs with Houdini variables removed and rejects any SideFX/Houdini binary import.
+
 See [Alembic and USD writers](docs/scene-writers.md) for API, build-provider, packaging, and current-scope details.
 
 ## Native Houdini ROP

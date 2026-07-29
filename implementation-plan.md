@@ -1157,7 +1157,7 @@ Exit criteria:
 
 ### Phase 43 — HouIO-owned Alembic and USD archives
 
-**Status: core ownership and provider abstraction implemented on `feat/standalone-abc-usd`; bundled upstream dependency build remains open.**
+**Status: complete. Core ownership merged through PR #50; bundled upstream release implemented on `feat/bundled-scene-io`.**
 
 Goals and completed work:
 
@@ -1175,8 +1175,11 @@ Goals and completed work:
 - [x] Respect SideFX licensing in the HDK consumer by rejecting Alembic and USD export in Houdini Apprentice before creating files.
 - [x] Validate `.abc`, `.usd`, `.usda`, and `.usdc` through the ROP in Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368.
 - [x] Validate standalone CLI output with `abcinfo` and `usdchecker` using the temporary integration provider.
-- [ ] Fetch, build, pin, and package upstream Alembic and OpenUSD for the `bundled` release provider.
-- [ ] Add release-package consumer tests proving no Houdini installation is required.
+- [x] Fetch and build pinned OpenUSD 26.05, Alembic 1.8.12, Imath 3.2.2, and oneTBB 2021.12.0 for the `bundled` release provider.
+- [x] Normalize OpenUSD's Windows DLL/resource layout for execution beside the portable HouIO CLI.
+- [x] Package runtime DLLs, headers, import libraries, CMake metadata, USD resources, dependency revisions, SHA-256 hashes, and third-party notices.
+- [x] Add installed-SDK and extracted-ZIP consumer tests proving no Houdini installation or SideFX binary is required.
+- [x] Add a cached Windows release workflow that builds, tests, validates, packages, and uploads the portable ZIP and checksum.
 
 ## Deferred work
 

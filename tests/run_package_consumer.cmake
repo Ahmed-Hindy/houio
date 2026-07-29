@@ -118,12 +118,20 @@ if(consumer_executable STREQUAL "")
     message(FATAL_ERROR "Package consumer executable was not produced")
 endif()
 
+set(original_path "$ENV{PATH}")
+if(CMAKE_HOST_WIN32)
+    set(package_bin "${package_root}/bin")
+    cmake_path(NATIVE_PATH package_bin NORMALIZE package_bin_native)
+    set(ENV{PATH} "${package_bin_native};$ENV{PATH}")
+endif()
+
 execute_process(
     COMMAND "${consumer_executable}"
     RESULT_VARIABLE run_result
     OUTPUT_VARIABLE run_output
     ERROR_VARIABLE run_error
 )
+set(ENV{PATH} "${original_path}")
 if(NOT run_result EQUAL 0)
     message(FATAL_ERROR "Package consumer execution failed:\n${run_output}\n${run_error}")
 endif()
