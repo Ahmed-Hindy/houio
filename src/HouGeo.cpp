@@ -270,6 +270,8 @@ namespace houio
 			using Storage = HouGeoAdapter::AttributeAdapter::Storage;
 			switch (storage)
 			{
+			case Storage::uint8:
+				return Attribute::ComponentType::uint8;
 			case Storage::float16:
 				return Attribute::ComponentType::float16;
 			case Storage::float32:
@@ -294,6 +296,9 @@ namespace houio
 		{
 			switch( storage )
 			{
+			case HouGeoAdapter::AttributeAdapter::Storage::uint8:
+				storeNumericValue(data, destination_index, value.as<ubyte>());
+				break;
 			case HouGeoAdapter::AttributeAdapter::Storage::float16:
 				storeNumericValue(data, destination_index, floatToHalfBits(value.as<real32>()));
 				break;
@@ -774,6 +779,9 @@ namespace houio
 			throw std::invalid_argument("HouAttribute numeric storage cannot be null");
 		switch (numeric_attribute_->elementComponentType())
 		{
+		case Attribute::ComponentType::uint8:
+			storage_ = Storage::uint8;
+			break;
 		case Attribute::ComponentType::float32:
 			storage_ = Storage::float32;
 			break;

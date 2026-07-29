@@ -45,6 +45,8 @@ Every current fixture has an empty `known_losses` list, so the maintained matrix
 
 Houdini 20.0 does not expose `hou.Attrib.numericDataType()`. On 20.0, the validator still compares attribute owner, broad data type, tuple size, values, names, counts, topology, and groups, but cannot independently query the numeric storage-precision enum. Direct numeric-storage metadata validation is active on Houdini 20.5 and newer.
 
+A separate `houio.houdini_uint8_roundtrip` integration test authors a genuine Houdini `GA_STORE_UINT8` point attribute, preserves values `0`, `128`, and `255` through both native BGEO conversion and the direct HOM custom-writer path, and verifies the output back in Houdini.
+
 ## Large-asset validation
 
 The Crag test validates a representative polygon asset containing:

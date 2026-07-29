@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
@@ -33,6 +34,26 @@ namespace
                 return true;
         }
         return false;
+    }
+
+    bool matchesUInt8(
+        const houio::HouGeoAdapter::AttributeAdapter::ConstPtr &attribute,
+        std::initializer_list<houio::ubyte> expected)
+    {
+        if( !attribute
+            || attribute->storage() != houio::HouGeoAdapter::AttributeAdapter::Storage::uint8
+            || attribute->elementCount() != static_cast<int>(expected.size()) )
+        {
+            return false;
+        }
+        std::size_t index = 0;
+        for( const houio::ubyte value : expected )
+        {
+            if( attribute->rawData().read<houio::ubyte>(index) != value )
+                return false;
+            ++index;
+        }
+        return true;
     }
 
     int verifyMixedManifest(const std::filesystem::path &directory)
@@ -63,6 +84,10 @@ namespace
                         "values":[0,0,0,1,1,0,0,1,0,1,0,1,0.5,0.5,0.5,1]
                     },
                     {
+                        "name":"mask","kind":"numeric","storage":"uint8",
+                        "tuple_size":1,"element_count":4,"values":[0,128,255,64]
+                    },
+                    {
                         "name":"label","kind":"string","tuple_size":1,
                         "element_count":4,"values":["a","b","c","volume"]
                     }
@@ -72,18 +97,30 @@ namespace
                         "name":"uv","kind":"numeric","storage":"float32",
                         "tuple_size":2,"element_count":4,
                         "values":[0,0,1,0,0,1,0.5,0.5]
+                    },
+                    {
+                        "name":"vertex_mask","kind":"numeric","storage":"uint8",
+                        "tuple_size":1,"element_count":4,"values":[255,0,128,64]
                     }
                 ],
                 "primitive":[
                     {
                         "name":"kind","kind":"string","tuple_size":1,
                         "element_count":2,"values":["polygon","volume"]
+                    },
+                    {
+                        "name":"primitive_mask","kind":"numeric","storage":"uint8",
+                        "tuple_size":1,"element_count":2,"values":[128,255]
                     }
                 ],
                 "global":[
                     {
                         "name":"asset","kind":"string","tuple_size":1,
                         "element_count":1,"values":["manifest_test"]
+                    },
+                    {
+                        "name":"global_mask","kind":"numeric","storage":"uint8",
+                        "tuple_size":1,"element_count":1,"values":[255]
                     }
                 ]
             },
@@ -107,6 +144,15 @@ namespace
             || result.value->primitiveCount() != 2 )
         {
             return fail("mixed HOM manifest domain counts are incorrect");
+        }
+        if( !matchesUInt8(result.value->pointAttribute("mask"), {0, 128, 255, 64})
+            || !matchesUInt8(
+                result.value->vertexAttribute("vertex_mask"), {255, 0, 128, 64})
+            || !matchesUInt8(
+                result.value->primitiveAttribute("primitive_mask"), {128, 255})
+            || !matchesUInt8(result.value->globalAttribute("global_mask"), {255}) )
+        {
+            return fail("mixed HOM manifest lost UInt8 attribute storage across domains");
         }
         if( !result.value->pointAttribute("label")
             || !result.value->vertexAttribute("uv")
@@ -137,7 +183,13 @@ namespace
             return fail("mixed HOM manifest failed custom serialization");
         const auto roundtrip = houio::GeometryIO::readHouGeo(outputPath);
         if( !roundtrip || roundtrip.value->primitiveCount() != 2
-            || !roundtrip.value->vertexAttribute("uv") )
+            || !roundtrip.value->vertexAttribute("uv")
+            || !matchesUInt8(roundtrip.value->pointAttribute("mask"), {0, 128, 255, 64})
+            || !matchesUInt8(
+                roundtrip.value->vertexAttribute("vertex_mask"), {255, 0, 128, 64})
+            || !matchesUInt8(
+                roundtrip.value->primitiveAttribute("primitive_mask"), {128, 255})
+            || !matchesUInt8(roundtrip.value->globalAttribute("global_mask"), {255}) )
         {
             return fail("mixed HOM manifest output did not round-trip");
         }

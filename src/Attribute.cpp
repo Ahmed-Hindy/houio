@@ -216,6 +216,8 @@ namespace houio
     {
         switch (component_type)
         {
+        case ComponentType::uint8:
+            return static_cast<int>(sizeof(ubyte));
         case ComponentType::int32:
             return static_cast<int>(sizeof(sint32));
         case ComponentType::float32:

@@ -404,6 +404,20 @@ if(HOUIO_HYTHON_EXECUTABLE)
                 ENVIRONMENT "HOUIO_EXECUTABLE=$<TARGET_FILE:houio_cli>;HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
                 ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
         )
+
+        add_test(
+            NAME houio.houdini_uint8_roundtrip
+            COMMAND
+                "${HOUIO_HYTHON_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tools/houdini/test_uint8_storage.py"
+                "${CMAKE_CURRENT_BINARY_DIR}/houdini_uint8_roundtrip"
+        )
+        set_tests_properties(
+            houio.houdini_uint8_roundtrip
+            PROPERTIES
+                ENVIRONMENT "HOUIO_EXECUTABLE=$<TARGET_FILE:houio_cli>"
+                ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
+        )
     endif()
 
     if(TARGET houio_convert)

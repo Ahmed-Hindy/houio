@@ -118,6 +118,7 @@ namespace houio
                 int32,
                 int64,
                 float16,
+                uint8,
             };
 
             virtual ~AttributeAdapter() = default;

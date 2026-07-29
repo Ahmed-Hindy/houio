@@ -94,6 +94,8 @@ namespace houio
     HouGeoAdapter::AttributeAdapter::Storage HouGeoAdapter::AttributeAdapter::parseStorage(
         std::string_view storage_name) noexcept
     {
+        if (storage_name == "uint8")
+            return Storage::uint8;
         if (storage_name == "fpreal16")
             return Storage::float16;
         if (storage_name == "fpreal32")
@@ -112,6 +114,8 @@ namespace houio
     {
         switch (storage)
         {
+        case Storage::uint8:
+            return "uint8";
         case Storage::float16:
             return "fpreal16";
         case Storage::float32:
@@ -133,6 +137,8 @@ namespace houio
     {
         switch (storage)
         {
+        case Storage::uint8:
+            return sizeof(ubyte);
         case Storage::float16:
             return sizeof(uword);
         case Storage::float32:

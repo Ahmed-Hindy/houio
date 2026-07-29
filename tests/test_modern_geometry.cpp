@@ -166,6 +166,20 @@ const char* modernQuadGeometry()
 int verifyStrongAttributeMetadata()
 {
     using AttributeAdapter = houio::HouGeoAdapter::AttributeAdapter;
+    static_assert(static_cast<int>(houio::Attribute::ComponentType::invalid) == 0);
+    static_assert(static_cast<int>(houio::Attribute::ComponentType::int32) == 1);
+    static_assert(static_cast<int>(houio::Attribute::ComponentType::float32) == 2);
+    static_assert(static_cast<int>(houio::Attribute::ComponentType::float64) == 3);
+    static_assert(static_cast<int>(houio::Attribute::ComponentType::int64) == 4);
+    static_assert(static_cast<int>(houio::Attribute::ComponentType::float16) == 5);
+    static_assert(static_cast<int>(houio::Attribute::ComponentType::uint8) == 6);
+    static_assert(static_cast<int>(AttributeAdapter::Storage::invalid) == 0);
+    static_assert(static_cast<int>(AttributeAdapter::Storage::float32) == 1);
+    static_assert(static_cast<int>(AttributeAdapter::Storage::float64) == 2);
+    static_assert(static_cast<int>(AttributeAdapter::Storage::int32) == 3);
+    static_assert(static_cast<int>(AttributeAdapter::Storage::int64) == 4);
+    static_assert(static_cast<int>(AttributeAdapter::Storage::float16) == 5);
+    static_assert(static_cast<int>(AttributeAdapter::Storage::uint8) == 6);
 
     const AttributeAdapter::TupleSize tupleSize(3);
     if (tupleSize.value() != 3 || tupleSize.asSize() != 3u)
@@ -214,7 +228,8 @@ int verifyStrongAttributeMetadata()
         std::string_view name;
         std::size_t byteWidth;
     };
-    const std::array<StorageCase, 5> storageCases{{
+    const std::array<StorageCase, 6> storageCases{{
+        {AttributeAdapter::Storage::uint8, "uint8", sizeof(houio::ubyte)},
         {AttributeAdapter::Storage::float16, "fpreal16", sizeof(houio::uword)},
         {AttributeAdapter::Storage::float32, "fpreal32", sizeof(houio::real32)},
         {AttributeAdapter::Storage::float64, "fpreal64", sizeof(houio::real64)},
