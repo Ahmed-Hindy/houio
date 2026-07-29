@@ -12,7 +12,7 @@ Supported containers:
 The minimum supported Houdini version is **20.0**. The file, large-asset, and package matrices are validated with Houdini 20.0.653, 20.5.410, 21.0.631, and 22.0.368. See the [compatibility matrix](docs/compatibility.md).
 
 > [!IMPORTANT]
-> This derivative repository does not currently provide a project-wide license grant. The imported HouIO history contains no project-wide license file, so public source and binary redistribution remains blocked pending permission from the relevant upstream copyright holders. See [License status](LICENSE_STATUS.md) and [source provenance](docs/provenance.md).
+> This derivative repository does not currently provide a project-wide license grant. The imported HouIO history contains no project-wide license file, so public source and binary redistribution remains blocked pending permission from the relevant upstream copyright holders or a documented independently licensable replacement of upstream-derived implementation. See [License status](LICENSE_STATUS.md) and [source provenance](docs/provenance.md).
 
 ## Components
 

@@ -1206,7 +1206,7 @@ Exit criteria:
 
 ### Phase 45 — Provenance cleanup and non-publishing release policy
 
-**Status: technical provenance cleanup complete on `chore/provenance-cleanup`; upstream permission remains an external release blocker.**
+**Status: technical provenance cleanup complete on `chore/provenance-cleanup`; documented upstream permission or an independently licensable replacement remains an external release blocker.**
 
 Goals and completed work:
 
@@ -1217,7 +1217,7 @@ Goals and completed work:
 - [x] Install and validate legal-status documents in generated packages.
 - [x] Remove CI artifact upload and tag-triggered release behavior while keeping package construction and clean-runtime validation.
 - [x] Run the expensive dependency workflow on relevant `master` pushes so default-branch caches can seed later pull requests.
-- [ ] Obtain written permission or a compatible license grant from the relevant upstream copyright holders.
+- [ ] Obtain written permission or a compatible license grant from the relevant upstream copyright holders, or replace upstream-derived implementation through a documented independently licensable process.
 - [ ] Add a project-wide license only after its scope over the complete combined work is confirmed.
 
 Exit criteria:
@@ -1226,7 +1226,7 @@ Exit criteria:
 - Generated packages carry the project legal status, provenance record, and third-party notices.
 - CI validates packages but does not publish archives.
 - Documentation states that third-party component licenses do not license HouIO as a combined work.
-- Public release remains blocked until upstream permission is documented.
+- Public release remains blocked until upstream permission or a documented independently licensable replacement is established.
 
 ## Deferred work
 
