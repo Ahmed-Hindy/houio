@@ -2,6 +2,7 @@
 
 #include "TestSupport.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <iostream>
@@ -189,6 +190,98 @@ namespace
         }
         return 0;
     }
+
+    int verifyVariablePolygonTopology()
+    {
+        const houio::Geometry::Ptr pentagon = houio::Geometry::createPolyGeometry();
+        for (unsigned int point_index = 0; point_index < 5; ++point_index)
+        {
+            pentagon->attribute("P")->appendElement(houio::math::V3f(
+                static_cast<float>(point_index),
+                0.0f,
+                0.0f));
+        }
+        const std::array<houio::Geometry::Index, 5> pentagon_indices = {0, 1, 2, 3, 4};
+        if (pentagon->addPolygon(pentagon_indices) != 0
+            || pentagon->verticesPerPrimitive() != 5
+            || pentagon->primitiveVertexCount(0) != 5)
+        {
+            return fail("first variable polygon returned incorrect topology metadata");
+        }
+
+        try
+        {
+            const std::span<const houio::Geometry::Index> empty;
+            static_cast<void>(pentagon->addPolygon(empty));
+            return fail("polygon geometry accepted an empty primitive");
+        }
+        catch (const std::invalid_argument&)
+        {
+        }
+
+        const houio::Geometry::Ptr triangle = houio::Geometry::createPolyGeometry();
+        for (unsigned int point_index = 0; point_index < 3; ++point_index)
+        {
+            triangle->attribute("P")->appendElement(houio::math::V3f(
+                static_cast<float>(point_index),
+                1.0f,
+                0.0f));
+        }
+        const std::array<houio::Geometry::Index, 3> triangle_indices = {0, 1, 2};
+        triangle->addPolygon(triangle_indices);
+
+        const houio::Geometry::Ptr merged = houio::Geometry::merge({pentagon, triangle});
+        const std::span<const unsigned int> counts = merged
+            ? merged->primitiveVertexCounts() : std::span<const unsigned int>();
+        const std::array<houio::Geometry::Index, 8> expected_indices = {
+            0, 1, 2, 3, 4, 5, 6, 7};
+        if (!merged || merged->primitiveType() != houio::Geometry::PrimitiveType::polygon
+            || merged->primitiveCount() != 2 || merged->verticesPerPrimitive() != 0
+            || counts.size() != 2 || counts[0] != 5 || counts[1] != 3
+            || merged->primitiveVertexCount(0) != 5
+            || merged->primitiveVertexCount(1) != 3
+            || !std::equal(
+                merged->indexBuffer().begin(),
+                merged->indexBuffer().end(),
+                expected_indices.begin()))
+        {
+            return fail("variable polygon merge did not preserve exact boundaries");
+        }
+
+        try
+        {
+            static_cast<void>(merged->primitiveVertexCount(2));
+            return fail("polygon primitive count query accepted an out-of-range index");
+        }
+        catch (const std::out_of_range&)
+        {
+        }
+
+        merged->reverse();
+        const std::array<houio::Geometry::Index, 8> reversed = {4, 3, 2, 1, 0, 7, 6, 5};
+        if (!std::equal(merged->indexBuffer().begin(), merged->indexBuffer().end(), reversed.begin()))
+            return fail("variable polygon reverse crossed a primitive boundary");
+
+        const houio::Geometry::Ptr compatibility = houio::Geometry::createPolyGeometry();
+        compatibility->addPolygonVertex(0);
+        compatibility->addPolygonVertex(1);
+        compatibility->addPolygonVertex(2);
+        if (compatibility->primitiveCount() != 1
+            || compatibility->verticesPerPrimitive() != 3
+            || compatibility->primitiveVertexCounts().size() != 1
+            || compatibility->primitiveVertexCounts()[0] != 3)
+        {
+            return fail("legacy addPolygonVertex compatibility changed");
+        }
+        compatibility->clear();
+        if (compatibility->primitiveCount() != 0
+            || !compatibility->primitiveVertexCounts().empty()
+            || !compatibility->indexBuffer().empty())
+        {
+            return fail("clearing polygon geometry retained topology metadata");
+        }
+        return 0;
+    }
 }
 
 int main()
@@ -197,5 +290,7 @@ int main()
         return result;
     if (const int result = verifyGeneratorsAndValidation(); result != 0)
         return result;
-    return verifyMergeAndDuplicate();
+    if (const int result = verifyMergeAndDuplicate(); result != 0)
+        return result;
+    return verifyVariablePolygonTopology();
 }

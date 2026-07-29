@@ -60,7 +60,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add installed `HoudiniGeometry` and `SimplifiedMesh` aliases that make model responsibilities explicit without breaking established class names.
 - [x] Add an optional immutable topology view and remove the unconditional topology-vector copy from faithful export.
 - [x] Add an optional immutable primitive-container view and remove the unconditional shared-pointer-vector copy from faithful export.
-- [x] Convert one arbitrary n-gon into the simplified polygon model with structured multi-n-gon rejection.
+- [x] Convert arbitrary n-gons into the simplified polygon model and preserve exact multiple variable-size polygon boundaries.
 - [x] Report open-polygon closure loss explicitly when simplified conversion creates a closed face.
 
 ## Product priorities next
@@ -188,7 +188,7 @@ Priority levels:
 
 - [ ] Preserve point and vertex domains in a lossless mesh representation.
 - [x] Support mixed primitive groups.
-- [ ] Support multiple variable-size polygons by returning multiple simplified meshes or extending the simplified topology model.
+- [x] Support multiple variable-size polygons through exact per-primitive counts in the simplified topology model.
 - [ ] Preserve face-varying attributes without forced point duplication.
 - [x] Add a conversion result that reports splits, losses, and unsupported data.
 

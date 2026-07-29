@@ -374,7 +374,7 @@ int verifyOversizedIntegerPackingRejection()
     return 0;
 }
 
-int verifySingleNgonConversion()
+int verifyPolygonConversion()
 {
     houio::HouGeo::Ptr geometry = houio::HouGeo::create();
     houio::Attribute::Ptr positions = houio::Attribute::createV3f();
@@ -420,24 +420,34 @@ int verifySingleNgonConversion()
 
     houio::HouGeo::Ptr multiple = houio::HouGeo::create();
     houio::Attribute::Ptr multiplePositions = houio::Attribute::createV3f();
-    for (int pointIndex = 0; pointIndex < 10; ++pointIndex)
+    for (int pointIndex = 0; pointIndex < 8; ++pointIndex)
         multiplePositions->appendElement(houio::math::V3f(static_cast<float>(pointIndex), 0.0f, 0.0f));
     multiple->setPointAttribute(
         std::make_shared<houio::HouGeo::HouAttribute>("P", multiplePositions));
     auto multipleTopology = std::make_shared<houio::HouGeo::HouTopology>();
-    multipleTopology->setIndices({0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+    multipleTopology->setIndices({0, 1, 2, 3, 4, 5, 6, 7});
     multiple->setTopology(multipleTopology);
     auto multiplePolygons = std::make_shared<houio::HouGeo::HouPoly>();
     multiplePolygons->setPolygonData(
-        2, {5, 5}, {0, 5}, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, true);
+        2, {5, 3}, {0, 5}, {0, 1, 2, 3, 4, 5, 6, 7}, true);
     multiple->addPrimitive(multiplePolygons);
-    const houio::GeometryConversionResult rejected =
+    const houio::GeometryConversionResult converted =
         houio::HouGeoIO::convertToGeometryResult(multiple, multiplePolygons);
-    if (rejected || rejected.diagnostics.empty()
-        || rejected.diagnostics.back().category != houio::DiagnosticCategory::unsupported_input
-        || rejected.diagnostics.back().path != "conversion.primitive")
+    const std::span<const unsigned int> polygonCounts = converted.value
+        ? converted.value->primitiveVertexCounts() : std::span<const unsigned int>();
+    const std::array<houio::Geometry::Index, 8> expectedIndices = {
+        4, 3, 2, 1, 0, 7, 6, 5};
+    if (!converted
+        || converted.value->primitiveType() != houio::Geometry::PrimitiveType::polygon
+        || converted.value->primitiveCount() != 2
+        || converted.value->verticesPerPrimitive() != 0
+        || polygonCounts.size() != 2 || polygonCounts[0] != 5 || polygonCounts[1] != 3
+        || !std::equal(
+            converted.value->indexBuffer().begin(),
+            converted.value->indexBuffer().end(),
+            expectedIndices.begin()))
     {
-        return fail("multiple n-gons were not rejected explicitly");
+        return fail("variable polygon conversion did not preserve primitive boundaries");
     }
     return 0;
 }
@@ -558,7 +568,7 @@ int main()
     {
         return result;
     }
-    if (const int result = verifySingleNgonConversion(); result != 0)
+    if (const int result = verifyPolygonConversion(); result != 0)
     {
         return result;
     }

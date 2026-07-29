@@ -6,7 +6,9 @@
 
 #include <array>
 #include <filesystem>
+#include <fstream>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #ifndef HOUIO_HAS_ALEMBIC
@@ -35,14 +37,20 @@ namespace
         return false;
     }
 
-    houio::Geometry::Ptr createQuad()
+    houio::Geometry::Ptr createVariablePolygons()
     {
-        houio::Geometry::Ptr geometry = houio::Geometry::createQuadGeometry();
-        geometry->attribute("P")->appendElement(houio::math::V3f(0.0F, 0.0F, 0.0F));
-        geometry->attribute("P")->appendElement(houio::math::V3f(1.0F, 0.0F, 0.0F));
-        geometry->attribute("P")->appendElement(houio::math::V3f(1.0F, 1.0F, 0.0F));
-        geometry->attribute("P")->appendElement(houio::math::V3f(0.0F, 1.0F, 0.0F));
-        geometry->addQuad(0, 1, 2, 3);
+        houio::Geometry::Ptr geometry = houio::Geometry::createPolyGeometry();
+        for (unsigned int point_index = 0; point_index < 8; ++point_index)
+        {
+            geometry->attribute("P")->appendElement(houio::math::V3f(
+                static_cast<float>(point_index),
+                0.0F,
+                0.0F));
+        }
+        const std::array<houio::Geometry::Index, 5> pentagon = {0, 1, 2, 3, 4};
+        const std::array<houio::Geometry::Index, 3> triangle = {5, 6, 7};
+        geometry->addPolygon(pentagon);
+        geometry->addPolygon(triangle);
         return geometry;
     }
 
@@ -70,9 +78,11 @@ namespace
         bool available,
         const std::string& unavailable_message)
     {
-        const std::filesystem::path output = directory / ("quad" + extension);
+        const std::filesystem::path output = directory / ("variable_polygons" + extension);
         std::filesystem::remove(output);
-        const houio::WriteResult result = houio::Writer::write(output, createQuad());
+        const houio::WriteResult result = houio::Writer::write(
+            output,
+            createVariablePolygons());
         if (available)
         {
             if (!result)
@@ -81,6 +91,19 @@ namespace
                 || std::filesystem::file_size(output) == 0U)
             {
                 return fail("Compiled scene writer produced no file for " + extension);
+            }
+            if (extension == ".usda")
+            {
+                std::ifstream input(output);
+                std::ostringstream contents;
+                contents << input.rdbuf();
+                if (!input.good() && !input.eof())
+                    return fail("Compiled USDA writer output could not be read");
+                if (contents.str().find("faceVertexCounts = [5, 3]")
+                    == std::string::npos)
+                {
+                    return fail("Compiled USDA writer flattened variable polygon boundaries");
+                }
             }
         }
         else

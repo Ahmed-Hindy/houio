@@ -377,9 +377,11 @@ namespace houio
 			report->droppedPrimitiveGroups = houGeo->primitiveGroupNames();
 		}
 
-		// The simplified model supports fixed-size primitive sets and one arbitrary n-gon.
+		// The simplified model preserves fixed-size primitive sets and exact polygon boundaries.
 		int numPolys = 0;
 		int numVerticesPerPoly = 0;
+		bool constantPolygonVertexCount = true;
+		std::vector<int> polygonVertexCounts;
 		if( houPrim )
 		{
 			HouGeo::HouPoly::ConstPtr poly =
@@ -392,27 +394,31 @@ namespace houio
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry polygon count cannot be negative", -1, "conversion.primitive"});
 
+			polygonVertexCounts.reserve(static_cast<size_t>(numPolys));
 			size_t observedVertexCount = 0;
 			numVerticesPerPoly = numPolys > 0 ? poly->polygonVertexCount(0) : 0;
 			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
 			{
 				const int polygonVertexCount = poly->polygonVertexCount(polygonIndex);
-				if( polygonVertexCount != numVerticesPerPoly )
-					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
-						"HouGeoIO::convertToGeometry requires a constant polygon vertex count", -1,
-						"conversion.primitive"});
+				if( polygonIndex > 0 && polygonVertexCount != numVerticesPerPoly )
+					constantPolygonVertexCount = false;
 				if( polygonVertexCount < 0 || static_cast<size_t>(polygonVertexCount) > vertexCount - observedVertexCount )
 					throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 						"HouGeoIO::convertToGeometry polygon vertices exceed the vertex domain", -1,
 						"conversion.primitive"});
 				static_cast<void>(poly->polygonVertexIndices(polygonIndex));
+				polygonVertexCounts.push_back(polygonVertexCount);
 				observedVertexCount += static_cast<size_t>(polygonVertexCount);
 			}
 			if( observedVertexCount != vertexCount )
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 					"HouGeoIO::convertToGeometry polygon vertex total does not match vertexcount", -1,
 					"conversion.primitive"});
-			if( numVerticesPerPoly >= 3 && !poly->isClosed() )
+			const bool containsFace = std::any_of(
+				polygonVertexCounts.begin(),
+				polygonVertexCounts.end(),
+				[](int count) { return count >= 3; });
+			if( containsFace && !poly->isClosed() )
 			{
 				if( report )
 					report->polygonClosureLost = true;
@@ -428,28 +434,32 @@ namespace houio
 			result = Geometry::createPointGeometry();
 		}
 		else
-		if( numVerticesPerPoly == 2 )
+		if( constantPolygonVertexCount && numVerticesPerPoly == 2 )
 		{
 			result = Geometry::createLineGeometry();
 		}
 		else
-		if( numVerticesPerPoly == 3 )
+		if( constantPolygonVertexCount && numVerticesPerPoly == 3 )
 		{
 			result = Geometry::createTriangleGeometry();
 		}
 		else
-		if( numVerticesPerPoly == 4 )
+		if( constantPolygonVertexCount && numVerticesPerPoly == 4 )
 		{
 			result = Geometry::createQuadGeometry();
 		}
 		else
-		if( numPolys == 1 && numVerticesPerPoly > 4 )
+		if( numPolys > 0
+			&& std::all_of(
+				polygonVertexCounts.begin(),
+				polygonVertexCounts.end(),
+				[](int count) { return count >= 3; }) )
 		{
 			result = Geometry::createPolyGeometry();
 		}
 		if( !result )
 			throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
-				"HouGeoIO::convertToGeometry supports lines, triangles, quads, or one arbitrary n-gon", -1,
+				"HouGeoIO::convertToGeometry supports uniform lines, triangles, quads, or polygon sets with at least three vertices per face", -1,
 				"conversion.primitive"});
 
 		// attributes ---
@@ -807,17 +817,14 @@ namespace houio
 					vertices.push_back(finalPointIndex);
 				}
 
-				if( polygonVertexCount == 2 )
+				if( result->primitiveType() == Geometry::PrimitiveType::polygon )
+					result->addPolygon(vertices);
+				else if( polygonVertexCount == 2 )
 					result->addLine(vertices[0], vertices[1]);
 				else if( polygonVertexCount == 3 )
 					result->addTriangle(vertices[0], vertices[1], vertices[2]);
 				else if( polygonVertexCount == 4 )
 					result->addQuad(vertices[0], vertices[1], vertices[2], vertices[3]);
-				else if( numPolys == 1 && polygonVertexCount > 4 )
-				{
-					for( const unsigned int vertex : vertices )
-						result->addPolygonVertex(vertex);
-				}
 			}
 
 			// Houdini polygons are clockwise; the convenience geometry expects counter-clockwise order.
@@ -927,20 +934,72 @@ namespace houio
 			}
 			houdiniGeometry->setTopology(topology);
 
-			// The simplified Geometry model uses a fixed vertex count, so all polygons form one run.
 			HouGeo::HouPoly::Ptr polygon_run = std::make_shared<HouGeo::HouPoly>();
-			const int primitive_count = static_cast<int>(geometry->primitiveCount());
-			const int vertices_per_primitive = static_cast<int>(geometry->verticesPerPrimitive());
-			std::vector<int> vertex_offsets(static_cast<size_t>(primitive_count), 0);
-			for (int primitive_index = 1; primitive_index < primitive_count; ++primitive_index)
+			if (geometry->primitiveCount()
+				> static_cast<unsigned int>(std::numeric_limits<int>::max()))
 			{
-				vertex_offsets[static_cast<size_t>(primitive_index)] =
-					vertex_offsets[static_cast<size_t>(primitive_index - 1)]
-					+ vertices_per_primitive;
+				throw std::overflow_error("HouGeoIO::adaptGeometry primitive count exceeds int range");
 			}
-			std::vector<int> vertex_counts(
-				static_cast<size_t>(primitive_count),
-				vertices_per_primitive);
+			const int primitive_count = static_cast<int>(geometry->primitiveCount());
+			std::vector<int> vertex_counts;
+			vertex_counts.reserve(static_cast<size_t>(primitive_count));
+			if (geometry->primitiveType() == Geometry::PrimitiveType::polygon)
+			{
+				const std::span<const unsigned int> polygon_counts =
+					geometry->primitiveVertexCounts();
+				if (polygon_counts.size() != static_cast<size_t>(primitive_count))
+				{
+					throw std::runtime_error(
+						"HouGeoIO::adaptGeometry polygon counts do not match primitive count");
+				}
+				for (const unsigned int vertex_count : polygon_counts)
+				{
+					if (vertex_count == 0
+						|| vertex_count > static_cast<unsigned int>(std::numeric_limits<int>::max()))
+					{
+						throw std::runtime_error(
+							"HouGeoIO::adaptGeometry polygon vertex count is invalid");
+					}
+					vertex_counts.push_back(static_cast<int>(vertex_count));
+				}
+			}
+			else
+			{
+				const unsigned int vertices_per_primitive = geometry->verticesPerPrimitive();
+				if (vertices_per_primitive == 0
+					|| vertices_per_primitive
+						> static_cast<unsigned int>(std::numeric_limits<int>::max()))
+				{
+					throw std::runtime_error(
+						"HouGeoIO::adaptGeometry fixed primitive vertex count is invalid");
+				}
+				vertex_counts.assign(
+					static_cast<size_t>(primitive_count),
+					static_cast<int>(vertices_per_primitive));
+			}
+
+			std::vector<int> vertex_offsets;
+			vertex_offsets.reserve(static_cast<size_t>(primitive_count));
+			size_t observed_vertex_count = 0;
+			for (const int vertex_count : vertex_counts)
+			{
+				if (observed_vertex_count
+					> static_cast<size_t>(std::numeric_limits<int>::max()))
+				{
+					throw std::overflow_error(
+						"HouGeoIO::adaptGeometry polygon offset exceeds int range");
+				}
+				if (static_cast<size_t>(vertex_count)
+					> geometry_indices.size() - observed_vertex_count)
+				{
+					throw std::runtime_error(
+						"HouGeoIO::adaptGeometry topology does not match primitive counts");
+				}
+				vertex_offsets.push_back(static_cast<int>(observed_vertex_count));
+				observed_vertex_count += static_cast<size_t>(vertex_count);
+			}
+			if (observed_vertex_count != geometry_indices.size())
+				throw std::runtime_error("HouGeoIO::adaptGeometry topology contains trailing vertices");
 
 			if (geometry_indices.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
 				throw std::overflow_error("HouGeoIO::adaptGeometry index buffer exceeds int range");
