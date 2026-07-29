@@ -39,7 +39,10 @@ def create_source() -> hou.Geometry:
         second.addVertex(points[point_index])
 
     mask = geometry.addAttrib(hou.attribType.Point, "mask", 0)
-    for point, value in zip(points, (10, 20, 30, 40)):
+    point_values = (10, 20, 30, 40)
+    if len(points) != len(point_values):
+        raise AssertionError("Point fixture values do not match the point count")
+    for point, value in zip(points, point_values):
         point.setAttribValue(mask, value)
 
     uv = geometry.addAttrib(hou.attribType.Vertex, "uv", (0.0, 0.0))
@@ -52,9 +55,10 @@ def create_source() -> hou.Geometry:
         (1.0, 1.0),
         (0.0, 1.0),
     )
-    for vertex, value in zip(
-        tuple(first.vertices()) + tuple(second.vertices()), uv_values
-    ):
+    vertices = tuple(first.vertices()) + tuple(second.vertices())
+    if len(vertices) != len(uv_values):
+        raise AssertionError("UV fixture values do not match the vertex count")
+    for vertex, value in zip(vertices, uv_values):
         vertex.setAttribValue(uv, value)
         vertex.setAttribValue(normal, (0.0, 0.0, 1.0))
 
@@ -151,9 +155,13 @@ def main() -> None:
     output_path = output_directory / "houio_simplified.bgeo"
     create_source().saveToFile(str(source_path))
 
-    executable = Path(
-        os.environ["HOUIO_SIMPLIFIED_ROUNDTRIP_EXECUTABLE"]
-    ).resolve()
+    executable_path = os.environ.get("HOUIO_SIMPLIFIED_ROUNDTRIP_EXECUTABLE")
+    if not executable_path:
+        raise RuntimeError(
+            "HOUIO_SIMPLIFIED_ROUNDTRIP_EXECUTABLE must point at "
+            "houio_roundtrip_simplified_geometry"
+        )
+    executable = Path(executable_path).resolve()
     completed = subprocess.run(
         [str(executable), str(source_path), str(output_path)],
         check=False,

@@ -104,7 +104,8 @@ Unsupported recognized input should produce an `unsupported_input` diagnostic ra
 
 Use `HouGeo` (`HoudiniGeometry`) or `HouGeoAdapter` when Houdini domain fidelity matters. The simplified `Geometry` (`SimplifiedMesh`) type is render-oriented and has different guarantees. The aliases are provided by `<houio/GeometryModels.h>` and do not replace the established class names:
 
-- Supported numeric point, vertex, primitive, and global domains remain independent; vertex discontinuities do not duplicate points.
+- Supported numeric point, vertex, and global domains remain independent; vertex discontinuities do not duplicate points.
+- Numeric primitive attributes are preserved only when the selected primitive run covers the complete source primitive domain; partial mappings are skipped and reported.
 - `attribute()` remains a compatibility alias for the point domain, while explicit domain accessors expose the complete simplified attribute model.
 - Strings, dictionaries, groups, and mixed primitive families are not silently collapsed into one mesh.
 - Multiple variable-size polygon faces preserve exact per-primitive vertex counts in one `SimplifiedMesh`; `verticesPerPrimitive()` returns zero when those counts differ, and `primitiveVertexCounts()` exposes the exact boundaries.

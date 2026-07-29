@@ -186,7 +186,7 @@ Priority levels:
 
 ### Geometry
 
-- [x] Preserve numeric point, vertex, primitive, and global domains in the simplified mesh representation.
+- [x] Preserve numeric point, vertex, and global domains in the simplified mesh representation; preserve primitive attributes when the selected run covers the complete primitive domain and report partial mappings.
 - [x] Support mixed primitive groups.
 - [x] Support multiple variable-size polygons through exact per-primitive counts in the simplified topology model.
 - [x] Preserve face-varying numeric attributes without forced point duplication.

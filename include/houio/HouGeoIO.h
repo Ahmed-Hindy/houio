@@ -72,9 +72,12 @@ namespace houio
 
         static void makeLog(const std::string& path, std::ostream& output);
 
-        // Lossy convenience conversion. Requires P, one fixed polygon size,
-        // and domain-consistent attributes. Vertex attributes are flattened to
-        // points by duplicating points where values differ.
+        // Convenience conversion. Requires P, one supported polygon run, and
+        // domain-consistent attributes. Supported numeric point, vertex,
+        // primitive, and global domains are preserved directly; vertex data is
+        // not flattened onto duplicated points. Primitive attributes require the
+        // selected run to cover the complete primitive domain. Unsupported or
+        // partial domains are skipped and reported.
         [[nodiscard]] static Geometry::Ptr convertToGeometry(
             HouGeo::ConstPtr houdini_geometry,
             HouGeoAdapter::Primitive::ConstPtr primitive);
