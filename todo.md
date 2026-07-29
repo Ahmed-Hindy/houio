@@ -89,7 +89,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Add a primary **Write Selected Geometry** shelf action and retain diagnostics/conversion tools.
 - [x] Add the first native HDK **HouIO Geometry** ROP vertical slice for polygon sequence export.
 - [x] Move animated Alembic and USD archive ownership into HouIO's public writer API and C ABI; keep the HDK plugin as a geometry-adapter consumer.
-- [x] Build, validate, and package pinned upstream Alembic, OpenUSD, Imath, and oneTBB dependencies for standalone HouIO releases without redistributing SideFX binaries.
+- [x] Build, validate, and package pinned upstream Alembic, OpenUSD, Imath, and oneTBB dependencies for private HouIO evaluation without redistributing SideFX binaries.
 - [x] Document the first successful custom-write workflow before advanced internals.
 
 ### Data-type expansion after the product surface
@@ -131,11 +131,11 @@ Priority levels:
 
 ### Licensing and provenance
 
-- [ ] Establish a project-wide license before distributing source or binaries.
-- [ ] Document the license and provenance of code under `include/ttl/`.
-- [ ] Document the license and provenance of the half-float implementation.
-- [ ] Add the required notices to source and binary distributions.
-- [ ] Do not publish releases until these items are complete.
+- [ ] Obtain written upstream permission or another legal basis for a project-wide license before distributing source or binaries.
+- [x] Remove the retired `include/ttl/` tree and document its historical provenance.
+- [x] Remove the retired ILM/OpenEXR half tree and retain its BSD notice for the active replacement.
+- [x] Add legal-status, provenance, and third-party notices to generated packages.
+- [x] Keep CI package validation non-publishing until the upstream license blocker is resolved.
 
 ## P1 — Maintained baseline
 

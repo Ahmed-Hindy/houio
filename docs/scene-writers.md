@@ -67,11 +67,11 @@ Configure `HOUIO_SCENE_IO_PROVIDER` with one of:
 | `disabled` | Dependency-free development and CI build. Scene APIs remain present and return explicit unavailable-backend diagnostics. |
 | `houdini` | Temporary integration validation against the matching Houdini SDK. This provider must not be used for HouIO release redistribution. |
 | `system` | Build against externally installed upstream Alembic and OpenUSD CMake packages. |
-| `bundled` | Release build against HouIO's pinned dependency prefix supplied through `HOUIO_BUNDLED_SCENE_IO_ROOT`. |
+| `bundled` | Private-evaluation and future release-candidate build against HouIO's pinned dependency prefix supplied through `HOUIO_BUNDLED_SCENE_IO_ROOT`. |
 
-The bundled provider is the intended release configuration. It packages upstream Alembic/OpenUSD outputs and their notices; it does not copy or redistribute SideFX libraries.
+The bundled provider is the intended private-evaluation and future release-candidate configuration. It packages upstream Alembic/OpenUSD outputs and their notices; it does not copy or redistribute SideFX libraries. Public HouIO redistribution remains blocked by the project-wide license status documented in `LICENSE_STATUS.md`.
 
-## Bundled release build
+## Bundled private-evaluation build
 
 Pinned versions are maintained in `cmake/scene-io-versions.cmake`. The Windows dependency builder downloads and compiles:
 

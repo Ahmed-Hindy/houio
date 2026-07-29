@@ -47,6 +47,18 @@ set(bootstrap_directory "${HOUIO_HOUDINI_BOOTSTRAP_EXTRACT_DIR}/bootstrap")
 if(NOT EXISTS "${bootstrap_script}")
     message(FATAL_ERROR "Bootstrap script is missing from the package archive")
 endif()
+foreach(required_legal_file IN ITEMS
+    "houio/legal/LICENSE_STATUS.md"
+    "houio/legal/THIRD_PARTY_NOTICES.md"
+    "houio/legal/docs/provenance.md"
+)
+    set(required_legal_path
+        "${HOUIO_HOUDINI_BOOTSTRAP_EXTRACT_DIR}/${required_legal_file}")
+    if(NOT EXISTS "${required_legal_path}")
+        message(FATAL_ERROR
+            "Legal-status document is missing from the Houdini package: ${required_legal_file}")
+    endif()
+endforeach()
 
 set(existing_bootstrap_directory "${HOUIO_HOUDINI_BOOTSTRAP_EXTRACT_DIR}/existing-bootstrap")
 set(existing_bootstrap_sentinel "${existing_bootstrap_directory}/sentinel.txt")

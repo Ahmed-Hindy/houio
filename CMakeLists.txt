@@ -306,7 +306,6 @@ install(
 install(
     DIRECTORY include/houio
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    PATTERN "math/Half" EXCLUDE
 )
 install(
     DIRECTORY python/houio_hom
@@ -317,6 +316,16 @@ install(
 install(
     FILES tools/houdini/install_hom_bridge.ps1
     DESTINATION ${CMAKE_INSTALL_DATADIR}/houio/houdini
+)
+install(
+    FILES
+        LICENSE_STATUS.md
+        THIRD_PARTY_NOTICES.md
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/houio/legal
+)
+install(
+    FILES docs/provenance.md
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/houio/legal/docs
 )
 
 if(HOUIO_EFFECTIVE_SCENE_IO_PROVIDER STREQUAL "bundled")

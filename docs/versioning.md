@@ -1,6 +1,6 @@
 # Versioning and release policy
 
-HouIO currently uses development version identifiers for builds and package archives, but it is not ready for public redistribution. A project-wide license, third-party provenance review, and required notices must be completed before publishing source or binary releases.
+HouIO currently uses development version identifiers for private evaluation builds and package archives, but it is not ready for public redistribution. The parent HouIO repository and imported history contain no project-wide license grant. Public release therefore requires written permission from the relevant upstream copyright holders or a documented independently licensable replacement of upstream-derived implementation. See [Source provenance and release status](provenance.md).
 
 The existing `0.x` package version is a development identifier. It does not override the redistribution warning and does not imply that a supported public release has occurred.
 
@@ -63,12 +63,14 @@ A newer production build in the same Houdini line may work but is not considered
 
 A public release must not be created until all of the following are satisfied:
 
-- Project-wide license is present.
-- TTL and half-float provenance is documented.
-- Required source and binary notices are included.
+- Written upstream permission or an equivalent legal basis is documented.
+- A project-wide license covering the complete combined work is present.
+- Retired TTL code is absent and half-float provenance is documented.
+- Required source, binary, and legal-status notices are included.
 - Strict, sanitizer, static-analysis, fuzzing, package, and Houdini compatibility checks are green.
 - Release notes identify support additions, fixes, breaks, and known limitations.
 - Binary artifacts include checksums and build provenance.
+- CI release jobs are explicitly enabled only after the redistribution blocker is resolved.
 - The version and Git tag match the packaged metadata.
 
 ## Change log expectations

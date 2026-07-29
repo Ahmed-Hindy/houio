@@ -1,4 +1,4 @@
-"""Validate the distributable HouIO package inside Houdini."""
+"""Validate the private-evaluation HouIO package inside Houdini."""
 
 from __future__ import annotations
 
@@ -27,6 +27,19 @@ def validate_environment() -> None:
         raise AssertionError(f"Missing converter: {converter_path}")
     if not blosc_path.is_file():
         raise AssertionError(f"Missing Blosc runtime: {blosc_path}")
+
+    required_legal_paths = (
+        package_root / "legal" / "LICENSE_STATUS.md",
+        package_root / "legal" / "THIRD_PARTY_NOTICES.md",
+        package_root / "legal" / "docs" / "provenance.md",
+    )
+    for legal_path in required_legal_paths:
+        if not legal_path.is_file():
+            raise AssertionError(f"Missing package legal-status document: {legal_path}")
+    license_status = required_legal_paths[0].read_text(encoding="utf-8")
+    if "does not currently provide a project-wide license grant" not in license_status:
+        raise AssertionError("Package license status no longer contains the release blocker")
+
     if package_root not in Path(houio_hom.__file__).resolve().parents:
         raise AssertionError("houio_hom was not imported from the package")
     if package_root not in Path(houio_tools.__file__).resolve().parents:

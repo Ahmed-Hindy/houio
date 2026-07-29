@@ -3,26 +3,57 @@ name: Bundled scene IO
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "v*"
+    branches:
+      - master
+    paths:
+      - ".github/workflows/bundled-scene-io.yml"
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - "LICENSE_STATUS.md"
+      - "THIRD_PARTY_NOTICES.md"
+      - "cmake/houio-config.cmake.in"
+      - "cmake/houio-scene-io.cmake"
+      - "cmake/scene-io-versions.cmake"
+      - "docs/provenance.md"
+      - "include/houio/SceneArchive.h"
+      - "src/SceneArchive.cpp"
+      - "src/Writer.cpp"
+      - "tests/CMakeLists.txt"
+      - "tests/check_release_policy.cmake"
+      - "tests/data/scene_writer_manifest.json"
+      - "tests/install_bundled_package.cmake"
+      - "tests/run_houdini_bootstrap_test.cmake"
+      - "tests/run_package_consumer.cmake"
+      - "tests/test_scene_writer.cpp"
+      - "tools/dependencies/build_scene_io.ps1"
+      - "tools/dependencies/validate_bundled_scene_io.ps1"
+      - "tools/houdini/build_houdini_package.py"
+      - "tools/houdini/test_houdini_package.py"
   pull_request:
     paths:
       - ".github/workflows/bundled-scene-io.yml"
       - "CMakeLists.txt"
       - "CMakePresets.json"
+      - "LICENSE_STATUS.md"
+      - "THIRD_PARTY_NOTICES.md"
       - "cmake/houio-config.cmake.in"
       - "cmake/houio-scene-io.cmake"
       - "cmake/scene-io-versions.cmake"
+      - "docs/provenance.md"
       - "include/houio/SceneArchive.h"
       - "src/SceneArchive.cpp"
       - "src/Writer.cpp"
       - "tests/CMakeLists.txt"
+      - "tests/check_release_policy.cmake"
       - "tests/data/scene_writer_manifest.json"
       - "tests/install_bundled_package.cmake"
+      - "tests/run_houdini_bootstrap_test.cmake"
       - "tests/run_package_consumer.cmake"
       - "tests/test_scene_writer.cpp"
       - "tools/dependencies/build_scene_io.ps1"
       - "tools/dependencies/validate_bundled_scene_io.ps1"
+      - "tools/houdini/build_houdini_package.py"
+      - "tools/houdini/test_houdini_package.py"
 
 permissions:
   contents: read
@@ -127,12 +158,3 @@ jobs:
             -PackageRoot $packageRoot `
             -ManifestPath .\tests\data\scene_writer_manifest.json `
             -WorkDirectory (Join-Path $env:RUNNER_TEMP "houio-scene-validation")
-
-      - name: Upload portable package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: houio-bundled-scene-io-windows-x86_64
-          path: |
-            build/windows-msvc-release-bundled/houio-*-windows-x86_64.zip
-            build/windows-msvc-release-bundled/houio-*-windows-x86_64.zip.sha256
-          if-no-files-found: error

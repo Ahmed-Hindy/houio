@@ -152,6 +152,35 @@ function Read-And-ValidateDependencyMetadata(
     }
 }
 
+function Read-And-ValidateProjectLegalMetadata(
+    [Parameter(Mandatory)]
+    [string]$Root
+) {
+    $legalRoot = Join-Path $Root "share\houio\legal"
+    $requiredLegalFiles = @(
+        "LICENSE_STATUS.md",
+        "THIRD_PARTY_NOTICES.md",
+        "docs\provenance.md"
+    )
+    foreach ($legalFile in $requiredLegalFiles) {
+        $path = Join-Path $legalRoot $legalFile
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Required HouIO legal-status document is missing: $path"
+        }
+    }
+
+    $licenseStatus = Get-Content -LiteralPath (Join-Path $legalRoot "LICENSE_STATUS.md") -Raw
+    if ($licenseStatus -notmatch "does not currently provide a project-wide license grant") {
+        throw "Packaged license status does not contain the expected redistribution warning"
+    }
+
+    return [ordered]@{
+        directory = $legalRoot
+        files = $requiredLegalFiles
+        redistribution_status = "blocked_pending_upstream_permission"
+    }
+}
+
 function Assert-NoSideFxImports(
     [Parameter(Mandatory)]
     [string]$Root
@@ -258,6 +287,7 @@ try {
     }
 
     $dependencyMetadata = Read-And-ValidateDependencyMetadata $PackageRoot
+    $projectLegalMetadata = Read-And-ValidateProjectLegalMetadata $PackageRoot
     Assert-NoSideFxImports $PackageRoot
 
     [ordered]@{
@@ -272,6 +302,7 @@ try {
         fixture = $fixture
         outputs = $outputs
         dependency_metadata = $dependencyMetadata
+        project_legal_metadata = $projectLegalMetadata
         sidefx_import_audit = "passed"
         runtime_hash_audit = "passed"
     } | ConvertTo-Json -Depth 6
