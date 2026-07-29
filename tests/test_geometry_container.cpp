@@ -191,6 +191,91 @@ namespace
         return 0;
     }
 
+    int verifyAttributeDomains()
+    {
+        const auto makeTriangle = [](float x_offset, houio::sint32 primitive_id) {
+            const houio::Geometry::Ptr geometry = houio::Geometry::createTriangleGeometry();
+            const houio::Attribute::Ptr positions = geometry->pointAttribute("P");
+            positions->appendElement(houio::math::V3f(x_offset, 0.0f, 0.0f));
+            positions->appendElement(houio::math::V3f(x_offset + 1.0f, 0.0f, 0.0f));
+            positions->appendElement(houio::math::V3f(x_offset, 1.0f, 0.0f));
+            geometry->addTriangle(0, 1, 2);
+
+            const houio::Attribute::Ptr uv = houio::Attribute::createV2f();
+            uv->appendElement(houio::math::V2f(0.0f, 0.0f));
+            uv->appendElement(houio::math::V2f(1.0f, 0.0f));
+            uv->appendElement(houio::math::V2f(0.0f, 1.0f));
+            geometry->setVertexAttribute("UV", uv);
+
+            const houio::Attribute::Ptr primitive_ids = houio::Attribute::createInt();
+            primitive_ids->appendElement<houio::sint32>(primitive_id);
+            geometry->setPrimitiveAttribute("id", primitive_ids);
+
+            const houio::Attribute::Ptr scale = houio::Attribute::createFloat();
+            scale->appendElement(2.5f);
+            geometry->setGlobalAttribute("scale", scale);
+            return geometry;
+        };
+
+        const houio::Geometry::Ptr first = makeTriangle(0.0f, 7);
+        const houio::Geometry::Ptr second = makeTriangle(2.0f, 9);
+        first->reverse();
+        const houio::Attribute::Ptr reversed_uv = first->vertexAttribute("UV");
+        if (!reversed_uv
+            || reversed_uv->get<houio::math::V2f>(0) != houio::math::V2f(0.0f, 1.0f)
+            || reversed_uv->get<houio::math::V2f>(1) != houio::math::V2f(1.0f, 0.0f)
+            || reversed_uv->get<houio::math::V2f>(2) != houio::math::V2f(0.0f, 0.0f)
+            || first->primitiveAttribute("id")->get<houio::sint32>(0) != 7
+            || first->globalAttribute("scale")->get<houio::real32>(0) != 2.5f)
+        {
+            return fail("domain-aware reverse did not keep vertex data aligned with topology");
+        }
+
+        const houio::Geometry::Index duplicate = first->duplicatePoint(1);
+        if (duplicate != 3 || first->pointAttribute("P")->numElements() != 4
+            || first->vertexAttribute("UV")->numElements() != 3
+            || first->primitiveAttribute("id")->numElements() != 1
+            || first->globalAttribute("scale")->numElements() != 1)
+        {
+            return fail("point duplication changed a non-point attribute domain");
+        }
+
+        const houio::Geometry::Ptr merged = houio::Geometry::merge({first, second});
+        const houio::Attribute::Ptr merged_uv = merged ? merged->vertexAttribute("UV") : nullptr;
+        const houio::Attribute::Ptr merged_ids = merged ? merged->primitiveAttribute("id") : nullptr;
+        const houio::Attribute::Ptr merged_scale = merged ? merged->globalAttribute("scale") : nullptr;
+        if (!merged || merged->pointAttribute("P")->numElements() != 7
+            || merged->indexBuffer().size() != 6 || !merged_uv || merged_uv->numElements() != 6
+            || !merged_ids || merged_ids->numElements() != 2
+            || merged_ids->get<houio::sint32>(0) != 7
+            || merged_ids->get<houio::sint32>(1) != 9
+            || !merged_scale || merged_scale->numElements() != 1
+            || merged_scale->get<houio::real32>(0) != 2.5f)
+        {
+            return fail("domain-aware merge did not preserve all attribute domains");
+        }
+
+        const houio::Geometry::Ptr incompatible = makeTriangle(4.0f, 11);
+        incompatible->globalAttribute("scale")->set<houio::real32>(0, 3.0f);
+        try
+        {
+            static_cast<void>(houio::Geometry::merge({second, incompatible}));
+            return fail("geometry merge accepted conflicting global attribute values");
+        }
+        catch (const std::invalid_argument&)
+        {
+        }
+
+        merged->clear();
+        if (!merged->pointAttributes().empty() || !merged->vertexAttributes().empty()
+            || !merged->primitiveAttributes().empty() || !merged->globalAttributes().empty()
+            || !merged->indexBuffer().empty() || merged->primitiveCount() != 0)
+        {
+            return fail("Geometry::clear retained an attribute domain");
+        }
+        return 0;
+    }
+
     int verifyVariablePolygonTopology()
     {
         const houio::Geometry::Ptr pentagon = houio::Geometry::createPolyGeometry();
@@ -291,6 +376,8 @@ int main()
     if (const int result = verifyGeneratorsAndValidation(); result != 0)
         return result;
     if (const int result = verifyMergeAndDuplicate(); result != 0)
+        return result;
+    if (const int result = verifyAttributeDomains(); result != 0)
         return result;
     return verifyVariablePolygonTopology();
 }

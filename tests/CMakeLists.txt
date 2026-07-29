@@ -321,6 +321,10 @@ add_executable(houio_roundtrip_geometry roundtrip_geometry.cpp)
 target_link_libraries(houio_roundtrip_geometry PRIVATE houio::houio)
 target_compile_features(houio_roundtrip_geometry PRIVATE cxx_std_20)
 
+add_executable(houio_roundtrip_simplified_geometry roundtrip_simplified_geometry.cpp)
+target_link_libraries(houio_roundtrip_simplified_geometry PRIVATE houio::houio)
+target_compile_features(houio_roundtrip_simplified_geometry PRIVATE cxx_std_20)
+
 add_executable(houio_inspect_json inspect_json.cpp)
 target_link_libraries(houio_inspect_json PRIVATE houio::houio)
 target_compile_features(houio_inspect_json PRIVATE cxx_std_20)
@@ -417,6 +421,22 @@ if(HOUIO_HYTHON_EXECUTABLE)
             PROPERTIES
                 ENVIRONMENT "HOUIO_EXECUTABLE=$<TARGET_FILE:houio_cli>"
                 ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
+        )
+    endif()
+
+    if(TARGET houio_roundtrip_simplified_geometry)
+        add_test(
+            NAME houio.houdini_simplified_domains
+            COMMAND
+                "${HOUIO_HYTHON_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tools/houdini/test_simplified_domains.py"
+                "${CMAKE_CURRENT_BINARY_DIR}/houdini_simplified_domains"
+        )
+        set_tests_properties(
+            houio.houdini_simplified_domains
+            PROPERTIES
+                ENVIRONMENT
+                    "HOUIO_SIMPLIFIED_ROUNDTRIP_EXECUTABLE=$<TARGET_FILE:houio_roundtrip_simplified_geometry>"
         )
     endif()
 

@@ -46,16 +46,71 @@ namespace houio
 
         [[nodiscard]] math::BoundingBox3f bounds() const;
 
+        /// Compatibility alias for pointAttribute().
         [[nodiscard]] Attribute::Ptr attribute(const std::string& name);
+        /// Compatibility alias for pointAttribute().
         [[nodiscard]] Attribute::CPtr attribute(const std::string& name) const;
+        /// Compatibility alias for setPointAttribute().
         void setAttribute(const std::string& name, Attribute::Ptr attribute);
+        /// Compatibility alias for hasPointAttribute().
         [[nodiscard]] bool hasAttribute(const std::string& name) const;
+        /// Compatibility alias for pointAttributeNames().
         [[nodiscard]] std::vector<std::string> attributeNames() const;
+        /// Compatibility alias for removePointAttribute().
         void removeAttribute(const std::string& name);
 
+        [[nodiscard]] Attribute::Ptr pointAttribute(const std::string& name);
+        [[nodiscard]] Attribute::CPtr pointAttribute(const std::string& name) const;
+        void setPointAttribute(const std::string& name, Attribute::Ptr attribute);
+        [[nodiscard]] bool hasPointAttribute(const std::string& name) const;
+        [[nodiscard]] std::vector<std::string> pointAttributeNames() const;
+        void removePointAttribute(const std::string& name);
+
+        [[nodiscard]] Attribute::Ptr vertexAttribute(const std::string& name);
+        [[nodiscard]] Attribute::CPtr vertexAttribute(const std::string& name) const;
+        void setVertexAttribute(const std::string& name, Attribute::Ptr attribute);
+        [[nodiscard]] bool hasVertexAttribute(const std::string& name) const;
+        [[nodiscard]] std::vector<std::string> vertexAttributeNames() const;
+        void removeVertexAttribute(const std::string& name);
+
+        [[nodiscard]] Attribute::Ptr primitiveAttribute(const std::string& name);
+        [[nodiscard]] Attribute::CPtr primitiveAttribute(const std::string& name) const;
+        void setPrimitiveAttribute(const std::string& name, Attribute::Ptr attribute);
+        [[nodiscard]] bool hasPrimitiveAttribute(const std::string& name) const;
+        [[nodiscard]] std::vector<std::string> primitiveAttributeNames() const;
+        void removePrimitiveAttribute(const std::string& name);
+
+        [[nodiscard]] Attribute::Ptr globalAttribute(const std::string& name);
+        [[nodiscard]] Attribute::CPtr globalAttribute(const std::string& name) const;
+        void setGlobalAttribute(const std::string& name, Attribute::Ptr attribute);
+        [[nodiscard]] bool hasGlobalAttribute(const std::string& name) const;
+        [[nodiscard]] std::vector<std::string> globalAttributeNames() const;
+        void removeGlobalAttribute(const std::string& name);
+
+        /// Compatibility view of point attributes.
         [[nodiscard]] const AttributeMap& attributes() const noexcept
         {
-            return attributes_;
+            return point_attributes_;
+        }
+
+        [[nodiscard]] const AttributeMap& pointAttributes() const noexcept
+        {
+            return point_attributes_;
+        }
+
+        [[nodiscard]] const AttributeMap& vertexAttributes() const noexcept
+        {
+            return vertex_attributes_;
+        }
+
+        [[nodiscard]] const AttributeMap& primitiveAttributes() const noexcept
+        {
+            return primitive_attributes_;
+        }
+
+        [[nodiscard]] const AttributeMap& globalAttributes() const noexcept
+        {
+            return global_attributes_;
         }
 
         [[nodiscard]] PrimitiveType primitiveType() const noexcept
@@ -144,7 +199,10 @@ namespace houio
         [[nodiscard]] unsigned int commonPolygonVertexCount() const noexcept;
         void appendFixedPrimitive(std::span<const Index> point_indices);
 
-        AttributeMap attributes_;
+        AttributeMap point_attributes_;
+        AttributeMap vertex_attributes_;
+        AttributeMap primitive_attributes_;
+        AttributeMap global_attributes_;
         PrimitiveType primitive_type_;
         std::vector<Index> indices_;
         std::vector<unsigned int> primitive_vertex_counts_;

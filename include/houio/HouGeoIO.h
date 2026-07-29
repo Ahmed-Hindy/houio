@@ -19,6 +19,8 @@ namespace houio
     {
         std::size_t sourcePointCount = 0;
         std::size_t outputPointCount = 0;
+        // Retained for API compatibility. Supported numeric vertex domains no
+        // longer require point splitting, so maintained conversions leave both zero.
         std::size_t splitSourcePointCount = 0;
         std::size_t duplicatedPointCount = 0;
         bool windingReversed = false;

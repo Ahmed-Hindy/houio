@@ -50,7 +50,7 @@ HouIO currently supports:
 - Exact live-HOM extraction of scalar Float VDBs whose active topology is fully observable
 - SCF compression through C-Blosc
 
-The simplified `Geometry` API is intentionally render-oriented and may split points at vertex-attribute discontinuities. It supports fixed-size point, line, triangle, and quad sets plus multiple variable-size polygon faces with exact primitive boundaries. Use `HouGeo` and `HouGeoAdapter` when point/vertex-domain identity or mixed primitive-family fidelity matters.
+The simplified `Geometry` API is intentionally render-oriented. It preserves supported numeric point, vertex, primitive, and global attributes without duplicating points at vertex-attribute discontinuities. It supports fixed-size point, line, triangle, and quad sets plus multiple variable-size polygon faces with exact primitive boundaries. Existing `attribute()` calls remain point-domain aliases; domain-specific callers can use `pointAttribute()`, `vertexAttribute()`, `primitiveAttribute()`, and `globalAttribute()`. Use `HouGeo` and `HouGeoAdapter` when strings, dictionaries, groups, mixed primitive families, or full Houdini metadata are required.
 
 `<houio/GeometryModels.h>` provides intention-revealing, non-breaking aliases: `HoudiniGeometry` for the supported Houdini-oriented model and `SimplifiedMesh` for the render-oriented convenience model.
 
@@ -137,7 +137,7 @@ if (!result)
 houio::Geometry::Ptr mesh = result.value;
 ```
 
-For explicit split and loss reporting, convert one Houdini-oriented primitive directly:
+For explicit conversion and loss reporting, convert one Houdini-oriented primitive directly:
 
 ```cpp
 const auto source = houio::GeometryIO::readHouGeo("mesh.bgeo");
@@ -155,10 +155,11 @@ if (!conversion)
 }
 
 houio::Geometry::Ptr mesh = conversion.value;
-const std::size_t duplicated_points = conversion.report.duplicatedPointCount;
+houio::Attribute::Ptr uv = mesh->vertexAttribute("UV");
+houio::Attribute::Ptr primitive_id = mesh->primitiveAttribute("id");
 ```
 
-The report also lists skipped point, vertex, primitive, and global attributes; dropped groups; source/output point counts; split source points; winding reversal; and closure loss when an open Houdini polygon becomes a closed simplified face.
+The report lists unsupported or skipped point, vertex, primitive, and global attributes; dropped groups; source/output point counts; winding reversal; and closure loss when an open Houdini polygon becomes a closed simplified face. The legacy split/duplicate counters remain for API compatibility and stay zero for supported numeric vertex domains.
 
 ### Read all dense scalar volumes
 

@@ -367,20 +367,29 @@ int verifyGeometry(const houio::HouGeo::ConstPtr& geometry, int expectedPosition
         return fail("failed to convert modern geometry to the simplified mesh model");
     }
 
-    houio::Attribute::Ptr convertedPositions = converted->attribute("P");
-    houio::Attribute::Ptr convertedUv = converted->attribute("UV");
+    houio::Attribute::Ptr convertedPositions = converted->pointAttribute("P");
+    houio::Attribute::Ptr convertedUv = converted->vertexAttribute("UV");
+    houio::Attribute::Ptr convertedNormals = converted->vertexAttribute("N");
     if (!convertedPositions || convertedPositions->numElements() != 4 || !convertedUv
-        || convertedUv->numElements() != 4)
+        || convertedUv->numElements() != 4 || !convertedNormals
+        || convertedNormals->numElements() != 4
+        || converted->hasPointAttribute("UV"))
     {
-        return fail("simplified mesh conversion lost P or UV elements");
+        return fail("simplified mesh conversion did not preserve point and vertex domains");
     }
 
+    const std::span<const houio::Geometry::Index> convertedIndices = converted->indexBuffer();
+    if (convertedIndices.size() != 4 || convertedIndices[0] != 3 || convertedIndices[1] != 2
+        || convertedIndices[2] != 1 || convertedIndices[3] != 0)
+    {
+        return fail("simplified mesh conversion did not reverse polygon winding");
+    }
     const houio::math::V3f convertedPosition = convertedPositions->get<houio::math::V3f>(2);
-    const houio::math::V2f convertedUvValue = convertedUv->get<houio::math::V2f>(2);
+    const houio::math::V2f convertedUvValue = convertedUv->get<houio::math::V2f>(1);
     if (convertedPosition.x != 1.0f || convertedPosition.y != 1.0f
         || convertedUvValue.x != 1.0f || convertedUvValue.y != 1.0f)
     {
-        return fail("simplified mesh conversion used an incorrect tuple stride");
+        return fail("simplified mesh conversion used an incorrect domain stride");
     }
 
     return 0;

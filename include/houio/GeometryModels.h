@@ -9,7 +9,9 @@ namespace houio
     /// global, group, topology, and primitive-record domains.
     using HoudiniGeometry = HouGeo;
 
-    /// Render-oriented convenience mesh. Conversion from HoudiniGeometry may
-    /// split points and omit domains that this simplified model cannot express.
+    /// Render-oriented convenience mesh preserving supported numeric point,
+    /// vertex, primitive, and global domains for one polygon primitive family.
+    /// Strings, dictionaries, groups, and mixed primitive families remain on
+    /// the Houdini-oriented model.
     using SimplifiedMesh = Geometry;
 }

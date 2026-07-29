@@ -99,15 +99,87 @@ namespace houio
 			return raw_data;
 		}
 
-		size_t attributeElementBytes( const Attribute::Ptr &attribute )
+		Attribute::Ptr copyNumericAttribute(
+			const HouGeoAdapter::AttributeAdapter::ConstPtr& source,
+			const std::string& path)
 		{
-			if( !attribute || attribute->numComponents() <= 0 || attribute->elementComponentSize() <= 0 )
-				throw std::runtime_error( "Converted attribute has invalid component metadata" );
-			const size_t componentCount = static_cast<size_t>(attribute->numComponents());
-			const size_t componentBytes = static_cast<size_t>(attribute->elementComponentSize());
-			if( componentCount > std::numeric_limits<size_t>::max() / componentBytes )
-				throw std::length_error( "Converted attribute element size overflow" );
-			return componentCount * componentBytes;
+			if (!source || source->type() != HouGeoAdapter::AttributeAdapter::Type::numeric)
+				throw std::invalid_argument("copyNumericAttribute requires a numeric attribute");
+			const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(source, path);
+			Attribute::ComponentType component_type = Attribute::ComponentType::invalid;
+			switch (source->storage())
+			{
+			case HouGeoAdapter::AttributeAdapter::Storage::uint8:
+				component_type = Attribute::ComponentType::uint8;
+				break;
+			case HouGeoAdapter::AttributeAdapter::Storage::float16:
+				component_type = Attribute::ComponentType::float16;
+				break;
+			case HouGeoAdapter::AttributeAdapter::Storage::float32:
+				component_type = Attribute::ComponentType::float32;
+				break;
+			case HouGeoAdapter::AttributeAdapter::Storage::float64:
+				component_type = Attribute::ComponentType::float64;
+				break;
+			case HouGeoAdapter::AttributeAdapter::Storage::int32:
+				component_type = Attribute::ComponentType::int32;
+				break;
+			case HouGeoAdapter::AttributeAdapter::Storage::int64:
+				component_type = Attribute::ComponentType::int64;
+				break;
+			case HouGeoAdapter::AttributeAdapter::Storage::invalid:
+				return nullptr;
+			}
+			return Attribute::create(
+				source->tupleSize().value(),
+				component_type,
+				raw_data.bytes(),
+				source->elementCount());
+		}
+
+		std::vector<size_t> houdiniVertexOrder(const Geometry& geometry)
+		{
+			const std::span<const Geometry::Index> indices = geometry.indexBuffer();
+			std::vector<size_t> order;
+			order.reserve(indices.size());
+			size_t primitive_offset = 0;
+			for (unsigned int primitive_index = 0;
+				primitive_index < geometry.primitiveCount(); ++primitive_index)
+			{
+				const size_t vertex_count = geometry.primitiveVertexCount(primitive_index);
+				if (vertex_count == 0 || vertex_count > indices.size() - primitive_offset)
+					throw std::runtime_error("Geometry primitive boundaries do not match topology");
+				for (size_t local_index = 0; local_index < vertex_count; ++local_index)
+					order.push_back(primitive_offset + vertex_count - local_index - 1U);
+				primitive_offset += vertex_count;
+			}
+			if (primitive_offset != indices.size())
+				throw std::runtime_error("Geometry topology contains trailing vertices");
+			return order;
+		}
+
+		Attribute::Ptr reorderAttribute(
+			const Attribute& source,
+			std::span<const size_t> source_order)
+		{
+			if (source.numElements() < 0
+				|| static_cast<size_t>(source.numElements()) != source_order.size())
+			{
+				throw std::runtime_error("Vertex attribute count does not match topology order");
+			}
+			Attribute::Ptr reordered = std::make_shared<Attribute>(
+				source.numComponents(), source.elementComponentType());
+			reordered->resize(source_order.size());
+			for (size_t destination_index = 0;
+				destination_index < source_order.size(); ++destination_index)
+			{
+				const std::span<const std::byte> source_value =
+					source.elementBytes(source_order[destination_index]);
+				std::span<std::byte> destination_value =
+					reordered->mutableElementBytes(destination_index);
+				std::copy(source_value.begin(), source_value.end(), destination_value.begin());
+			}
+			return reordered;
 		}
 
 		struct JsonScalarWriter
@@ -365,13 +437,13 @@ namespace houio
 		// Cast and validate the domain sizes before allocating convenience geometry.
 		const sint64 numPoints = houGeo->pointCount();
 		const sint64 numVertices = houGeo->vertexCount();
+		const sint64 numPrimitives = houGeo->primitiveCount();
 		const size_t pointCount = checkedConversionCount(numPoints, "Point count");
 		const size_t vertexCount = checkedConversionCount(numVertices, "Vertex count");
+		const size_t primitiveCount = checkedConversionCount(numPrimitives, "Primitive count");
 		if( report )
 		{
 			report->sourcePointCount = pointCount;
-			report->skippedPrimitiveAttributes = houGeo->primitiveAttributeNames();
-			report->skippedGlobalAttributes = houGeo->globalAttributeNames();
 			report->droppedPointGroups = houGeo->pointGroupNames();
 			report->droppedVertexGroups = houGeo->vertexGroupNames();
 			report->droppedPrimitiveGroups = houGeo->primitiveGroupNames();
@@ -618,12 +690,11 @@ namespace houio
 				"HouGeoIO::convertToGeometry requires one converted P value per point", -1,
 				"attributes.pointattributes.P"});
 
-		// convert vertex attributes ---
-		std::vector<std::pair<Attribute::Ptr, Attribute::Ptr>> vertex2pointAttr;
+		// convert vertex attributes without changing the point domain ---
 		for (const std::string& attribute_name : vertexAttributesNames)
 		{
 			std::string attrName = attribute_name;
-			HouGeoAdapter::AttributeAdapter::ConstPtr houAttr =
+			const HouGeoAdapter::AttributeAdapter::ConstPtr houAttr =
 				houGeo->vertexAttribute(attrName);
 			const std::string attributePath = "attributes.vertexattributes." + attrName;
 			validateDomainAttribute(houAttr, numVertices, attributePath);
@@ -636,19 +707,17 @@ namespace houio
 					-1, attributePath});
 				continue;
 			}
-			const int numComponents = houAttr->tupleSize().value();
-			const HouGeoAdapter::AttributeAdapter::Storage storage = houAttr->storage();
 
 			Attribute::Ptr attr;
-			if( (attrName == "UV")||(attrName == "uv") )
+			if( (attrName == "UV") || (attrName == "uv") )
 			{
+				const int numComponents = houAttr->tupleSize().value();
 				if( numComponents < 2 )
 					throw std::runtime_error( "HouGeoIO::convertToGeometry: vertex UV requires at least two components" );
+				const HouGeoAdapter::AttributeAdapter::Storage storage = houAttr->storage();
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-
 				attrName = "UV";
 				attr = Attribute::createV2f();
-
 				for( size_t vertexIndex=0;vertexIndex<vertexCount;++vertexIndex )
 				{
 					math::Vec2f uv;
@@ -675,36 +744,10 @@ namespace houio
 						throw std::runtime_error( "HouGeoIO::convertToGeometry: unsupported vertex UV storage" );
 					attr->appendElement(uv);
 				}
-			}else
-			if( storage == HouGeoAdapter::AttributeAdapter::Storage::uint8 )
-			{
-				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::ComponentType::uint8,
-					raw_data.bytes(), houAttr->elementCount());
 			}
-			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float16 )
+			else
 			{
-				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::ComponentType::float16,
-					raw_data.bytes(), houAttr->elementCount());
-			}
-			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float32 )
-			{
-				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::ComponentType::float32,
-					raw_data.bytes(), houAttr->elementCount());
-			}
-			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::float64 )
-			{
-				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::ComponentType::float64,
-					raw_data.bytes(), houAttr->elementCount());
-			}
-			else if( storage == HouGeoAdapter::AttributeAdapter::Storage::int64 )
-			{
-				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
-				attr = Attribute::create(numComponents, Attribute::ComponentType::int64,
-					raw_data.bytes(), houAttr->elementCount());
+				attr = copyNumericAttribute(houAttr, attributePath);
 			}
 
 			if( !attr )
@@ -713,19 +756,65 @@ namespace houio
 					report->skippedVertexAttributes.push_back(attrName);
 				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
 					"HouGeoIO::convertToGeometry cannot convert vertex attribute " + attrName,
-					-1, "attributes.vertexattributes." + attrName});
+					-1, attributePath});
 				continue;
 			}
-
-			// create point attribute which we will derive from this vertex attribute
-			Attribute::Ptr pointAttr = attr->copy();
-			pointAttr->resize(pointCount);
-			pointAttr->fillZero();
-
-			result->setAttribute(attrName, pointAttr);
-			vertex2pointAttr.push_back( std::make_pair( attr, pointAttr ) );
+			result->setVertexAttribute(attrName, std::move(attr));
 		}
 
+		const bool completePrimitiveDomain = primitiveCount == static_cast<size_t>(numPolys);
+		for (const std::string& attrName : houGeo->primitiveAttributeNames())
+		{
+			const std::string attributePath = "attributes.primitiveattributes." + attrName;
+			const HouGeoAdapter::AttributeAdapter::ConstPtr houAttr =
+				houGeo->primitiveAttribute(attrName);
+			validateDomainAttribute(houAttr, numPrimitives, attributePath);
+			if (!completePrimitiveDomain
+				|| houAttr->type() != HouGeoAdapter::AttributeAdapter::Type::numeric)
+			{
+				if (report)
+					report->skippedPrimitiveAttributes.push_back(attrName);
+				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
+					completePrimitiveDomain
+						? "HouGeoIO::convertToGeometry skips non-numeric primitive attribute " + attrName
+						: "HouGeoIO::convertToGeometry cannot map a partial primitive domain for " + attrName,
+					-1, attributePath});
+				continue;
+			}
+			Attribute::Ptr attr = copyNumericAttribute(houAttr, attributePath);
+			if (!attr)
+			{
+				if (report)
+					report->skippedPrimitiveAttributes.push_back(attrName);
+				continue;
+			}
+			result->setPrimitiveAttribute(attrName, std::move(attr));
+		}
+
+		for (const std::string& attrName : houGeo->globalAttributeNames())
+		{
+			const std::string attributePath = "attributes.globalattributes." + attrName;
+			const HouGeoAdapter::AttributeAdapter::ConstPtr houAttr =
+				houGeo->globalAttribute(attrName);
+			validateDomainAttribute(houAttr, 1, attributePath);
+			if (houAttr->type() != HouGeoAdapter::AttributeAdapter::Type::numeric)
+			{
+				if (report)
+					report->skippedGlobalAttributes.push_back(attrName);
+				appendDiagnostic(diagnostics, Diagnostic{DiagnosticSeverity::warning, DiagnosticCategory::conversion,
+					"HouGeoIO::convertToGeometry skips non-numeric global attribute " + attrName,
+					-1, attributePath});
+				continue;
+			}
+			Attribute::Ptr attr = copyNumericAttribute(houAttr, attributePath);
+			if (!attr)
+			{
+				if (report)
+					report->skippedGlobalAttributes.push_back(attrName);
+				continue;
+			}
+			result->setGlobalAttribute(attrName, std::move(attr));
+		}
 
 		// only done when we have primitives...
 		if( houPrim )
@@ -736,17 +825,15 @@ namespace houio
 				throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::unsupported_input,
 					"HouGeoIO::convertToGeometry expected a polygon primitive", -1, "conversion.primitive"});
 
-			// Geometry has no face-varying domain, so points are split when vertex values differ.
-			std::vector<bool> pointsToSplit(pointCount, false);
-			std::vector<bool> pointsInitialized(pointCount, false);
-			std::vector<int> firstVertex(pointCount, -1);
-
 			size_t globalVertexIndex = 0;
 			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
 			{
 				const int polygonVertexCount = poly->polygonVertexCount(polygonIndex);
 				const std::span<const int> polygonVertices = poly->polygonVertexIndices(polygonIndex);
-				for( int localVertexIndex=0;localVertexIndex<polygonVertexCount;++localVertexIndex, ++globalVertexIndex )
+				std::vector<unsigned int> vertices;
+				vertices.reserve(static_cast<size_t>(polygonVertexCount));
+				for( int localVertexIndex=0;localVertexIndex<polygonVertexCount;
+					++localVertexIndex, ++globalVertexIndex )
 				{
 					if( globalVertexIndex >= vertexCount )
 						throw std::runtime_error( "Polygon traversal exceeded the vertex domain" );
@@ -754,79 +841,7 @@ namespace houio
 					if( point < 0 || static_cast<size_t>(point) >= pointCount )
 						throw DiagnosticException(Diagnostic{DiagnosticSeverity::error, DiagnosticCategory::schema,
 							"Polygon references a point outside pointcount", -1, "conversion.primitive"});
-					const size_t pointIndex = static_cast<size_t>(point);
-					if( pointsToSplit[pointIndex] )
-						continue;
-
-					if( firstVertex[pointIndex] >= 0 )
-					{
-						for( const auto &attributePair : vertex2pointAttr )
-						{
-							const size_t elementBytes = attributeElementBytes(attributePair.first);
-							const std::span<const std::byte> current_value =
-								attributePair.first->elementBytes(globalVertexIndex);
-							const std::span<const std::byte> first_value = attributePair.first->elementBytes(
-								static_cast<size_t>(firstVertex[pointIndex]));
-							if (current_value.size() != elementBytes || first_value.size() != elementBytes)
-								throw std::runtime_error("Vertex attribute element byte size is inconsistent");
-							if (std::memcmp(current_value.data(), first_value.data(), elementBytes) != 0)
-							{
-								pointsToSplit[pointIndex] = true;
-								break;
-							}
-						}
-					}
-					else
-					{
-						firstVertex[pointIndex] = static_cast<int>(globalVertexIndex);
-					}
-				}
-			}
-			if( globalVertexIndex != vertexCount )
-				throw std::runtime_error( "Polygon traversal did not consume the complete vertex domain" );
-			if( report )
-			{
-				report->splitSourcePointCount = static_cast<size_t>(
-					std::count(pointsToSplit.begin(), pointsToSplit.end(), true));
-			}
-
-			globalVertexIndex = 0;
-			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
-			{
-				const int polygonVertexCount = poly->polygonVertexCount(polygonIndex);
-				const std::span<const int> polygonVertices = poly->polygonVertexIndices(polygonIndex);
-				std::vector<unsigned int> vertices;
-				vertices.reserve(static_cast<size_t>(polygonVertexCount));
-
-				for( int localVertexIndex=0;localVertexIndex<polygonVertexCount;++localVertexIndex, ++globalVertexIndex )
-				{
-					const int point = polygonVertices[localVertexIndex];
-					if( point < 0 || static_cast<size_t>(point) >= pointCount || globalVertexIndex >= vertexCount )
-						throw std::runtime_error( "Polygon traversal contains an invalid point or vertex index" );
-					const size_t pointIndex = static_cast<size_t>(point);
-					unsigned int finalPointIndex = static_cast<unsigned int>(pointIndex);
-
-					if( pointsToSplit[pointIndex] && pointsInitialized[pointIndex] )
-					{
-						finalPointIndex = result->duplicatePoint(finalPointIndex);
-						if( report )
-							++report->duplicatedPointCount;
-					}
-					else if( !pointsInitialized[pointIndex] )
-						pointsInitialized[pointIndex] = true;
-
-					for( const auto &attributePair : vertex2pointAttr )
-					{
-						const size_t elementBytes = attributeElementBytes(attributePair.first);
-						std::span<std::byte> destination_value =
-							attributePair.second->mutableElementBytes(static_cast<size_t>(finalPointIndex));
-						const std::span<const std::byte> source_value =
-							attributePair.first->elementBytes(globalVertexIndex);
-						if (destination_value.size() != elementBytes || source_value.size() != elementBytes)
-							throw std::runtime_error("Converted vertex attribute element byte size is inconsistent");
-						std::memcpy(destination_value.data(), source_value.data(), elementBytes);
-					}
-					vertices.push_back(finalPointIndex);
+					vertices.push_back(static_cast<unsigned int>(point));
 				}
 
 				if( result->primitiveType() == Geometry::PrimitiveType::polygon )
@@ -838,6 +853,8 @@ namespace houio
 				else if( polygonVertexCount == 4 )
 					result->addQuad(vertices[0], vertices[1], vertices[2], vertices[3]);
 			}
+			if( globalVertexIndex != vertexCount )
+				throw std::runtime_error( "Polygon traversal did not consume the complete vertex domain" );
 
 			// Houdini polygons are clockwise; the convenience geometry expects counter-clockwise order.
 			result->reverse();
@@ -908,10 +925,10 @@ namespace houio
 			return HouGeo::Ptr();
 		HouGeo::Ptr houdiniGeometry = std::make_shared<HouGeo>();
 
-		const std::vector<std::string> pointAttributeNames = geometry->attributeNames();
+		const std::vector<std::string> pointAttributeNames = geometry->pointAttributeNames();
 		for( const std::string &name : pointAttributeNames )
 		{
-			Attribute::Ptr sourceAttribute = geometry->attribute(name);
+			Attribute::Ptr sourceAttribute = geometry->pointAttribute(name);
 
 			// Houdini stores P as a four-component point position in this representation.
 			if( name == "P" && sourceAttribute->numComponents() == 3 )
@@ -933,13 +950,28 @@ namespace houio
 			houdiniGeometry->setPointAttribute(houdiniAttribute);
 		}
 
+		const std::vector<std::string> vertexAttributeNames =
+			geometry->vertexAttributeNames();
+		const std::span<const Geometry::Index> geometry_indices = geometry->indexBuffer();
+		const std::vector<size_t> vertex_order = houdiniVertexOrder(*geometry);
+		for (const std::string& name : geometry->globalAttributeNames())
+		{
+			Attribute::Ptr sourceAttribute = geometry->globalAttribute(name);
+			if (!sourceAttribute || sourceAttribute->numElements() != 1)
+				throw std::runtime_error("HouGeoIO::adaptGeometry global attributes require one element");
+			houdiniGeometry->setGlobalAttribute(
+				std::make_shared<HouGeo::HouAttribute>(name, sourceAttribute));
+		}
+
 		if( geometry->primitiveCount() > 0 )
 		{
 			HouGeo::HouTopology::Ptr topology = std::make_shared<HouGeo::HouTopology>();
-			const std::span<const Geometry::Index> geometry_indices = geometry->indexBuffer();
 			topology->reserve(geometry_indices.size());
-			for (const unsigned int point_index : geometry_indices)
+			for (const size_t source_vertex_index : vertex_order)
 			{
+				if (source_vertex_index >= geometry_indices.size())
+					throw std::out_of_range("HouGeoIO::adaptGeometry vertex order is out of range");
+				const unsigned int point_index = geometry_indices[source_vertex_index];
 				if (point_index > static_cast<unsigned int>(std::numeric_limits<int>::max()))
 					throw std::overflow_error("HouGeoIO::adaptGeometry point index exceeds int range");
 				topology->appendIndex(static_cast<int>(point_index));
@@ -1026,6 +1058,38 @@ namespace houio
 				std::move(point_indices),
 				geometry->primitiveType() != Geometry::LINE);
 			houdiniGeometry->addPrimitive(polygon_run);
+		}
+
+		for( const std::string &name : vertexAttributeNames )
+		{
+			Attribute::Ptr sourceAttribute = geometry->vertexAttribute(name);
+			if( !sourceAttribute )
+				throw std::runtime_error("HouGeoIO::adaptGeometry encountered a null vertex attribute");
+			if( sourceAttribute->numElements() < 0
+				|| static_cast<size_t>(sourceAttribute->numElements()) != geometry_indices.size() )
+			{
+				throw std::runtime_error(
+					"HouGeoIO::adaptGeometry vertex attribute count does not match topology");
+			}
+			houdiniGeometry->setVertexAttribute(
+				std::make_shared<HouGeo::HouAttribute>(
+					name, reorderAttribute(*sourceAttribute, vertex_order)));
+		}
+
+		for (const std::string& name : geometry->primitiveAttributeNames())
+		{
+			Attribute::Ptr sourceAttribute = geometry->primitiveAttribute(name);
+			if (!sourceAttribute
+				|| sourceAttribute->numElements() < 0
+				|| static_cast<unsigned int>(sourceAttribute->numElements())
+					!= geometry->primitiveCount())
+			{
+				throw std::runtime_error(
+					"HouGeoIO::adaptGeometry primitive attribute count does not match topology");
+			}
+			houdiniGeometry->setPrimitiveAttribute(
+				name,
+				std::make_shared<HouGeo::HouAttribute>(name, sourceAttribute));
 		}
 
 		return houdiniGeometry;
