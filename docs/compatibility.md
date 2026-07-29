@@ -122,4 +122,4 @@ Direct HOM extraction supports scalar Float VDBs when the sampled non-background
 
 ## Distribution status
 
-Technical compatibility does not make the repository ready for redistribution. A project-wide license and third-party provenance notices are still required before publishing source or binary releases.
+Technical compatibility does not make the repository ready for redistribution. The upstream-derived project currently has no project-wide license grant; public release remains blocked pending written upstream permission or an equivalent legal basis. See [Source provenance and release status](provenance.md).

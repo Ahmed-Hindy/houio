@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
@@ -72,14 +72,6 @@ jobs:
         if: matrix.preset == 'windows-msvc-release'
         run: cmake --build --preset windows-msvc-release --target houio_houdini_package
 
-      - name: Upload Houdini package
-        if: matrix.preset == 'windows-msvc-release'
-        uses: actions/upload-artifact@v7
-        with:
-          name: houio-houdini-package-windows-x86_64
-          path: build/windows-msvc-release/houio-houdini-package-*.zip
-          if-no-files-found: error
-
   linux-gcc:
     runs-on: ubuntu-24.04
     strategy:
@@ -90,7 +82,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
@@ -108,7 +100,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
@@ -138,7 +130,7 @@ jobs:
         run: ctest --test-dir build/linux-gcc-openvdb --output-on-failure
 
       - name: Upload constructed native VDB fixture
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: houio-constructed-native-vdb
           path: build/linux-gcc-openvdb/tests/openvdb_constructed.bgeo
@@ -149,7 +141,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 

@@ -9,36 +9,13 @@ function(strip_cpp_comments input_content output_variable)
     set(${output_variable} "${code_content}" PARENT_SCOPE)
 endfunction()
 
-set(ttl_root "${HOUIO_SOURCE_DIR}/include/ttl")
-set(half_root "${HOUIO_SOURCE_DIR}/include/houio/math/Half")
-set(half_source_root "${HOUIO_SOURCE_DIR}/src/math/Half")
-
-file(GLOB_RECURSE ttl_files LIST_DIRECTORIES FALSE "${ttl_root}/*")
-foreach(file_path IN LISTS ttl_files)
-    get_filename_component(file_name "${file_path}" NAME)
-    if(file_name STREQUAL "retired.hpp")
-        continue()
-    endif()
-    file(READ "${file_path}" file_content)
-    string(FIND "${file_content}" "#include <ttl/retired.hpp>" marker_position)
-    if(marker_position EQUAL -1)
-        message(FATAL_ERROR "Retired TTL file contains implementation code: ${file_path}")
-    endif()
-endforeach()
-
-file(GLOB_RECURSE half_files LIST_DIRECTORIES FALSE
-    "${half_root}/*"
-    "${half_source_root}/*"
+foreach(retired_path IN ITEMS
+    "${HOUIO_SOURCE_DIR}/include/ttl"
+    "${HOUIO_SOURCE_DIR}/include/houio/math/Half"
+    "${HOUIO_SOURCE_DIR}/src/math/Half"
 )
-foreach(file_path IN LISTS half_files)
-    get_filename_component(file_name "${file_path}" NAME)
-    if(file_name STREQUAL "retired.h")
-        continue()
-    endif()
-    file(READ "${file_path}" file_content)
-    string(FIND "${file_content}" "houio/math/Half/retired.h" marker_position)
-    if(marker_position EQUAL -1)
-        message(FATAL_ERROR "Retired half file contains implementation code: ${file_path}")
+    if(EXISTS "${retired_path}")
+        message(FATAL_ERROR "Retired third-party source tree was restored: ${retired_path}")
     endif()
 endforeach()
 
@@ -50,9 +27,6 @@ file(GLOB_RECURSE active_sources LIST_DIRECTORIES FALSE
     "${HOUIO_SOURCE_DIR}/tools/*.cpp"
 )
 foreach(file_path IN LISTS active_sources)
-    if(file_path MATCHES "/math/Half/" OR file_path MATCHES "/src/math/Half/")
-        continue()
-    endif()
     file(READ "${file_path}" file_content)
     strip_cpp_comments("${file_content}" code_content)
     string(REGEX MATCH "(^|[^A-Za-z0-9_])typedef([^A-Za-z0-9_]|$)" legacy_typedef "${code_content}")
@@ -115,9 +89,6 @@ file(GLOB_RECURSE public_headers LIST_DIRECTORIES FALSE
     "${HOUIO_SOURCE_DIR}/include/houio/*.hpp"
 )
 foreach(header_path IN LISTS public_headers)
-    if(header_path MATCHES "/math/Half/")
-        continue()
-    endif()
     file(READ "${header_path}" header_content)
     strip_cpp_comments("${header_content}" header_code)
     string(REPLACE "\r" "" header_code "${header_code}")

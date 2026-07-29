@@ -1179,7 +1179,7 @@ Goals and completed work:
 - [x] Normalize OpenUSD's Windows DLL/resource layout for execution beside the portable HouIO CLI.
 - [x] Package runtime DLLs, headers, import libraries, CMake metadata, USD resources, dependency revisions, SHA-256 hashes, and third-party notices.
 - [x] Add installed-SDK and extracted-ZIP consumer tests proving no Houdini installation or SideFX binary is required.
-- [x] Add a cached Windows release workflow that builds, tests, validates, packages, and uploads the portable ZIP and checksum.
+- [x] Add a cached Windows workflow that builds, tests, validates, and packages the portable ZIP and checksum for private evaluation.
 
 ### Phase 44 — Variable-size simplified polygon topology
 
@@ -1203,6 +1203,30 @@ Exit criteria:
 - Merge, reverse, HouGeo conversion, scene adaptation, and BGEO round trips retain both boundaries.
 - Existing fixed-size and single-polygon callers remain source-compatible.
 - Strict, sanitizer, analysis, package, and Houdini compatibility matrices remain green.
+
+### Phase 45 — Provenance cleanup and non-publishing release policy
+
+**Status: technical provenance cleanup complete on `chore/provenance-cleanup`; upstream permission remains an external release blocker.**
+
+Goals and completed work:
+
+- [x] Confirm the repository is a derivative of `dkoerner/houio` and that neither parent nor imported history contains a project-wide license.
+- [x] Delete the retired `include/ttl`, `include/houio/math/Half`, and `src/math/Half` trees rather than retaining dormant third-party stubs.
+- [x] Retain the historical ILM/OpenEXR BSD notice conservatively for the active half-conversion replacement.
+- [x] Add explicit `LICENSE_STATUS.md`, source provenance, and third-party notice documents.
+- [x] Install and validate legal-status documents in generated packages.
+- [x] Remove CI artifact upload and tag-triggered release behavior while keeping package construction and clean-runtime validation.
+- [x] Run the expensive dependency workflow on relevant `master` pushes so default-branch caches can seed later pull requests.
+- [ ] Obtain written permission or a compatible license grant from the relevant upstream copyright holders.
+- [ ] Add a project-wide license only after its scope over the complete combined work is confirmed.
+
+Exit criteria:
+
+- No retired TTL or legacy half implementation remains in the working tree or installed SDK.
+- Generated packages carry the project legal status, provenance record, and third-party notices.
+- CI validates packages but does not publish archives.
+- Documentation states that third-party component licenses do not license HouIO as a combined work.
+- Public release remains blocked until upstream permission is documented.
 
 ## Deferred work
 

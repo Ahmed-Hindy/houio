@@ -29,6 +29,9 @@ set(installed_files
     "${package_root}/share/houio/python/houio_hom/__init__.py"
     "${package_root}/share/houio/python/houio_hom/bridge.py"
     "${package_root}/share/houio/houdini/install_hom_bridge.ps1"
+    "${package_root}/share/houio/legal/LICENSE_STATUS.md"
+    "${package_root}/share/houio/legal/THIRD_PARTY_NOTICES.md"
+    "${package_root}/share/houio/legal/docs/provenance.md"
 )
 if(HOUIO_EXPECT_TOOLS)
     set(installed_converter "${package_root}/bin/houio_convert")
