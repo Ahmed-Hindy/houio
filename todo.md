@@ -2,14 +2,23 @@
 
 The long-term roadmap remains below. The active modernization program is summarized first so completed work, validation state, and the immediate execution order are visible in one place. Detailed implementation steps are maintained in `implementation-plan.md`.
 
-## Active branch
+## Current baseline
 
-- Branch: `feat/native-houdini-rop`
-- Baseline commit: `34718b9` (`master` after merged PR #45).
-- MSVC warnings-as-errors/Houdini and Windows AddressSanitizer suites pass **70/70**; MSVC native analysis is error-clean.
-- The 21-fixture and Houdini package matrices pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
-- The native `houio::geometry` HDK ROP builds and renders an animated two-frame polygon sequence in all four maintained Houdini versions.
-- The active branch adds a real `/out` operator, direct `GU_Detail` polygon extraction, a C ABI separating SideFX's C++17 SDKs from HouIO's C++20 core, standard ROP frame/script controls, explicit loss rejection, and versioned runtime tests.
+- The maintained product surfaces are the C++ library, primary CLI, Houdini package, and optional OpenVDB/Alembic/OpenUSD backends. See [Product scope](docs/product-scope.md).
+- MSVC warnings-as-errors and AddressSanitizer suites pass **76/76**; MSVC native analysis is error-clean.
+- The bundled no-Houdini scene-I/O package suite passes **34/34**.
+- Houdini integration is validated with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Public redistribution remains blocked by the documented upstream license/provenance issue.
+
+## Active consolidation priorities
+
+- [x] Define explicit core-minimal, OpenVDB, scene-I/O, Houdini-package, and full-development build profiles.
+- [x] Add a safe developer command for removing preset builds, generated build trees, dependency caches, or the complete ignored build directory.
+- [x] Separate simplified-to-Houdini adaptation from the monolithic `HouGeoIO.cpp` translation unit.
+- [ ] Split faithful HouGeo schema loading by attributes, polygons/curves, packed records, and volumes.
+- [ ] Split manifest decoding by attributes, primitive families, and VDB records.
+- [ ] Evaluate retirement of `houio_convert` after a documented compatibility period.
+- [ ] Reduce generic JSON-tree memory amplification for large numeric arrays.
 
 ## Modernization completed
 

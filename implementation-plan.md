@@ -1,8 +1,10 @@
 # Legacy-Core Modernization Implementation Plan
 
+> This is the detailed historical engineering record. Use [Product scope](docs/product-scope.md) for the current product boundary and [Roadmap and Current Work](todo.md) for active priorities.
+
 ## Scope
 
-This plan records the completed legacy-core modernization program and the current product/data-type expansion phases on top of `master`.
+This plan records the completed legacy-core modernization program and the product/data-type expansion phases built on top of `master`.
 
 The objective is to keep the retained HouIO core modern and stable while extending the custom writer one fixture-backed data family at a time. New work must preserve supported file-format behavior, Houdini interoperability, package layout, documented row-vector matrix semantics, and the established diagnostic contracts.
 
@@ -65,8 +67,9 @@ Every phase must preserve these constraints:
 
 ## Current validation status
 
-- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **70/70**.
-- Current exact source: Windows AddressSanitizer matrix passes **70/70**.
+- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **76/76**.
+- Current exact source: Windows AddressSanitizer matrix passes **76/76**.
+- Current exact source: bundled no-Houdini scene-I/O package suite passes **34/34**.
 - MSVC native static analysis is error-clean.
 - The native HDK ROP warnings-as-errors build/runtime matrix passes in Houdini **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - The 21-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.

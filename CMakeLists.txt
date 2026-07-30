@@ -37,6 +37,7 @@ add_library(
     src/HomManifest.cpp
     src/HouGeo.cpp
     src/HouGeoAdapter.cpp
+    src/HouGeoAdapt.cpp
     src/HouGeoIO.cpp
     src/json.cpp
     src/NativeVdbPayload.cpp

@@ -111,14 +111,24 @@ jobs:
             libboost-iostreams-dev \
             libopenvdb-dev
 
-      - name: Configure OpenVDB backend
+      - name: Resolve OpenVDB CMake module
         shell: bash
         run: |
           openvdb_cmake_dir="$(dirname "$(dpkg -L libopenvdb-dev | grep '/FindOpenVDB.cmake$' | head -n 1)")"
           test -n "$openvdb_cmake_dir"
+          echo "OPENVDB_CMAKE_DIR=$openvdb_cmake_dir" >> "$GITHUB_ENV"
+
+      - name: Validate named OpenVDB product profile
+        run: cmake --preset linux-gcc-core-openvdb -DCMAKE_MODULE_PATH="$OPENVDB_CMAKE_DIR"
+
+      - name: Build named OpenVDB product profile
+        run: cmake --build --preset linux-gcc-core-openvdb
+
+      - name: Configure OpenVDB test backend
+        run: |
           cmake -S . -B build/linux-gcc-openvdb -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_MODULE_PATH="$openvdb_cmake_dir" \
+            -DCMAKE_MODULE_PATH="$OPENVDB_CMAKE_DIR" \
             -DHOUIO_ENABLE_OPENVDB=ON \
             -DHOUIO_BUILD_TESTS=ON \
             -DHOUIO_BUILD_TOOLS=ON

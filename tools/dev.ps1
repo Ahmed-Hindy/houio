@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("help", "build", "test", "fixtures", "package", "native-rop", "scene-deps", "scene-package", "benchmarks", "validate-all")]
+    [ValidateSet("help", "build", "test", "clean", "fixtures", "package", "native-rop", "scene-deps", "scene-package", "benchmarks", "validate-all")]
     [string]$Command = "help",
 
     [string]$Preset = "windows-msvc-release",
@@ -9,6 +9,11 @@ param(
     [string]$HoudiniVersion = "21.0.631",
 
     [switch]$SkipHoudini,
+
+    [ValidateSet("preset", "builds", "dependencies", "all")]
+    [string]$CleanScope = "preset",
+
+    [switch]$ConfirmClean,
 
     [switch]$ConfirmLargeDownload
 )
@@ -115,12 +120,70 @@ function Test-Preset {
     )
 }
 
+function Remove-GeneratedPath {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [Parameter(Mandatory)]
+        [string]$Description
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Write-Host "${Description} is already clean: $Path"
+        return
+    }
+    Remove-Item -LiteralPath $Path -Recurse -Force
+    Write-Host "Removed ${Description}: $Path"
+}
+
+function Invoke-Clean {
+    $buildRoot = Join-Path $repositoryRoot "build"
+    $dependencyRoot = Join-Path $buildRoot "dependencies"
+
+    switch ($CleanScope) {
+        "preset" {
+            if ($Preset -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+                throw "Preset cleanup requires a preset name, not a path: $Preset"
+            }
+            Remove-GeneratedPath -Path (Join-Path $buildRoot $Preset) -Description "preset build tree"
+        }
+        "builds" {
+            if (-not $ConfirmClean) {
+                throw "Cleaning all build trees requires -ConfirmClean. The dependency cache will be preserved."
+            }
+            if (-not (Test-Path -LiteralPath $buildRoot -PathType Container)) {
+                Write-Host "Build directory is already clean: $buildRoot"
+                return
+            }
+            Get-ChildItem -LiteralPath $buildRoot -Force |
+                Where-Object { $_.FullName -ne $dependencyRoot } |
+                ForEach-Object {
+                    Remove-GeneratedPath -Path $_.FullName -Description "generated build artifact"
+                }
+        }
+        "dependencies" {
+            if (-not $ConfirmClean) {
+                throw "Cleaning downloaded and compiled dependencies requires -ConfirmClean."
+            }
+            Remove-GeneratedPath -Path $dependencyRoot -Description "dependency cache"
+        }
+        "all" {
+            if (-not $ConfirmClean) {
+                throw "Cleaning the complete build directory requires -ConfirmClean."
+            }
+            Remove-GeneratedPath -Path $buildRoot -Description "complete build directory"
+        }
+    }
+}
+
 function Show-Help {
     Write-Host "HouIO developer workflow"
     Write-Host ""
     Write-Host "Usage:"
     Write-Host "  .\tools\dev.ps1 build [-Preset windows-msvc-release]"
     Write-Host "  .\tools\dev.ps1 test [-Preset windows-msvc-release] [-HoudiniVersion 21.0.631]"
+    Write-Host "  .\tools\dev.ps1 clean [-Preset windows-msvc-release] [-CleanScope preset|builds|dependencies|all] [-ConfirmClean]"
     Write-Host "  .\tools\dev.ps1 fixtures"
     Write-Host "  .\tools\dev.ps1 package [-HoudiniVersion 21.0.631]"
     Write-Host "  .\tools\dev.ps1 native-rop"
@@ -131,10 +194,24 @@ function Show-Help {
     Write-Host ""
     Write-Host "validate-all runs warnings-as-errors, static analysis, AddressSanitizer,"
     Write-Host "and, unless -SkipHoudini is supplied, the four-version fixture, package, and native ROP matrices."
+    Write-Host ""
+    Write-Host "Product presets:"
+    Write-Host "  windows-msvc-core-minimal       library only"
+    Write-Host "  linux-gcc-core-openvdb          core and CLI with system OpenVDB"
+    Write-Host "  windows-msvc-scene-io           core and CLI with bundled Alembic/OpenUSD"
+    Write-Host "  windows-msvc-full-development   complete local development surface"
+    Write-Host ""
+    Write-Host "Clean scopes: preset removes one build tree; builds preserves dependencies;"
+    Write-Host "dependencies and all require -ConfirmClean."
 }
 
 if ($Command -eq "help") {
     Show-Help
+    exit 0
+}
+if ($Command -eq "clean") {
+    Set-Location $repositoryRoot
+    Invoke-Clean
     exit 0
 }
 
