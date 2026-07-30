@@ -104,15 +104,16 @@ Unsupported recognized input should produce an `unsupported_input` diagnostic ra
 
 Use `HouGeo` (`HoudiniGeometry`) or `HouGeoAdapter` when Houdini domain fidelity matters. The simplified `Geometry` (`SimplifiedMesh`) type is render-oriented and has different guarantees. The aliases are provided by `<houio/GeometryModels.h>` and do not replace the established class names:
 
-- Vertex-domain discontinuities may require point duplication.
-- Point identity can therefore change even when rendered attribute values are preserved.
-- Mixed primitive families are not silently collapsed into one mesh.
+- Supported numeric point, vertex, and global domains remain independent; vertex discontinuities do not duplicate points.
+- Numeric primitive attributes are preserved only when the selected primitive run covers the complete source primitive domain; partial mappings are skipped and reported.
+- `attribute()` remains a compatibility alias for the point domain, while explicit domain accessors expose the complete simplified attribute model.
+- Strings, dictionaries, groups, and mixed primitive families are not silently collapsed into one mesh.
 - Multiple variable-size polygon faces preserve exact per-primitive vertex counts in one `SimplifiedMesh`; `verticesPerPrimitive()` returns zero when those counts differ, and `primitiveVertexCounts()` exposes the exact boundaries.
 - Open polygons with three or more vertices become closed simplified faces; `GeometryConversionReport::polygonClosureLost` and a conversion warning expose that loss.
 - Native VDB payloads are retained by the Houdini-oriented model but are not converted into a simplified mesh.
 - Unsupported primitive records are not converted implicitly.
 
-`HouGeoIO::convertToGeometryResult` reports source/output point counts, distinct split source points, duplicated points, winding reversal, skipped point/vertex/primitive/global attributes, dropped groups, and structured diagnostics for unsupported or invalid data. Callers that require faithful round trips should still stay on the Houdini-oriented model rather than treating a clean simplified conversion as proof that every domain was preserved.
+`HouGeoIO::convertToGeometryResult` reports source/output point counts, winding reversal, skipped point/vertex/primitive/global attributes, dropped groups, and structured diagnostics for unsupported or invalid data. The legacy split-source and duplicated-point counters remain for API compatibility and are zero for supported numeric vertex domains. Callers that require strings, dictionaries, groups, mixed primitive families, or complete Houdini metadata should still use the Houdini-oriented model.
 
 ## VDB scope
 

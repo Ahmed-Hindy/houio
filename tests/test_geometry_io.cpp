@@ -185,6 +185,84 @@ int verifyVariablePolygonRoundtrip(const std::filesystem::path &directory)
     return 0;
 }
 
+int verifyAllDomainRoundtrip(const std::filesystem::path &directory)
+{
+    const houio::Geometry::Ptr geometry = houio::Geometry::createTriangleGeometry();
+    houio::Attribute::Ptr positions = geometry->pointAttribute("P");
+    positions->appendElement(houio::math::V3f(0.0f, 0.0f, 0.0f));
+    positions->appendElement(houio::math::V3f(1.0f, 0.0f, 0.0f));
+    positions->appendElement(houio::math::V3f(0.0f, 1.0f, 0.0f));
+    geometry->addTriangle(0, 1, 2);
+
+    houio::Attribute::Ptr mask = std::make_shared<houio::Attribute>(
+        1, houio::Attribute::ComponentType::uint8);
+    mask->appendElement<houio::ubyte>(0);
+    mask->appendElement<houio::ubyte>(128);
+    mask->appendElement<houio::ubyte>(255);
+    geometry->setPointAttribute("mask", mask);
+
+    houio::Attribute::Ptr uv = houio::Attribute::createV2f();
+    uv->appendElement(houio::math::V2f(0.0f, 0.0f));
+    uv->appendElement(houio::math::V2f(1.0f, 0.0f));
+    uv->appendElement(houio::math::V2f(0.0f, 1.0f));
+    geometry->setVertexAttribute("UV", uv);
+
+    houio::Attribute::Ptr primitive_id = houio::Attribute::createInt();
+    primitive_id->appendElement<houio::sint32>(42);
+    geometry->setPrimitiveAttribute("id", primitive_id);
+
+    houio::Attribute::Ptr scale = houio::Attribute::createFloat();
+    scale->appendElement(2.5f);
+    geometry->setGlobalAttribute("scale", scale);
+
+    const std::filesystem::path path = directory / "all_domains.bgeo";
+    const houio::GeometryWriteResult write_result =
+        houio::GeometryIO::writeGeometry(path, geometry);
+    if (!write_result)
+    {
+        for (const houio::Diagnostic& diagnostic : write_result.diagnostics)
+            std::cerr << diagnostic.message << " [" << diagnostic.path << "]\n";
+        return fail("all-domain simplified geometry write failed");
+    }
+
+    const houio::GeometryReadResult<houio::HouGeo::Ptr> faithful =
+        houio::GeometryIO::readHouGeo(path);
+    if (!faithful
+        || !faithful.value->pointAttribute("mask")
+        || !faithful.value->vertexAttribute("UV")
+        || !faithful.value->primitiveAttribute("id")
+        || !faithful.value->globalAttribute("scale")
+        || faithful.value->vertexAttribute("UV")->elementCount() != 3
+        || faithful.value->primitiveAttribute("id")->rawData().read<houio::sint32>(0) != 42
+        || faithful.value->globalAttribute("scale")->rawData().read<houio::real32>(0) != 2.5f)
+    {
+        return fail("all-domain BGEO write lost faithful attribute domains");
+    }
+
+    const houio::GeometryReadResult<houio::Geometry::Ptr> simplified =
+        houio::GeometryIO::readGeometry(path);
+    const houio::Geometry::Ptr result = simplified.value;
+    const houio::Attribute::Ptr result_mask = result ? result->pointAttribute("mask") : nullptr;
+    const houio::Attribute::Ptr result_uv = result ? result->vertexAttribute("UV") : nullptr;
+    const houio::Attribute::Ptr result_id = result ? result->primitiveAttribute("id") : nullptr;
+    const houio::Attribute::Ptr result_scale = result ? result->globalAttribute("scale") : nullptr;
+    if (!simplified || !result || result->primitiveCount() != 1
+        || result->indexBuffer().size() != 3
+        || result->indexBuffer()[0] != 0 || result->indexBuffer()[1] != 1
+        || result->indexBuffer()[2] != 2
+        || !result_mask || result_mask->get<houio::ubyte>(1) != 128
+        || !result_uv || result_uv->numElements() != 3
+        || result_uv->get<houio::math::V2f>(0) != houio::math::V2f(0.0f, 0.0f)
+        || result_uv->get<houio::math::V2f>(1) != houio::math::V2f(1.0f, 0.0f)
+        || result_uv->get<houio::math::V2f>(2) != houio::math::V2f(0.0f, 1.0f)
+        || !result_id || result_id->get<houio::sint32>(0) != 42
+        || !result_scale || result_scale->get<houio::real32>(0) != 2.5f)
+    {
+        return fail("all-domain simplified BGEO round-trip changed data or winding");
+    }
+    return 0;
+}
+
 int verifyMultipleVolumes(const std::filesystem::path &directory)
 {
     houio::ScalarField::Ptr first = houio::ScalarField::create(houio::math::V3i(2, 1, 1));
@@ -295,6 +373,8 @@ int main()
     if( const int result = verifyScfRoundtrip(testDirectory); result != 0 )
         return result;
     if( const int result = verifyVariablePolygonRoundtrip(testDirectory); result != 0 )
+        return result;
+    if( const int result = verifyAllDomainRoundtrip(testDirectory); result != 0 )
         return result;
     if( const int result = verifyMultipleVolumes(testDirectory); result != 0 )
         return result;

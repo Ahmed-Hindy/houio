@@ -676,7 +676,7 @@ Exit criteria:
 
 ### Phase 23 — Structured simplified-conversion reporting
 
-**Status: complete.**
+**Status: complete; its point-splitting implementation was retired by Phase 48 while the report fields remain source-compatible.**
 
 Target files:
 
@@ -690,18 +690,18 @@ Tasks:
 - Add `GeometryConversionReport` and `GeometryConversionResult` without removing existing convenience conversions.
 - Preserve structured diagnostics in the result for conversion failures.
 - Record source and output point counts.
-- Record distinct source points requiring face-varying splits and the actual number of duplicated output points.
+- Retain counters for distinct split source points and duplicated output points as compatibility metadata.
 - Record skipped point, vertex, primitive, and global attributes.
 - Record dropped point, vertex, and primitive groups.
 - Record Houdini-to-simplified winding reversal.
 - Exercise a successful conversion with non-numeric attributes, unsupported simplified domains, and groups.
-- Exercise a real two-triangle UV seam that duplicates one shared point.
+- Exercise a real two-triangle UV seam; Phase 48 later changed its expected result to independent corner data without point duplication.
 - Exercise a schema failure that returns diagnostics and partial report metadata.
 
 Exit criteria:
 
 - Successful lossy conversions expose every currently known simplified-model loss category.
-- Face-varying point splitting is quantified deterministically.
+- Legacy face-varying split counters are exposed deterministically.
 - Failed conversions return no geometry but preserve diagnostics and available source metadata.
 - Existing `convertToGeometry` overloads retain their behavior.
 - Strict, Release/Houdini, AddressSanitizer, and static-analysis matrices pass.
@@ -870,7 +870,7 @@ Target files:
 Tasks:
 
 - Reuse the simplified model's existing single-polygon storage for one arbitrary n-gon.
-- Preserve point attributes, vertex-to-point splitting, winding conversion, and conversion reporting.
+- Preserve point attributes, the then-current vertex-to-point conversion, winding conversion, and conversion reporting; Phase 48 later replaced vertex-to-point conversion with a native vertex domain.
 - Keep fixed-size line, triangle, and quad conversion unchanged.
 - Reject multiple n-gons because `SimplifiedMesh` cannot encode multiple variable-size polygon boundaries.
 - Return a structured `unsupported_input` diagnostic for the multi-n-gon case.
@@ -1250,12 +1250,68 @@ Exit criteria:
 - Houdini reload reports `hou.numericData.UInt8` with unchanged values.
 - Strict, sanitizer, analysis, package, and Houdini integration matrices remain green.
 
+### Phase 47 — Explicit simplified attribute domains
+
+**Status: complete on `feat/lossless-attribute-domains`.**
+
+Goals and completed work:
+
+- [x] Split the simplified `Geometry` attribute container into point, vertex, primitive, and global maps.
+- [x] Preserve `attribute()`, `setAttribute()`, and related methods as source-compatible point-domain aliases.
+- [x] Add explicit domain accessors and immutable map views.
+- [x] Reverse vertex attributes in lockstep with each primitive's topology.
+- [x] Limit point duplication to the point domain.
+- [x] Merge point, vertex, and primitive attributes independently and require identical global values.
+- [x] Validate each domain against its authoritative element count before domain-aware operations.
+
+Exit criteria:
+
+- Existing point-domain callers remain source-compatible.
+- Vertex data stays aligned through winding reversal and variable-size polygons.
+- Merge and clear operations preserve or reset all four domains deterministically.
+
+### Phase 48 — Lossless face-varying conversion
+
+**Status: complete on `feat/lossless-attribute-domains`.**
+
+Goals and completed work:
+
+- [x] Convert supported numeric vertex attributes into the simplified vertex domain instead of synthesizing point attributes.
+- [x] Remove seam detection, split-point bookkeeping, and duplicate-point generation from maintained conversion.
+- [x] Preserve original point identity and corner count for shared-point UV seams.
+- [x] Reverse topology and vertex attributes together during Houdini-to-simplified conversion.
+- [x] Reverse them together again during simplified-to-Houdini adaptation so BGEO round trips are winding-stable.
+- [x] Retain legacy split and duplicate counters as zero-valued API compatibility fields.
+
+Exit criteria:
+
+- A two-triangle UV seam retains four points and six independent corner values.
+- `Geometry -> BGEO -> Geometry` preserves topology, winding, and vertex ordering.
+- A live Houdini-authored seam passes without point duplication.
+
+### Phase 49 — Numeric primitive and global domains
+
+**Status: complete on `feat/lossless-attribute-domains`.**
+
+Goals and completed work:
+
+- [x] Preserve supported numeric primitive attributes when the selected polygon run covers the complete primitive domain.
+- [x] Preserve supported numeric global attributes as one-element values.
+- [x] Keep partial primitive-domain mappings explicit and reported instead of misindexing them.
+- [x] Round-trip numeric point, vertex, primitive, and global data through public BGEO APIs.
+- [x] Validate merge semantics for concatenated primitive data and invariant global data.
+
+Exit criteria:
+
+- Public container and BGEO tests cover all four numeric domains.
+- Houdini reload retains shared-point topology, face-varying UVs and normals, primitive IDs, and global values.
+- Unsupported strings, dictionaries, groups, and mixed primitive families remain explicitly outside the simplified model.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
 
 - Additional primitive-record families after the packed-reference family.
-- Lossless point/vertex-domain redesign.
 - [x] Dependency-neutral sparse FloatGrid construction/editing and optional OpenVDB `.vdb` I/O.
 - [x] Native Houdini VDB payload generation from sparse grids and exact scalar Float VDB live-HOM extraction.
 - [x] Active FloatGrid tile representation and explicit manifest construction.

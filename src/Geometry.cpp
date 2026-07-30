@@ -72,6 +72,58 @@ namespace houio
                 return math::Vec3f(0.0f);
             return normal.normalized();
         }
+
+        void validateAttributeCount(
+            const Geometry::AttributeMap& attributes,
+            std::size_t expected_count,
+            const char* domain)
+        {
+            const int expected = checkedElementCount(expected_count, domain);
+            for (const auto& [name, attribute] : attributes)
+            {
+                if (!attribute)
+                    throw std::runtime_error(
+                        std::string("Geometry contains a null ") + domain + " attribute named " + name);
+                if (attribute->numElements() != expected)
+                {
+                    throw std::runtime_error(
+                        std::string("Geometry ") + domain
+                        + " attribute count does not match its domain: " + name);
+                }
+            }
+        }
+
+        void reverseAttributeRange(Attribute& attribute, std::size_t offset, std::size_t count)
+        {
+            if (count < 2U)
+                return;
+            if (offset > static_cast<std::size_t>(attribute.numElements())
+                || count > static_cast<std::size_t>(attribute.numElements()) - offset)
+            {
+                throw std::out_of_range("Geometry vertex attribute range is out of bounds");
+            }
+            std::vector<std::byte> temporary(attribute.elementByteSize());
+            for (std::size_t local_index = 0; local_index < count / 2U; ++local_index)
+            {
+                const std::size_t left_index = offset + local_index;
+                const std::size_t right_index = offset + count - local_index - 1U;
+                const std::span<const std::byte> left = attribute.elementBytes(left_index);
+                std::copy(left.begin(), left.end(), temporary.begin());
+                const std::span<const std::byte> right = attribute.elementBytes(right_index);
+                std::span<std::byte> left_destination = attribute.mutableElementBytes(left_index);
+                std::copy(right.begin(), right.end(), left_destination.begin());
+                std::span<std::byte> right_destination = attribute.mutableElementBytes(right_index);
+                std::copy(temporary.begin(), temporary.end(), right_destination.begin());
+            }
+        }
+
+        [[nodiscard]] bool attributesEqual(const Attribute& left, const Attribute& right)
+        {
+            return left.numComponents() == right.numComponents()
+                && left.elementComponentType() == right.elementComponentType()
+                && left.numElements() == right.numElements()
+                && std::equal(left.bytes().begin(), left.bytes().end(), right.bytes().begin(), right.bytes().end());
+        }
     }
 
     Geometry::Geometry(PrimitiveType primitive_type)
@@ -113,46 +165,212 @@ namespace houio
 
     Attribute::Ptr Geometry::attribute(const std::string& name)
     {
-        const auto attribute = attributes_.find(name);
-        return attribute == attributes_.end() ? nullptr : attribute->second;
+        return pointAttribute(name);
     }
 
     Attribute::CPtr Geometry::attribute(const std::string& name) const
     {
-        const auto attribute = attributes_.find(name);
-        return attribute == attributes_.end() ? nullptr : attribute->second;
+        return pointAttribute(name);
     }
 
     void Geometry::setAttribute(const std::string& name, Attribute::Ptr attribute)
     {
-        if (name.empty())
-            throw std::invalid_argument("Geometry::setAttribute requires a non-empty name");
-        if (!attribute)
-            throw std::invalid_argument("Geometry::setAttribute received a null attribute");
-        attributes_[name] = std::move(attribute);
+        setPointAttribute(name, std::move(attribute));
     }
 
     bool Geometry::hasAttribute(const std::string& name) const
     {
-        return attributes_.contains(name);
+        return hasPointAttribute(name);
     }
 
     std::vector<std::string> Geometry::attributeNames() const
     {
+        return pointAttributeNames();
+    }
+
+    void Geometry::removeAttribute(const std::string& name)
+    {
+        removePointAttribute(name);
+    }
+
+    Attribute::Ptr Geometry::pointAttribute(const std::string& name)
+    {
+        const auto attribute = point_attributes_.find(name);
+        return attribute == point_attributes_.end() ? nullptr : attribute->second;
+    }
+
+    Attribute::CPtr Geometry::pointAttribute(const std::string& name) const
+    {
+        const auto attribute = point_attributes_.find(name);
+        return attribute == point_attributes_.end() ? nullptr : attribute->second;
+    }
+
+    void Geometry::setPointAttribute(const std::string& name, Attribute::Ptr attribute)
+    {
+        if (name.empty())
+            throw std::invalid_argument("Geometry::setPointAttribute requires a non-empty name");
+        if (!attribute)
+            throw std::invalid_argument("Geometry::setPointAttribute received a null attribute");
+        point_attributes_[name] = std::move(attribute);
+    }
+
+    bool Geometry::hasPointAttribute(const std::string& name) const
+    {
+        return point_attributes_.contains(name);
+    }
+
+    std::vector<std::string> Geometry::pointAttributeNames() const
+    {
         std::vector<std::string> names;
-        names.reserve(attributes_.size());
-        for (const auto& [name, attribute] : attributes_)
+        names.reserve(point_attributes_.size());
+        for (const auto& [name, attribute] : point_attributes_)
         {
             if (!attribute)
-                throw std::runtime_error("Geometry contains a null attribute named " + name);
+                throw std::runtime_error("Geometry contains a null point attribute named " + name);
             names.push_back(name);
         }
         return names;
     }
 
-    void Geometry::removeAttribute(const std::string& name)
+    void Geometry::removePointAttribute(const std::string& name)
     {
-        attributes_.erase(name);
+        point_attributes_.erase(name);
+    }
+
+    Attribute::Ptr Geometry::vertexAttribute(const std::string& name)
+    {
+        const auto attribute = vertex_attributes_.find(name);
+        return attribute == vertex_attributes_.end() ? nullptr : attribute->second;
+    }
+
+    Attribute::CPtr Geometry::vertexAttribute(const std::string& name) const
+    {
+        const auto attribute = vertex_attributes_.find(name);
+        return attribute == vertex_attributes_.end() ? nullptr : attribute->second;
+    }
+
+    void Geometry::setVertexAttribute(const std::string& name, Attribute::Ptr attribute)
+    {
+        if (name.empty())
+            throw std::invalid_argument("Geometry::setVertexAttribute requires a non-empty name");
+        if (name == "P")
+            throw std::invalid_argument("Geometry P must remain a point attribute");
+        if (!attribute)
+            throw std::invalid_argument("Geometry::setVertexAttribute received a null attribute");
+        vertex_attributes_[name] = std::move(attribute);
+    }
+
+    bool Geometry::hasVertexAttribute(const std::string& name) const
+    {
+        return vertex_attributes_.contains(name);
+    }
+
+    std::vector<std::string> Geometry::vertexAttributeNames() const
+    {
+        std::vector<std::string> names;
+        names.reserve(vertex_attributes_.size());
+        for (const auto& [name, attribute] : vertex_attributes_)
+        {
+            if (!attribute)
+                throw std::runtime_error("Geometry contains a null vertex attribute named " + name);
+            names.push_back(name);
+        }
+        return names;
+    }
+
+    void Geometry::removeVertexAttribute(const std::string& name)
+    {
+        vertex_attributes_.erase(name);
+    }
+
+    Attribute::Ptr Geometry::primitiveAttribute(const std::string& name)
+    {
+        const auto attribute = primitive_attributes_.find(name);
+        return attribute == primitive_attributes_.end() ? nullptr : attribute->second;
+    }
+
+    Attribute::CPtr Geometry::primitiveAttribute(const std::string& name) const
+    {
+        const auto attribute = primitive_attributes_.find(name);
+        return attribute == primitive_attributes_.end() ? nullptr : attribute->second;
+    }
+
+    void Geometry::setPrimitiveAttribute(const std::string& name, Attribute::Ptr attribute)
+    {
+        if (name.empty())
+            throw std::invalid_argument("Geometry::setPrimitiveAttribute requires a non-empty name");
+        if (!attribute)
+            throw std::invalid_argument("Geometry::setPrimitiveAttribute received a null attribute");
+        primitive_attributes_[name] = std::move(attribute);
+    }
+
+    bool Geometry::hasPrimitiveAttribute(const std::string& name) const
+    {
+        return primitive_attributes_.contains(name);
+    }
+
+    std::vector<std::string> Geometry::primitiveAttributeNames() const
+    {
+        std::vector<std::string> names;
+        names.reserve(primitive_attributes_.size());
+        for (const auto& [name, attribute] : primitive_attributes_)
+        {
+            if (!attribute)
+                throw std::runtime_error("Geometry contains a null primitive attribute named " + name);
+            names.push_back(name);
+        }
+        return names;
+    }
+
+    void Geometry::removePrimitiveAttribute(const std::string& name)
+    {
+        primitive_attributes_.erase(name);
+    }
+
+    Attribute::Ptr Geometry::globalAttribute(const std::string& name)
+    {
+        const auto attribute = global_attributes_.find(name);
+        return attribute == global_attributes_.end() ? nullptr : attribute->second;
+    }
+
+    Attribute::CPtr Geometry::globalAttribute(const std::string& name) const
+    {
+        const auto attribute = global_attributes_.find(name);
+        return attribute == global_attributes_.end() ? nullptr : attribute->second;
+    }
+
+    void Geometry::setGlobalAttribute(const std::string& name, Attribute::Ptr attribute)
+    {
+        if (name.empty())
+            throw std::invalid_argument("Geometry::setGlobalAttribute requires a non-empty name");
+        if (!attribute)
+            throw std::invalid_argument("Geometry::setGlobalAttribute received a null attribute");
+        if (attribute->numElements() != 1)
+            throw std::invalid_argument("Geometry global attributes require exactly one element");
+        global_attributes_[name] = std::move(attribute);
+    }
+
+    bool Geometry::hasGlobalAttribute(const std::string& name) const
+    {
+        return global_attributes_.contains(name);
+    }
+
+    std::vector<std::string> Geometry::globalAttributeNames() const
+    {
+        std::vector<std::string> names;
+        names.reserve(global_attributes_.size());
+        for (const auto& [name, attribute] : global_attributes_)
+        {
+            if (!attribute)
+                throw std::runtime_error("Geometry contains a null global attribute named " + name);
+            names.push_back(name);
+        }
+        return names;
+    }
+
+    void Geometry::removeGlobalAttribute(const std::string& name)
+    {
+        global_attributes_.erase(name);
     }
 
     unsigned int Geometry::primitiveVertexCount(unsigned int primitive_index) const
@@ -281,6 +499,7 @@ namespace houio
 
     void Geometry::reverse()
     {
+        validateAttributeCount(vertex_attributes_, indices_.size(), "vertex");
         if (primitive_count_ == 0)
             return;
 
@@ -300,6 +519,11 @@ namespace houio
                 const auto first = indices_.begin()
                     + static_cast<std::ptrdiff_t>(primitive_offset);
                 std::reverse(first, first + vertex_count);
+                for (const auto& [name, attribute] : vertex_attributes_)
+                {
+                    static_cast<void>(name);
+                    reverseAttributeRange(*attribute, primitive_offset, vertex_count);
+                }
                 primitive_offset += vertex_count;
             }
             if (primitive_offset != indices_.size())
@@ -316,9 +540,16 @@ namespace houio
 
         for (unsigned int primitive_index = 0; primitive_index < primitive_count_; ++primitive_index)
         {
+            const std::size_t primitive_offset =
+                static_cast<std::size_t>(primitive_index) * vertices_per_primitive_;
             const auto first = indices_.begin()
-                + static_cast<std::ptrdiff_t>(primitive_index * vertices_per_primitive_);
+                + static_cast<std::ptrdiff_t>(primitive_offset);
             std::reverse(first, first + vertices_per_primitive_);
+            for (const auto& [name, attribute] : vertex_attributes_)
+            {
+                static_cast<void>(name);
+                reverseAttributeRange(*attribute, primitive_offset, vertices_per_primitive_);
+            }
         }
     }
 
@@ -335,19 +566,19 @@ namespace houio
             throw std::overflow_error("Geometry::duplicatePoint exceeds the supported point range");
 
         const Index duplicate_index = static_cast<Index>(point_count);
-        for (const auto& [name, point_attribute] : attributes_)
+        for (const auto& [name, point_attribute] : point_attributes_)
         {
             if (!point_attribute)
-                throw std::runtime_error("Geometry contains a null attribute named " + name);
+                throw std::runtime_error("Geometry contains a null point attribute named " + name);
             if (point_attribute->numElements() != point_count)
                 throw std::runtime_error(
-                    "Geometry attribute counts are inconsistent while duplicating a point");
+                    "Geometry point attribute counts are inconsistent while duplicating a point");
         }
-        for (const auto& [name, point_attribute] : attributes_)
+        for (const auto& [name, point_attribute] : point_attributes_)
         {
             static_cast<void>(name);
             if (point_attribute->duplicateElement(point_index) != duplicate_index)
-                throw std::runtime_error("Geometry attributes produced different duplicate indices");
+                throw std::runtime_error("Geometry point attributes produced different duplicate indices");
         }
         return duplicate_index;
     }
@@ -485,7 +716,10 @@ namespace houio
 
     void Geometry::clear()
     {
-        attributes_.clear();
+        point_attributes_.clear();
+        vertex_attributes_.clear();
+        primitive_attributes_.clear();
+        global_attributes_.clear();
         indices_.clear();
         primitive_vertex_counts_.clear();
         primitive_count_ = 0;
@@ -958,17 +1192,53 @@ namespace houio
             throw std::invalid_argument("Geometry::merge received a null geometry");
 
         auto result = std::make_shared<Geometry>(reference->primitiveType());
-        const std::vector<std::string> attribute_names = reference->attributeNames();
-        for (const std::string& name : attribute_names)
+        const std::vector<std::string> point_attribute_names =
+            reference->pointAttributeNames();
+        const std::vector<std::string> vertex_attribute_names =
+            reference->vertexAttributeNames();
+        const std::vector<std::string> primitive_attribute_names =
+            reference->primitiveAttributeNames();
+        const std::vector<std::string> global_attribute_names =
+            reference->globalAttributeNames();
+        for (const std::string& name : point_attribute_names)
         {
-            const Attribute::CPtr source = reference->attribute(name);
+            const Attribute::CPtr source = reference->pointAttribute(name);
             if (!source)
-                throw std::runtime_error("Geometry::merge reference contains a null attribute");
-            result->setAttribute(
+                throw std::runtime_error("Geometry::merge reference contains a null point attribute");
+            result->setPointAttribute(
                 name,
                 std::make_shared<Attribute>(
                     source->numComponents(),
                     source->elementComponentType()));
+        }
+        for (const std::string& name : vertex_attribute_names)
+        {
+            const Attribute::CPtr source = reference->vertexAttribute(name);
+            if (!source)
+                throw std::runtime_error("Geometry::merge reference contains a null vertex attribute");
+            result->setVertexAttribute(
+                name,
+                std::make_shared<Attribute>(
+                    source->numComponents(),
+                    source->elementComponentType()));
+        }
+        for (const std::string& name : primitive_attribute_names)
+        {
+            const Attribute::CPtr source = reference->primitiveAttribute(name);
+            if (!source)
+                throw std::runtime_error("Geometry::merge reference contains a null primitive attribute");
+            result->setPrimitiveAttribute(
+                name,
+                std::make_shared<Attribute>(
+                    source->numComponents(),
+                    source->elementComponentType()));
+        }
+        for (const std::string& name : global_attribute_names)
+        {
+            const Attribute::CPtr source = reference->globalAttribute(name);
+            if (!source)
+                throw std::runtime_error("Geometry::merge reference contains a null global attribute");
+            result->setGlobalAttribute(name, source->copy());
         }
 
         for (const Pointer& geometry_pointer : geometries)
@@ -978,32 +1248,89 @@ namespace houio
                 throw std::invalid_argument("Geometry::merge received a null geometry");
             if (geometry->primitiveType() != reference->primitiveType())
                 throw std::invalid_argument("Geometry::merge requires a common primitive type");
+            if (geometry->pointAttributeNames() != point_attribute_names)
+                throw std::invalid_argument("Geometry::merge requires identical point attribute names");
+            if (geometry->vertexAttributeNames() != vertex_attribute_names)
+                throw std::invalid_argument("Geometry::merge requires identical vertex attribute names");
+            if (geometry->primitiveAttributeNames() != primitive_attribute_names)
+                throw std::invalid_argument("Geometry::merge requires identical primitive attribute names");
+            if (geometry->globalAttributeNames() != global_attribute_names)
+                throw std::invalid_argument("Geometry::merge requires identical global attribute names");
 
-            const std::vector<std::string> source_attribute_names = geometry->attributeNames();
-            if (source_attribute_names != attribute_names)
-                throw std::invalid_argument("Geometry::merge requires identical attribute names");
-
-            const Attribute::Ptr result_positions = result->attribute("P");
-            if (!result_positions)
-                throw std::runtime_error("Geometry::merge requires a P attribute");
+            const Attribute::CPtr source_positions = geometry->pointAttribute("P");
+            const Attribute::Ptr result_positions = result->pointAttribute("P");
+            if (!source_positions || !result_positions)
+                throw std::runtime_error("Geometry::merge requires a point P attribute");
+            const int source_point_count_value = source_positions->numElements();
             const int point_offset_value = result_positions->numElements();
-            if (point_offset_value < 0)
+            if (source_point_count_value < 0 || point_offset_value < 0)
                 throw std::runtime_error("Geometry::merge encountered a negative point count");
+            const std::size_t source_point_count =
+                static_cast<std::size_t>(source_point_count_value);
             const Index point_offset = static_cast<Index>(point_offset_value);
+            validateAttributeCount(geometry->point_attributes_, source_point_count, "point");
+            validateAttributeCount(geometry->vertex_attributes_, geometry->indices_.size(), "vertex");
+            validateAttributeCount(
+                geometry->primitive_attributes_, geometry->primitive_count_, "primitive");
+            validateAttributeCount(geometry->global_attributes_, 1U, "global");
 
-            for (const std::string& name : attribute_names)
+            for (const std::string& name : point_attribute_names)
             {
-                const Attribute::CPtr source = geometry->attribute(name);
-                const Attribute::Ptr destination = result->attribute(name);
+                const Attribute::CPtr source = geometry->pointAttribute(name);
+                const Attribute::Ptr destination = result->pointAttribute(name);
                 if (!source || !destination)
-                    throw std::runtime_error("Geometry::merge encountered a missing attribute");
+                    throw std::runtime_error("Geometry::merge encountered a missing point attribute");
                 if (source->numComponents() != destination->numComponents()
                     || source->elementComponentType() != destination->elementComponentType())
                 {
-                    throw std::invalid_argument("Geometry::merge attribute layouts do not match");
+                    throw std::invalid_argument("Geometry::merge point attribute layouts do not match");
                 }
                 destination->append(*source);
             }
+            for (const std::string& name : vertex_attribute_names)
+            {
+                const Attribute::CPtr source = geometry->vertexAttribute(name);
+                const Attribute::Ptr destination = result->vertexAttribute(name);
+                if (!source || !destination)
+                    throw std::runtime_error("Geometry::merge encountered a missing vertex attribute");
+                if (source->numComponents() != destination->numComponents()
+                    || source->elementComponentType() != destination->elementComponentType())
+                {
+                    throw std::invalid_argument("Geometry::merge vertex attribute layouts do not match");
+                }
+                destination->append(*source);
+            }
+            for (const std::string& name : primitive_attribute_names)
+            {
+                const Attribute::CPtr source = geometry->primitiveAttribute(name);
+                const Attribute::Ptr destination = result->primitiveAttribute(name);
+                if (!source || !destination)
+                    throw std::runtime_error("Geometry::merge encountered a missing primitive attribute");
+                if (source->numComponents() != destination->numComponents()
+                    || source->elementComponentType() != destination->elementComponentType())
+                {
+                    throw std::invalid_argument("Geometry::merge primitive attribute layouts do not match");
+                }
+                destination->append(*source);
+            }
+            for (const std::string& name : global_attribute_names)
+            {
+                const Attribute::CPtr source = geometry->globalAttribute(name);
+                const Attribute::CPtr destination = result->globalAttribute(name);
+                if (!source || !destination || !attributesEqual(*source, *destination))
+                {
+                    throw std::invalid_argument(
+                        "Geometry::merge requires identical global attribute values");
+                }
+            }
+
+            const auto adjustedIndex = [&](Index index) {
+                if (static_cast<std::size_t>(index) >= source_point_count)
+                    throw std::out_of_range("Geometry::merge topology references a point outside P");
+                if (index > std::numeric_limits<Index>::max() - point_offset)
+                    throw std::overflow_error("Geometry::merge index exceeds unsigned int range");
+                return static_cast<Index>(index + point_offset);
+            };
 
             if (geometry->primitiveType() == PrimitiveType::polygon)
             {
@@ -1026,13 +1353,8 @@ namespace houio
                     adjusted_indices.reserve(vertex_count);
                     for (unsigned int local_index = 0; local_index < vertex_count; ++local_index)
                     {
-                        const Index index = geometry->indices_[primitive_offset + local_index];
-                        if (index > std::numeric_limits<Index>::max() - point_offset)
-                        {
-                            throw std::overflow_error(
-                                "Geometry::merge polygon index exceeds unsigned int range");
-                        }
-                        adjusted_indices.push_back(index + point_offset);
+                        adjusted_indices.push_back(adjustedIndex(
+                            geometry->indices_[primitive_offset + local_index]));
                     }
                     result->addPolygon(adjusted_indices);
                     primitive_offset += vertex_count;
@@ -1046,11 +1368,7 @@ namespace houio
             else
             {
                 for (const Index index : geometry->indices_)
-                {
-                    if (index > std::numeric_limits<Index>::max() - point_offset)
-                        throw std::overflow_error("Geometry::merge index exceeds unsigned int range");
-                    result->indices_.push_back(index + point_offset);
-                }
+                    result->indices_.push_back(adjustedIndex(index));
                 if (geometry->primitive_count_
                     > std::numeric_limits<unsigned int>::max() - result->primitive_count_)
                 {
@@ -1059,6 +1377,9 @@ namespace houio
                 result->primitive_count_ += geometry->primitive_count_;
             }
         }
+        validateAttributeCount(result->vertex_attributes_, result->indices_.size(), "vertex");
+        validateAttributeCount(result->primitive_attributes_, result->primitive_count_, "primitive");
+        validateAttributeCount(result->global_attributes_, 1U, "global");
         return result;
     }
 

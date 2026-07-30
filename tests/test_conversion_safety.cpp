@@ -82,6 +82,49 @@ int verifyInvalidPolygonPointReference()
     return 0;
 }
 
+int verifyPartialPrimitiveDomainIsSkipped()
+{
+    const houio::HouGeo::Ptr geometry = houio::HouGeo::create();
+    houio::Attribute::Ptr positions = houio::Attribute::createV3f();
+    positions->appendElement(houio::math::V3f(0.0f, 0.0f, 0.0f));
+    positions->appendElement(houio::math::V3f(1.0f, 0.0f, 0.0f));
+    positions->appendElement(houio::math::V3f(0.0f, 1.0f, 0.0f));
+    geometry->setPointAttribute(
+        std::make_shared<houio::HouGeo::HouAttribute>("P", positions));
+
+    auto topology = std::make_shared<houio::HouGeo::HouTopology>();
+    topology->setIndices({0, 1, 2});
+    geometry->setTopology(topology);
+    auto polygon = std::make_shared<houio::HouGeo::HouPoly>();
+    polygon->setPolygonData(1, {3}, {0}, {0, 1, 2}, true);
+    geometry->addPrimitive(polygon);
+    auto second_polygon = std::make_shared<houio::HouGeo::HouPoly>();
+    second_polygon->setPolygonData(1, {3}, {0}, {0, 1, 2}, true);
+    geometry->addPrimitive(second_polygon);
+
+    houio::Attribute::Ptr primitive_ids = houio::Attribute::createInt();
+    primitive_ids->appendElement<houio::sint32>(7);
+    primitive_ids->appendElement<houio::sint32>(9);
+    geometry->setPrimitiveAttribute(
+        "id", std::make_shared<houio::HouGeo::HouAttribute>("id", primitive_ids));
+
+    const houio::GeometryConversionResult result =
+        houio::HouGeoIO::convertToGeometryResult(geometry, polygon);
+    const bool reported = std::find(
+        result.report.skippedPrimitiveAttributes.begin(),
+        result.report.skippedPrimitiveAttributes.end(),
+        "id") != result.report.skippedPrimitiveAttributes.end();
+    bool warned = false;
+    for (const houio::Diagnostic& diagnostic : result.diagnostics)
+        warned = warned || diagnostic.path == "attributes.primitiveattributes.id";
+    if (!result || result.value->primitiveCount() != 1
+        || result.value->primitiveAttribute("id") || !reported || !warned)
+    {
+        return fail("partial primitive-domain conversion was not reported and skipped safely");
+    }
+    return 0;
+}
+
 int verifyPolygonAccessorSafety()
 {
     houio::HouGeo::HouPoly polygon;
@@ -279,7 +322,7 @@ int verifyNonNumericAttributesAreSkipped()
     return 0;
 }
 
-int verifyPointSplitReport()
+int verifyFaceVaryingPreservation()
 {
     const std::string document = R"JSON([
         "pointcount", 4,
@@ -324,15 +367,36 @@ int verifyPointSplitReport()
 
     const houio::GeometryConversionResult result =
         houio::HouGeoIO::convertToGeometryResult(geometry, primitives.front());
+    const houio::Attribute::Ptr vertexUv = result
+        ? result.value->vertexAttribute("UV") : houio::Attribute::Ptr();
+    const std::span<const houio::Geometry::Index> indices = result
+        ? result.value->indexBuffer() : std::span<const houio::Geometry::Index>();
     if (!result || result.report.sourcePointCount != 4
-        || result.report.outputPointCount != 5
-        || result.report.splitSourcePointCount != 1
-        || result.report.duplicatedPointCount != 1
+        || result.report.outputPointCount != 4
+        || result.report.splitSourcePointCount != 0
+        || result.report.duplicatedPointCount != 0
         || !result.report.windingReversed
         || result.value->primitiveCount() != 2
-        || result.value->indexBuffer().size() != 6)
+        || indices.size() != 6
+        || indices[0] != 2 || indices[1] != 1 || indices[2] != 0
+        || indices[3] != 3 || indices[4] != 2 || indices[5] != 0
+        || !vertexUv || vertexUv->numElements() != 6
+        || result.value->hasPointAttribute("UV"))
     {
-        return fail("conversion result did not report face-varying point duplication");
+        return fail("conversion did not preserve lossless face-varying domains");
+    }
+    const std::array<houio::math::V2f, 6> expectedUv = {
+        houio::math::V2f(1.0f, 1.0f),
+        houio::math::V2f(1.0f, 0.0f),
+        houio::math::V2f(0.0f, 0.0f),
+        houio::math::V2f(0.0f, 1.0f),
+        houio::math::V2f(1.0f, 1.0f),
+        houio::math::V2f(0.5f, 0.5f),
+    };
+    for (std::size_t index = 0; index < expectedUv.size(); ++index)
+    {
+        if (vertexUv->get<houio::math::V2f>(index) != expectedUv[index])
+            return fail("conversion changed face-varying UV ordering");
     }
     return 0;
 }
@@ -548,6 +612,10 @@ int main()
     {
         return result;
     }
+    if (const int result = verifyPartialPrimitiveDomainIsSkipped(); result != 0)
+    {
+        return result;
+    }
     if (const int result = verifyPolygonAccessorSafety(); result != 0)
     {
         return result;
@@ -560,7 +628,7 @@ int main()
     {
         return result;
     }
-    if (const int result = verifyPointSplitReport(); result != 0)
+    if (const int result = verifyFaceVaryingPreservation(); result != 0)
     {
         return result;
     }

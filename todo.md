@@ -186,11 +186,11 @@ Priority levels:
 
 ### Geometry
 
-- [ ] Preserve point and vertex domains in a lossless mesh representation.
+- [x] Preserve numeric point, vertex, and global domains in the simplified mesh representation; preserve primitive attributes when the selected run covers the complete primitive domain and report partial mappings.
 - [x] Support mixed primitive groups.
 - [x] Support multiple variable-size polygons through exact per-primitive counts in the simplified topology model.
-- [ ] Preserve face-varying attributes without forced point duplication.
-- [x] Add a conversion result that reports splits, losses, and unsupported data.
+- [x] Preserve face-varying numeric attributes without forced point duplication.
+- [x] Add a conversion result that reports losses and unsupported data while retaining legacy split counters for API compatibility.
 
 ### Primitive records
 
