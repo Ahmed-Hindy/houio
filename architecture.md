@@ -38,8 +38,9 @@ Writes follow the reverse path. Every operation is synchronous and owns its pars
 | JSON format | `json.h`, `json.cpp` | ASCII and binary JSON parsing, handlers, writers, limits, and byte offsets |
 | Houdini model | `HouGeo.h`, `HouGeo.cpp` | Attributes, topology, groups, polygons, curves, and dense volumes |
 | Adapter API | `HouGeoAdapter.h`, `HouGeoAdapter.cpp` | Read-only export contract for caller-owned geometry |
-| Compatibility API | `HouGeoIO.h`, `HouGeoIO.cpp` | Stream operations and thin source-compatible wrappers |
-| Simplified mesh | `Geometry.h`, `Geometry.cpp` | Render-oriented points, lines, triangles, quads, and polygons |
+| Compatibility I/O | `HouGeoIO.h`, `HouGeoIO.cpp` | Stream operations, faithful export, and thin source-compatible wrappers |
+| Model adaptation | `HouGeoAdapt.cpp` | Simplified geometry and dense-field adaptation into `HouGeo` |
+| Simplified mesh | `Geometry.h`, `Geometry.cpp` | Render-oriented points, lines, triangles, quads, polygons, and numeric attribute domains |
 | Attribute storage | `Attribute.h`, `Attribute.cpp` | Fixed-width tuple storage backed by contiguous bytes |
 | Dense fields | `Field.h`, `Field.cpp` | Dense scalar/vector grids, transforms, and sampling |
 | SCF | `Scf.h`, `Scf.cpp` | SideFX SCF framing and dynamic C-Blosc integration |
@@ -123,6 +124,7 @@ Each attribute has:
 
 Supported numeric storage:
 
+- Unsigned UInt8
 - Signed Int32
 - Signed Int64
 - Float16
@@ -212,11 +214,11 @@ C-Blosc resolution uses, in order:
 
 ## Simplified Geometry
 
-`Geometry` is a convenience representation for rendering and interchange. It supports one primitive mode per object.
+`Geometry` is a convenience representation for rendering and interchange. It supports one primitive mode per object and separate numeric point, vertex, primitive, and global attribute maps.
 
-Vertex attributes are converted to point attributes by duplicating points at discontinuities such as UV seams. This preserves visible mesh data but is not a lossless representation of every Houdini domain.
+Supported face-varying data remains in the vertex domain, so UV seams and vertex normals do not require point duplication. Primitive attributes are preserved only when the selected primitive run covers the complete source primitive domain; partial mappings are skipped and reported.
 
-Use `HouGeo` when primitive attributes, groups, mixed records, curve basis metadata, quadric transforms, or exact domain separation must be retained. The simplified `Geometry` model does not implicitly tessellate NURBS, Bezier, Sphere, or Tube records.
+Use `HouGeo` when strings, dictionaries, groups, mixed records, curve basis metadata, quadric transforms, or complete Houdini metadata must be retained. The simplified `Geometry` model does not implicitly tessellate NURBS, Bezier, Sphere, or Tube records.
 
 ## Attribute storage
 
@@ -234,7 +236,7 @@ The typed accessors remain compatibility APIs and require the caller to request 
 
 ## Houdini bridge
 
-The Houdini integration layer does not load a CPython extension or HDK plug-in. It uses HOM and starts `houio_convert` as a subprocess with a finite timeout.
+The primary Houdini integration layer does not load a CPython extension. It uses HOM, writes the HouIO-owned manifest boundary, and starts the `houio` CLI as a subprocess with a finite timeout. The optional native HDK ROP is isolated behind a C ABI and consumes the same core writer implementation.
 
 Supported bridge workflows:
 

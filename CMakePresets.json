@@ -29,6 +29,53 @@
       }
     },
     {
+      "name": "windows-msvc-core-minimal",
+      "displayName": "Windows MSVC Core Library Only",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-msvc-core-minimal",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HOUIO_BUILD_TESTS": "OFF",
+        "HOUIO_BUILD_EXAMPLES": "OFF",
+        "HOUIO_BUILD_TOOLS": "OFF",
+        "HOUIO_BUILD_BENCHMARKS": "OFF",
+        "HOUIO_ENABLE_OPENVDB": "OFF",
+        "HOUIO_BUILD_HOUDINI_PLUGIN": "OFF",
+        "HOUIO_SCENE_IO_PROVIDER": "disabled"
+      }
+    },
+    {
+      "name": "windows-msvc-scene-io",
+      "displayName": "Windows MSVC Scene-enabled CLI",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-msvc-scene-io",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HOUIO_BUILD_TESTS": "OFF",
+        "HOUIO_BUILD_EXAMPLES": "OFF",
+        "HOUIO_BUILD_TOOLS": "ON",
+        "HOUIO_BUILD_BENCHMARKS": "OFF",
+        "HOUIO_ENABLE_OPENVDB": "OFF",
+        "HOUIO_BUILD_HOUDINI_PLUGIN": "OFF",
+        "HOUIO_SCENE_IO_PROVIDER": "bundled",
+        "HOUIO_BUNDLED_SCENE_IO_ROOT": "$env{HOUIO_BUNDLED_SCENE_IO_ROOT}"
+      }
+    },
+    {
+      "name": "windows-msvc-full-development",
+      "displayName": "Windows MSVC Full Development",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-msvc-full-development",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HOUIO_BUILD_TESTS": "ON",
+        "HOUIO_BUILD_EXAMPLES": "ON",
+        "HOUIO_BUILD_TOOLS": "ON",
+        "HOUIO_BUILD_BENCHMARKS": "ON",
+        "HOUIO_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
       "name": "windows-msvc-release-bundled",
       "displayName": "Windows MSVC Release with Bundled Scene Writers",
       "inherits": "windows-msvc-release",
@@ -104,6 +151,22 @@
       }
     },
     {
+      "name": "linux-gcc-core-openvdb",
+      "displayName": "Linux GCC Core with OpenVDB",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-gcc-core-openvdb",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HOUIO_BUILD_TESTS": "OFF",
+        "HOUIO_BUILD_EXAMPLES": "OFF",
+        "HOUIO_BUILD_TOOLS": "ON",
+        "HOUIO_BUILD_BENCHMARKS": "OFF",
+        "HOUIO_ENABLE_OPENVDB": "ON",
+        "HOUIO_BUILD_HOUDINI_PLUGIN": "OFF",
+        "HOUIO_SCENE_IO_PROVIDER": "disabled"
+      }
+    },
+    {
       "name": "linux-gcc-ubsan",
       "displayName": "Linux GCC UndefinedBehaviorSanitizer",
       "generator": "Ninja",
@@ -140,6 +203,18 @@
       "configurePreset": "windows-msvc-release"
     },
     {
+      "name": "windows-msvc-core-minimal",
+      "configurePreset": "windows-msvc-core-minimal"
+    },
+    {
+      "name": "windows-msvc-scene-io",
+      "configurePreset": "windows-msvc-scene-io"
+    },
+    {
+      "name": "windows-msvc-full-development",
+      "configurePreset": "windows-msvc-full-development"
+    },
+    {
       "name": "windows-msvc-release-bundled",
       "configurePreset": "windows-msvc-release-bundled"
     },
@@ -166,6 +241,10 @@
     {
       "name": "linux-gcc-release",
       "configurePreset": "linux-gcc-release"
+    },
+    {
+      "name": "linux-gcc-core-openvdb",
+      "configurePreset": "linux-gcc-core-openvdb"
     },
     {
       "name": "linux-gcc-ubsan",
@@ -204,6 +283,13 @@
     {
       "name": "windows-msvc-werror",
       "configurePreset": "windows-msvc-werror",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-msvc-full-development",
+      "configurePreset": "windows-msvc-full-development",
       "output": {
         "outputOnFailure": true
       }

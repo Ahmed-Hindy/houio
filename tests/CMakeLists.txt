@@ -30,6 +30,15 @@ add_test(
         "-DHOUIO_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/check_release_policy.cmake"
 )
+if(WIN32)
+    add_test(
+        NAME houio.developer_workflow
+        COMMAND
+            "${CMAKE_COMMAND}"
+            "-DHOUIO_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/check_developer_workflow.cmake"
+    )
+endif()
 
 add_executable(houio_test_attribute test_attribute.cpp)
 target_link_libraries(houio_test_attribute PRIVATE houio::houio)

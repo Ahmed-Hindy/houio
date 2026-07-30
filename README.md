@@ -25,6 +25,8 @@ The minimum supported Houdini version is **20.0**. The file, large-asset, and pa
 | Houdini package | Direct custom-write shelf tool, round trip, diagnostics, and converter access |
 | Test suite | Parser, schema, topology, attribute, volume, package, sanitizer, and fuzz coverage |
 
+See [Product scope](docs/product-scope.md) for the current runtime products, optional backends, non-goals, and named build profiles.
+
 ## Supported geometry
 
 HouIO currently supports:
@@ -88,6 +90,21 @@ Windows Release:
 cmake --preset windows-msvc-release
 cmake --build --preset windows-msvc-release
 ctest --preset windows-msvc-release
+```
+
+Focused product profiles:
+
+```powershell
+cmake --preset windows-msvc-core-minimal
+cmake --build --preset windows-msvc-core-minimal
+
+$env:HOUIO_BUNDLED_SCENE_IO_ROOT = "$PWD\build\dependencies\scene-io\install"
+cmake --preset windows-msvc-scene-io
+cmake --build --preset windows-msvc-scene-io
+
+cmake --preset windows-msvc-full-development
+cmake --build --preset windows-msvc-full-development
+ctest --preset windows-msvc-full-development
 ```
 
 Linux GCC:
