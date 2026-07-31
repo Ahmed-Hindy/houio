@@ -67,9 +67,9 @@ Every phase must preserve these constraints:
 
 ## Current validation status
 
-- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **76/76**.
-- Current exact source: Windows AddressSanitizer matrix passes **76/76**.
-- Current exact source: bundled no-Houdini scene-I/O package suite passes **34/34**.
+- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **77/77**.
+- Current exact source: Windows AddressSanitizer matrix passes **77/77**.
+- Current exact source: bundled no-Houdini scene-I/O package suite passes **35/35**.
 - MSVC native static analysis is error-clean.
 - The native HDK ROP warnings-as-errors build/runtime matrix passes in Houdini **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - The 21-fixture matrix, direct custom writer, large Crag round trip, and Houdini package pass with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
@@ -1309,6 +1309,34 @@ Exit criteria:
 - Public container and BGEO tests cover all four numeric domains.
 - Houdini reload retains shared-point topology, face-varying UVs and normals, primitive IDs, and global values.
 - Unsupported strings, dictionaries, groups, and mixed primitive families remain explicitly outside the simplified model.
+
+### Phase 50 — Product-surface consolidation
+
+**Status: complete through PR #57.**
+
+Completed work:
+
+- [x] Define maintained product surfaces and explicit build profiles.
+- [x] Add safe cleanup commands for generated builds and dependency caches.
+- [x] Move simplified geometry and dense-field adaptation into `HouGeoAdapt.cpp`.
+- [x] Update architecture and product-scope documentation to match the shipped library, CLI, Houdini package, and optional backends.
+
+### Phase 51 — Primitive schema-loader modularization
+
+**Status: complete on `chore/consolidate-product-surface`.**
+
+Completed work:
+
+- [x] Move native VDB, Sphere, Tube, NURBS, and Bezier schema decoding out of `HouGeo.cpp`.
+- [x] Keep primitive dispatch and object ownership in the core Houdini model.
+- [x] Add a source-layout test that prevents the extracted loaders from returning to the monolithic translation unit.
+- [x] Update the architecture and active roadmap with the new module boundary.
+
+Exit criteria:
+
+- The strict compiler target builds without behavioral changes.
+- Existing curve, quadric, native VDB, fixture, and package tests remain green.
+- Future primitive-family loading has an explicit focused module to extend.
 
 ## Deferred work
 

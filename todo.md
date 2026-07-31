@@ -5,8 +5,8 @@ The long-term roadmap remains below. The active modernization program is summari
 ## Current baseline
 
 - The maintained product surfaces are the C++ library, primary CLI, Houdini package, and optional OpenVDB/Alembic/OpenUSD backends. See [Product scope](docs/product-scope.md).
-- MSVC warnings-as-errors and AddressSanitizer suites pass **76/76**; MSVC native analysis is error-clean.
-- The bundled no-Houdini scene-I/O package suite passes **34/34**.
+- MSVC warnings-as-errors and AddressSanitizer suites pass **77/77**; MSVC native analysis is error-clean.
+- The bundled no-Houdini scene-I/O package suite passes **35/35**.
 - Houdini integration is validated with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
 - Public redistribution remains blocked by the documented upstream license/provenance issue.
 
@@ -15,7 +15,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Define explicit core-minimal, OpenVDB, scene-I/O, Houdini-package, and full-development build profiles.
 - [x] Add a safe developer command for removing preset builds, generated build trees, dependency caches, or the complete ignored build directory.
 - [x] Separate simplified-to-Houdini adaptation from the monolithic `HouGeoIO.cpp` translation unit.
-- [ ] Split faithful HouGeo schema loading by attributes, polygons/curves, packed records, and volumes.
+- [ ] Split faithful HouGeo schema loading by attributes, polygons/curves, packed records, and volumes; curve, quadric, and native VDB decoding now live in `HouGeoPrimitiveLoad.cpp`.
 - [ ] Split manifest decoding by attributes, primitive families, and VDB records.
 - [ ] Evaluate retirement of `houio_convert` after a documented compatibility period.
 - [ ] Reduce generic JSON-tree memory amplification for large numeric arrays.

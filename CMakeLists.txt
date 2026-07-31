@@ -36,6 +36,7 @@ add_library(
     src/GeometryIO.cpp
     src/HomManifest.cpp
     src/HouGeo.cpp
+    src/HouGeoPrimitiveLoad.cpp
     src/HouGeoAdapter.cpp
     src/HouGeoAdapt.cpp
     src/HouGeoIO.cpp

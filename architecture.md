@@ -36,7 +36,8 @@ Writes follow the reverse path. Every operation is synchronous and owns its pars
 | --- | --- | --- |
 | Public I/O | `GeometryIO.h`, `GeometryIO.cpp` | Format detection, path I/O, owned results, diagnostics, and SCF routing |
 | JSON format | `json.h`, `json.cpp` | ASCII and binary JSON parsing, handlers, writers, limits, and byte offsets |
-| Houdini model | `HouGeo.h`, `HouGeo.cpp` | Attributes, topology, groups, polygons, curves, and dense volumes |
+| Houdini model | `HouGeo.h`, `HouGeo.cpp` | Core object state, attributes, topology, groups, and primitive dispatch |
+| Primitive schema loading | `HouGeoPrimitiveLoad.cpp` | Native VDB, Sphere, Tube, NURBS, and Bezier record decoding |
 | Adapter API | `HouGeoAdapter.h`, `HouGeoAdapter.cpp` | Read-only export contract for caller-owned geometry |
 | Compatibility I/O | `HouGeoIO.h`, `HouGeoIO.cpp` | Stream operations, faithful export, and thin source-compatible wrappers |
 | Model adaptation | `HouGeoAdapt.cpp` | Simplified geometry and dense-field adaptation into `HouGeo` |
@@ -144,6 +145,8 @@ Topology stores vertex-to-point indices. Every point reference is validated agai
 Point, vertex, and primitive groups use boolean membership masks. Mask size must match the corresponding domain. Ordered selections are rejected because their ordering semantics are not implemented.
 
 ### Primitives
+
+Primitive dispatch remains in `HouGeo.cpp`. Curve, quadric, and native VDB schema decoding is isolated in `HouGeoPrimitiveLoad.cpp`; additional primitive-family extractions should follow this boundary rather than expanding the core translation unit.
 
 Supported primitive records:
 
