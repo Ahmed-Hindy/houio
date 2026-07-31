@@ -30,6 +30,13 @@ add_test(
         "-DHOUIO_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/check_release_policy.cmake"
 )
+add_test(
+    NAME houio.hougeo_module_layout
+    COMMAND
+        "${CMAKE_COMMAND}"
+        "-DHOUIO_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/check_hougeo_module_layout.cmake"
+)
 if(WIN32)
     add_test(
         NAME houio.developer_workflow
