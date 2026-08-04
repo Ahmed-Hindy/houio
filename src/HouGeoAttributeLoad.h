@@ -18,6 +18,13 @@ namespace houio::hougeo_attribute_detail
     [[nodiscard]] Attribute::ComponentType componentTypeForStorage(
         HouGeoAdapter::AttributeAdapter::Storage storage) noexcept;
 
+    [[nodiscard]] bool copyUniformNumericValues(
+        std::span<std::byte> destination,
+        std::size_t destinationStart,
+        std::size_t destinationStride,
+        HouGeoAdapter::AttributeAdapter::Storage storage,
+        const json::ArrayPtr& source);
+
     void storeNumericComponent(
         std::span<std::byte> data,
         std::size_t destinationIndex,

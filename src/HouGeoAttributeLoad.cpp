@@ -6,6 +6,7 @@
 #include <cstring>
 #include <limits>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <type_traits>
 
@@ -326,6 +327,110 @@ namespace houio::hougeo_attribute_detail
             return Attribute::ComponentType::invalid;
         }
         return Attribute::ComponentType::invalid;
+    }
+
+    bool copyUniformNumericValues(
+        std::span<std::byte> destination,
+        std::size_t destinationStart,
+        std::size_t destinationStride,
+        HouGeoAdapter::AttributeAdapter::Storage storage,
+        const json::ArrayPtr& source)
+    {
+        if( !source || !source->isUniform() )
+            return false;
+
+        json::Token::Type expectedStorage = json::Token::Type::nullValue;
+        using Storage = HouGeoAdapter::AttributeAdapter::Storage;
+        switch( storage )
+        {
+        case Storage::uint8:
+            expectedStorage = json::Token::JID_UINT8;
+            break;
+        case Storage::float16:
+            expectedStorage = json::Token::JID_REAL16;
+            break;
+        case Storage::float32:
+            expectedStorage = json::Token::JID_REAL32;
+            break;
+        case Storage::float64:
+            expectedStorage = json::Token::JID_REAL64;
+            break;
+        case Storage::int32:
+            expectedStorage = json::Token::JID_INT32;
+            break;
+        case Storage::int64:
+            expectedStorage = json::Token::JID_INT64;
+            break;
+        case Storage::invalid:
+            return false;
+        }
+        if( source->uniformStorageType() != expectedStorage )
+            return false;
+
+        const std::optional<std::size_t> componentWidth =
+            HouGeoAdapter::AttributeAdapter::storageByteWidth(storage);
+        if( !componentWidth )
+            return false;
+        const sint64 sourceCountValue = source->size();
+        if( sourceCountValue < 0 )
+            throw std::runtime_error("Uniform numeric source has a negative element count");
+        const std::size_t sourceCount = static_cast<std::size_t>(sourceCountValue);
+        if( sourceCount != 0
+            && *componentWidth > std::numeric_limits<std::size_t>::max() / sourceCount )
+        {
+            throw std::length_error("Uniform numeric source byte count overflow");
+        }
+        const std::size_t sourceByteCount = sourceCount * *componentWidth;
+        const std::span<const std::byte> sourceData = source->uniformData();
+        if( sourceData.size() != sourceByteCount )
+            throw std::runtime_error("Uniform numeric source byte count is inconsistent");
+        if( sourceCount == 0 )
+            return true;
+        if( sourceCount > 1 && destinationStride == 0 )
+            throw std::invalid_argument("Uniform numeric destination stride cannot be zero");
+
+        const std::size_t finalOffset = sourceCount - 1;
+        if( finalOffset != 0
+            && destinationStride > (std::numeric_limits<std::size_t>::max()
+                - destinationStart) / finalOffset )
+        {
+            throw std::out_of_range("Uniform numeric destination index overflow");
+        }
+        const std::size_t finalIndex = destinationStart + finalOffset * destinationStride;
+        if( finalIndex > std::numeric_limits<std::size_t>::max() / *componentWidth )
+            throw std::out_of_range("Uniform numeric destination byte offset overflow");
+        const std::size_t finalByteOffset = finalIndex * *componentWidth;
+        if( finalByteOffset > destination.size()
+            || *componentWidth > destination.size() - finalByteOffset )
+        {
+            throw std::out_of_range("Uniform numeric destination is outside storage");
+        }
+
+        if( destinationStride == 1 )
+        {
+            if( destinationStart > std::numeric_limits<std::size_t>::max()
+                    / *componentWidth )
+            {
+                throw std::out_of_range("Uniform numeric destination byte offset overflow");
+            }
+            const std::size_t destinationByteOffset = destinationStart * *componentWidth;
+            std::memcpy(
+                destination.data() + destinationByteOffset,
+                sourceData.data(),
+                sourceByteCount);
+            return true;
+        }
+
+        for( std::size_t sourceIndex = 0; sourceIndex < sourceCount; ++sourceIndex )
+        {
+            const std::size_t destinationIndex =
+                destinationStart + sourceIndex * destinationStride;
+            std::memcpy(
+                destination.data() + destinationIndex * *componentWidth,
+                sourceData.data() + sourceIndex * *componentWidth,
+                *componentWidth);
+        }
+        return true;
     }
 
     void storeNumericComponent(
