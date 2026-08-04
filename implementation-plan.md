@@ -67,8 +67,8 @@ Every phase must preserve these constraints:
 
 ## Current validation status
 
-- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **77/77**.
-- Current exact source: Windows AddressSanitizer matrix passes **77/77**.
+- Current exact source: MSVC warnings-as-errors/Houdini CTest suite passes **78/78**.
+- Current exact source: Windows AddressSanitizer matrix passes **78/78**.
 - Current exact source: bundled no-Houdini scene-I/O package suite passes **35/35**.
 - MSVC native static analysis is error-clean.
 - The native HDK ROP warnings-as-errors build/runtime matrix passes in Houdini **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
@@ -1337,6 +1337,24 @@ Exit criteria:
 - The strict compiler target builds without behavioral changes.
 - Existing curve, quadric, native VDB, fixture, and package tests remain green.
 - Future primitive-family loading has an explicit focused module to extend.
+
+### Phase 52 — HOM manifest decoder modularization
+
+**Status: complete on `refactor/hom-manifest-modules`.**
+
+Completed work:
+
+- [x] Keep parser setup, shared schema helpers, recursive root orchestration, and public result handling in `HomManifest.cpp`.
+- [x] Move numeric, string, and dictionary attribute decoding plus group membership into `HomManifestAttributes.cpp`.
+- [x] Move polygon, curve, quadric, packed-reference, and dense-volume manifest records into `HomManifestPrimitives.cpp`.
+- [x] Move Float, Int32, and Vec3f sparse VDB manifest records into `HomManifestVdb.cpp`.
+- [x] Add a private shared contract and a source-layout regression test for the module boundary.
+
+Exit criteria:
+
+- The strict warnings-as-errors build and complete local CTest suite pass without behavior changes.
+- Manifest diagnostics retain their existing schema paths and categories.
+- Future manifest data families have focused decoder modules instead of expanding the orchestration translation unit.
 
 ## Deferred work
 
