@@ -101,7 +101,7 @@ build/windows-msvc-release-bundled/houio-<version>-windows-x86_64.zip.sha256
 
 The ZIP is a portable SDK/runtime package containing:
 
-- `houio.exe`, `houio_convert.exe`, and `houio.lib`;
+- `houio.exe` and `houio.lib`;
 - upstream runtime DLLs beside the executables;
 - Alembic, Imath, OpenUSD, and oneTBB headers/import libraries;
 - relocatable Alembic/OpenUSD CMake package metadata;

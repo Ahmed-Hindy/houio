@@ -1,6 +1,6 @@
 # HouIO command-line interface
 
-`houio` is the primary command-line entry point for the custom writer, inspection, validation, and runtime diagnostics. `houio_convert` remains available as a compatibility two-path converter.
+`houio` is the single command-line entry point for custom writing, file conversion, inspection, validation, and runtime diagnostics. The beta-only `houio_convert` executable has been retired; use the `convert` subcommand.
 
 ## Commands
 

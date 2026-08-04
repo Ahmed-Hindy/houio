@@ -50,46 +50,6 @@ class HouIOConverterError(subprocess.CalledProcessError):
         return f"{message}\n{details}" if details else message
 
 
-def _resolve_converter(executable: Optional[PathLike]) -> Path:
-    """Resolve the installed or locally built HouIO converter executable."""
-    candidates: list[Path] = []
-    if executable is not None:
-        candidates.append(Path(executable))
-    environment_executable = os.environ.get("HOUIO_CONVERT_EXECUTABLE")
-    if environment_executable:
-        candidates.append(Path(environment_executable))
-    path_executable = shutil.which("houio_convert") or shutil.which("houio_convert.exe")
-    if path_executable:
-        candidates.append(Path(path_executable))
-
-    repository_root = os.environ.get("HOUIO_ROOT")
-    if repository_root:
-        root = Path(repository_root)
-        candidates.extend(
-            (
-                root / "bin" / "houio_convert.exe",
-                root / "bin" / "houio_convert",
-                root / "build" / "windows-msvc-release" / "houio_convert.exe",
-                root
-                / "build"
-                / "windows-msvc-release"
-                / "Release"
-                / "houio_convert.exe",
-                root / "build" / "windows-gcc-mingw" / "houio_convert.exe",
-                root / "build" / "windows-gcc-mingw" / "Release" / "houio_convert.exe",
-                root / "build" / "linux-gcc-release" / "houio_convert",
-            )
-        )
-
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate.resolve()
-    raise FileNotFoundError(
-        "Could not find houio_convert. Pass executable=..., set "
-        "HOUIO_CONVERT_EXECUTABLE, or install houio_convert on PATH."
-    )
-
-
 def _resolve_writer(executable: Optional[PathLike]) -> Path:
     """Resolve the primary ``houio`` command-line writer."""
     candidates: list[Path] = []
@@ -700,27 +660,27 @@ def convert_with_houio(
     executable: Optional[PathLike] = None,
     timeout_seconds: Optional[float] = DEFAULT_CONVERTER_TIMEOUT_SECONDS,
 ) -> None:
-    """Run the HouIO converter from a Houdini Python session.
+    """Run ``houio convert`` from a Houdini Python session.
 
     VDB input is converted to a temporary dense-volume bgeo before invoking
     HouIO. VDB output is written by Houdini after HouIO produces an
     uncompressed bgeo intermediate. `.bgeo.sc` can be passed directly because
-    `houio_convert` supports the SCF wrapper natively.
+    the primary command supports the SCF wrapper natively.
 
     Args:
         input_path: Input `.geo`, `.bgeo`, `.bgeo.sc`, or scalar `.vdb` file.
         output_path: Output `.bgeo`, `.bgeo.sc`, or `.vdb` file.
-        executable: Optional explicit path to `houio_convert`.
-        timeout_seconds: Maximum converter runtime, or `None` to disable the timeout.
+        executable: Optional explicit path to the primary `houio` executable.
+        timeout_seconds: Maximum command runtime, or `None` to disable the timeout.
 
     Raises:
-        FileNotFoundError: If `houio_convert` cannot be resolved.
+        FileNotFoundError: If the primary `houio` executable cannot be resolved.
         subprocess.CalledProcessError: If HouIO reports a conversion failure.
-        subprocess.TimeoutExpired: If the converter exceeds `timeout_seconds`.
+        subprocess.TimeoutExpired: If the command exceeds `timeout_seconds`.
     """
     source = Path(input_path)
     destination = Path(output_path)
-    converter = _resolve_converter(executable)
+    writer = _resolve_writer(executable)
     destination.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="houio_hom_") as temporary_directory:
@@ -737,7 +697,7 @@ def convert_with_houio(
             converter_output = temporary_root / "output.bgeo"
 
         completed = subprocess.run(
-            (str(converter), str(converter_input), str(converter_output)),
+            (str(writer), "convert", str(converter_input), str(converter_output)),
             check=False,
             capture_output=True,
             text=True,
@@ -765,8 +725,8 @@ def roundtrip_node_geometry(
 
     Args:
         node: SOP node whose cooked geometry should be processed.
-        executable: Optional explicit path to `houio_convert`.
-        timeout_seconds: Maximum converter runtime, or `None` to disable the timeout.
+        executable: Optional explicit path to the primary `houio` executable.
+        timeout_seconds: Maximum command runtime, or `None` to disable the timeout.
 
     Returns:
         Newly allocated geometry loaded from HouIO's output. Supported Float VDB
@@ -774,7 +734,7 @@ def roundtrip_node_geometry(
         VDB primitives with their level-set or fog class. Native dense volumes
         remain dense volumes.
     """
-    converter = _resolve_converter(executable)
+    writer = _resolve_writer(executable)
     source_geometry = _copy_geometry(node.geometry())
     _, volume_count, vdb_count = _primitive_counts(source_geometry)
     vdb_group_name: Optional[str] = None
@@ -795,7 +755,7 @@ def roundtrip_node_geometry(
         convert_with_houio(
             input_path,
             output_path,
-            executable=converter,
+            executable=writer,
             timeout_seconds=timeout_seconds,
         )
         processed_geometry = geometry_from_bgeo_bytes(output_path.read_bytes())
@@ -814,8 +774,8 @@ def roundtrip_current_sop(
     """Replace the current writable Python SOP geometry with HouIO output.
 
     Args:
-        executable: Optional explicit path to `houio_convert`.
-        timeout_seconds: Maximum converter runtime, or `None` to disable the timeout.
+        executable: Optional explicit path to the primary `houio` executable.
+        timeout_seconds: Maximum command runtime, or `None` to disable the timeout.
 
     Returns:
         The current Python SOP's modifiable geometry. Supported Float VDB

@@ -7,7 +7,7 @@ param(
     [string[]]$HoudiniVersions = @("20.0", "20.5", "21.0", "22.0"),
 
     [Parameter()]
-    [string]$ConverterExecutable = "",
+    [string]$HouIOExecutable = "",
 
     [Parameter()]
     [switch]$Uninstall
@@ -43,30 +43,31 @@ if (-not (Test-Path (Join-Path $pythonRoot "houio_hom"))) {
 }
 $resolvedPythonRoot = Convert-ToPackagePath -Path $pythonRoot
 
-if ([string]::IsNullOrWhiteSpace($ConverterExecutable)) {
-    $converterCandidates = @(
-        (Join-Path $RepositoryRoot "build\windows-msvc-release\houio_convert.exe")
-        (Join-Path $RepositoryRoot "build\windows-msvc-release\Release\houio_convert.exe")
-        (Join-Path $RepositoryRoot "build\windows-gcc-mingw\houio_convert.exe")
-        (Join-Path $RepositoryRoot "build\windows-gcc-mingw\Release\houio_convert.exe")
-        (Join-Path $RepositoryRoot "bin\houio_convert.exe")
-        (Join-Path $RepositoryRoot "bin\houio_convert")
+if ([string]::IsNullOrWhiteSpace($HouIOExecutable)) {
+    $executableCandidates = @(
+        (Join-Path $RepositoryRoot "build\windows-msvc-release\houio.exe")
+        (Join-Path $RepositoryRoot "build\windows-msvc-release\Release\houio.exe")
+        (Join-Path $RepositoryRoot "build\windows-msvc-werror\houio.exe")
+        (Join-Path $RepositoryRoot "build\windows-gcc-mingw\houio.exe")
+        (Join-Path $RepositoryRoot "build\windows-gcc-mingw\Release\houio.exe")
+        (Join-Path $RepositoryRoot "bin\houio.exe")
+        (Join-Path $RepositoryRoot "bin\houio")
     )
-    foreach ($candidateConverter in $converterCandidates) {
-        if (Test-Path $candidateConverter) {
-            $ConverterExecutable = $candidateConverter
+    foreach ($candidateExecutable in $executableCandidates) {
+        if (Test-Path $candidateExecutable) {
+            $HouIOExecutable = $candidateExecutable
             break
         }
     }
 }
-if (-not [string]::IsNullOrWhiteSpace($ConverterExecutable) -and
-    -not (Test-Path -LiteralPath $ConverterExecutable -PathType Leaf)) {
-    throw "Could not find houio_convert at $ConverterExecutable"
+if (-not [string]::IsNullOrWhiteSpace($HouIOExecutable) -and
+    -not (Test-Path -LiteralPath $HouIOExecutable -PathType Leaf)) {
+    throw "Could not find houio at $HouIOExecutable"
 }
-$resolvedConverter = if ([string]::IsNullOrWhiteSpace($ConverterExecutable)) {
+$resolvedExecutable = if ([string]::IsNullOrWhiteSpace($HouIOExecutable)) {
     ""
 } else {
-    Convert-ToPackagePath -Path $ConverterExecutable
+    Convert-ToPackagePath -Path $HouIOExecutable
 }
 
 $documentsDirectory = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
@@ -94,8 +95,8 @@ foreach ($houdiniVersion in $HoudiniVersions) {
         [ordered]@{ PYTHONPATH = '$HOUIO_PYTHON_ROOT;$PYTHONPATH' }
         [ordered]@{ HOUIO_BLOSC_LIBRARY = '$HFS/bin/blosc.dll' }
     )
-    if (-not [string]::IsNullOrWhiteSpace($resolvedConverter)) {
-        $packageEnvironment += [ordered]@{ HOUIO_CONVERT_EXECUTABLE = $resolvedConverter }
+    if (-not [string]::IsNullOrWhiteSpace($resolvedExecutable)) {
+        $packageEnvironment += [ordered]@{ HOUIO_EXECUTABLE = $resolvedExecutable }
     }
 
     $package = [ordered]@{

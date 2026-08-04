@@ -2,8 +2,7 @@
 
 The Windows archive contains:
 
-- `houio.exe`, the primary custom-writer CLI
-- `houio_convert.exe`, the compatibility converter
+- `houio.exe`, the unified writer, converter, inspection, and diagnostics CLI
 - The `houio_hom` direct HOM extraction bridge
 - Shelf and Tab-menu tools
 - Package diagnostics
@@ -111,13 +110,13 @@ Inside the bootstrapped Houdini session:
 1. Create a Geometry object and enter its SOP network.
 2. Create and select a Box SOP.
 3. Run **Tab > HouIO > Package Diagnostics**.
-4. Confirm the package root, writer, converter, and C-Blosc checks pass.
+4. Confirm the package root, HouIO executable, diagnostics, and C-Blosc checks pass.
 5. Run **Tab > HouIO > Write Selected Geometry** and choose a `.bgeo.sc` destination.
 6. Load the result with a File SOP and compare attributes, groups, points, and primitives.
 7. Run **Tab > HouIO > HouIO Round Trip**.
 8. Confirm the created node cooks without errors or warnings.
 9. Disable **Enabled** and confirm geometry passes through unchanged.
-10. Use **Convert Geometry File** for compatibility file-to-file conversion.
+10. Use **Convert Geometry File** for file-to-file conversion through `houio convert`.
 
 Repeat the test in each Houdini version you intend to support.
 
@@ -168,17 +167,17 @@ Creates a configured Python SOP after the selected SOP.
 Parameters:
 
 - **Enabled** bypasses HouIO when disabled.
-- **Timeout (seconds)** limits converter execution; default `300`.
+- **Timeout (seconds)** limits external HouIO command execution; default `300`.
 
 Supported VDB inputs are densified only for the external HouIO process and are restored as VDB primitives when the node finishes cooking. Native dense volumes remain dense volumes.
 
 ### Convert Geometry File
 
-Converts `.geo`, `.bgeo`, or `.bgeo.sc` through the bundled executable.
+Converts `.geo`, `.bgeo`, or `.bgeo.sc` through the bundled `houio convert` command.
 
 ### Package Diagnostics
 
-Reports the active package root, Houdini version, primary writer path and `houio diagnose --json` result, compatibility converter path, C-Blosc path, and runtime existence checks.
+Reports the active package root, Houdini version, HouIO executable path and `houio diagnose --json` result, C-Blosc path, and runtime existence checks.
 
 ## Supported data
 
@@ -190,7 +189,7 @@ File-to-file conversion preserves packed fragments, and direct **Write Selected 
 
 ## Runtime model
 
-The package does not load a HouIO extension or HDK plug-in into Houdini. It imports Python code, extracts supported data into the HouIO-owned `houio.hom/1` manifest, and starts `houio.exe` as a separate custom-writer process. `houio_convert.exe` remains bundled for compatibility workflows.
+The package does not load a HouIO extension or HDK plug-in into Houdini. It imports Python code and starts the unified `houio.exe` CLI as a separate process. Live geometry uses the HouIO-owned `houio.hom/1` manifest; file conversion uses the CLI's `convert` subcommand.
 
 `.bgeo.sc` support resolves C-Blosc from the active Houdini installation through `$HFS/bin/blosc.dll`.
 

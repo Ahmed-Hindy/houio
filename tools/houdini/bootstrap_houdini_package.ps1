@@ -133,7 +133,6 @@ $resolvedSourceRoot = Resolve-AbsolutePath -Path $SourceRoot -Description "packa
 $packageFile = Join-Path $resolvedSourceRoot "houio.json"
 $contentDirectory = Join-Path $resolvedSourceRoot "houio"
 $writerExecutable = Join-Path $contentDirectory "bin\houio.exe"
-$converterExecutable = Join-Path $contentDirectory "bin\houio_convert.exe"
 
 if (-not (Test-Path -LiteralPath $packageFile -PathType Leaf)) {
     throw "Missing package file: $packageFile"
@@ -142,10 +141,7 @@ if (-not (Test-Path -LiteralPath $contentDirectory -PathType Container)) {
     throw "Missing package content directory: $contentDirectory"
 }
 if (-not (Test-Path -LiteralPath $writerExecutable -PathType Leaf)) {
-    throw "Missing HouIO writer executable: $writerExecutable"
-}
-if (-not (Test-Path -LiteralPath $converterExecutable -PathType Leaf)) {
-    throw "Missing converter executable: $converterExecutable"
+    throw "Missing HouIO executable: $writerExecutable"
 }
 
 if ([string]::IsNullOrWhiteSpace($BootstrapDirectory)) {

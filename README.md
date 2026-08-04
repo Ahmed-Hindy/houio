@@ -19,10 +19,9 @@ The minimum supported Houdini version is **20.0**. The file, large-asset, and pa
 | Component | Purpose |
 | --- | --- |
 | `houio::houio` | Static C++ library for GEO, BGEO, and SCF geometry I/O |
-| `houio` | Primary CLI for write, convert, inspect, validate, capabilities, and diagnostics |
-| `houio_convert` | Compatibility two-path file converter |
+| `houio` | Unified CLI for write, convert, inspect, validate, capabilities, and diagnostics |
 | `python/houio_hom` | Direct HOM extraction and custom-writer bridge |
-| Houdini package | Direct custom-write shelf tool, round trip, diagnostics, and converter access |
+| Houdini package | Direct custom-write shelf tool, file conversion, round trip, and diagnostics |
 | Test suite | Parser, schema, topology, attribute, volume, package, sanitizer, and fuzz coverage |
 
 See [Product scope](docs/product-scope.md) for the current runtime products, optional backends, non-goals, and named build profiles.
@@ -247,7 +246,7 @@ houio capabilities --json
 houio diagnose --json
 ```
 
-The Houdini bridge uses `houio write-manifest <manifest.json> <output>` internally. `houio_convert input output` remains available for compatibility. Use `HOUIO_BLOSC_LIBRARY` or `GeometryWriteOptions::bloscLibraryPath` when C-Blosc cannot be resolved automatically.
+The Houdini bridge uses `houio write-manifest <manifest.json> <output>` for live HOM geometry and `houio convert <input> <output>` for file conversion. Use `HOUIO_BLOSC_LIBRARY` or `GeometryWriteOptions::bloscLibraryPath` when C-Blosc cannot be resolved automatically.
 
 ## Alembic and USD writers
 

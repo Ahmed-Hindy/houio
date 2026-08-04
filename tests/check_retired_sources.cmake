@@ -19,6 +19,24 @@ foreach(retired_path IN ITEMS
     endif()
 endforeach()
 
+file(READ "${HOUIO_SOURCE_DIR}/CMakeLists.txt" project_source)
+foreach(retired_converter_pattern IN ITEMS
+    "add_executable(houio_convert"
+    "TARGET_FILE:houio_convert"
+    "IN ITEMS houio_cli houio_convert"
+)
+    string(FIND "${project_source}" "${retired_converter_pattern}" converter_position)
+    if(NOT converter_position EQUAL -1)
+        message(FATAL_ERROR "Retired compatibility converter target was restored: ${retired_converter_pattern}")
+    endif()
+endforeach()
+
+file(READ "${HOUIO_SOURCE_DIR}/houdini/package/houio.json.in" houdini_package_source)
+string(FIND "${houdini_package_source}" "HOUIO_CONVERT_EXECUTABLE" converter_environment_position)
+if(NOT converter_environment_position EQUAL -1)
+    message(FATAL_ERROR "Retired compatibility converter environment variable was restored")
+endif()
+
 file(GLOB_RECURSE active_sources LIST_DIRECTORIES FALSE
     "${HOUIO_SOURCE_DIR}/include/houio/*.h"
     "${HOUIO_SOURCE_DIR}/include/houio/*.hpp"

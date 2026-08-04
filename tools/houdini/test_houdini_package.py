@@ -16,15 +16,15 @@ def validate_environment() -> None:
     """Validate package paths and imported modules."""
     package_root = Path(os.environ["HOUIO_ROOT"]).resolve()
     writer_path = Path(os.environ["HOUIO_EXECUTABLE"]).resolve()
-    converter_path = Path(os.environ["HOUIO_CONVERT_EXECUTABLE"]).resolve()
     blosc_path = Path(hou.text.expandString(os.environ["HOUIO_BLOSC_LIBRARY"])).resolve()
 
     if not package_root.is_dir():
         raise AssertionError(f"Missing package root: {package_root}")
     if not writer_path.is_file():
-        raise AssertionError(f"Missing HouIO writer: {writer_path}")
-    if not converter_path.is_file():
-        raise AssertionError(f"Missing converter: {converter_path}")
+        raise AssertionError(f"Missing HouIO executable: {writer_path}")
+    retired_converter = package_root / "bin" / "houio_convert.exe"
+    if retired_converter.exists():
+        raise AssertionError(f"Retired converter was packaged: {retired_converter}")
     if not blosc_path.is_file():
         raise AssertionError(f"Missing Blosc runtime: {blosc_path}")
 
@@ -237,7 +237,6 @@ def validate_diagnostics() -> None:
         "package_root_exists",
         "writer_exists",
         "writer_diagnostics_ok",
-        "converter_exists",
         "blosc_exists",
     )
     for key in required_true_values:

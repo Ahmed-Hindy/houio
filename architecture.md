@@ -1,6 +1,6 @@
 # Architecture
 
-HouIO is organized around a standalone C++20 file-format library, a path-based I/O facade, a command-line converter, and an optional Houdini Python integration layer.
+HouIO is organized around a standalone C++20 file-format library, a path-based I/O facade, one command-line application, and an optional Houdini Python integration layer.
 
 The minimum supported Houdini version is 20.0.
 
@@ -47,7 +47,7 @@ Writes follow the reverse path. Every operation is synchronous and owns its pars
 | Dense fields | `Field.h`, `Field.cpp` | Dense scalar/vector grids, transforms, and sampling |
 | SCF | `Scf.h`, `Scf.cpp` | SideFX SCF framing and dynamic C-Blosc integration |
 | Houdini bridge | `python/houio_hom` | Package workflows, in-memory BGEO exchange, and VDB conversion |
-| Converter | `tools/houio_convert.cpp` | Path-to-path conversion using the public API |
+| Command-line application | `tools/houio.cpp` | Writing, path conversion, inspection, validation, capabilities, and diagnostics |
 
 ## GeometryIO
 

@@ -463,7 +463,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
         )
     endif()
 
-    if(TARGET houio_convert)
+    if(TARGET houio_cli)
         add_test(
             NAME houio.hom_bridge
             COMMAND
@@ -474,7 +474,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
         set_tests_properties(
             houio.hom_bridge
             PROPERTIES
-                ENVIRONMENT "HOUIO_CONVERT_EXECUTABLE=$<TARGET_FILE:houio_convert>;HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
+                ENVIRONMENT "HOUIO_EXECUTABLE=$<TARGET_FILE:houio_cli>;HOUIO_BLOSC_LIBRARY=${HOUIO_HYTHON_BLOSC_LIBRARY}"
                 ENVIRONMENT_MODIFICATION "PYTHONPATH=path_list_prepend:${PROJECT_SOURCE_DIR}/python"
         )
     endif()
@@ -636,7 +636,7 @@ if(HOUIO_HYTHON_EXECUTABLE)
             FIXTURES_REQUIRED "houio_fixture_sources;houio_triangle_scf_output"
     )
 
-    if(TARGET houio_convert)
+    if(TARGET houio_cli)
         add_test(
             NAME houio.fixtures.triangles.houdini_scf_generate
             COMMAND
@@ -656,7 +656,8 @@ if(HOUIO_HYTHON_EXECUTABLE)
         add_test(
             NAME houio.fixtures.triangles.houdini_scf_read
             COMMAND
-                $<TARGET_FILE:houio_convert>
+                $<TARGET_FILE:houio_cli>
+                convert
                 "${HOUIO_FIXTURE_SOURCE_DIR}/triangles_houdini.bgeo.sc"
                 "${HOUIO_FIXTURE_OUTPUT_DIR}/triangles_houdini_scf.bgeo"
         )

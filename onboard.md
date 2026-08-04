@@ -133,7 +133,7 @@ Start with the primary CLI:
 .\build\windows-msvc-debug\houio.exe write input.bgeo output.bgeo.sc
 ```
 
-`houio_convert.exe input output` remains available for compatibility.
+Use `houio.exe convert input output` for file-to-file conversion.
 
 Use the inspection tools when you need parser or schema detail:
 

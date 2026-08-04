@@ -981,7 +981,7 @@ Exit criteria:
 
 - Human-readable and machine-readable output are both maintained contracts.
 - CLI help exposes supported formats, records, compression, and limitations.
-- The old two-path converter behavior remains available through compatibility syntax or a documented migration.
+- The two-path behavior remains available through `houio convert`; the temporary compatibility executable is addressed by Phase 53.
 
 ### Phase 34 — Installation and Houdini user experience
 
@@ -1355,6 +1355,24 @@ Exit criteria:
 - The strict warnings-as-errors build and complete local CTest suite pass without behavior changes.
 - Manifest diagnostics retain their existing schema paths and categories.
 - Future manifest data families have focused decoder modules instead of expanding the orchestration translation unit.
+
+### Phase 53 — Unified CLI and compatibility-converter retirement
+
+**Status: complete on `refactor/retire-compat-converter`.**
+
+Completed work:
+
+- [x] Remove the standalone `houio_convert` executable from build, install, portable-package, and Houdini-package targets.
+- [x] Migrate the HOM bridge and file-conversion shelf workflow to `houio convert` while retaining the Python `convert_with_houio` API.
+- [x] Package only `houio.exe` and use `HOUIO_EXECUTABLE` as the single runtime executable setting.
+- [x] Update source-tree installation, bootstrap, manual-test bundles, diagnostics, and package-consumer validation.
+- [x] Retain `tools/houio_convert.cpp` only as a non-built migration marker and guard against restoring the retired target.
+
+Exit criteria:
+
+- The strict compiler and Houdini integration suites pass with no `houio_convert` target or packaged binary.
+- The installed and Houdini package surfaces contain one executable.
+- File-to-file GEO/BGEO/SCF conversion continues through `houio convert` with the existing bridge API.
 
 ## Deferred work
 

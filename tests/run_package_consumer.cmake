@@ -34,11 +34,11 @@ set(installed_files
     "${package_root}/share/houio/legal/docs/provenance.md"
 )
 if(HOUIO_EXPECT_TOOLS)
-    set(installed_converter "${package_root}/bin/houio_convert")
+    set(installed_cli "${package_root}/bin/houio")
     if(CMAKE_HOST_WIN32)
-        string(APPEND installed_converter ".exe")
+        string(APPEND installed_cli ".exe")
     endif()
-    list(APPEND installed_files "${installed_converter}")
+    list(APPEND installed_files "${installed_cli}")
 endif()
 foreach(installed_file IN LISTS installed_files)
     if(NOT EXISTS "${installed_file}")
@@ -49,6 +49,8 @@ endforeach()
 foreach(retired_install_path IN ITEMS
     "${package_root}/include/ttl"
     "${package_root}/include/houio/math/Half"
+    "${package_root}/bin/houio_convert"
+    "${package_root}/bin/houio_convert.exe"
 )
     if(EXISTS "${retired_install_path}")
         message(FATAL_ERROR "Retired implementation detail was installed: ${retired_install_path}")
