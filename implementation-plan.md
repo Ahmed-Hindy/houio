@@ -1565,6 +1565,22 @@ Exit criteria:
 - Conversion no longer repeatedly reallocates special attribute buffers.
 - Strict, AddressSanitizer, static-analysis, fixture, package, modern-geometry, and conversion-safety matrices pass.
 
+### Phase 65 — Exact simplified-position promotion allocation
+
+**Status: complete on `perf/preallocate-position-promotion`.**
+
+Completed work:
+
+- [x] Read the final simplified point count before V3f-to-V4f position promotion.
+- [x] Allocate the promoted Houdini V4f `P` attribute at its final size once.
+- [x] Write promoted positions by validated index instead of append growth.
+- [x] Preserve XYZ values, homogeneous W=1, point-domain counts, and downstream export behavior.
+
+Exit criteria:
+
+- Simplified V3f positions adapt to exact Houdini V4f positions without repeated destination reallocations.
+- Geometry I/O, export safety, scene adaptation, strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
