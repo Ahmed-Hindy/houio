@@ -73,6 +73,51 @@ namespace houio
 				}
 			}
 
+			std::size_t uniformStorageBytes(
+				Token::Type storage_type,
+				sint64 element_count)
+			{
+				if (element_count < 0)
+					throw std::invalid_argument("Uniform array element count cannot be negative");
+				const std::size_t count = static_cast<std::size_t>(element_count);
+				if (storage_type == Token::JID_BOOL)
+				{
+					if (count > std::numeric_limits<std::size_t>::max() - 31u)
+						throw std::length_error("Uniform Bool storage size overflow");
+					return ((count + 31u) / 32u) * sizeof(uint32);
+				}
+
+				std::size_t element_size = 0;
+				switch (storage_type)
+				{
+				case Token::JID_INT8:
+				case Token::JID_UINT8:
+					element_size = 1;
+					break;
+				case Token::JID_INT16:
+				case Token::JID_REAL16:
+				case Token::JID_UINT16:
+					element_size = 2;
+					break;
+				case Token::JID_INT32:
+				case Token::JID_REAL32:
+					element_size = 4;
+					break;
+				case Token::JID_INT64:
+				case Token::JID_REAL64:
+					element_size = 8;
+					break;
+				default:
+					throw std::invalid_argument("Uniform array storage type is not numeric");
+				}
+				if (count != 0
+					&& element_size > std::numeric_limits<std::size_t>::max() / count)
+				{
+					throw std::length_error("Uniform array storage size overflow");
+				}
+				return count * element_size;
+			}
+
 			template<typename ValueAt>
 			std::vector<uint32> packBoolWords(size_t element_count, ValueAt value_at)
 			{
@@ -1107,6 +1152,26 @@ namespace houio
 				&& write(data);
 		}
 
+		bool BinaryWriter::jsonUniformArrayRaw(
+			Token::Type storage_type,
+			sint64 element_count,
+			std::span<const std::byte> data)
+		{
+			if (storage_type == Token::JID_STRING
+				|| !isSupportedUniformArrayType(storage_type))
+			{
+				throw std::invalid_argument(
+					"BinaryWriter::jsonUniformArrayRaw requires numeric storage");
+			}
+			if (data.size() != uniformStorageBytes(storage_type, element_count))
+				throw std::invalid_argument(
+					"BinaryWriter::jsonUniformArrayRaw byte count is inconsistent");
+			return writeId(Token::JID_UNIFORM_ARRAY)
+				&& write<ubyte>(static_cast<ubyte>(storage_type))
+				&& writeLength(element_count)
+				&& write(data);
+		}
+
 		void BinaryWriter::jsonBool( const bool &value )
 		{
 			if( value )
@@ -1394,21 +1459,110 @@ namespace houio
 			return uniform_type_index_;
 		}
 
+		Token::Type Array::uniformStorageType() const noexcept
+		{
+			return uniform_storage_type_;
+		}
+
 		void Array::setUniformStorage(
 			int type_index,
 			sint64 element_count,
 			std::span<const std::byte> data)
 		{
+			Token::Type storage_type = Token::Type::nullValue;
+			switch (type_index)
+			{
+			case static_cast<int>(variantIndex<bool, Value::Variant>):
+			{
+				if (element_count < 0)
+					throw std::invalid_argument("Uniform array element count cannot be negative");
+				const std::size_t count = static_cast<std::size_t>(element_count);
+				if (count > std::numeric_limits<std::size_t>::max() / sizeof(bool)
+					|| data.size() != count * sizeof(bool))
+				{
+					throw std::invalid_argument("Uniform Bool byte count is inconsistent");
+				}
+				const std::vector<uint32> words = packBoolWords(
+					count,
+					[&](std::size_t index)
+					{
+						bool value = false;
+						std::memcpy(
+							&value,
+							data.data() + index * sizeof(bool),
+							sizeof(bool));
+						return value;
+					});
+				std::vector<std::byte> packed_data(words.size() * sizeof(uint32));
+				if (!words.empty())
+				{
+					std::memcpy(
+						packed_data.data(),
+						words.data(),
+						packed_data.size());
+				}
+				setUniformStorage(
+					type_index,
+					Token::JID_BOOL,
+					element_count,
+					std::move(packed_data));
+				return;
+			}
+			case static_cast<int>(variantIndex<sint32, Value::Variant>):
+				storage_type = Token::JID_INT32;
+				break;
+			case static_cast<int>(variantIndex<real32, Value::Variant>):
+				storage_type = Token::JID_REAL32;
+				break;
+			case static_cast<int>(variantIndex<real64, Value::Variant>):
+				storage_type = Token::JID_REAL64;
+				break;
+			case static_cast<int>(variantIndex<ubyte, Value::Variant>):
+				storage_type = Token::JID_UINT8;
+				break;
+			case static_cast<int>(variantIndex<sint64, Value::Variant>):
+				storage_type = Token::JID_INT64;
+				break;
+			default:
+				throw std::invalid_argument("Uniform array type index is unsupported");
+			}
+			setUniformStorage(type_index, storage_type, element_count, data);
+		}
+
+		void Array::setUniformStorage(
+			int type_index,
+			Token::Type storage_type,
+			sint64 element_count,
+			std::span<const std::byte> data)
+		{
+			std::vector<std::byte> owned_data(data.begin(), data.end());
+			setUniformStorage(
+				type_index,
+				storage_type,
+				element_count,
+				std::move(owned_data));
+		}
+
+		void Array::setUniformStorage(
+			int type_index,
+			Token::Type storage_type,
+			sint64 element_count,
+			std::vector<std::byte>&& data)
+		{
 			if (type_index < 0)
 				throw std::invalid_argument("Uniform array type index cannot be negative");
-			if (element_count < 0)
-				throw std::invalid_argument("Uniform array element count cannot be negative");
 			if (!values_.empty())
 				throw std::logic_error("Uniform storage cannot replace expanded array values");
+			const std::size_t expected_bytes = uniformStorageBytes(
+				storage_type,
+				element_count);
+			if (data.size() != expected_bytes)
+				throw std::invalid_argument("Uniform array storage byte count is inconsistent");
 			uses_uniform_storage_ = true;
 			uniform_type_index_ = type_index;
+			uniform_storage_type_ = storage_type;
 			uniform_element_count_ = element_count;
-			uniform_data_.assign(data.begin(), data.end());
+			uniform_data_ = std::move(data);
 		}
 
 		void Array::append(const Value& value)
@@ -1448,48 +1602,57 @@ namespace houio
 				throw std::runtime_error("Uniform array has no storage");
 
 			const size_t element_index = static_cast<size_t>(index);
-			switch (uniform_type_index_)
+			const auto read_element = [&]<typename T>(size_t storage_index)
 			{
-			case 0:
+				if (storage_index > std::numeric_limits<size_t>::max() / sizeof(T))
+					throw std::out_of_range("Uniform array storage offset overflow");
+				const size_t byte_offset = storage_index * sizeof(T);
+				if (byte_offset > uniform_data_.size()
+					|| sizeof(T) > uniform_data_.size() - byte_offset)
+				{
+					throw std::out_of_range("Uniform array storage is truncated");
+				}
+				T value{};
+				std::memcpy(&value, uniform_data_.data() + byte_offset, sizeof(T));
+				return value;
+			};
+
+			switch (uniform_storage_type_)
 			{
-				bool value = false;
-				std::memcpy(&value, uniform_data_.data() + sizeof(bool) * element_index, sizeof(value));
-				return Value::create<bool>(value);
+			case Token::JID_BOOL:
+			{
+				const uint32 word = read_element.template operator()<uint32>(element_index / 32u);
+				return Value::create<bool>((word & (uint32{1} << (element_index % 32u))) != 0u);
 			}
-			case 1:
-			{
-				sint32 value = 0;
-				std::memcpy(&value, uniform_data_.data() + sizeof(sint32) * element_index, sizeof(value));
-				return Value::create<sint32>(value);
-			}
-			case 2:
-			{
-				real32 value = 0.0f;
-				std::memcpy(&value, uniform_data_.data() + sizeof(real32) * element_index, sizeof(value));
-				return Value::create<real32>(value);
-			}
-			case 3:
-			{
-				real64 value = 0.0;
-				std::memcpy(&value, uniform_data_.data() + sizeof(real64) * element_index, sizeof(value));
-				return Value::create<real64>(value);
-			}
-			case 4:
-				throw std::runtime_error( "Uniform string arrays use expanded storage" );
-			case 5:
-			{
-				ubyte value = 0;
-				std::memcpy(&value, uniform_data_.data() + sizeof(ubyte) * element_index, sizeof(value));
-				return Value::create<ubyte>(value);
-			}
-			case 6:
-			{
-				sint64 value = 0;
-				std::memcpy(&value, uniform_data_.data() + sizeof(sint64) * element_index, sizeof(value));
-				return Value::create<sint64>(value);
-			}
+			case Token::JID_INT8:
+				return Value::create<sint32>(
+					static_cast<sint32>(read_element.template operator()<sbyte>(element_index)));
+			case Token::JID_INT16:
+				return Value::create<sint32>(
+					static_cast<sint32>(read_element.template operator()<sword>(element_index)));
+			case Token::JID_INT32:
+				return Value::create<sint32>(
+					read_element.template operator()<sint32>(element_index));
+			case Token::JID_INT64:
+				return Value::create<sint64>(
+					read_element.template operator()<sint64>(element_index));
+			case Token::JID_REAL16:
+				return Value::create<real32>(halfBitsToFloat(
+					read_element.template operator()<uword>(element_index)));
+			case Token::JID_REAL32:
+				return Value::create<real32>(
+					read_element.template operator()<real32>(element_index));
+			case Token::JID_REAL64:
+				return Value::create<real64>(
+					read_element.template operator()<real64>(element_index));
+			case Token::JID_UINT8:
+				return Value::create<ubyte>(
+					read_element.template operator()<ubyte>(element_index));
+			case Token::JID_UINT16:
+				return Value::create<sint32>(static_cast<sint32>(
+					read_element.template operator()<uword>(element_index)));
 			default:
-				throw std::runtime_error( "Uniform array has an invalid storage type" );
+				throw std::runtime_error("Uniform array has an invalid storage type");
 			}
 		}
 
@@ -1588,6 +1751,27 @@ namespace houio
 		Value JSONReader::root() const
 		{
 			return root_;
+		}
+
+		void JSONReader::appendUniformArray(Value uniform_array_value)
+		{
+			if (!uniform_array_value.isArray()
+				|| !uniform_array_value.asArray()->isUniform())
+			{
+				throw std::invalid_argument(
+					"JSONReader::appendUniformArray requires uniform array storage");
+			}
+			if (root_.isArray())
+				root_.asArray()->append(uniform_array_value);
+			else if (root_.isObject())
+			{
+				root_.asObject()->append(next_key_, uniform_array_value);
+				next_key_.clear();
+			}
+			else if (root_.isNull() && stack_.empty())
+				root_ = std::move(uniform_array_value);
+			else
+				throw std::runtime_error("JSONReader::appendUniformArray has no active container");
 		}
 
 		void JSONReader::pushContainer()
@@ -1697,67 +1881,86 @@ namespace houio
 		{
 			if (element_count < 0)
 				throw std::length_error("JSONReader::uaBool received a negative element count");
-			jsonBeginArray();
-			sint64 elements_remaining = element_count;
-			while (elements_remaining > 0)
+			const size_t storage_bytes = uniformStorageBytes(Token::JID_BOOL, element_count);
+			std::vector<std::byte> packed_data(storage_bytes);
+			const size_t word_count = storage_bytes / sizeof(uint32);
+			constexpr size_t chunk_capacity = 4096;
+			std::vector<uint32> word_chunk(chunk_capacity);
+			size_t words_remaining = word_count;
+			size_t destination_offset = 0;
+			while (words_remaining > 0)
 			{
-				const uint32 bits = parser.read<uint32>();
-				const int bit_count = static_cast<int>(std::min<sint64>(elements_remaining, 32));
-				elements_remaining -= bit_count;
-				for (int bit_index = 0; bit_index < bit_count; ++bit_index)
-					jsonBool((bits & (uint32{1} << bit_index)) != 0);
+				const size_t chunk_size = std::min(words_remaining, chunk_capacity);
+				parser.read(std::span<uint32>(word_chunk.data(), chunk_size));
+				const size_t chunk_bytes = chunk_size * sizeof(uint32);
+				std::memcpy(
+					packed_data.data() + destination_offset,
+					word_chunk.data(),
+					chunk_bytes);
+				destination_offset += chunk_bytes;
+				words_remaining -= chunk_size;
 			}
-			jsonEndArray();
+			Value uniform_array_value = Value::createArray();
+			uniform_array_value.asArray()->setUniformStorage(
+				static_cast<int>(variantIndex<bool, Value::Variant>),
+				Token::JID_BOOL,
+				element_count,
+				std::move(packed_data));
+			appendUniformArray(std::move(uniform_array_value));
 		}
 
 		void JSONReader::uaReal16(sint64 element_count, Parser& parser)
 		{
-			if (element_count < 0)
-				throw std::length_error("JSONReader::uaReal16 received a negative element count");
-			jsonBeginArray();
-			for (sint64 element_index = 0; element_index < element_count; ++element_index)
-				jsonReal32(halfBitsToFloat(parser.read<uword>()));
-			jsonEndArray();
+			jsonUniformArray<real32, uword>(
+				element_count, parser, Token::JID_REAL16);
 		}
 
 		void JSONReader::uaReal32(sint64 element_count, Parser& parser)
 		{
-			jsonUniformArray<real32, real32>(element_count, parser);
+			jsonUniformArray<real32, real32>(
+				element_count, parser, Token::JID_REAL32);
 		}
 
 		void JSONReader::uaReal64(sint64 element_count, Parser& parser)
 		{
-			jsonUniformArray<real64, real64>(element_count, parser);
+			jsonUniformArray<real64, real64>(
+				element_count, parser, Token::JID_REAL64);
 		}
 
 		void JSONReader::uaInt8(sint64 element_count, Parser& parser)
 		{
-			jsonUniformArray<sint32, sbyte>(element_count, parser);
+			jsonUniformArray<sint32, sbyte>(
+				element_count, parser, Token::JID_INT8);
 		}
 
 		void JSONReader::uaInt16(sint64 element_count, Parser& parser)
 		{
-			jsonUniformArray<sint32, sword>(element_count, parser);
+			jsonUniformArray<sint32, sword>(
+				element_count, parser, Token::JID_INT16);
 		}
 
 		void JSONReader::uaInt32(sint64 element_count, Parser& parser)
 		{
-			jsonUniformArray<sint32, sint32>(element_count, parser);
+			jsonUniformArray<sint32, sint32>(
+				element_count, parser, Token::JID_INT32);
 		}
 
 		void JSONReader::uaInt64(sint64 element_count, Parser& parser)
 		{
-			jsonUniformArray<sint64, sint64>(element_count, parser);
+			jsonUniformArray<sint64, sint64>(
+				element_count, parser, Token::JID_INT64);
 		}
 
 		void JSONReader::uaUInt8(sint64 element_count, Parser& parser)
 		{
-			jsonUniformArray<ubyte, ubyte>(element_count, parser);
+			jsonUniformArray<ubyte, ubyte>(
+				element_count, parser, Token::JID_UINT8);
 		}
 
 		void JSONReader::uaUInt16(sint64 element_count, Parser& parser)
 		{
-			jsonUniformArray<sint32, uword>(element_count, parser);
+			jsonUniformArray<sint32, uword>(
+				element_count, parser, Token::JID_UINT16);
 		}
 
 		void JSONReader::uaString(sint64 element_count, Parser& parser)
@@ -1792,6 +1995,14 @@ namespace houio
 		{
 			if (!array)
 				throw std::invalid_argument("JSONWriter::write received a null array");
+			if (array->isUniform() && binary_writer_)
+			{
+				return binary_writer_->jsonUniformArrayRaw(
+					array->uniformStorageType(),
+					array->uniformElementCount(),
+					array->uniformData());
+			}
+
 			writer_->jsonBeginArray();
 			if (array->isUniform())
 			{

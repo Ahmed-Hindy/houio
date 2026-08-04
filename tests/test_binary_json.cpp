@@ -472,12 +472,52 @@ int verifyEveryUniformNumericArray()
     {
         return fail("a numeric uniform-array type changed values during round trip");
     }
-    if (!int8_array->isUniform() || !int16_array->isUniform()
+    if (!bool_array->isUniform() || !vector_bool_array->isUniform()
+        || !int8_array->isUniform() || !int16_array->isUniform()
         || !int32_array->isUniform() || !int64_array->isUniform()
-        || !real32_array->isUniform() || !real64_array->isUniform()
-        || !uint8_array->isUniform() || !uint16_array->isUniform())
+        || !real16_array->isUniform() || !real32_array->isUniform()
+        || !real64_array->isUniform() || !uint8_array->isUniform()
+        || !uint16_array->isUniform())
     {
         return fail("numeric uniform storage was not preserved in the JSON tree");
+    }
+    if (bool_array->uniformStorageType() != houio::json::Token::JID_BOOL
+        || bool_array->uniformData().size() != 2 * sizeof(houio::uint32)
+        || vector_bool_array->uniformStorageType() != houio::json::Token::JID_BOOL
+        || vector_bool_array->uniformData().size() != sizeof(houio::uint32)
+        || int8_array->uniformStorageType() != houio::json::Token::JID_INT8
+        || int8_array->uniformData().size() != int8_values.size() * sizeof(houio::sbyte)
+        || int16_array->uniformStorageType() != houio::json::Token::JID_INT16
+        || int16_array->uniformData().size() != int16_values.size() * sizeof(houio::sword)
+        || int32_array->uniformStorageType() != houio::json::Token::JID_INT32
+        || int32_array->uniformData().size() != int32_values.size() * sizeof(houio::sint32)
+        || int64_array->uniformStorageType() != houio::json::Token::JID_INT64
+        || int64_array->uniformData().size() != int64_values.size() * sizeof(houio::sint64)
+        || real16_array->uniformStorageType() != houio::json::Token::JID_REAL16
+        || real16_array->uniformData().size() != real16_values.size() * sizeof(houio::uword)
+        || real32_array->uniformStorageType() != houio::json::Token::JID_REAL32
+        || real32_array->uniformData().size() != real32_values.size() * sizeof(houio::real32)
+        || real64_array->uniformStorageType() != houio::json::Token::JID_REAL64
+        || real64_array->uniformData().size() != real64_values.size() * sizeof(houio::real64)
+        || uint8_array->uniformStorageType() != houio::json::Token::JID_UINT8
+        || uint8_array->uniformData().size() != uint8_values.size() * sizeof(houio::ubyte)
+        || uint16_array->uniformStorageType() != houio::json::Token::JID_UINT16
+        || uint16_array->uniformData().size() != uint16_values.size() * sizeof(houio::uword))
+    {
+        return fail("uniform arrays did not retain their exact binary storage widths");
+    }
+
+    const std::array<houio::sint32, 2> compatibility_values = {7, -3};
+    const houio::json::ArrayPtr compatibility_array = houio::json::Array::create();
+    compatibility_array->setUniformStorage(
+        static_cast<int>(houio::json::variantIndex<houio::sint32, houio::json::Value::Variant>),
+        static_cast<houio::sint64>(compatibility_values.size()),
+        std::as_bytes(std::span<const houio::sint32>(compatibility_values)));
+    if (!compatibility_array->isUniform()
+        || compatibility_array->uniformStorageType() != houio::json::Token::JID_INT32
+        || compatibility_array->get<houio::sint32>(1) != -3)
+    {
+        return fail("legacy setUniformStorage did not preserve its logical storage contract");
     }
 
     for (const bool binary : {false, true})
@@ -508,6 +548,19 @@ int verifyEveryUniformNumericArray()
             || !rewritten_uint16 || rewritten_uint16->get<int>(1) != 65535)
         {
             return fail("JSONWriter lost uniform-array values during tree round trip");
+        }
+        if (binary
+            && (!rewritten_bool->isUniform()
+                || rewritten_bool->uniformStorageType() != houio::json::Token::JID_BOOL
+                || rewritten_bool->uniformData().size() != 2 * sizeof(houio::uint32)
+                || !rewritten_int64->isUniform()
+                || rewritten_int64->uniformStorageType() != houio::json::Token::JID_INT64
+                || !rewritten_uint16->isUniform()
+                || rewritten_uint16->uniformStorageType() != houio::json::Token::JID_UINT16
+                || rewritten_uint16->uniformData().size()
+                    != uint16_values.size() * sizeof(houio::uword)))
+        {
+            return fail("binary JSONWriter did not preserve exact uniform-array storage");
         }
     }
     return 0;

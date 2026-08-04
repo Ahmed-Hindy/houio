@@ -105,9 +105,9 @@ The parser rejects malformed flattened objects, invalid string references, trunc
 
 Handlers separate token decoding from consumers:
 
-- `JSONReader` builds the generic tree.
+- `JSONReader` builds the generic tree and retains binary numeric uniform arrays at their encoded widths, including bit-packed Bool and Float16 storage.
 - `JSONLogger` exposes parser events for diagnostics and testing.
-- Writers serialize ASCII or binary JSON.
+- Writers serialize ASCII or binary JSON; binary tree rewrites preserve retained numeric uniform tokens and raw storage directly.
 
 ## Houdini object decoding
 
