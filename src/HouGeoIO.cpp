@@ -151,24 +151,6 @@ namespace houio
 		};
 
 		template<typename T>
-		std::vector<T> copyUniformValues(const json::ArrayPtr& array)
-		{
-			const sint64 uniform_element_count = array->uniformElementCount();
-			if (uniform_element_count < 0)
-				throw std::runtime_error("Cannot export a uniform array with a negative element count");
-			const size_t element_count = static_cast<size_t>(uniform_element_count);
-			if (element_count > std::numeric_limits<size_t>::max() / sizeof(T))
-				throw std::length_error("Uniform JSON array byte count overflow");
-			const std::span<const std::byte> bytes = array->uniformData();
-			if (element_count * sizeof(T) != bytes.size())
-				throw std::runtime_error("Cannot export a uniform array with inconsistent storage");
-			std::vector<T> values(element_count);
-			if (element_count > 0)
-				std::memcpy(values.data(), bytes.data(), bytes.size());
-			return values;
-		}
-
-		template<typename T>
 		std::vector<T> copyRawValues(
 			const HouGeoAdapter::RawDataView& raw_data,
 			size_t scalar_count,
@@ -196,26 +178,15 @@ namespace houio
 				throw std::runtime_error( "Cannot export a null JSON array" );
 			if( array->isUniform() )
 			{
-				switch (array->uniformTypeIndex())
+				if( !writer.jsonUniformArrayRaw(
+						array->uniformStorageType(),
+						array->uniformElementCount(),
+						array->uniformData()) )
 				{
-				case 1:
-					writer.jsonUniformArray(copyUniformValues<sint32>(array));
-					return;
-				case 2:
-					writer.jsonUniformArray(copyUniformValues<real32>(array));
-					return;
-				case 3:
-					writer.jsonUniformArray(copyUniformValues<real64>(array));
-					return;
-				case 5:
-					writer.jsonUniformArray(copyUniformValues<ubyte>(array));
-					return;
-				case 6:
-					writer.jsonUniformArray(copyUniformValues<sint64>(array));
-					return;
-				default:
-					throw std::runtime_error( "Cannot export an unsupported uniform JSON array type" );
+					throw std::runtime_error(
+						"Cannot export a retained uniform JSON array" );
 				}
+				return;
 			}
 
 			writer.jsonBeginArray();

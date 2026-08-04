@@ -107,7 +107,7 @@ Handlers separate token decoding from consumers:
 
 - `JSONReader` builds the generic tree, retains binary numeric uniform arrays at their encoded widths, and compacts homogeneous ordinary numeric arrays with at least 64 elements into contiguous storage when the array closes.
 - `JSONLogger` exposes parser events for diagnostics and testing.
-- Writers serialize ASCII or binary JSON; binary tree rewrites preserve retained or compacted numeric tokens and raw storage directly, while ASCII output expands them to the established scalar representation.
+- Writers serialize ASCII or binary JSON; binary tree rewrites and HouGeo payload exports preserve retained or compacted numeric tokens and raw storage directly, while ASCII output expands them to the established scalar representation.
 
 A full HouGeo-specific parser handler is intentionally deferred. The retained tree provides flattened-record validation, arbitrary field ordering, recursive shared data, and one path-aware schema decoder; numeric payload amplification is mitigated within that pipeline. See [Direct semantic-handler evaluation](docs/direct-semantic-handler.md).
 

@@ -4,9 +4,11 @@
 
 #include "TestSupport.h"
 
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <span>
 #include <string>
 
 static_assert(static_cast<int>(houio::WriterDataType::sparse_openvdb) == 6);
@@ -304,10 +306,13 @@ namespace
         metadata->appendValue<houio::sint32>("tilesize", 4096);
         payload->append(metadata);
         auto opaqueBytes = houio::json::Array::create();
-        opaqueBytes->appendValue<houio::sint32>(32);
-        opaqueBytes->appendValue<houio::sint32>(66);
-        opaqueBytes->appendValue<houio::sint32>(68);
-        opaqueBytes->appendValue<houio::sint32>(86);
+        const std::array<houio::sword, 4> narrowPayload = {32, 66, 68, 86};
+        opaqueBytes->setUniformStorage(
+            static_cast<int>(houio::json::variantIndex<
+                houio::sint32, houio::json::Value::Variant>),
+            houio::json::Token::JID_INT16,
+            static_cast<houio::sint64>(narrowPayload.size()),
+            std::as_bytes(std::span<const houio::sword>(narrowPayload)));
         payload->append(opaqueBytes);
         auto nativeVdb = std::make_shared<houio::HouGeo::HouVdb>();
         nativeVdb->setTopologyVertex(0);
@@ -331,6 +336,18 @@ namespace
             || vdbPrimitive->serializedPayload()->size() != 2 )
         {
             return fail("Native VDB serialized payload changed");
+        }
+        const houio::json::ArrayPtr roundTripNarrowPayload =
+            vdbPrimitive->serializedPayload()->array(1);
+        if( !roundTripNarrowPayload || !roundTripNarrowPayload->isUniform()
+            || roundTripNarrowPayload->uniformStorageType()
+                != houio::json::Token::JID_INT16
+            || roundTripNarrowPayload->uniformData().size()
+                != narrowPayload.size() * sizeof(houio::sword)
+            || roundTripNarrowPayload->get<int>(0) != 32
+            || roundTripNarrowPayload->get<int>(3) != 86 )
+        {
+            return fail("HouGeo export widened or changed retained uniform storage");
         }
 
         houio::HouGeo::Ptr sparseVdbGeometry = createHouGeo();
