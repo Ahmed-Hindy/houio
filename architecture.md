@@ -231,6 +231,8 @@ C-Blosc resolution uses, in order:
 
 Supported face-varying data remains in the vertex domain, so UV seams and vertex normals do not require point duplication. Primitive attributes are preserved only when the selected primitive run covers the complete source primitive domain; partial mappings are skipped and reported. HouGeo-to-simplified conversion allocates final `P` and point/vertex `UV` storage once, then writes converted values by index rather than repeatedly growing attribute buffers. It also reuses one polygon scratch buffer across the complete primitive run. Simplified-to-HouGeo adaptation likewise allocates the final V4f `P` buffer once when promoting V3f positions.
 
+These optimizations remove avoidable transient growth and per-face scratch allocations; they do not alias storage between models. `HouGeo` and simplified `Geometry` retain independent ownership so either result remains valid after the source is released or modified.
+
 Use `HouGeo` when strings, dictionaries, groups, mixed records, curve basis metadata, quadric transforms, or complete Houdini metadata must be retained. The simplified `Geometry` model does not implicitly tessellate NURBS, Bezier, Sphere, or Tube records.
 
 ## Attribute storage

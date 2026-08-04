@@ -8,6 +8,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - MSVC warnings-as-errors and AddressSanitizer suites pass **78/78**; MSVC native analysis is error-clean.
 - The bundled no-Houdini scene-I/O package suite passes **35/35**.
 - Houdini integration is validated with **20.0.653**, **20.5.410**, **21.0.631**, and **22.0.368**.
+- Performance and memory consolidation phases 59–66 are merged through PRs **#66–#73**.
 - Public redistribution remains blocked by the documented upstream license/provenance issue.
 
 ## Active consolidation priorities
@@ -19,6 +20,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Split manifest decoding by attributes, primitive families, and VDB records.
 - [x] Retire the beta-only `houio_convert` executable after migrating packages and the HOM bridge to `houio convert`.
 - [x] Reduce generic JSON-tree memory amplification for large numeric arrays by retaining exact binary uniform storage and compacting large homogeneous ordinary numeric arrays at array close.
+- [x] Complete the first bounded copy/allocation reduction pass across compact attribute loading, HouGeo payload export, special attribute conversion, position promotion, and polygon topology conversion.
 
 ## Modernization completed
 
@@ -269,7 +271,7 @@ Add fixture-backed support one record type at a time:
 - [x] Preallocate exact simplified `P` and point/vertex `UV` attribute sizes before HouGeo conversion instead of growing them element by element.
 - [x] Preallocate the final Houdini V4f position buffer when promoting simplified V3f `P` attributes.
 - [x] Reuse one polygon scratch buffer across HouGeo-to-simplified topology conversion instead of allocating per face.
-- [ ] Reduce remaining copies between `HouGeo`, adapters, and simplified representations.
+- [ ] Profile remaining ownership-preserving copies between `HouGeo`, adapters, and simplified representations before changing APIs or storage ownership.
 
 ## Documentation and releases
 
