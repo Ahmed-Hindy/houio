@@ -20,7 +20,7 @@ Versioning applies to maintained, documented surfaces:
 
 - Installed C++ headers and exported CMake target `houio::houio`.
 - `GeometryIO` read/write behavior and documented diagnostics.
-- `houio_convert` command-line syntax and exit behavior.
+- `houio` command-line syntax, subcommands, JSON diagnostics, and exit behavior.
 - Houdini package entry points and documented bridge behavior.
 - Formats explicitly documented as stable HouIO-owned formats.
 
@@ -28,7 +28,7 @@ Reading third-party Houdini formats is compatibility work, not ownership of thos
 
 ## Experimental surfaces
 
-Experimental APIs or formats may change during a minor `0.x` update when the change is documented clearly. The current native `FieldIO` binary layout is experimental and excluded from stable format guarantees. See [Experimental field persistence format](field-format.md).
+Experimental APIs or formats may change during a minor `0.x` update when the change is documented clearly. This policy permitted retirement of the beta-only `houio_convert` executable in favor of the already available `houio convert` subcommand. The current native `FieldIO` binary layout is experimental and excluded from stable format guarantees. See [Experimental field persistence format](field-format.md).
 
 An experimental surface should be promoted to stable only after it has:
 

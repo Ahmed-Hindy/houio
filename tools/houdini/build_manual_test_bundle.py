@@ -86,14 +86,14 @@ import hou
 
 bundle_root = Path(hou.text.expandString("$HIP")).parent
 python_root = bundle_root / "share" / "houio" / "python"
-converter = bundle_root / "bin" / "houio_convert.exe"
+houio_executable = bundle_root / "bin" / "houio.exe"
 blosc = Path(hou.text.expandString("$HFS")) / "bin" / "blosc.dll"
 
 if str(python_root) not in sys.path:
     sys.path.insert(0, str(python_root))
 os.environ["HOUIO_ROOT"] = str(bundle_root)
 os.environ["HOUIO_PYTHON_ROOT"] = str(python_root)
-os.environ["HOUIO_CONVERT_EXECUTABLE"] = str(converter)
+os.environ["HOUIO_EXECUTABLE"] = str(houio_executable)
 os.environ["HOUIO_BLOSC_LIBRARY"] = str(blosc)
 """.strip()
 
@@ -259,8 +259,8 @@ iso dense volumes and rebuild as level sets; fog VDBs become smoke dense volumes
 and rebuild as fog grids. Inspect the `houio_vdb_class` primitive attribute and
 the `vdb_class` intrinsic to verify the semantic class.
 
-The HIP file bootstraps the bundled Python package and converter relative to its
-own location. Installing the Houdini package is optional for this HIP file.
+The HIP file bootstraps the bundled Python package and primary HouIO executable
+relative to its own location. Installing the Houdini package is optional.
 
 ## Optional package installation
 
@@ -282,7 +282,7 @@ Windows Documents known folder in `houdini22.0/packages`.
 
 ## Included runtime
 
-- `bin/houio_convert.exe`
+- `bin/houio.exe`
 - `share/houio/python/houio_hom`
 - `share/houio/houdini/install_hom_bridge.ps1`
 - ready Houdini HIP and source/result cache files
@@ -303,12 +303,12 @@ param()
 $ErrorActionPreference = "Stop"
 $BundleRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Installer = Join-Path $BundleRoot "share\houio\houdini\install_hom_bridge.ps1"
-$Converter = Join-Path $BundleRoot "bin\houio_convert.exe"
+$HouIO = Join-Path $BundleRoot "bin\houio.exe"
 
 powershell -NoProfile -ExecutionPolicy Bypass -File $Installer `
     -HoudiniVersions 22.0 `
     -RepositoryRoot $BundleRoot `
-    -ConverterExecutable $Converter
+    -HouIOExecutable $HouIO
 """
 
 
@@ -344,7 +344,7 @@ bundle_root = Path(__file__).resolve().parents[1]
 python_root = bundle_root / "share" / "houio" / "python"
 os.environ["HOUIO_ROOT"] = str(bundle_root)
 os.environ["HOUIO_PYTHON_ROOT"] = str(python_root)
-os.environ["HOUIO_CONVERT_EXECUTABLE"] = str(bundle_root / "bin" / "houio_convert.exe")
+os.environ["HOUIO_EXECUTABLE"] = str(bundle_root / "bin" / "houio.exe")
 os.environ["HOUIO_BLOSC_LIBRARY"] = str(Path(hou.text.expandString("$HFS")) / "bin" / "blosc.dll")
 sys.path.insert(0, str(python_root))
 
@@ -504,7 +504,7 @@ def create_polygon_network(obj: hou.Node) -> hou.Node:
     view.setPosition(hou.Vector2(6.0, 0.0))
     add_note(
         network,
-        "POLYGON TEST\n\nRESULT_POLYGON should be identical to SOURCE_POLYGON. Equal counts are expected.\nVALIDATE_SOURCE_RESULT performs a semantic comparison and writes houio_test_status=PASS.\nRESULT_POLYGON_OFFSET moves the validated result right for visual comparison.\nVIEW_SOURCE_AND_RESULT displays source and result together.\nRecook HOUiO_ROUNDTRIP to launch the bundled converter.",
+        "POLYGON TEST\n\nRESULT_POLYGON should be identical to SOURCE_POLYGON. Equal counts are expected.\nVALIDATE_SOURCE_RESULT performs a semantic comparison and writes houio_test_status=PASS.\nRESULT_POLYGON_OFFSET moves the validated result right for visual comparison.\nVIEW_SOURCE_AND_RESULT displays source and result together.\nRecook HOUiO_ROUNDTRIP to launch the bundled HouIO CLI.",
         (-6.5, 1.0, 13.5, 5.2),
     )
     return network
@@ -614,9 +614,7 @@ def configure_bundle_environment(bundle_root: Path) -> None:
     sys.path.insert(0, str(python_root))
     os.environ["HOUIO_ROOT"] = str(bundle_root)
     os.environ["HOUIO_PYTHON_ROOT"] = str(python_root)
-    os.environ["HOUIO_CONVERT_EXECUTABLE"] = str(
-        bundle_root / "bin" / "houio_convert.exe"
-    )
+    os.environ["HOUIO_EXECUTABLE"] = str(bundle_root / "bin" / "houio.exe")
     os.environ["HOUIO_BLOSC_LIBRARY"] = str(
         Path(hou.text.expandString("$HFS")) / "bin" / "blosc.dll"
     )
@@ -629,6 +627,8 @@ def create_bundle(install_root: Path, output_root: Path, commit: str) -> None:
     output_root.mkdir(parents=True)
 
     shutil.copytree(install_root / "bin", output_root / "bin")
+    for retired_name in ("houio_convert.exe", "houio_convert"):
+        (output_root / "bin" / retired_name).unlink(missing_ok=True)
     shutil.copytree(install_root / "share", output_root / "share")
     write_text(output_root / "README.md", README_TEXT.format(commit=commit))
     write_text(output_root / "INSTALL_HOUDINI_22.ps1", INSTALL_SCRIPT)

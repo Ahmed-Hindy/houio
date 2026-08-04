@@ -190,12 +190,9 @@ endif()
 if(HOUIO_BUILD_TOOLS)
     add_executable(houio_cli tools/houio.cpp)
     set_target_properties(houio_cli PROPERTIES OUTPUT_NAME houio)
-    add_executable(houio_convert tools/houio_convert.cpp)
-    foreach(tool_target IN ITEMS houio_cli houio_convert)
-        target_link_libraries(${tool_target} PRIVATE houio::houio)
-        target_compile_features(${tool_target} PRIVATE cxx_std_20)
-        target_compile_definitions(${tool_target} PRIVATE HOUIO_VERSION_STRING="${PROJECT_VERSION}")
-    endforeach()
+    target_link_libraries(houio_cli PRIVATE houio::houio)
+    target_compile_features(houio_cli PRIVATE cxx_std_20)
+    target_compile_definitions(houio_cli PRIVATE HOUIO_VERSION_STRING="${PROJECT_VERSION}")
 
     if(WIN32)
         find_package(Python3 QUIET COMPONENTS Interpreter)
@@ -230,13 +227,11 @@ if(HOUIO_BUILD_TOOLS)
                     "${Python3_EXECUTABLE}"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/build_houdini_package.py"
                     --cli "$<TARGET_FILE:houio_cli>"
-                    --converter "$<TARGET_FILE:houio_convert>"
                     --output "${HOUIO_HOUDINI_PACKAGE_ARCHIVE}"
                     --version "${PROJECT_VERSION}"
                     ${HOUIO_HOUDINI_PACKAGE_RUNTIME_ARGS}
                 DEPENDS
                     houio_cli
-                    houio_convert
                     ${HOUIO_HOUDINI_PACKAGE_SOURCES}
                     ${HOUIO_HOUDINI_PACKAGE_RUNTIME_SOURCES}
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/houdini/build_houdini_package.py"
@@ -355,11 +350,9 @@ if(HOUIO_EFFECTIVE_SCENE_IO_PROVIDER STREQUAL "bundled")
         )
     endif()
 endif()
-foreach(tool_target IN ITEMS houio_cli houio_convert)
-    if(TARGET ${tool_target})
-        install(TARGETS ${tool_target} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-    endif()
-endforeach()
+if(TARGET houio_cli)
+    install(TARGETS houio_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 configure_package_config_file(
     cmake/houio-config.cmake.in
@@ -402,11 +395,9 @@ if(PROJECT_IS_TOP_LEVEL)
     include(CPack)
 
     set(HOUIO_PORTABLE_PACKAGE_DEPENDENCIES houio)
-    foreach(portable_target IN ITEMS houio_cli houio_convert)
-        if(TARGET ${portable_target})
-            list(APPEND HOUIO_PORTABLE_PACKAGE_DEPENDENCIES ${portable_target})
-        endif()
-    endforeach()
+    if(TARGET houio_cli)
+        list(APPEND HOUIO_PORTABLE_PACKAGE_DEPENDENCIES houio_cli)
+    endif()
     add_custom_target(
         houio_portable_package
         COMMAND

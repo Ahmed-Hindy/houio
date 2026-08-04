@@ -357,11 +357,9 @@ def package_diagnostics() -> dict[str, object]:
 
     root_text = os.environ.get("HOUIO_ROOT", "")
     writer_text = os.environ.get("HOUIO_EXECUTABLE", "")
-    converter_text = os.environ.get("HOUIO_CONVERT_EXECUTABLE", "")
     blosc_text = hou.text.expandString(os.environ.get("HOUIO_BLOSC_LIBRARY", ""))
     root_path = Path(root_text) if root_text else None
     writer_path = Path(writer_text) if writer_text else None
-    converter_path = Path(converter_text) if converter_text else None
     blosc_path = Path(blosc_text) if blosc_text else None
 
     writer_diagnostics: dict[str, object] = {}
@@ -414,8 +412,6 @@ def package_diagnostics() -> dict[str, object]:
         "writer_exists": bool(writer_path and writer_path.is_file()),
         "writer_diagnostics": writer_diagnostics,
         "writer_diagnostics_ok": writer_diagnostics_ok,
-        "converter": str(converter_path) if converter_path else "not set",
-        "converter_exists": bool(converter_path and converter_path.is_file()),
         "blosc_library": str(blosc_path) if blosc_path else "not set",
         "blosc_exists": bool(blosc_path and blosc_path.is_file()),
     }
@@ -433,7 +429,6 @@ def show_package_diagnostics() -> dict[str, object]:
         diagnostics["package_root_exists"]
         and diagnostics["writer_exists"]
         and diagnostics["writer_diagnostics_ok"]
-        and diagnostics["converter_exists"]
         and diagnostics["blosc_exists"]
     )
     hou.ui.displayMessage(

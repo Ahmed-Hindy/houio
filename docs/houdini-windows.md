@@ -2,7 +2,7 @@
 
 This guide covers development and validation with Houdini 20.0 or newer.
 
-HouIO integrates through HOM and an external `houio_convert.exe` process. It does not load a CPython extension or HDK plug-in into Houdini.
+HouIO integrates through HOM and the external `houio.exe` CLI. It does not load a CPython extension or HDK plug-in into Houdini.
 
 ## Supported versions
 
@@ -25,10 +25,10 @@ cmake --build --preset windows-msvc-release
 ctest --preset windows-msvc-release
 ```
 
-The converter is written to:
+The unified executable is written to:
 
 ```text
-build/windows-msvc-release/houio_convert.exe
+build/windows-msvc-release/houio.exe
 ```
 
 ## Development install from the source tree
@@ -39,7 +39,7 @@ Install the HOM bridge for all supported major/minor versions:
 powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\install_hom_bridge.ps1 `
   -RepositoryRoot "$PWD" `
-  -ConverterExecutable "$PWD\build\windows-msvc-release\houio_convert.exe"
+  -HouIOExecutable "$PWD\build\windows-msvc-release\houio.exe"
 ```
 
 Install one version only:
@@ -48,7 +48,7 @@ Install one version only:
 powershell -NoProfile -ExecutionPolicy Bypass -File `
   .\tools\houdini\install_hom_bridge.ps1 `
   -RepositoryRoot "$PWD" `
-  -ConverterExecutable "$PWD\build\windows-msvc-release\houio_convert.exe" `
+  -HouIOExecutable "$PWD\build\windows-msvc-release\houio.exe" `
   -HoudiniVersions 20.0
 ```
 
@@ -74,7 +74,7 @@ import houio_hom
 
 print(hou.applicationVersionString())
 print(houio_hom.__file__)
-print(os.environ.get("HOUIO_CONVERT_EXECUTABLE"))
+print(os.environ.get("HOUIO_EXECUTABLE"))
 print(hou.text.expandString(os.environ.get("HOUIO_BLOSC_LIBRARY", "")))
 ```
 
@@ -82,13 +82,13 @@ Confirm:
 
 - Houdini reports version 20.0 or newer.
 - `houio_hom` resolves from the intended source or install tree.
-- `HOUIO_CONVERT_EXECUTABLE` points to the Release executable.
+- `HOUIO_EXECUTABLE` points to the Release executable.
 - `HOUIO_BLOSC_LIBRARY` resolves to `$HFS/bin/blosc.dll`.
 
-## Test the converter outside Houdini
+## Test file conversion outside Houdini
 
 ```powershell
-.\build\windows-msvc-release\houio_convert.exe `
+.\build\windows-msvc-release\houio.exe convert `
   input.bgeo `
   output.bgeo.sc
 ```
@@ -143,7 +143,7 @@ Creates a Python SOP after the selected node. Verify:
 
 ### Convert Geometry File
 
-Runs the external converter for a selected input and output path.
+Runs the external `houio convert` command for a selected input and output path.
 
 ### Package Diagnostics
 
@@ -151,8 +151,7 @@ Reports:
 
 - Houdini version
 - Package root
-- Primary writer path and `houio diagnose --json` result
-- Compatibility converter path
+- HouIO executable path and `houio diagnose --json` result
 - C-Blosc path
 - Existence checks for each runtime dependency
 
@@ -232,9 +231,9 @@ Restart Houdini after uninstalling.
 
 Check the package JSON and `PYTHONPATH`, then restart Houdini.
 
-### Writer or converter is missing
+### HouIO executable is missing
 
-Rebuild the Release preset. Verify `HOUIO_EXECUTABLE` for the primary custom writer and `HOUIO_CONVERT_EXECUTABLE` for compatibility workflows.
+Rebuild the Release preset and verify that `HOUIO_EXECUTABLE` points to `houio.exe`.
 
 ### `.bgeo.sc` fails
 
@@ -246,4 +245,4 @@ Use file-to-file native VDB pass-through when possible. Exact scalar Float VDBs 
 
 ### Round Trip node times out
 
-Increase the node timeout only after checking file size, primitive support, and converter diagnostics.
+Increase the node timeout only after checking file size, primitive support, and HouIO command diagnostics.

@@ -14,9 +14,6 @@
       "HOUIO_EXECUTABLE": "$HOUDINI_PACKAGE_PATH/houio/bin/houio.exe"
     },
     {
-      "HOUIO_CONVERT_EXECUTABLE": "$HOUDINI_PACKAGE_PATH/houio/bin/houio_convert.exe"
-    },
-    {
       "HOUIO_BLOSC_LIBRARY": "$HFS/bin/blosc.dll"
     }
   ]

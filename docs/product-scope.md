@@ -17,14 +17,14 @@ The C++20 static library provides:
 
 ### `houio`
 
-The primary command-line application provides:
+The unified command-line application provides:
 
 - `write` and `write-manifest`.
 - `convert`.
 - `inspect` and `validate`.
 - `capabilities` and `diagnose`.
 
-`houio_convert` remains a compatibility executable and is not the preferred interface for new integrations.
+The beta-only `houio_convert` executable is retired. File conversion is provided exclusively by `houio convert`.
 
 ### Houdini package
 

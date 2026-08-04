@@ -17,7 +17,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Separate simplified-to-Houdini adaptation from the monolithic `HouGeoIO.cpp` translation unit.
 - [ ] Split faithful HouGeo schema loading by attributes, polygons/curves, packed records, and volumes; curve, quadric, and native VDB decoding now live in `HouGeoPrimitiveLoad.cpp`.
 - [x] Split manifest decoding by attributes, primitive families, and VDB records.
-- [ ] Evaluate retirement of `houio_convert` after a documented compatibility period.
+- [x] Retire the beta-only `houio_convert` executable after migrating packages and the HOM bridge to `houio convert`.
 - [ ] Reduce generic JSON-tree memory amplification for large numeric arrays.
 
 ## Modernization completed
@@ -84,7 +84,7 @@ The long-term roadmap remains below. The active modernization program is summari
 
 ### Tooling and infrastructure
 
-- [x] Add a primary CLI with write, write-manifest, inspect, validate, convert, capabilities, and diagnose subcommands while retaining the compatibility converter.
+- [x] Add a unified CLI with write, write-manifest, inspect, validate, convert, capabilities, and diagnose subcommands.
 - [x] Add stable machine-readable JSON output and documented exit-code categories.
 - [x] Add a capability report covering supported and recognized data families.
 - [x] Make build, test, package, fixture, benchmark, and full validation commands discoverable through `tools/dev.ps1`.
@@ -93,7 +93,7 @@ The long-term roadmap remains below. The active modernization program is summari
 ### Installation and user experience
 
 - [x] Preserve one-command package build, install, uninstall, and isolated launch workflows and include the primary writer executable.
-- [x] Add package self-diagnostics for the primary writer, compatibility converter, and C-Blosc runtime.
+- [x] Add package self-diagnostics for the unified HouIO executable and C-Blosc runtime.
 - [x] Expose a small HOM API for writing cooked node geometry through the custom writer.
 - [x] Add a primary **Write Selected Geometry** shelf action and retain diagnostics/conversion tools.
 - [x] Add the first native HDK **HouIO Geometry** ROP vertical slice for polygon sequence export.
