@@ -1531,6 +1531,23 @@ Exit criteria:
 - The performance roadmap no longer implies an unqualified second import path.
 - Future implementation requires evidence and compatibility gates rather than architecture speculation.
 
+### Phase 63 — Direct retained uniform-array export
+
+**Status: complete on `perf/direct-uniform-json-export`.**
+
+Completed work:
+
+- [x] Remove typed temporary-vector materialization from the custom HouGeo JSON array exporter.
+- [x] Forward retained storage token, element count, and validated byte span directly to `BinaryWriter::jsonUniformArrayRaw`.
+- [x] Preserve narrow Int8/Int16/UInt16, Float16, bit-packed Bool, and established wide storage without token widening.
+- [x] Add a full HouGeo write/read regression using retained Int16 payload storage that the previous exporter could not preserve directly.
+
+Exit criteria:
+
+- Retained uniform arrays export without a second full-payload allocation or copy.
+- Exact storage tokens and bytes survive a HouGeo write/read cycle.
+- Strict, AddressSanitizer, static-analysis, fixture, package, writer, and native-payload matrices pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:

@@ -265,7 +265,8 @@ Add fixture-backed support one record type at a time:
 - [x] Preserve compact numeric arrays through semantic attribute loading by directly copying exact matching storage and retaining conversion fallback for mismatched types.
 - [x] Evaluate direct semantic handlers; retain the single tree-backed schema decoder until profiling and ordering contracts justify a second path. See `docs/direct-semantic-handler.md`.
 - [ ] Add streaming or chunked APIs only after compatibility tests are comprehensive.
-- [ ] Reduce copies between `HouGeo`, adapters, and simplified representations.
+- [x] Eliminate typed temporary buffers when HouGeo exports retained uniform JSON arrays; emit validated token, count, and bytes directly.
+- [ ] Reduce remaining copies between `HouGeo`, adapters, and simplified representations.
 
 ## Documentation and releases
 
