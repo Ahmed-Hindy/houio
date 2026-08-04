@@ -758,11 +758,12 @@ namespace houio
 					"HouGeoIO::convertToGeometry expected a polygon primitive", -1, "conversion.primitive"});
 
 			size_t globalVertexIndex = 0;
+			std::vector<unsigned int> vertices;
 			for( int polygonIndex=0;polygonIndex<numPolys;++polygonIndex )
 			{
 				const int polygonVertexCount = poly->polygonVertexCount(polygonIndex);
 				const std::span<const int> polygonVertices = poly->polygonVertexIndices(polygonIndex);
-				std::vector<unsigned int> vertices;
+				vertices.clear();
 				vertices.reserve(static_cast<size_t>(polygonVertexCount));
 				for( int localVertexIndex=0;localVertexIndex<polygonVertexCount;
 					++localVertexIndex, ++globalVertexIndex )

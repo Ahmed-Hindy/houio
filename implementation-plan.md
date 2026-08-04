@@ -1581,6 +1581,22 @@ Exit criteria:
 - Simplified V3f positions adapt to exact Houdini V4f positions without repeated destination reallocations.
 - Geometry I/O, export safety, scene adaptation, strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
 
+### Phase 66 — Reusable polygon conversion scratch storage
+
+**Status: complete on `perf/reuse-polygon-conversion-buffer`.**
+
+Completed work:
+
+- [x] Move the HouGeo-to-simplified polygon index scratch vector outside the per-face loop.
+- [x] Clear and reuse its retained capacity for lines, triangles, quads, and variable-size polygons.
+- [x] Preserve point-index validation, complete vertex-domain consumption, primitive boundaries, and winding reversal.
+
+Exit criteria:
+
+- Multi-face conversion no longer creates one scratch allocation per polygon.
+- Mixed polygon sizes and variable primitive boundaries remain exact.
+- Polygon-run, modern-geometry, conversion-safety, strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:

@@ -268,6 +268,7 @@ Add fixture-backed support one record type at a time:
 - [x] Eliminate typed temporary buffers when HouGeo exports retained uniform JSON arrays; emit validated token, count, and bytes directly.
 - [x] Preallocate exact simplified `P` and point/vertex `UV` attribute sizes before HouGeo conversion instead of growing them element by element.
 - [x] Preallocate the final Houdini V4f position buffer when promoting simplified V3f `P` attributes.
+- [x] Reuse one polygon scratch buffer across HouGeo-to-simplified topology conversion instead of allocating per face.
 - [ ] Reduce remaining copies between `HouGeo`, adapters, and simplified representations.
 
 ## Documentation and releases
