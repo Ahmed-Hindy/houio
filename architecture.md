@@ -38,6 +38,7 @@ Writes follow the reverse path. Every operation is synchronous and owns its pars
 | JSON format | `json.h`, `json.cpp` | ASCII and binary JSON parsing, handlers, writers, limits, and byte offsets |
 | Houdini model | `HouGeo.h`, `HouGeo.cpp` | Core object state, attributes, topology, groups, and primitive dispatch |
 | Primitive schema loading | `HouGeoPrimitiveLoad.cpp` | Native VDB, Sphere, Tube, NURBS, and Bezier record decoding |
+| HOM manifest decoding | `HomManifest.cpp`, `HomManifestAttributes.cpp`, `HomManifestPrimitives.cpp`, `HomManifestVdb.cpp` | Manifest orchestration, attribute/group domains, primitive families, and sparse VDB records |
 | Adapter API | `HouGeoAdapter.h`, `HouGeoAdapter.cpp` | Read-only export contract for caller-owned geometry |
 | Compatibility I/O | `HouGeoIO.h`, `HouGeoIO.cpp` | Stream operations, faithful export, and thin source-compatible wrappers |
 | Model adaptation | `HouGeoAdapt.cpp` | Simplified geometry and dense-field adaptation into `HouGeo` |
