@@ -129,6 +129,8 @@ Each attribute has:
 - Numeric storage or expanded strings
 - Element count validated against its domain
 
+When a tuple or component array already uses the exact destination numeric storage token, attribute loading copies its retained bytes directly into contiguous or strided attribute storage. Mismatched storage continues through the established scalar conversion and validation path.
+
 Supported numeric storage:
 
 - Unsigned UInt8

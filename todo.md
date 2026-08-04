@@ -262,7 +262,7 @@ Add fixture-backed support one record type at a time:
 - [x] Benchmark dense-volume imports.
 - [x] Avoid retained per-element `Value` allocations for binary uniform numeric arrays, including bit-packed Bool and Float16 storage.
 - [x] Avoid retained per-element `Value` allocations for large homogeneous ordinary ASCII and non-uniform binary numeric arrays; small, mixed, nested, and string arrays retain expanded storage.
-- [ ] Preserve uniform arrays through semantic loading where possible.
+- [x] Preserve compact numeric arrays through semantic attribute loading by directly copying exact matching storage and retaining conversion fallback for mismatched types.
 - [ ] Evaluate direct semantic handlers that bypass the generic JSON tree.
 - [ ] Add streaming or chunked APIs only after compatibility tests are comprehensive.
 - [ ] Reduce copies between `HouGeo`, adapters, and simplified representations.

@@ -1496,6 +1496,24 @@ Exit criteria:
 - Strict, AddressSanitizer, static-analysis, fixture, package, and binary JSON matrices pass.
 - The active generic JSON-tree numeric-array amplification priority is complete.
 
+### Phase 61 — Direct compact numeric attribute loading
+
+**Status: complete on `perf/direct-uniform-attribute-load`.**
+
+Completed work:
+
+- [x] Detect compact numeric tuple and component arrays whose retained token exactly matches the destination attribute storage.
+- [x] Copy matching tuple arrays contiguously and matching component arrays with validated destination strides.
+- [x] Preserve the existing per-scalar conversion path whenever source and destination storage differ.
+- [x] Validate source byte counts, destination bounds, multiplication, offsets, and strides before copying.
+- [x] Add focused coverage for contiguous copies, strided copies, and storage-mismatch fallback.
+
+Exit criteria:
+
+- Matching compact storage reaches `Attribute` bytes without per-scalar `Value` extraction.
+- Mismatched numeric representations retain established conversion behavior and diagnostics.
+- Strict, AddressSanitizer, static-analysis, fixture, package, and numeric-storage matrices pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:

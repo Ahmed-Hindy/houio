@@ -1,10 +1,14 @@
 #include <houio/HouGeoIO.h>
 
+#include "../src/HouGeoAttributeLoad.h"
 #include "TestSupport.h"
 
+#include <array>
+#include <cstring>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -36,6 +40,66 @@ houio::real64 readFloat64(const houio::HouGeoAdapter::AttributeAdapter::Ptr& att
     if (index < 0)
         throw std::out_of_range("Float64 attribute index cannot be negative");
     return attribute->rawData().read<houio::real64>(static_cast<size_t>(index));
+}
+
+int verifyUniformCopyHelper()
+{
+    const std::array<houio::real32, 3> sourceValues = {1.25f, -2.5f, 7.75f};
+    const houio::json::ArrayPtr source = houio::json::Array::create();
+    source->setUniformStorage(
+        static_cast<int>(houio::json::variantIndex<
+            houio::real32, houio::json::Value::Variant>),
+        houio::json::Token::JID_REAL32,
+        static_cast<houio::sint64>(sourceValues.size()),
+        std::as_bytes(std::span<const houio::real32>(sourceValues)));
+
+    std::vector<std::byte> contiguous(sourceValues.size() * sizeof(houio::real32));
+    if (!houio::hougeo_attribute_detail::copyUniformNumericValues(
+            contiguous,
+            0,
+            1,
+            houio::HouGeoAdapter::AttributeAdapter::Storage::float32,
+            source)
+        || std::memcmp(
+               contiguous.data(),
+               sourceValues.data(),
+               contiguous.size()) != 0)
+    {
+        return fail("uniform numeric helper did not copy contiguous storage");
+    }
+
+    std::vector<std::byte> strided(6 * sizeof(houio::real32));
+    if (!houio::hougeo_attribute_detail::copyUniformNumericValues(
+            strided,
+            1,
+            2,
+            houio::HouGeoAdapter::AttributeAdapter::Storage::float32,
+            source))
+    {
+        return fail("uniform numeric helper rejected strided storage");
+    }
+    for (std::size_t index = 0; index < sourceValues.size(); ++index)
+    {
+        houio::real32 value = 0.0f;
+        std::memcpy(
+            &value,
+            strided.data() + (1 + index * 2) * sizeof(houio::real32),
+            sizeof(value));
+        if (value != sourceValues[index])
+            return fail("uniform numeric helper changed a strided value");
+    }
+
+    std::vector<std::byte> mismatch(sourceValues.size() * sizeof(houio::real64));
+    if (houio::hougeo_attribute_detail::copyUniformNumericValues(
+            mismatch,
+            0,
+            1,
+            houio::HouGeoAdapter::AttributeAdapter::Storage::float64,
+            source))
+    {
+        return fail("uniform numeric helper bypassed required conversion");
+    }
+    return 0;
 }
 
 int verifyHalfConversion()
@@ -130,6 +194,10 @@ int verifyFloat64Attribute(const houio::HouGeo::Ptr& geometry)
 
 int main()
 {
+    if (const int result = verifyUniformCopyHelper(); result != 0)
+    {
+        return result;
+    }
     if (const int result = verifyHalfConversion(); result != 0)
     {
         return result;

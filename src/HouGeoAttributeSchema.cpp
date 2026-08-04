@@ -253,13 +253,24 @@ namespace houio
                                 + attrName);
                         }
 
+                        const std::size_t destinationStart =
+                            static_cast<std::size_t>(elementIndex)
+                                * static_cast<std::size_t>(attrTupleSize);
+                        if( hougeo_attribute_detail::copyUniformNumericValues(
+                                data,
+                                destinationStart,
+                                1,
+                                attrStorage,
+                                tuple) )
+                        {
+                            continue;
+                        }
+
                         for( int componentIndex = 0;
                             componentIndex < attrTupleSize;
                             ++componentIndex )
                         {
-                            const std::size_t destinationIndex =
-                                static_cast<std::size_t>(elementIndex)
-                                    * static_cast<std::size_t>(attrTupleSize)
+                            const std::size_t destinationIndex = destinationStart
                                 + static_cast<std::size_t>(componentIndex);
                             hougeo_attribute_detail::storeNumericComponent(
                                 data,
@@ -292,6 +303,16 @@ namespace houio
                             throw std::runtime_error(
                                 "HouGeo::loadAttribute component value count mismatch for attribute "
                                 + attrName);
+                        }
+
+                        if( hougeo_attribute_detail::copyUniformNumericValues(
+                                data,
+                                static_cast<std::size_t>(componentIndex),
+                                static_cast<std::size_t>(attrTupleSize),
+                                attrStorage,
+                                componentValues) )
+                        {
+                            continue;
                         }
 
                         for( sint64 elementIndex = 0;
