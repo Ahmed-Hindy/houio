@@ -1408,6 +1408,23 @@ Exit criteria:
 - Strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
 - `HouGeo.cpp` is limited to root orchestration, topology, primitive dispatch, retained model state, and remaining primitive families.
 
+### Phase 56 — Faithful packed-record schema modularization
+
+**Status: complete on `refactor/hougeo-packed-schema-module`.**
+
+Completed work:
+
+- [x] Move embedded `PackedGeometry`, named `PackedFragment`, external `PackedDisk`, and `PackedDiskSequence` decoding into `HouGeoPackedLoad.cpp`.
+- [x] Preserve shared embedded-geometry lookup, topology validation, transforms, pivots, bounds, viewport flags, filenames, sequence indices, and wrap modes.
+- [x] Keep primitive type dispatch in `HouGeo::loadPrimitive`.
+- [x] Extend the source-layout test to prevent packed loaders from returning to `HouGeo.cpp`.
+
+Exit criteria:
+
+- All four packed fixture families retain exact round-trip behavior and diagnostics.
+- Strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
+- `HouGeo.cpp` no longer owns packed-record schema decoding.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:

@@ -6,6 +6,7 @@ set(monolith "${HOUIO_SOURCE_DIR}/src/HouGeo.cpp")
 set(attribute_loader "${HOUIO_SOURCE_DIR}/src/HouGeoAttributeLoad.cpp")
 set(attribute_header "${HOUIO_SOURCE_DIR}/src/HouGeoAttributeLoad.h")
 set(attribute_schema "${HOUIO_SOURCE_DIR}/src/HouGeoAttributeSchema.cpp")
+set(packed_loader "${HOUIO_SOURCE_DIR}/src/HouGeoPackedLoad.cpp")
 set(primitive_loader "${HOUIO_SOURCE_DIR}/src/HouGeoPrimitiveLoad.cpp")
 set(project_file "${HOUIO_SOURCE_DIR}/CMakeLists.txt")
 
@@ -14,6 +15,7 @@ foreach(required_file IN ITEMS
     "${attribute_loader}"
     "${attribute_header}"
     "${attribute_schema}"
+    "${packed_loader}"
     "${primitive_loader}"
     "${project_file}")
     if(NOT EXISTS "${required_file}")
@@ -24,6 +26,7 @@ endforeach()
 file(READ "${monolith}" monolith_source)
 file(READ "${attribute_loader}" attribute_loader_source)
 file(READ "${attribute_schema}" attribute_schema_source)
+file(READ "${packed_loader}" packed_loader_source)
 file(READ "${primitive_loader}" primitive_loader_source)
 file(READ "${project_file}" project_source)
 
@@ -75,9 +78,26 @@ foreach(attribute_schema_definition IN ITEMS
     endif()
 endforeach()
 
+foreach(packed_definition IN ITEMS
+    "void HouGeo::loadPackedGeometryPrimitive"
+    "void HouGeo::loadPackedFragmentPrimitive"
+    "void HouGeo::loadPackedDiskPrimitive"
+    "void HouGeo::loadPackedDiskSequencePrimitive")
+    string(FIND "${packed_loader_source}" "${packed_definition}" loader_position)
+    if(loader_position EQUAL -1)
+        message(FATAL_ERROR "HouGeo packed loader is missing: ${packed_definition}")
+    endif()
+
+    string(FIND "${monolith_source}" "${packed_definition}" monolith_position)
+    if(NOT monolith_position EQUAL -1)
+        message(FATAL_ERROR "Extracted packed loader returned to HouGeo.cpp: ${packed_definition}")
+    endif()
+endforeach()
+
 foreach(module IN ITEMS
     "src/HouGeoAttributeLoad.cpp"
     "src/HouGeoAttributeSchema.cpp"
+    "src/HouGeoPackedLoad.cpp"
     "src/HouGeoPrimitiveLoad.cpp")
     string(FIND "${project_source}" "${module}" cmake_position)
     if(cmake_position EQUAL -1)
