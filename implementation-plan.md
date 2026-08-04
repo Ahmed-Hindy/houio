@@ -1459,6 +1459,24 @@ Exit criteria:
 - Strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
 - The active faithful-schema modularization priority is complete; `HouGeo.cpp` retains root orchestration, primitive dispatch, model state, and public accessors.
 
+### Phase 59 — Exact-width binary uniform-array storage
+
+**Status: complete on `perf/exact-uniform-array-storage`.**
+
+Completed work:
+
+- [x] Retain binary uniform Bool arrays in their bit-packed word representation instead of expanded `Value` elements.
+- [x] Retain Int8, Int16, UInt16, and Float16 arrays at their encoded one- or two-byte widths while preserving established widened scalar access.
+- [x] Record the original uniform storage token independently from the logical `Value::Variant` type.
+- [x] Emit retained numeric uniform arrays directly through binary `JSONWriter` without scalar expansion or token widening.
+- [x] Keep the previous three-argument `Array::setUniformStorage` API as a compatibility path and add explicit storage-token overloads.
+
+Exit criteria:
+
+- Every supported numeric uniform-array token retains exact values, token identity, element count, and encoded byte width.
+- Binary tree read/write/read round trips preserve compact uniform storage; ASCII output retains the established scalar representation.
+- Strict, AddressSanitizer, static-analysis, fixture, package, and binary JSON matrices pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:

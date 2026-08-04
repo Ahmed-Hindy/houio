@@ -103,6 +103,7 @@ namespace houio
                 const std::span<const ubyte> values(pending_.data(), pending_.size());
                 tile->setUniformStorage(
                     static_cast<int>(json::variantIndex<ubyte, json::Value::Variant>),
+                    json::Token::JID_UINT8,
                     static_cast<sint64>(pending_.size()),
                     std::as_bytes(values));
                 payload_->append(tile);
@@ -163,6 +164,7 @@ namespace houio
             const std::span<const ubyte> values = openvdbStream.subspan(offset, count);
             tile->setUniformStorage(
                 static_cast<int>(json::variantIndex<ubyte, json::Value::Variant>),
+                json::Token::JID_UINT8,
                 static_cast<sint64>(count),
                 std::as_bytes(values));
             payload->append(tile);

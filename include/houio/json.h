@@ -16,6 +16,7 @@
 #include <stack>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -408,6 +409,10 @@ namespace houio
 			bool jsonUniformArray(const std::vector<T>& data);
 			bool jsonUniformArray(const std::vector<bool>& data);
 			bool jsonUniformArrayReal16(std::span<const uword> data);
+			bool jsonUniformArrayRaw(
+				Token::Type storage_type,
+				sint64 element_count,
+				std::span<const std::byte> data);
 
 			bool                                      writeId( Token::Type id );
 			bool                            writeLength( const sint64 &length );
@@ -861,11 +866,22 @@ namespace houio
 			[[nodiscard]] std::span<const std::byte> uniformData() const noexcept;
 			[[nodiscard]] sint64 uniformElementCount() const noexcept;
 			[[nodiscard]] int uniformTypeIndex() const noexcept;
+			[[nodiscard]] Token::Type uniformStorageType() const noexcept;
 
 			void setUniformStorage(
 				int type_index,
 				sint64 element_count,
 				std::span<const std::byte> data);
+			void setUniformStorage(
+				int type_index,
+				Token::Type storage_type,
+				sint64 element_count,
+				std::span<const std::byte> data);
+			void setUniformStorage(
+				int type_index,
+				Token::Type storage_type,
+				sint64 element_count,
+				std::vector<std::byte>&& data);
 
 			template<typename T>
 			void appendValue(const T& value);
@@ -879,6 +895,7 @@ namespace houio
 			std::vector<std::byte> uniform_data_;
 			sint64 uniform_element_count_ = 0;
 			int uniform_type_index_ = -1;
+			Token::Type uniform_storage_type_ = Token::Type::nullValue;
 		};
 
 		template<typename T>
@@ -971,7 +988,11 @@ namespace houio
 			template<typename T>
 			void jsonValue(const T& value);
 			template<typename T, typename Source>
-			void jsonUniformArray(sint64 element_count, Parser& parser);
+			void jsonUniformArray(
+				sint64 element_count,
+				Parser& parser,
+				Token::Type storage_type);
+			void appendUniformArray(Value uniform_array_value);
 
 			void pushContainer();
 			void popContainer();
@@ -1003,52 +1024,44 @@ namespace houio
 		}
 
 		template<typename T, typename Source>
-		void JSONReader::jsonUniformArray(sint64 element_count, Parser& parser)
+		void JSONReader::jsonUniformArray(
+			sint64 element_count,
+			Parser& parser,
+			Token::Type storage_type)
 		{
 			if (element_count < 0)
 				throw std::length_error("JSONReader::jsonUniformArray received a negative element count");
 			const size_t count = static_cast<size_t>(element_count);
-			constexpr size_t largest_element_size = sizeof(T) > sizeof(Source) ? sizeof(T) : sizeof(Source);
-			if (count > std::numeric_limits<size_t>::max() / largest_element_size)
-			{
+			if (count > std::numeric_limits<size_t>::max() / sizeof(Source))
 				throw std::length_error("JSONReader::jsonUniformArray allocation size overflow");
-			}
 
-			constexpr size_t uniform_type_index = variantIndex<T, Value::Variant>;
-			std::vector<T> converted_data;
-			converted_data.reserve(count);
-			sint64 elements_remaining = element_count;
+			const size_t storage_bytes = count * sizeof(Source);
+			std::vector<std::byte> exact_data(storage_bytes);
 			constexpr size_t chunk_capacity = 4096;
+			std::vector<Source> source_chunk(chunk_capacity);
+			size_t destination_offset = 0;
+			sint64 elements_remaining = element_count;
 			while (elements_remaining > 0)
 			{
 				const size_t chunk_size = static_cast<size_t>(
 					std::min<sint64>(elements_remaining, chunk_capacity));
-				std::vector<Source> source_data(chunk_size);
-				parser.read(std::span<Source>(source_data));
-				for (const Source& source_value : source_data)
-					converted_data.push_back(static_cast<T>(source_value));
+				parser.read(std::span<Source>(source_chunk.data(), chunk_size));
+				const size_t chunk_bytes = chunk_size * sizeof(Source);
+				std::memcpy(
+					exact_data.data() + destination_offset,
+					source_chunk.data(),
+					chunk_bytes);
+				destination_offset += chunk_bytes;
 				elements_remaining -= static_cast<sint64>(chunk_size);
 			}
 
 			Value uniform_array_value = Value::createArray();
-			ArrayPtr uniform_array = uniform_array_value.asArray();
-			const size_t destination_bytes = count * sizeof(T);
-			const auto bytes = std::span<const std::byte>(
-				reinterpret_cast<const std::byte*>(converted_data.data()),
-				destination_bytes);
-			uniform_array->setUniformStorage(
-				static_cast<int>(uniform_type_index),
+			uniform_array_value.asArray()->setUniformStorage(
+				static_cast<int>(variantIndex<T, Value::Variant>),
+				storage_type,
 				element_count,
-				bytes);
-
-			if (root_.isArray())
-				root_.asArray()->append(uniform_array_value);
-			else if (root_.isObject())
-				root_.asObject()->append(next_key_, uniform_array_value);
-			else if (root_.isNull() && stack_.empty())
-				root_ = uniform_array_value;
-			else
-				throw std::runtime_error("JSONReader::jsonUniformArray has no active container");
+				std::move(exact_data));
+			appendUniformArray(std::move(uniform_array_value));
 		}
 
 
@@ -1059,9 +1072,15 @@ namespace houio
 			explicit JSONWriter(std::ostream& output, bool binary = false)
 			{
 				if (binary)
-					writer_ = std::make_unique<BinaryWriter>(output);
+				{
+					auto binary_writer = std::make_unique<BinaryWriter>(output);
+					binary_writer_ = binary_writer.get();
+					writer_ = std::move(binary_writer);
+				}
 				else
+				{
 					writer_ = std::make_unique<ASCIIWriter>(output);
+				}
 			}
 
 			~JSONWriter() = default;
@@ -1081,6 +1100,7 @@ namespace houio
 			void operator()( const std::string &value ){writer_->jsonString(value);}
 		private:
 			std::unique_ptr<Writer> writer_;
+			BinaryWriter* binary_writer_ = nullptr;
 		};
 
 	}
