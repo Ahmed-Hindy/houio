@@ -1477,6 +1477,25 @@ Exit criteria:
 - Binary tree read/write/read round trips preserve compact uniform storage; ASCII output retains the established scalar representation.
 - Strict, AddressSanitizer, static-analysis, fixture, package, and binary JSON matrices pass.
 
+### Phase 60 — Homogeneous ordinary numeric-array compaction
+
+**Status: complete on `perf/compact-ascii-numeric-arrays`.**
+
+Completed work:
+
+- [x] Detect large homogeneous scalar arrays when `JSONReader` closes an ordinary array.
+- [x] Compact Bool, Int32, Int64, UInt8, Float32, and Float64 logical values into contiguous numeric storage after 64 elements.
+- [x] Release expanded `Value` capacity after compaction while preserving element count, indexed scalar access, and ASCII serialization.
+- [x] Leave small, mixed-type, nested, object, null, and string arrays in their established expanded representation.
+- [x] Preserve compacted storage through binary tree rewrites and subsequent reads.
+
+Exit criteria:
+
+- Large ordinary ASCII integer, real, and Bool arrays retain exact values in compact storage.
+- Small and mixed arrays do not change representation.
+- Strict, AddressSanitizer, static-analysis, fixture, package, and binary JSON matrices pass.
+- The active generic JSON-tree numeric-array amplification priority is complete.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:

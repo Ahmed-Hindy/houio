@@ -1084,6 +1084,109 @@ int verifyParserReuse()
     return 0;
 }
 
+int verifyAsciiNumericArrayCompaction()
+{
+    const auto parse_array = [](const std::string& text)
+    {
+        std::istringstream input(text);
+        houio::json::JSONReader reader;
+        houio::json::Parser parser;
+        if (!parser.parse(input, reader))
+            return houio::json::ArrayPtr{};
+        return reader.root().asArray();
+    };
+
+    std::ostringstream integer_text;
+    integer_text << '[';
+    for (int index = 0; index < 128; ++index)
+    {
+        if (index != 0)
+            integer_text << ',';
+        integer_text << index - 64;
+    }
+    integer_text << ']';
+    const houio::json::ArrayPtr integers = parse_array(integer_text.str());
+    if (!integers || !integers->isUniform() || integers->size() != 128
+        || integers->uniformStorageType() != houio::json::Token::JID_INT64
+        || integers->uniformTypeIndex()
+            != static_cast<int>(houio::json::variantIndex<
+                houio::sint64, houio::json::Value::Variant>)
+        || integers->uniformData().size() != 128 * sizeof(houio::sint64)
+        || integers->get<houio::sint64>(0) != -64
+        || integers->get<houio::sint64>(127) != 63)
+    {
+        return fail("large ASCII integer arrays were not compacted exactly");
+    }
+
+    std::ostringstream real_text;
+    real_text << '[';
+    for (int index = 0; index < 80; ++index)
+    {
+        if (index != 0)
+            real_text << ',';
+        real_text << index << ".5";
+    }
+    real_text << ']';
+    const houio::json::ArrayPtr reals = parse_array(real_text.str());
+    if (!reals || !reals->isUniform() || reals->size() != 80
+        || reals->uniformStorageType() != houio::json::Token::JID_REAL32
+        || reals->uniformData().size() != 80 * sizeof(houio::real32)
+        || reals->get<houio::real32>(0) != 0.5f
+        || reals->get<houio::real32>(79) != 79.5f)
+    {
+        return fail("large ASCII real arrays were not compacted exactly");
+    }
+
+    std::ostringstream bool_text;
+    bool_text << '[';
+    for (int index = 0; index < 70; ++index)
+    {
+        if (index != 0)
+            bool_text << ',';
+        bool_text << ((index % 3) == 0 ? "true" : "false");
+    }
+    bool_text << ']';
+    const houio::json::ArrayPtr bools = parse_array(bool_text.str());
+    if (!bools || !bools->isUniform() || bools->size() != 70
+        || bools->uniformStorageType() != houio::json::Token::JID_BOOL
+        || bools->uniformData().size() != 3 * sizeof(houio::uint32)
+        || !bools->get<bool>(0) || bools->get<bool>(1) || !bools->get<bool>(69))
+    {
+        return fail("large ASCII Bool arrays were not compacted exactly");
+    }
+
+    const houio::json::ArrayPtr small = parse_array("[1,2,3]");
+    const houio::json::ArrayPtr mixed = parse_array(
+        "[1,2.5,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,"
+        "21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,"
+        "41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,"
+        "61,62,63,64]");
+    if (!small || small->isUniform() || small->elements().size() != 3
+        || !mixed || mixed->isUniform() || mixed->elements().size() != 64)
+    {
+        return fail("small or mixed ASCII arrays changed representation");
+    }
+
+    std::ostringstream binary_output(std::ios::out | std::ios::binary);
+    houio::json::JSONWriter binary_writer(binary_output, true);
+    if (!binary_writer.write(integers))
+        return fail("binary writer rejected a compacted ASCII array");
+    std::istringstream binary_input(binary_output.str(), std::ios::in | std::ios::binary);
+    houio::json::JSONReader binary_reader;
+    houio::json::Parser binary_parser;
+    if (!binary_parser.parse(binary_input, binary_reader))
+        return fail("compacted ASCII array did not survive binary rewrite");
+    const houio::json::ArrayPtr rewritten = binary_reader.root().asArray();
+    if (!rewritten || !rewritten->isUniform()
+        || rewritten->uniformStorageType() != houio::json::Token::JID_INT64
+        || rewritten->uniformData().size() != integers->uniformData().size()
+        || rewritten->get<houio::sint64>(127) != 63)
+    {
+        return fail("binary rewrite changed compacted ASCII storage");
+    }
+    return 0;
+}
+
 int verifyWriterValidation()
 {
     std::ostringstream output(std::ios::out | std::ios::binary);
@@ -1139,7 +1242,7 @@ int main()
         int (*run)();
     };
 
-    const std::array<TestCase, 21> tests = {{
+    const std::array<TestCase, 22> tests = {{
         {"every scalar token", verifyEveryScalarToken},
         {"null tree round trip", verifyNullTreeRoundTrip},
         {"integer length encodings", verifyIntegerLengthEncodings},
@@ -1160,6 +1263,7 @@ int main()
         {"token and nesting validation", verifyTokenAndNestingValidation},
         {"structured diagnostics", verifyStructuredDiagnostics},
         {"parser reuse", verifyParserReuse},
+        {"ASCII numeric array compaction", verifyAsciiNumericArrayCompaction},
         {"writer validation", verifyWriterValidation},
     }};
 

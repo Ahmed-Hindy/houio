@@ -17,6 +17,8 @@ namespace houio
 	{
 		namespace
 		{
+			constexpr std::size_t numericArrayCompactionThreshold = 64;
+
 			bool isDefinedTokenType(Token::Type value)
 			{
 				switch( value )
@@ -1565,6 +1567,99 @@ namespace houio
 			uniform_data_ = std::move(data);
 		}
 
+		bool Array::compactNumericStorage(std::size_t minimum_elements)
+		{
+			if (uses_uniform_storage_ || values_.size() < minimum_elements)
+				return false;
+
+			const Value& first_value = values_.front();
+			if (first_value.kind_ != Value::Kind::scalar)
+				return false;
+			const std::size_t type_index = first_value.scalar_.index();
+			if (type_index == variantIndex<std::string, Value::Variant>)
+				return false;
+			for (const Value& value : values_)
+			{
+				if (value.kind_ != Value::Kind::scalar
+					|| value.scalar_.index() != type_index)
+				{
+					return false;
+				}
+			}
+			if (values_.size() > static_cast<std::size_t>(
+					std::numeric_limits<sint64>::max()))
+			{
+				throw std::length_error("Numeric array element count exceeds sint64 range");
+			}
+
+			Token::Type storage_type = Token::Type::nullValue;
+			std::vector<std::byte> exact_data;
+			const auto copy_values = [&]<typename T>(Token::Type token)
+			{
+				if (values_.size() > std::numeric_limits<std::size_t>::max() / sizeof(T))
+					throw std::length_error("Numeric array storage size overflow");
+				exact_data.resize(values_.size() * sizeof(T));
+				for (std::size_t index = 0; index < values_.size(); ++index)
+				{
+					const T& scalar = std::get<T>(values_[index].scalar_);
+					std::memcpy(
+						exact_data.data() + index * sizeof(T),
+						&scalar,
+						sizeof(T));
+				}
+				storage_type = token;
+			};
+
+			switch (type_index)
+			{
+			case variantIndex<bool, Value::Variant>:
+			{
+				const std::vector<uint32> words = packBoolWords(
+					values_.size(),
+					[&](std::size_t index)
+					{
+						return std::get<bool>(values_[index].scalar_);
+					});
+				exact_data.resize(words.size() * sizeof(uint32));
+				if (!words.empty())
+				{
+					std::memcpy(
+						exact_data.data(),
+						words.data(),
+						exact_data.size());
+				}
+				storage_type = Token::JID_BOOL;
+				break;
+			}
+			case variantIndex<sint32, Value::Variant>:
+				copy_values.template operator()<sint32>(Token::JID_INT32);
+				break;
+			case variantIndex<real32, Value::Variant>:
+				copy_values.template operator()<real32>(Token::JID_REAL32);
+				break;
+			case variantIndex<real64, Value::Variant>:
+				copy_values.template operator()<real64>(Token::JID_REAL64);
+				break;
+			case variantIndex<ubyte, Value::Variant>:
+				copy_values.template operator()<ubyte>(Token::JID_UINT8);
+				break;
+			case variantIndex<sint64, Value::Variant>:
+				copy_values.template operator()<sint64>(Token::JID_INT64);
+				break;
+			default:
+				return false;
+			}
+
+			const sint64 element_count = static_cast<sint64>(values_.size());
+			ValueList{}.swap(values_);
+			uses_uniform_storage_ = true;
+			uniform_data_ = std::move(exact_data);
+			uniform_element_count_ = element_count;
+			uniform_type_index_ = static_cast<int>(type_index);
+			uniform_storage_type_ = storage_type;
+			return true;
+		}
+
 		void Array::append(const Value& value)
 		{
 			if (uses_uniform_storage_)
@@ -1806,6 +1901,8 @@ namespace houio
 		{
 			if (!root_.isArray())
 				throw std::runtime_error("JSONReader received an array end without an array");
+			static_cast<void>(root_.asArray()->compactNumericStorage(
+				numericArrayCompactionThreshold));
 			popContainer();
 		}
 

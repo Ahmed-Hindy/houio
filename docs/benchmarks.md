@@ -89,7 +89,7 @@ Emit one CSV row or choose a reduced workload:
 
 The report includes exact input bytes, incremental current-working-set deltas for the JSON and `HouGeo` stages, combined extra bytes, stage amplification ratios, and a checksum. Working-set sampling is supported on Windows and Linux.
 
-Binary uniform numeric arrays are retained in the generic JSON tree at their encoded widths: Bool remains bit-packed, Int8/UInt8 use one byte, Int16/UInt16/Float16 use two bytes, Int32/Float32 use four bytes, and Int64/Float64 use eight bytes per element. Binary tree rewrites emit the same uniform token and raw storage directly. Scalar access still returns the established widened `Value` type where required.
+Binary uniform numeric arrays are retained in the generic JSON tree at their encoded widths: Bool remains bit-packed, Int8/UInt8 use one byte, Int16/UInt16/Float16 use two bytes, Int32/Float32 use four bytes, and Int64/Float64 use eight bytes per element. Large homogeneous ordinary numeric arrays are also compacted into contiguous storage when they contain at least 64 scalar elements. Small, mixed, nested, and string arrays retain expanded `Value` storage. Binary tree rewrites emit compact storage directly; scalar access and ASCII output preserve the established logical values.
 
 The probe deliberately does not define pass/fail thresholds. Current working set is affected by allocator reuse, page commitment, operating-system accounting, background activity, and measurement order. Compare revisions only on the same machine, compiler, build type, workload, and process conditions. Use an allocation profiler when exact allocation ownership or transient peak memory is required.
 
