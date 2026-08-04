@@ -263,7 +263,7 @@ Add fixture-backed support one record type at a time:
 - [x] Avoid retained per-element `Value` allocations for binary uniform numeric arrays, including bit-packed Bool and Float16 storage.
 - [x] Avoid retained per-element `Value` allocations for large homogeneous ordinary ASCII and non-uniform binary numeric arrays; small, mixed, nested, and string arrays retain expanded storage.
 - [x] Preserve compact numeric arrays through semantic attribute loading by directly copying exact matching storage and retaining conversion fallback for mismatched types.
-- [ ] Evaluate direct semantic handlers that bypass the generic JSON tree.
+- [x] Evaluate direct semantic handlers; retain the single tree-backed schema decoder until profiling and ordering contracts justify a second path. See `docs/direct-semantic-handler.md`.
 - [ ] Add streaming or chunked APIs only after compatibility tests are comprehensive.
 - [ ] Reduce copies between `HouGeo`, adapters, and simplified representations.
 

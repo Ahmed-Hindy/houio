@@ -132,4 +132,4 @@ Do not commit machine-specific timing numbers as universal performance claims.
 
 The memory probe samples retained current working set; it does not attribute allocations to individual types and does not capture every transient peak. Exact allocator-level accounting remains future diagnostic work rather than a release gate.
 
-The benchmarks also do not yet cover direct semantic handlers, streaming APIs, native sparse volumes, or large mixed-record assets beyond the separate Crag compatibility test.
+The benchmarks also do not yet cover streaming APIs, native sparse volumes, or large mixed-record assets beyond the separate Crag compatibility test. A full direct semantic handler was evaluated and deferred because the remaining structural-tree cost has not yet justified duplicating the complete flattened HouGeo schema state machine; see [Direct semantic-handler evaluation](direct-semantic-handler.md).

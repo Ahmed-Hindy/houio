@@ -109,6 +109,8 @@ Handlers separate token decoding from consumers:
 - `JSONLogger` exposes parser events for diagnostics and testing.
 - Writers serialize ASCII or binary JSON; binary tree rewrites preserve retained or compacted numeric tokens and raw storage directly, while ASCII output expands them to the established scalar representation.
 
+A full HouGeo-specific parser handler is intentionally deferred. The retained tree provides flattened-record validation, arbitrary field ordering, recursive shared data, and one path-aware schema decoder; numeric payload amplification is mitigated within that pipeline. See [Direct semantic-handler evaluation](docs/direct-semantic-handler.md).
+
 ## Houdini object decoding
 
 Houdini geometry objects are represented as flattened key/value arrays. `Value::toObject()` validates the array before converting it into an object:

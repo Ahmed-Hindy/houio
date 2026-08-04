@@ -451,6 +451,7 @@ See [Performance baselines](docs/benchmarks.md) for methodology and workload con
 - [Command-line interface](docs/cli.md)
 - [Fixture generation and validation](docs/fixtures.md)
 - [Performance baselines](docs/benchmarks.md)
+- [Direct semantic-handler evaluation](docs/direct-semantic-handler.md)
 - [Experimental field persistence format](docs/field-format.md)
 - [Versioning and release policy](docs/versioning.md)
 - [Houdini package](docs/houdini-package.md)
