@@ -11,7 +11,7 @@ The maintained import path remains:
 3. `HouGeo::toObject` validates flattened key/value records.
 4. `HouGeo::load` performs schema-aware semantic decoding with path-qualified diagnostics.
 
-Large numeric payloads no longer require expanded per-element tree storage. Binary uniform arrays retain exact encoded bytes, large homogeneous ordinary arrays compact at array close, and matching numeric attribute storage is copied directly into semantic `Attribute` buffers. This leaves structural records, strings, mixed arrays, primitive metadata, and deliberately retained payloads as the principal tree cost.
+Large numeric payloads no longer require expanded per-element tree storage. Binary uniform arrays retain exact encoded bytes, large homogeneous ordinary arrays compact at array close, and matching numeric attribute storage is copied directly into semantic `Attribute` buffers. Retained payload export also forwards validated tokens and byte spans directly, while model conversion preallocates known final buffers and reuses polygon scratch capacity. This leaves structural records, strings, mixed arrays, primitive metadata, deliberately retained payloads, and independently owned destination models as the principal remaining costs.
 
 ## Alternatives considered
 
@@ -47,6 +47,9 @@ The current architecture already addresses the dominant numeric-payload costs:
 - Homogeneous ordinary numeric-array compaction after 64 elements.
 - Direct binary rewrite of retained compact arrays.
 - Direct contiguous or strided semantic attribute copies when source and destination storage match.
+- Direct retained-array payload export without typed full-payload temporary vectors.
+- Exact destination allocation for converted `P` and point/vertex `UV` attributes and V3f-to-V4f position promotion.
+- Reused polygon scratch capacity across complete HouGeo-to-simplified primitive runs.
 - A Windows/Linux working-set probe covering retained input, JSON tree, and HouGeo stages.
 
 These changes preserve a single schema decoder and the existing diagnostic model.
@@ -62,4 +65,4 @@ Reconsider a direct semantic handler only when all of the following are availabl
 5. Diagnostics, parser limits, cancellation behavior, and ownership of partially built geometry are specified.
 6. The measured gain justifies maintaining two import paths or replacing the existing path outright.
 
-Until those criteria are met, optimization should continue inside the single validated pipeline, especially by reducing copies between retained tree storage, HouGeo storage, adapters, and simplified geometry.
+Until those criteria are met, optimization should continue inside the single validated pipeline. Further copy reduction is profiling-gated because `HouGeo` and simplified geometry intentionally own independent data; future changes must demonstrate a material benefit without weakening ownership, validation, or diagnostics.

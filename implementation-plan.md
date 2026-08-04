@@ -77,6 +77,7 @@ Every phase must preserve these constraints:
 - Documentation records the primary Writer/CLI/HOM workflow, packed record support, opaque native VDB preservation, constructed native payloads, and remaining sparse-grid limitations.
 - Phases 11–31 are merged into `master` through PRs #31 and #32.
 - Phases 32–34 are complete and merged. Phase 35 supports embedded PackedGeometry, named PackedFragment, external PackedDisk, and PackedDiskSequence records. Phase 36 preserves opaque native VDB payloads, provides dependency-neutral sparse FloatGrid editing, optional native `.vdb` I/O, native Houdini payload generation, and exact scalar Float VDB live-HOM extraction.
+- Performance and memory phases 59–66 are merged into `master` through PRs **#66–#73**: exact-width retained arrays, ordinary numeric-array compaction, direct matching-storage attribute loads, the semantic-handler decision, direct retained payload export, exact special-attribute allocation, exact position promotion allocation, and reusable polygon conversion scratch storage.
 
 ## Execution phases
 
@@ -1160,7 +1161,7 @@ Exit criteria:
 
 ### Phase 43 — HouIO-owned Alembic and USD archives
 
-**Status: complete. Core ownership merged through PR #50; bundled upstream release implemented on `feat/bundled-scene-io`.**
+**Status: merged through PRs #50–#52: core ownership in #50, bundled upstream dependencies in #51, and bundled-package hardening in #52.**
 
 Goals and completed work:
 
@@ -1186,7 +1187,7 @@ Goals and completed work:
 
 ### Phase 44 — Variable-size simplified polygon topology
 
-**Status: complete on `feat/variable-polygon-topology`.**
+**Status: merged through PR #53 from `feat/variable-polygon-topology`.**
 
 Goals and completed work:
 
@@ -1209,7 +1210,7 @@ Exit criteria:
 
 ### Phase 45 — Provenance cleanup and non-publishing release policy
 
-**Status: technical provenance cleanup complete on `chore/provenance-cleanup`; documented upstream permission or an independently licensable replacement remains an external release blocker.**
+**Status: technical cleanup merged through PR #54 from `chore/provenance-cleanup`; documented upstream permission or an independently licensable replacement remains an external release blocker.**
 
 Goals and completed work:
 
@@ -1233,7 +1234,7 @@ Exit criteria:
 
 ### Phase 46 — Exact UInt8 attribute storage
 
-**Status: complete on `feat/unsigned-attribute-storage`.**
+**Status: merged through PR #55 from `feat/unsigned-attribute-storage`.**
 
 Goals and completed work:
 
@@ -1255,7 +1256,7 @@ Exit criteria:
 
 ### Phase 47 — Explicit simplified attribute domains
 
-**Status: complete on `feat/lossless-attribute-domains`.**
+**Status: merged through PR #56 from `feat/lossless-attribute-domains`.**
 
 Goals and completed work:
 
@@ -1275,7 +1276,7 @@ Exit criteria:
 
 ### Phase 48 — Lossless face-varying conversion
 
-**Status: complete on `feat/lossless-attribute-domains`.**
+**Status: merged through PR #56 from `feat/lossless-attribute-domains`.**
 
 Goals and completed work:
 
@@ -1294,7 +1295,7 @@ Exit criteria:
 
 ### Phase 49 — Numeric primitive and global domains
 
-**Status: complete on `feat/lossless-attribute-domains`.**
+**Status: merged through PR #56 from `feat/lossless-attribute-domains`.**
 
 Goals and completed work:
 
@@ -1323,7 +1324,7 @@ Completed work:
 
 ### Phase 51 — Primitive schema-loader modularization
 
-**Status: complete on `chore/consolidate-product-surface`.**
+**Status: merged through PR #58 from `chore/consolidate-product-surface`.**
 
 Completed work:
 
@@ -1340,7 +1341,7 @@ Exit criteria:
 
 ### Phase 52 — HOM manifest decoder modularization
 
-**Status: complete on `refactor/hom-manifest-modules`.**
+**Status: merged through PR #59 from `refactor/hom-manifest-modules`.**
 
 Completed work:
 
@@ -1358,7 +1359,7 @@ Exit criteria:
 
 ### Phase 53 — Unified CLI and compatibility-converter retirement
 
-**Status: complete on `refactor/retire-compat-converter`.**
+**Status: merged through PR #60 from `refactor/retire-compat-converter`.**
 
 Completed work:
 
@@ -1376,7 +1377,7 @@ Exit criteria:
 
 ### Phase 54 — Faithful attribute-payload helper modularization
 
-**Status: complete on `refactor/hougeo-attribute-payload-module`.**
+**Status: merged through PR #61 from `refactor/hougeo-attribute-payload-module`.**
 
 Completed work:
 
@@ -1393,7 +1394,7 @@ Exit criteria:
 
 ### Phase 55 — Faithful attribute and group schema modularization
 
-**Status: complete on `refactor/hougeo-attribute-schema-module`.**
+**Status: merged through PR #62 from `refactor/hougeo-attribute-schema-module`.**
 
 Completed work:
 
@@ -1410,7 +1411,7 @@ Exit criteria:
 
 ### Phase 56 — Faithful packed-record schema modularization
 
-**Status: complete on `refactor/hougeo-packed-schema-module`.**
+**Status: merged through PR #63 from `refactor/hougeo-packed-schema-module`.**
 
 Completed work:
 
@@ -1427,7 +1428,7 @@ Exit criteria:
 
 ### Phase 57 — Faithful dense-volume schema modularization
 
-**Status: complete on `refactor/hougeo-volume-schema-module`.**
+**Status: merged through PR #64 from `refactor/hougeo-volume-schema-module`.**
 
 Completed work:
 
@@ -1444,7 +1445,7 @@ Exit criteria:
 
 ### Phase 58 — Faithful polygon schema modularization
 
-**Status: complete on `refactor/hougeo-polygon-schema-module`.**
+**Status: merged through PR #65 from `refactor/hougeo-polygon-schema-module`.**
 
 Completed work:
 
@@ -1461,7 +1462,7 @@ Exit criteria:
 
 ### Phase 59 — Exact-width binary uniform-array storage
 
-**Status: complete on `perf/exact-uniform-array-storage`.**
+**Status: merged through PR #66 from `perf/exact-uniform-array-storage`.**
 
 Completed work:
 
@@ -1479,7 +1480,7 @@ Exit criteria:
 
 ### Phase 60 — Homogeneous ordinary numeric-array compaction
 
-**Status: complete on `perf/compact-ascii-numeric-arrays`.**
+**Status: merged through PR #67 from `perf/compact-ascii-numeric-arrays`.**
 
 Completed work:
 
@@ -1498,7 +1499,7 @@ Exit criteria:
 
 ### Phase 61 — Direct compact numeric attribute loading
 
-**Status: complete on `perf/direct-uniform-attribute-load`.**
+**Status: merged through PR #68 from `perf/direct-uniform-attribute-load`.**
 
 Completed work:
 
@@ -1516,7 +1517,7 @@ Exit criteria:
 
 ### Phase 62 — Direct semantic-handler architecture decision
 
-**Status: complete on `docs/direct-semantic-handler-decision`.**
+**Status: merged through PR #69 from `docs/direct-semantic-handler-decision`.**
 
 Completed work:
 
@@ -1533,7 +1534,7 @@ Exit criteria:
 
 ### Phase 63 — Direct retained uniform-array export
 
-**Status: complete on `perf/direct-uniform-json-export`.**
+**Status: merged through PR #70 from `perf/direct-uniform-json-export`.**
 
 Completed work:
 
@@ -1550,7 +1551,7 @@ Exit criteria:
 
 ### Phase 64 — Exact special-attribute conversion allocation
 
-**Status: complete on `perf/preallocate-special-attribute-conversion`.**
+**Status: merged through PR #71 from `perf/preallocate-special-attribute-conversion`.**
 
 Completed work:
 
@@ -1567,7 +1568,7 @@ Exit criteria:
 
 ### Phase 65 — Exact simplified-position promotion allocation
 
-**Status: complete on `perf/preallocate-position-promotion`.**
+**Status: merged through PR #72 from `perf/preallocate-position-promotion`.**
 
 Completed work:
 
@@ -1583,7 +1584,7 @@ Exit criteria:
 
 ### Phase 66 — Reusable polygon conversion scratch storage
 
-**Status: complete on `perf/reuse-polygon-conversion-buffer`.**
+**Status: merged through PR #73 from `perf/reuse-polygon-conversion-buffer`.**
 
 Completed work:
 

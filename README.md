@@ -55,6 +55,14 @@ The simplified `Geometry` API is intentionally render-oriented. It preserves sup
 
 `<houio/GeometryModels.h>` provides intention-revealing, non-breaking aliases: `HoudiniGeometry` for the supported Houdini-oriented model and `SimplifiedMesh` for the render-oriented convenience model.
 
+## Memory and conversion behavior
+
+The maintained parser keeps large numeric payloads compact without introducing a second HouGeo schema decoder. Binary uniform arrays retain their exact encoded widths, homogeneous ordinary numeric arrays with at least 64 scalar elements compact at array close, and matching semantic attribute storage is copied directly from retained bytes. Binary rewrites and HouGeo payload exports preserve compact tokens without typed full-payload temporary vectors.
+
+Conversions between `HouGeo` and the simplified `Geometry` model still create independently owned destination data, but their known avoidable growth allocations are bounded: final `P` and point/vertex `UV` buffers are preallocated, V3f-to-V4f position promotion allocates once, and polygon conversion reuses one scratch buffer across a primitive run. See [Performance baselines](docs/benchmarks.md), [Architecture](architecture.md), and the [direct semantic-handler decision](docs/direct-semantic-handler.md).
+
+## Current limitations
+
 Not currently supported by the standalone C++ model:
 
 - Agents and crowds

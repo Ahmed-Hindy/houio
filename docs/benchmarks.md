@@ -89,7 +89,16 @@ Emit one CSV row or choose a reduced workload:
 
 The report includes exact input bytes, incremental current-working-set deltas for the JSON and `HouGeo` stages, combined extra bytes, stage amplification ratios, and a checksum. Working-set sampling is supported on Windows and Linux.
 
-Binary uniform numeric arrays are retained in the generic JSON tree at their encoded widths: Bool remains bit-packed, Int8/UInt8 use one byte, Int16/UInt16/Float16 use two bytes, Int32/Float32 use four bytes, and Int64/Float64 use eight bytes per element. Large homogeneous ordinary numeric arrays are also compacted into contiguous storage when they contain at least 64 scalar elements. Small, mixed, nested, and string arrays retain expanded `Value` storage. Binary tree rewrites and HouGeo payload exports emit compact storage directly without typed temporary vectors; scalar access and ASCII output preserve the established logical values. Numeric attribute loading also copies compact tuple or component arrays directly when their storage token exactly matches the destination, avoiding per-scalar extraction while preserving the conversion fallback for mismatched representations. HouGeo-to-simplified conversion preallocates final `P` and point/vertex `UV` buffers, reuses one topology scratch buffer across polygon faces, and simplified-to-HouGeo V3f position promotion preallocates its final V4f buffer.
+The current retained-memory and conversion optimizations are:
+
+- Binary uniform numeric arrays retain their encoded widths: Bool remains bit-packed; Int8/UInt8 use one byte; Int16/UInt16/Float16 use two bytes; Int32/Float32 use four bytes; and Int64/Float64 use eight bytes per element.
+- Homogeneous ordinary numeric arrays with at least 64 scalar elements compact into contiguous storage when the array closes. Small, mixed, nested, and string arrays retain expanded `Value` storage.
+- Binary tree rewrites and HouGeo payload exports emit retained tokens and validated byte spans directly without typed full-payload temporary vectors. Scalar access and ASCII output preserve the established logical values.
+- Numeric attribute loading copies compact tuple or component arrays directly when their storage token exactly matches the destination, while mismatched representations retain the established conversion path.
+- HouGeo-to-simplified conversion preallocates final `P` and point/vertex `UV` buffers and reuses one topology scratch buffer across polygon faces.
+- Simplified-to-HouGeo V3f position promotion preallocates its final V4f buffer.
+
+The model conversions still produce independently owned destination storage. The completed work removes known avoidable temporary allocations and growth copies; it is not a zero-copy ownership contract.
 
 The probe deliberately does not define pass/fail thresholds. Current working set is affected by allocator reuse, page commitment, operating-system accounting, background activity, and measurement order. Compare revisions only on the same machine, compiler, build type, workload, and process conditions. Use an allocation profiler when exact allocation ownership or transient peak memory is required.
 
