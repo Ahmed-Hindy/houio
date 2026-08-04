@@ -18,7 +18,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Split faithful HouGeo schema loading into focused attribute, polygon/curve, packed-record, native-VDB/quadric, and dense-volume modules while retaining root and primitive dispatch in `HouGeo.cpp`.
 - [x] Split manifest decoding by attributes, primitive families, and VDB records.
 - [x] Retire the beta-only `houio_convert` executable after migrating packages and the HOM bridge to `houio convert`.
-- [ ] Reduce generic JSON-tree memory amplification for large numeric arrays; binary uniform numeric arrays now retain exact encoded widths and rewrite without scalar expansion.
+- [x] Reduce generic JSON-tree memory amplification for large numeric arrays by retaining exact binary uniform storage and compacting large homogeneous ordinary numeric arrays at array close.
 
 ## Modernization completed
 
@@ -261,7 +261,7 @@ Add fixture-backed support one record type at a time:
 - [x] Benchmark large topology arrays.
 - [x] Benchmark dense-volume imports.
 - [x] Avoid retained per-element `Value` allocations for binary uniform numeric arrays, including bit-packed Bool and Float16 storage.
-- [ ] Avoid per-element `Value` allocations for large ordinary ASCII and non-uniform arrays.
+- [x] Avoid retained per-element `Value` allocations for large homogeneous ordinary ASCII and non-uniform binary numeric arrays; small, mixed, nested, and string arrays retain expanded storage.
 - [ ] Preserve uniform arrays through semantic loading where possible.
 - [ ] Evaluate direct semantic handlers that bypass the generic JSON tree.
 - [ ] Add streaming or chunked APIs only after compatibility tests are comprehensive.

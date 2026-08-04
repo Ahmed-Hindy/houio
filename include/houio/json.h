@@ -890,12 +890,16 @@ namespace houio
 			void append(ArrayPtr array);
 
 		private:
+			[[nodiscard]] bool compactNumericStorage(std::size_t minimum_elements);
+
 			ValueList values_;
 			bool uses_uniform_storage_ = false;
 			std::vector<std::byte> uniform_data_;
 			sint64 uniform_element_count_ = 0;
 			int uniform_type_index_ = -1;
 			Token::Type uniform_storage_type_ = Token::Type::nullValue;
+
+			friend class JSONReader;
 		};
 
 		template<typename T>
