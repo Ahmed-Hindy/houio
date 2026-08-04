@@ -3,16 +3,24 @@ if(NOT DEFINED HOUIO_SOURCE_DIR)
 endif()
 
 set(monolith "${HOUIO_SOURCE_DIR}/src/HouGeo.cpp")
+set(attribute_loader "${HOUIO_SOURCE_DIR}/src/HouGeoAttributeLoad.cpp")
+set(attribute_header "${HOUIO_SOURCE_DIR}/src/HouGeoAttributeLoad.h")
 set(primitive_loader "${HOUIO_SOURCE_DIR}/src/HouGeoPrimitiveLoad.cpp")
 set(project_file "${HOUIO_SOURCE_DIR}/CMakeLists.txt")
 
-foreach(required_file IN ITEMS "${monolith}" "${primitive_loader}" "${project_file}")
+foreach(required_file IN ITEMS
+    "${monolith}"
+    "${attribute_loader}"
+    "${attribute_header}"
+    "${primitive_loader}"
+    "${project_file}")
     if(NOT EXISTS "${required_file}")
         message(FATAL_ERROR "Required HouGeo module file is missing: ${required_file}")
     endif()
 endforeach()
 
 file(READ "${monolith}" monolith_source)
+file(READ "${attribute_loader}" attribute_loader_source)
 file(READ "${primitive_loader}" primitive_loader_source)
 file(READ "${project_file}" project_source)
 
@@ -35,9 +43,28 @@ foreach(definition IN LISTS extracted_definitions)
     endif()
 endforeach()
 
-string(FIND "${project_source}" "src/HouGeoPrimitiveLoad.cpp" cmake_position)
-if(cmake_position EQUAL -1)
-    message(FATAL_ERROR "HouGeoPrimitiveLoad.cpp is not part of the houio target")
-endif()
+foreach(attribute_definition IN ITEMS
+    "std::vector<int> expandPagedIntValues"
+    "Attribute::ComponentType componentTypeForStorage"
+    "void storeNumericComponent")
+    string(FIND "${attribute_loader_source}" "${attribute_definition}" loader_position)
+    if(loader_position EQUAL -1)
+        message(FATAL_ERROR "HouGeo attribute payload module is missing: ${attribute_definition}")
+    endif()
 
-message(STATUS "HouGeo primitive-loader module boundary is intact")
+    string(FIND "${monolith_source}" "${attribute_definition}" monolith_position)
+    if(NOT monolith_position EQUAL -1)
+        message(FATAL_ERROR "Extracted attribute payload helper returned to HouGeo.cpp: ${attribute_definition}")
+    endif()
+endforeach()
+
+foreach(module IN ITEMS
+    "src/HouGeoAttributeLoad.cpp"
+    "src/HouGeoPrimitiveLoad.cpp")
+    string(FIND "${project_source}" "${module}" cmake_position)
+    if(cmake_position EQUAL -1)
+        message(FATAL_ERROR "${module} is not part of the houio target")
+    endif()
+endforeach()
+
+message(STATUS "HouGeo schema-loader module boundaries are intact")

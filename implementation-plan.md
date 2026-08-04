@@ -1374,6 +1374,23 @@ Exit criteria:
 - The installed and Houdini package surfaces contain one executable.
 - File-to-file GEO/BGEO/SCF conversion continues through `houio convert` with the existing bridge API.
 
+### Phase 54 — Faithful attribute-payload helper modularization
+
+**Status: complete on `refactor/hougeo-attribute-payload-module`.**
+
+Completed work:
+
+- [x] Move paged integer tuple expansion out of `HouGeo.cpp` into `HouGeoAttributeLoad.cpp`.
+- [x] Move storage-to-component mapping and checked typed numeric component writes into the same focused module.
+- [x] Keep `HouGeo::loadAttribute` as the schema and private-state orchestration boundary for the next extraction phase.
+- [x] Extend the HouGeo source-layout test to guard both attribute-payload and primitive-loader boundaries.
+
+Exit criteria:
+
+- Paged numeric, indexed string, and indexed dictionary attribute paths retain existing diagnostics and values.
+- The strict warnings-as-errors and Houdini integration suite passes without behavior changes.
+- `HouGeo.cpp` no longer owns low-level attribute page expansion or byte-storage helpers.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
