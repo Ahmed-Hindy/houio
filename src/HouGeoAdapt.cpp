@@ -73,13 +73,13 @@ HouGeo::Ptr HouGeoIO::adaptGeometry(Geometry::Ptr geometry)
         // Houdini stores P as a four-component point position in this representation.
         if (name == "P" && sourceAttribute->numComponents() == 3)
         {
-            Attribute::Ptr promotedAttribute =
-                std::make_shared<Attribute>(4, Attribute::ComponentType::float32);
             const int elementCount = sourceAttribute->numElements();
+            Attribute::Ptr promotedAttribute = Attribute::createV4f(elementCount);
             for (int elementIndex = 0; elementIndex < elementCount; ++elementIndex)
             {
                 const math::V3f position = sourceAttribute->get<math::V3f>(elementIndex);
-                promotedAttribute->appendElement<math::V4f>(
+                promotedAttribute->set<math::V4f>(
+                    static_cast<unsigned int>(elementIndex),
                     math::V4f(position.x, position.y, position.z, 1.0f));
             }
             sourceAttribute = promotedAttribute;

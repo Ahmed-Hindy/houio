@@ -267,6 +267,7 @@ Add fixture-backed support one record type at a time:
 - [ ] Add streaming or chunked APIs only after compatibility tests are comprehensive.
 - [x] Eliminate typed temporary buffers when HouGeo exports retained uniform JSON arrays; emit validated token, count, and bytes directly.
 - [x] Preallocate exact simplified `P` and point/vertex `UV` attribute sizes before HouGeo conversion instead of growing them element by element.
+- [x] Preallocate the final Houdini V4f position buffer when promoting simplified V3f `P` attributes.
 - [ ] Reduce remaining copies between `HouGeo`, adapters, and simplified representations.
 
 ## Documentation and releases
