@@ -42,6 +42,7 @@ add_library(
     src/HouGeoAttributeLoad.cpp
     src/HouGeoAttributeSchema.cpp
     src/HouGeoPackedLoad.cpp
+    src/HouGeoPolygonLoad.cpp
     src/HouGeoPrimitiveLoad.cpp
     src/HouGeoVolumeLoad.cpp
     src/HouGeoAdapter.cpp
