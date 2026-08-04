@@ -1514,6 +1514,23 @@ Exit criteria:
 - Mismatched numeric representations retain established conversion behavior and diagnostics.
 - Strict, AddressSanitizer, static-analysis, fixture, package, and numeric-storage matrices pass.
 
+### Phase 62 — Direct semantic-handler architecture decision
+
+**Status: complete on `docs/direct-semantic-handler-decision`.**
+
+Completed work:
+
+- [x] Map the parser handler contract against root, attribute, topology, shared-data, primitive, group, and recursive-geometry decoding requirements.
+- [x] Evaluate full and partial direct-handler designs against the existing compact-tree and direct-attribute-copy pipeline.
+- [x] Document the decision to retain one schema decoder until profiling shows structural tree retention is a material bottleneck.
+- [x] Define explicit ordering, reuse, differential-testing, diagnostics, ownership, and measured-benefit criteria for revisiting the decision.
+
+Exit criteria:
+
+- The decision and alternatives are documented in `docs/direct-semantic-handler.md`.
+- The performance roadmap no longer implies an unqualified second import path.
+- Future implementation requires evidence and compatibility gates rather than architecture speculation.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
