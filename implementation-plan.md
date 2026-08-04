@@ -1442,6 +1442,23 @@ Exit criteria:
 - Malformed tile metadata is rejected before destination allocation and indexing.
 - Strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
 
+### Phase 58 — Faithful polygon schema modularization
+
+**Status: complete on `refactor/hougeo-polygon-schema-module`.**
+
+Completed work:
+
+- [x] Move direct polygon decoding into `HouGeoPolygonLoad.cpp`.
+- [x] Move legacy per-primitive polygon-run entries and compact run-length or per-primitive count records into the same module.
+- [x] Preserve topology-index validation, exact primitive boundaries, open/closed state, compact aliases, and declared primitive-count checks.
+- [x] Keep primitive type dispatch in `HouGeo::loadPrimitive` and extend the source-layout guard.
+
+Exit criteria:
+
+- Direct `Poly`, legacy `run/Poly`, `Polygon_run`, and `PolygonCurve_run` tests retain exact behavior and diagnostics.
+- Strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
+- The active faithful-schema modularization priority is complete; `HouGeo.cpp` retains root orchestration, primitive dispatch, model state, and public accessors.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:

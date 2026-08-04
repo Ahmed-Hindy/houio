@@ -15,7 +15,7 @@ The long-term roadmap remains below. The active modernization program is summari
 - [x] Define explicit core-minimal, OpenVDB, scene-I/O, Houdini-package, and full-development build profiles.
 - [x] Add a safe developer command for removing preset builds, generated build trees, dependency caches, or the complete ignored build directory.
 - [x] Separate simplified-to-Houdini adaptation from the monolithic `HouGeoIO.cpp` translation unit.
-- [ ] Split faithful HouGeo schema loading by attributes, polygons/curves, packed records, and volumes; attributes/groups, packed records, and dense volumes now have focused modules, leaving polygon families and root dispatch in `HouGeo.cpp`.
+- [x] Split faithful HouGeo schema loading into focused attribute, polygon/curve, packed-record, native-VDB/quadric, and dense-volume modules while retaining root and primitive dispatch in `HouGeo.cpp`.
 - [x] Split manifest decoding by attributes, primitive families, and VDB records.
 - [x] Retire the beta-only `houio_convert` executable after migrating packages and the HOM bridge to `houio convert`.
 - [ ] Reduce generic JSON-tree memory amplification for large numeric arrays.

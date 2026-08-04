@@ -7,6 +7,7 @@ set(attribute_loader "${HOUIO_SOURCE_DIR}/src/HouGeoAttributeLoad.cpp")
 set(attribute_header "${HOUIO_SOURCE_DIR}/src/HouGeoAttributeLoad.h")
 set(attribute_schema "${HOUIO_SOURCE_DIR}/src/HouGeoAttributeSchema.cpp")
 set(packed_loader "${HOUIO_SOURCE_DIR}/src/HouGeoPackedLoad.cpp")
+set(polygon_loader "${HOUIO_SOURCE_DIR}/src/HouGeoPolygonLoad.cpp")
 set(primitive_loader "${HOUIO_SOURCE_DIR}/src/HouGeoPrimitiveLoad.cpp")
 set(volume_loader "${HOUIO_SOURCE_DIR}/src/HouGeoVolumeLoad.cpp")
 set(project_file "${HOUIO_SOURCE_DIR}/CMakeLists.txt")
@@ -17,6 +18,7 @@ foreach(required_file IN ITEMS
     "${attribute_header}"
     "${attribute_schema}"
     "${packed_loader}"
+    "${polygon_loader}"
     "${primitive_loader}"
     "${volume_loader}"
     "${project_file}")
@@ -29,6 +31,7 @@ file(READ "${monolith}" monolith_source)
 file(READ "${attribute_loader}" attribute_loader_source)
 file(READ "${attribute_schema}" attribute_schema_source)
 file(READ "${packed_loader}" packed_loader_source)
+file(READ "${polygon_loader}" polygon_loader_source)
 file(READ "${primitive_loader}" primitive_loader_source)
 file(READ "${volume_loader}" volume_loader_source)
 file(READ "${project_file}" project_source)
@@ -97,6 +100,21 @@ foreach(packed_definition IN ITEMS
     endif()
 endforeach()
 
+foreach(polygon_definition IN ITEMS
+    "void HouGeo::loadPolyPrimitive"
+    "void HouGeo::loadPolyPrimitiveRun"
+    "void HouGeo::loadPolygonRun")
+    string(FIND "${polygon_loader_source}" "${polygon_definition}" loader_position)
+    if(loader_position EQUAL -1)
+        message(FATAL_ERROR "HouGeo polygon loader is missing: ${polygon_definition}")
+    endif()
+
+    string(FIND "${monolith_source}" "${polygon_definition}" monolith_position)
+    if(NOT monolith_position EQUAL -1)
+        message(FATAL_ERROR "Extracted polygon loader returned to HouGeo.cpp: ${polygon_definition}")
+    endif()
+endforeach()
+
 foreach(volume_definition IN ITEMS
     "void HouGeo::loadVolumePrimitive"
     "std::vector<float> HouGeo::loadVoxelData")
@@ -115,6 +133,7 @@ foreach(module IN ITEMS
     "src/HouGeoAttributeLoad.cpp"
     "src/HouGeoAttributeSchema.cpp"
     "src/HouGeoPackedLoad.cpp"
+    "src/HouGeoPolygonLoad.cpp"
     "src/HouGeoPrimitiveLoad.cpp"
     "src/HouGeoVolumeLoad.cpp")
     string(FIND "${project_source}" "${module}" cmake_position)
