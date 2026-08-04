@@ -39,6 +39,7 @@ Writes follow the reverse path. Every operation is synchronous and owns its pars
 | Houdini model | `HouGeo.h`, `HouGeo.cpp` | Core object state, attributes, topology, groups, and schema dispatch |
 | Attribute schema loading | `HouGeoAttributeSchema.cpp` | Numeric, string, dictionary, and group record decoding into the faithful model |
 | Attribute payload loading | `HouGeoAttributeLoad.cpp` | Paged integer expansion and typed numeric component storage for faithful attributes |
+| Packed schema loading | `HouGeoPackedLoad.cpp` | Embedded geometry, fragment, disk, and disk-sequence record decoding |
 | Primitive schema loading | `HouGeoPrimitiveLoad.cpp` | Native VDB, Sphere, Tube, NURBS, and Bezier record decoding |
 | HOM manifest decoding | `HomManifest.cpp`, `HomManifestAttributes.cpp`, `HomManifestPrimitives.cpp`, `HomManifestVdb.cpp` | Manifest orchestration, attribute/group domains, primitive families, and sparse VDB records |
 | Adapter API | `HouGeoAdapter.h`, `HouGeoAdapter.cpp` | Read-only export contract for caller-owned geometry |
