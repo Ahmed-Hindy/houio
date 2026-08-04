@@ -367,6 +367,8 @@ namespace houio
 		const size_t pointCount = checkedConversionCount(numPoints, "Point count");
 		const size_t vertexCount = checkedConversionCount(numVertices, "Vertex count");
 		const size_t primitiveCount = checkedConversionCount(numPrimitives, "Primitive count");
+		const int pointElementCount = static_cast<int>(pointCount);
+		const int vertexElementCount = static_cast<int>(vertexCount);
 		if( report )
 		{
 			report->sourcePointCount = pointCount;
@@ -496,6 +498,7 @@ namespace houio
 				attr = result->attribute("P");
 				if( !attr )
 					throw std::runtime_error( "HouGeoIO::convertToGeometry target geometry has no P attribute" );
+				attr->resize(static_cast<std::size_t>(pointElementCount));
 				for( size_t pointIndex=0;pointIndex<pointCount;++pointIndex )
 				{
 					math::Vec3f position;
@@ -523,7 +526,8 @@ namespace houio
 					}
 					else
 						throw std::runtime_error( "HouGeoIO::convertToGeometry: unsupported P storage" );
-					attr->appendElement(position);
+					attr->set<math::Vec3f>(
+						static_cast<unsigned int>(pointIndex), position);
 				}
 			}else
 			if( (attrName == "UV")||(attrName == "uv") )
@@ -533,7 +537,7 @@ namespace houio
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 
 				attrName = "UV";
-				attr = Attribute::createV2f();
+				attr = Attribute::createV2f(pointElementCount);
 				for( size_t pointIndex=0;pointIndex<pointCount;++pointIndex )
 				{
 					math::Vec2f uv;
@@ -558,7 +562,8 @@ namespace houio
 					}
 					else
 						throw std::runtime_error( "HouGeoIO::convertToGeometry: unsupported UV storage" );
-					attr->appendElement(uv);
+					attr->set<math::Vec2f>(
+						static_cast<unsigned int>(pointIndex), uv);
 				}
 			}else
 			if( storage == HouGeoAdapter::AttributeAdapter::Storage::uint8 )
@@ -643,7 +648,7 @@ namespace houio
 				const HouGeoAdapter::AttributeAdapter::Storage storage = houAttr->storage();
 				const HouGeoAdapter::RawDataView raw_data = requireRawAttributeData(houAttr, attributePath);
 				attrName = "UV";
-				attr = Attribute::createV2f();
+				attr = Attribute::createV2f(vertexElementCount);
 				for( size_t vertexIndex=0;vertexIndex<vertexCount;++vertexIndex )
 				{
 					math::Vec2f uv;
@@ -668,7 +673,8 @@ namespace houio
 					}
 					else
 						throw std::runtime_error( "HouGeoIO::convertToGeometry: unsupported vertex UV storage" );
-					attr->appendElement(uv);
+					attr->set<math::Vec2f>(
+						static_cast<unsigned int>(vertexIndex), uv);
 				}
 			}
 			else

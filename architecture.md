@@ -229,7 +229,7 @@ C-Blosc resolution uses, in order:
 
 `Geometry` is a convenience representation for rendering and interchange. It supports one primitive mode per object and separate numeric point, vertex, primitive, and global attribute maps.
 
-Supported face-varying data remains in the vertex domain, so UV seams and vertex normals do not require point duplication. Primitive attributes are preserved only when the selected primitive run covers the complete source primitive domain; partial mappings are skipped and reported.
+Supported face-varying data remains in the vertex domain, so UV seams and vertex normals do not require point duplication. Primitive attributes are preserved only when the selected primitive run covers the complete source primitive domain; partial mappings are skipped and reported. HouGeo-to-simplified conversion allocates final `P` and point/vertex `UV` storage once, then writes converted values by index rather than repeatedly growing attribute buffers.
 
 Use `HouGeo` when strings, dictionaries, groups, mixed records, curve basis metadata, quadric transforms, or complete Houdini metadata must be retained. The simplified `Geometry` model does not implicitly tessellate NURBS, Bezier, Sphere, or Tube records.
 

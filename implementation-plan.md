@@ -1548,6 +1548,23 @@ Exit criteria:
 - Exact storage tokens and bytes survive a HouGeo write/read cycle.
 - Strict, AddressSanitizer, static-analysis, fixture, package, writer, and native-payload matrices pass.
 
+### Phase 64 — Exact special-attribute conversion allocation
+
+**Status: complete on `perf/preallocate-special-attribute-conversion`.**
+
+Completed work:
+
+- [x] Derive checked final point and vertex element counts once during HouGeo-to-simplified conversion.
+- [x] Resize the target simplified `P` attribute exactly once before Float16/Float32/Float64 conversion.
+- [x] Create point and vertex `UV` attributes at their final sizes before conversion.
+- [x] Write converted values by validated index instead of repeated append growth.
+
+Exit criteria:
+
+- Position and UV values, storage conversion, winding, and domain ordering remain unchanged.
+- Conversion no longer repeatedly reallocates special attribute buffers.
+- Strict, AddressSanitizer, static-analysis, fixture, package, modern-geometry, and conversion-safety matrices pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
