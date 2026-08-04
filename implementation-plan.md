@@ -1425,6 +1425,23 @@ Exit criteria:
 - Strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
 - `HouGeo.cpp` no longer owns packed-record schema decoding.
 
+### Phase 57 — Faithful dense-volume schema modularization
+
+**Status: complete on `refactor/hougeo-volume-schema-module`.**
+
+Completed work:
+
+- [x] Move dense-volume transform and point-position reconstruction into `HouGeoVolumeLoad.cpp`.
+- [x] Move inline/shared voxel selection, visualization metadata, and scalar-field population into the same module.
+- [x] Move constant and tiled voxel decoding, tile metadata validation, compression checks, and checked indexing with their volume-only helpers.
+- [x] Extend the source-layout test to prevent dense-volume loaders from returning to `HouGeo.cpp`.
+
+Exit criteria:
+
+- Dense-volume fixtures preserve resolution, values, transforms, topology vertex, and visualization metadata.
+- Malformed tile metadata is rejected before destination allocation and indexing.
+- Strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:

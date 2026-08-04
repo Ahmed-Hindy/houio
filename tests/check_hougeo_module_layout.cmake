@@ -8,6 +8,7 @@ set(attribute_header "${HOUIO_SOURCE_DIR}/src/HouGeoAttributeLoad.h")
 set(attribute_schema "${HOUIO_SOURCE_DIR}/src/HouGeoAttributeSchema.cpp")
 set(packed_loader "${HOUIO_SOURCE_DIR}/src/HouGeoPackedLoad.cpp")
 set(primitive_loader "${HOUIO_SOURCE_DIR}/src/HouGeoPrimitiveLoad.cpp")
+set(volume_loader "${HOUIO_SOURCE_DIR}/src/HouGeoVolumeLoad.cpp")
 set(project_file "${HOUIO_SOURCE_DIR}/CMakeLists.txt")
 
 foreach(required_file IN ITEMS
@@ -17,6 +18,7 @@ foreach(required_file IN ITEMS
     "${attribute_schema}"
     "${packed_loader}"
     "${primitive_loader}"
+    "${volume_loader}"
     "${project_file}")
     if(NOT EXISTS "${required_file}")
         message(FATAL_ERROR "Required HouGeo module file is missing: ${required_file}")
@@ -28,6 +30,7 @@ file(READ "${attribute_loader}" attribute_loader_source)
 file(READ "${attribute_schema}" attribute_schema_source)
 file(READ "${packed_loader}" packed_loader_source)
 file(READ "${primitive_loader}" primitive_loader_source)
+file(READ "${volume_loader}" volume_loader_source)
 file(READ "${project_file}" project_source)
 
 set(extracted_definitions
@@ -94,11 +97,26 @@ foreach(packed_definition IN ITEMS
     endif()
 endforeach()
 
+foreach(volume_definition IN ITEMS
+    "void HouGeo::loadVolumePrimitive"
+    "std::vector<float> HouGeo::loadVoxelData")
+    string(FIND "${volume_loader_source}" "${volume_definition}" loader_position)
+    if(loader_position EQUAL -1)
+        message(FATAL_ERROR "HouGeo volume loader is missing: ${volume_definition}")
+    endif()
+
+    string(FIND "${monolith_source}" "${volume_definition}" monolith_position)
+    if(NOT monolith_position EQUAL -1)
+        message(FATAL_ERROR "Extracted volume loader returned to HouGeo.cpp: ${volume_definition}")
+    endif()
+endforeach()
+
 foreach(module IN ITEMS
     "src/HouGeoAttributeLoad.cpp"
     "src/HouGeoAttributeSchema.cpp"
     "src/HouGeoPackedLoad.cpp"
-    "src/HouGeoPrimitiveLoad.cpp")
+    "src/HouGeoPrimitiveLoad.cpp"
+    "src/HouGeoVolumeLoad.cpp")
     string(FIND "${project_source}" "${module}" cmake_position)
     if(cmake_position EQUAL -1)
         message(FATAL_ERROR "${module} is not part of the houio target")

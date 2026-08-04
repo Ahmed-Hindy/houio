@@ -41,6 +41,7 @@ Writes follow the reverse path. Every operation is synchronous and owns its pars
 | Attribute payload loading | `HouGeoAttributeLoad.cpp` | Paged integer expansion and typed numeric component storage for faithful attributes |
 | Packed schema loading | `HouGeoPackedLoad.cpp` | Embedded geometry, fragment, disk, and disk-sequence record decoding |
 | Primitive schema loading | `HouGeoPrimitiveLoad.cpp` | Native VDB, Sphere, Tube, NURBS, and Bezier record decoding |
+| Dense-volume loading | `HouGeoVolumeLoad.cpp` | Volume transforms, shared/inline voxel payloads, tiled validation, and voxel expansion |
 | HOM manifest decoding | `HomManifest.cpp`, `HomManifestAttributes.cpp`, `HomManifestPrimitives.cpp`, `HomManifestVdb.cpp` | Manifest orchestration, attribute/group domains, primitive families, and sparse VDB records |
 | Adapter API | `HouGeoAdapter.h`, `HouGeoAdapter.cpp` | Read-only export contract for caller-owned geometry |
 | Compatibility I/O | `HouGeoIO.h`, `HouGeoIO.cpp` | Stream operations, faithful export, and thin source-compatible wrappers |
