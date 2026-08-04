@@ -40,6 +40,7 @@ add_library(
     src/HomManifestVdb.cpp
     src/HouGeo.cpp
     src/HouGeoAttributeLoad.cpp
+    src/HouGeoAttributeSchema.cpp
     src/HouGeoPrimitiveLoad.cpp
     src/HouGeoAdapter.cpp
     src/HouGeoAdapt.cpp

@@ -1391,6 +1391,23 @@ Exit criteria:
 - The strict warnings-as-errors and Houdini integration suite passes without behavior changes.
 - `HouGeo.cpp` no longer owns low-level attribute page expansion or byte-storage helpers.
 
+### Phase 55 — Faithful attribute and group schema modularization
+
+**Status: complete on `refactor/hougeo-attribute-schema-module`.**
+
+Completed work:
+
+- [x] Move `HouGeo::loadAttribute` into `HouGeoAttributeSchema.cpp` with numeric, string, and dictionary schema branches intact.
+- [x] Move unordered point, vertex, and primitive group decoding into the same schema module.
+- [x] Retain payload expansion and checked byte writes in `HouGeoAttributeLoad.cpp` as a lower-level dependency.
+- [x] Extend the source-layout test to prevent attribute methods from returning to `HouGeo.cpp`.
+
+Exit criteria:
+
+- Exact attribute scope, options, tuple, storage, page packing, string index, dictionary index, and group membership behavior remains unchanged.
+- Strict, AddressSanitizer, static-analysis, fixture, and package matrices pass.
+- `HouGeo.cpp` is limited to root orchestration, topology, primitive dispatch, retained model state, and remaining primitive families.
+
 ## Deferred work
 
 The following remain separate from the active product-facing phases unless required by a discovered defect:
